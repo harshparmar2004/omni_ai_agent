@@ -275,12 +275,17 @@ function initSchema(db) {
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN post_intent TEXT DEFAULT 'lead_magnet'",
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN staged_post_id INTEGER",
     "ALTER TABLE instagram_posts ADD COLUMN destination_account TEXT DEFAULT 'gta6'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN destination_account TEXT DEFAULT 'tech'"
+    "ALTER TABLE autonomous_ingestion_log ADD COLUMN destination_account TEXT DEFAULT 'tech'",
+    "ALTER TABLE tracked_instagram_channels ADD COLUMN destination_account TEXT DEFAULT 'tech'"
   ];
 
   for (const sql of migrations) {
     try { db.exec(sql); } catch (e) { /* Column already exists — safe to skip */ }
   }
+
+  try {
+    db.exec("UPDATE tracked_instagram_channels SET destination_account = 'gta6', niche_tag = 'gaming' WHERE username = 'gtaleaks' OR username LIKE '%gta%'");
+  } catch (e) {}
 }
 
 function getSetting(key, defaultValue = '') {
@@ -654,7 +659,10 @@ function seedInitialData(db) {
 }
 
 // ─── Tracked Channels Helpers ─────────────────────────────────────
-function getTrackedChannels() {
+function getTrackedChannels(destination = null) {
+  if (destination) {
+    return getDb().prepare('SELECT * FROM tracked_instagram_channels WHERE destination_account = ? ORDER BY is_active DESC, id DESC').all(destination);
+  }
   return getDb().prepare('SELECT * FROM tracked_instagram_channels ORDER BY is_active DESC, id DESC').all();
 }
 
@@ -670,11 +678,14 @@ function getTrackedChannelByUsername(username) {
 function addTrackedChannel(data) {
   const cleanUsername = data.username.replace(/^@/, '').trim();
   const profileUrl = data.profile_url || `https://www.instagram.com/${cleanUsername}/`;
+  const destinationAccount = data.destination_account || (data.niche_tag === 'gaming' ? 'gta6' : 'tech');
+  const nicheTag = data.niche_tag || (destinationAccount === 'gta6' ? 'gaming' : 'tech');
   const info = getDb().prepare(`
     INSERT INTO tracked_instagram_channels (
       username, profile_url, display_name, bio, followers_count, following_count,
-      posts_count, avatar_url, is_active, last_scraped_at, last_post_shortcode, synced_posts_count, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      posts_count, avatar_url, is_active, last_scraped_at, last_post_shortcode, synced_posts_count,
+      niche_tag, destination_account, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     cleanUsername,
     profileUrl,
@@ -688,6 +699,8 @@ function addTrackedChannel(data) {
     data.last_scraped_at || new Date().toISOString(),
     data.last_post_shortcode || '',
     data.synced_posts_count || 0,
+    nicheTag,
+    destinationAccount,
     new Date().toISOString()
   );
   return getTrackedChannelById(info.lastInsertRowid);
@@ -743,8 +756,8 @@ function addAutonomousLog(data) {
       discarded_tags, cleaned_media_paths,
       harvested_deliverable_url, harvested_deliverable_type, dm_comment_posted, dm_response_received,
       repurposed_hook, repurposed_caption, selected_song_title, selected_song_artist, selected_song_audio_url,
-      status, ig_media_id, ig_permalink, published_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      status, ig_media_id, ig_permalink, published_at, destination_account, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     data.channel_id || null,
     data.channel_username || '',
@@ -774,6 +787,7 @@ function addAutonomousLog(data) {
     data.ig_media_id || '',
     data.ig_permalink || '',
     data.published_at || null,
+    data.destination_account || 'tech',
     data.created_at || new Date().toISOString()
   );
   return getAutonomousLogById(info.lastInsertRowid);
@@ -811,12 +825,20 @@ function getAutonomousLogByShortcode(shortcode) {
   return parseAutonomousRow(row);
 }
 
-function getAutonomousLogs(limit = 50, status = null) {
+function getAutonomousLogs(limit = 50, status = null, destination = null) {
   let query = 'SELECT * FROM autonomous_ingestion_log';
+  const conditions = [];
   const params = [];
   if (status) {
-    query += ' WHERE status = ?';
+    conditions.push('status = ?');
     params.push(status);
+  }
+  if (destination) {
+    conditions.push('destination_account = ?');
+    params.push(destination);
+  }
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
   }
   query += ' ORDER BY id DESC LIMIT ?';
   params.push(limit);

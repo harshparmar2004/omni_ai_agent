@@ -87,7 +87,10 @@ async function executeStealthSurveillanceCycle(options = {}) {
   console.log(`[Stealth Sentinel] Phase 1: Lightweight Radar (<25KB) + SQLite Head-Check Deduplication`);
   console.log(`======================================================\n`);
 
-  const activeChannels = getTrackedChannels().filter(c => c.is_active);
+  const allActive = getTrackedChannels().filter(c => c.is_active);
+  const activeChannels = options.destination
+    ? allActive.filter(c => (c.destination_account || 'tech') === options.destination)
+    : allActive;
   const results = [];
   let newPostsDiscovered = 0;
 
@@ -102,7 +105,7 @@ async function executeStealthSurveillanceCycle(options = {}) {
     }
 
     try {
-      console.log(`[Stealth Sentinel Radar] 🔍 Inspecting @${ch.username} [${i + 1}/${activeChannels.length}]...`);
+      console.log(`[Stealth Sentinel Radar] 🔍 Inspecting @${ch.username} [${i + 1}/${activeChannels.length}] (Destination: ${(ch.destination_account || 'tech').toUpperCase()})...`);
       
       // Strategy 4: Fetch profile metadata (head check)
       const scrapeRes = await scrapeInstagramUrl(ch.profile_url || `https://www.instagram.com/${ch.username}/`);
@@ -126,7 +129,8 @@ async function executeStealthSurveillanceCycle(options = {}) {
       }
 
       // Fresh post found: Stage into autonomous_ingestion_log for Phase 2 async worker
-      console.log(`[Stealth Sentinel Radar] ⚡ NEW reel detected on @${ch.username}: ${latestPostUrl}! Staging for async worker...`);
+      const targetDestination = ch.destination_account || 'tech';
+      console.log(`[Stealth Sentinel Radar] ⚡ NEW reel detected on @${ch.username}: ${latestPostUrl}! Staging for [${targetDestination.toUpperCase()}]...`);
       getDb().prepare(`
         INSERT INTO autonomous_ingestion_log (
           channel_id, channel_username, source_post_url, shortcode,
@@ -139,7 +143,7 @@ async function executeStealthSurveillanceCycle(options = {}) {
         latestShortcode,
         'reel',
         'queued_for_ingestion',
-        'tech',
+        targetDestination,
         new Date().toISOString()
       );
 
@@ -286,15 +290,18 @@ async function rankAndPublishTopTwoReels(options = {}) {
   const db = getDb();
   const { executePublishPipeline } = require('./instagramPublisher');
 
+  const destination = options.destination || 'tech';
+
   // Load candidate logs that are staged or approved but not yet published
   const candidates = db.prepare(`
     SELECT * FROM autonomous_ingestion_log
     WHERE (status IN ('staged', 'cleansed', 'harvested', 'ranked', 'ingested') OR status IS NULL)
       AND (ig_permalink IS NULL OR ig_permalink = '')
       AND llm_fit_score IS NOT NULL
+      AND (destination_account = ? OR (destination_account IS NULL AND ? = 'tech'))
     ORDER BY id DESC
     LIMIT 25
-  `).all();
+  `).all(destination, destination);
 
   if (candidates.length === 0) {
     console.log('[Stealth Sentinel Ranking Arena] No unpublished candidate reels available to rank.');

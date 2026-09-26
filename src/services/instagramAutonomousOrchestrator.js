@@ -223,7 +223,8 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
 
   const originSource = channelId ? `channel:@${author || 'monitored'}` : 'mobile_bot';
 
-  const destination = options.destination || (channelId ? 'tech' : 'gta6');
+  const channel = channelId ? getTrackedChannelById(channelId) : null;
+  const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
 
   const insertPost = db.prepare(`
     INSERT INTO instagram_posts (

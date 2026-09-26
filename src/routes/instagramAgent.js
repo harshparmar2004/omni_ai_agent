@@ -366,7 +366,8 @@ router.post('/microservice/upload-album', async (req, res) => {
  */
 router.get('/tracked-channels', (req, res) => {
   try {
-    const channels = getTrackedChannels();
+    const { destination } = req.query;
+    const channels = getTrackedChannels(destination || null);
     res.json({ success: true, count: channels.length, channels });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -379,10 +380,11 @@ router.get('/tracked-channels', (req, res) => {
  */
 router.post('/tracked-channels/add', async (req, res) => {
   try {
-    const { input } = req.body || {};
+    const { input, destination_account, destination } = req.body || {};
     if (!input) return res.status(400).json({ error: 'Username or profile URL is required' });
 
-    const result = await registerTrackedChannel(input);
+    const dest = destination_account || destination || 'tech';
+    const result = await registerTrackedChannel(input, dest);
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -395,11 +397,13 @@ router.post('/tracked-channels/add', async (req, res) => {
  */
 router.post('/tracked-channels/batch-add', async (req, res) => {
   try {
-    const { channels, input, nicheTag = 'tech' } = req.body || {};
+    const { channels, input, nicheTag, destination_account, destination } = req.body || {};
     const toAdd = channels || input;
     if (!toAdd) return res.status(400).json({ error: 'Channels array or text is required' });
 
-    const result = await batchRegisterTrackedChannels(toAdd, nicheTag);
+    const dest = destination_account || destination || 'tech';
+    const effectiveNiche = nicheTag || (dest === 'gta6' ? 'gaming' : 'tech');
+    const result = await batchRegisterTrackedChannels(toAdd, effectiveNiche, dest);
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -626,7 +630,8 @@ router.get('/autonomous/feed', (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '50', 10);
     const status = req.query.status || null;
-    const logs = getAutonomousLogs(limit, status);
+    const destination = req.query.destination || null;
+    const logs = getAutonomousLogs(limit, status, destination);
     res.json({
       success: true,
       count: logs.length,
@@ -679,10 +684,12 @@ router.get('/stealth/status', (req, res) => {
  */
 router.post(['/autonomous/poll-now', '/stealth/trigger-cycle'], async (req, res) => {
   try {
-    executeStealthSurveillanceCycle().catch(e => console.error('[Stealth Surveillance Poll Error]:', e));
+    const { destination } = req.body || {};
+    executeStealthSurveillanceCycle({ destination }).catch(e => console.error('[Stealth Surveillance Poll Error]:', e));
     res.json({
       success: true,
-      message: '3-Hour Stealth Surveillance Cycle triggered across all active target channels with human delay staggering and SQLite deduplication!'
+      destination: destination || 'all',
+      message: `3-Hour Stealth Surveillance Cycle triggered ${destination ? `for [${destination.toUpperCase()}]` : 'across all target channels'} with human delay staggering and SQLite deduplication!`
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -695,11 +702,12 @@ router.post(['/autonomous/poll-now', '/stealth/trigger-cycle'], async (req, res)
  */
 router.post('/stealth/publish-top-two', async (req, res) => {
   try {
-    const { forcePublish = false, minScore = 70 } = req.body || {};
-    const result = await rankAndPublishTopTwoReels({ forcePublish, minScore });
+    const { forcePublish = false, minScore = 70, destination = 'tech' } = req.body || {};
+    const result = await rankAndPublishTopTwoReels({ forcePublish, minScore, destination });
     res.json({
       success: true,
-      message: `Batch evaluated! ${result.totalPublished || 0} reels published to Instagram via Meta Graph API v21.0.`,
+      destination,
+      message: `Batch evaluated for [${destination.toUpperCase()}]! ${result.totalPublished || 0} reels published to Instagram via Meta Graph API v21.0.`,
       result
     });
   } catch (err) {

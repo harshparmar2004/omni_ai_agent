@@ -12,7 +12,7 @@ const { recommendTrendingAudio } = require('./trendingAudioService');
  * Add an Instagram channel to monitor
  * @param {string} input - Instagram URL or username (@username)
  */
-async function registerTrackedChannel(input) {
+async function registerTrackedChannel(input, destinationAccount = 'tech') {
   if (!input || !input.trim()) {
     throw new Error('Username or Instagram URL is required');
   }
@@ -51,17 +51,21 @@ async function registerTrackedChannel(input) {
     ? (scraped.recent_post_urls[0].match(/\/p\/([A-Za-z0-9_-]+)/) || [])[1] || ''
     : '';
 
+  const nicheTag = destinationAccount === 'gta6' ? 'gaming' : 'tech';
+
   const newChannel = addTrackedChannel({
     username,
     profile_url: `https://www.instagram.com/${username}/`,
     display_name: username.charAt(0).toUpperCase() + username.slice(1),
-    bio: scraped ? (scraped.bio || '') : `Target account @${username} monitored for viral coding & tech insights.`,
+    bio: scraped ? (scraped.bio || '') : `Target account @${username} monitored for viral content.`,
     followers_count: scraped ? (scraped.followers || 'N/A') : 'N/A',
     following_count: scraped ? (scraped.following || 'N/A') : 'N/A',
     posts_count: scraped ? (scraped.posts_count || 'N/A') : 'N/A',
     avatar_url: scraped ? (scraped.profile_pic || '') : '',
     last_post_shortcode: '', // Left empty so first stealth scan ingests and evaluates the latest reel
     synced_posts_count: 0,
+    niche_tag: nicheTag,
+    destination_account: destinationAccount,
     is_active: 1
   });
 
@@ -197,7 +201,7 @@ async function syncAllActiveChannels() {
  * @param {Array<string>|string} inputs - Array of handles or comma/newline delimited text
  * @param {string} nicheTag - Optional niche tag (e.g. 'tech')
  */
-async function batchRegisterTrackedChannels(inputs, nicheTag = 'tech') {
+async function batchRegisterTrackedChannels(inputs, nicheTag = 'tech', destinationAccount = 'tech') {
   let list = [];
   if (Array.isArray(inputs)) {
     list = inputs;
@@ -211,6 +215,8 @@ async function batchRegisterTrackedChannels(inputs, nicheTag = 'tech') {
     errors: []
   };
 
+  const effectiveNiche = nicheTag || (destinationAccount === 'gta6' ? 'gaming' : 'tech');
+
   for (const raw of list) {
     if (!raw) continue;
     let username = raw.trim().replace(/^@/, '').replace(/https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '').replace(/[^A-Za-z0-9_.-]/g, '');
@@ -219,8 +225,8 @@ async function batchRegisterTrackedChannels(inputs, nicheTag = 'tech') {
     try {
       const existing = getTrackedChannelByUsername(username);
       if (existing) {
-        if (!existing.is_active) {
-          updateTrackedChannel(existing.id, { is_active: 1 });
+        if (!existing.is_active || (destinationAccount && existing.destination_account !== destinationAccount)) {
+          updateTrackedChannel(existing.id, { is_active: 1, destination_account: destinationAccount });
         }
         results.alreadyExisted.push(existing);
         continue;
@@ -237,7 +243,8 @@ async function batchRegisterTrackedChannels(inputs, nicheTag = 'tech') {
         avatar_url: '',
         last_post_shortcode: '',
         synced_posts_count: 0,
-        niche_tag: nicheTag || 'tech',
+        niche_tag: effectiveNiche,
+        destination_account: destinationAccount,
         is_active: 1
       });
       results.added.push(newChannel);
