@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OmniStudio AI — Autonomous Instagram Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="#overview" class="brand-logo" onclick="app.navigate('overview')">
+          <div class="brand-icon" style="background: linear-gradient(135deg, #E1306C, #FD1D1D, #F56040);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          </div>
+          <div>
+            <div class="brand-title">OmniStudio <span class="brand-badge" style="background: linear-gradient(135deg, #E1306C, #833AB4); color: #fff;">AI</span></div>
+            <div class="brand-sub">Autonomous Instagram Engine</div>
+          </div>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Dashboard</div>
+        <a href="#overview" class="nav-item active" data-tab="overview" onclick="app.navigate('overview')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span>Dashboard Overview</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Inbound Harvester Bot</div>
+        <a href="#instagram-bot" class="nav-item" data-tab="instagram-bot" onclick="app.navigate('instagram-bot')">
+          <span style="font-size: 1.15rem; line-height: 1; margin-right: 0.15rem;">📱</span>
+          <span>Share-to-DM Bot</span>
+          <span id="nav-bot-badge" class="badge" style="margin-left: auto; font-size: 0.65rem; font-weight: 800; background: rgba(16, 185, 129, 0.18); color: #10B981; padding: 2px 7px; border-radius: 9999px;">ACTIVE</span>
+        </a>
+        <a href="#instagram-bot-v2" class="nav-item" data-tab="instagram-bot-v2" onclick="app.navigate('instagram-bot-v2')">
+          <span style="font-size: 1.15rem; line-height: 1; margin-right: 0.15rem;">🤖</span>
+          <span>Share-to-DM Bot v2</span>
+          <span id="nav-bot-v2-badge" class="badge" style="margin-left: auto; font-size: 0.65rem; font-weight: 800; background: rgba(124, 58, 237, 0.18); color: #7C3AED; padding: 2px 7px; border-radius: 9999px;">AUTO SENTINEL</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Instagram Studio & Queue</div>
+        <a href="#instagram" class="nav-item" data-tab="instagram" onclick="app.navigate('instagram')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+          <span>Ready to Post with Extraction</span>
+          <span id="nav-queue-badge" style="margin-left: auto; font-size: 0.68rem; font-weight: 800; background: var(--accent-soft); color: var(--accent-primary); padding: 1px 6px; border-radius: 9999px;">0</span>
+        </a>
+        <a href="#published" class="nav-item" data-tab="published" onclick="app.navigate('published')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Published Post History</span>
+          <span id="nav-history-badge" style="margin-left: auto; font-size: 0.68rem; font-weight: 800; background: rgba(16, 185, 129, 0.18); color: #10B981; padding: 1px 6px; border-radius: 9999px;">0</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Core USP & Automation</div>
+        <a href="#instaauto" class="nav-item" data-tab="instaauto" onclick="app.navigate('instaauto')">
+          <span style="font-size: 1.15rem; line-height: 1; margin-right: 0.15rem;">⚡</span>
+          <span>InstaAuto DM Engine</span>
+          <span id="nav-instaauto-badge" class="badge" style="margin-left: auto; font-size: 0.65rem; font-weight: 800; background: rgba(59, 130, 246, 0.18); color: #3B82F6; padding: 2px 7px; border-radius: 9999px;">SYNC</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">System & Config</div>
+        <a href="#settings" class="nav-item" data-tab="settings" onclick="app.navigate('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1 2 0l.43-.25a2 2 0 0 1 1 1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span>Bridge & Settings</span>
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <a href="http://localhost:3000" target="_blank" class="sister-platform-card" title="Open connected InstaAuto Sister Agent on Port 3000">
+          <div class="sister-status-dot"></div>
+          <div>
+            <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-primary);">InstaAuto Agent</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">Port 3000 • Inbound Ready</div>
+          </div>
+          <svg style="margin-left: auto; width: 14px; height: 14px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <main class="main-wrapper">
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-title" id="page-title">Dashboard Overview</div>
+        <div class="topbar-actions">
+          <div class="bridge-status-pill" id="bridge-indicator">
+            <span class="pulse-dot"></span>
+            <span id="bridge-text">InstaAuto Bridge Online</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="app.openQuickShareModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            📥 Share Reel / Post
+          </button>
+        </div>
+      </header>
+
+      <!-- Content Views -->
+      <div class="content-body">
+        <div id="view-overview" class="view-panel"></div>
+        <div id="view-instagram-bot" class="view-panel hidden"></div>
+        <div id="view-instagram-bot-v2" class="view-panel hidden"></div>
+        <div id="view-instagram" class="view-panel hidden"></div>
+        <div id="view-instaauto" class="view-panel hidden"></div>
+        <div id="view-settings" class="view-panel hidden"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Quick Share / Ingest Modal -->
+  <div id="quick-share-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="flex items-center justify-between mb-4">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.5rem;">📥</span>
+          <h3 style="font-size: 1.25rem; margin: 0;">Ingest & Process Instagram Content</h3>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="app.closeQuickShareModal()">✕</button>
+      </div>
+      <p style="margin-bottom: 1.25rem; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5;">
+        Paste any Instagram Reel or Carousel URL. OmniStudio will download 1080p uncropped media, detect trigger keywords, brand with your logo, pair trending music, and stage or publish immediately!
+      </p>
+      
+      <div class="form-group">
+        <label class="form-label font-bold">Instagram Reel / Post URL</label>
+        <input type="text" id="qs-url" class="form-input" placeholder="https://www.instagram.com/reel/C.../ or https://www.instagram.com/p/.../">
+      </div>
+
+      <div class="form-group" style="background: rgba(37, 99, 235, 0.05); padding: 0.8rem; border-radius: 8px; border: 1px solid rgba(37, 99, 235, 0.2);">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.88rem; font-weight: 600;">
+          <input type="checkbox" id="qs-auto-publish" checked style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
+          <span>🚀 Instant Direct Auto-Publish (Meta Graph API / Microservice)</span>
+        </label>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; margin-left: 1.6rem;">
+          If checked, content will be directly posted to your live Instagram profile and delivered to your Telegram chat.
+        </div>
+      </div>
+
+      <!-- Execution Progress Box -->
+      <div id="qs-progress-box" class="card hidden" style="background: var(--bg-deep); border-color: var(--border-color); margin-bottom: 1.25rem; padding: 1.25rem;">
+        <div class="font-bold text-sm mb-3" id="qs-status-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="spinner-sm"></span> Processing Inbound Instagram Content...
+        </div>
+        <div id="qs-steps-list" style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem; color: var(--text-secondary);">
+          <div id="qs-step-1">⚪ 1. Downloading 1080p uncropped media & extracting caption</div>
+          <div id="qs-step-2">⚪ 2. Evaluating post with LLM ranker & detecting intent</div>
+          <div id="qs-step-3">⚪ 3. Cleansing competitor watermarks & stamping brand logo</div>
+          <div id="qs-step-4">⚪ 4. Layering trending soundtrack & pairing captions</div>
+          <div id="qs-step-5">⚪ 5. Staging into queue / Meta Verified auto-publishing</div>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mt-4">
+        <button class="btn btn-secondary" onclick="app.closeQuickShareModal()">Cancel</button>
+        <button id="qs-run-btn" class="btn btn-primary" onclick="app.runQuickIngest()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Ingest & Process Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Reel Preview Modal -->
+  <div id="video-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="max-width: 400px; padding: 1.5rem; display: flex; flex-direction: column; align-items: center;">
+      <div class="flex items-center justify-between w-full mb-4">
+        <span class="font-bold text-sm" id="modal-reel-title">Reel Preview (9:16)</span>
+        <button class="btn btn-secondary btn-sm" onclick="app.closeVideoModal()">✕</button>
+      </div>
+
+      <div class="phone-mockup">
+        <div class="phone-notch"></div>
+        <video id="modal-video-player" class="phone-video" controls autoplay loop playsinline></video>
+        <div class="phone-overlay">
+          <div class="phone-overlay-badge" id="modal-reel-keyword">KEYWORD</div>
+          <div class="phone-overlay-caption" id="modal-reel-caption">Caption text...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Application Logic Modules -->
+  <script src="/js/overviewView.js"></script>
+  <script src="/js/instagramBotView.js"></script>
+  <script src="/js/instagramBotV2View.js"></script>
+  <script src="/js/instagramView.js"></script>
+  <script src="/js/instaAutoView.js"></script>
+  <script src="/js/settingsView.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

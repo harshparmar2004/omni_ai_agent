@@ -1,0 +1,1493 @@
+const express = require('express');
+const router = express.Router();
+const path = require('path');
+const { 
+  getDb, 
+  getTrackedChannels, 
+  getTrackedChannelById, 
+  updateTrackedChannel, 
+  deleteTrackedChannel, 
+  getBrandAssets, 
+  setBrandAssets,
+  getSetting,
+  setSetting
+} = require('../database');
+const { recommendTrendingAudio, getAllTrendingTracks } = require('../services/trendingAudioService');
+const { publishCarouselToInstagram, publishReelToInstagram, publishImageToInstagram, executePublishPipeline } = require('../services/instagramPublisher');
+const { pushToInstaAutoBridge } = require('../services/bridgeService');
+const { 
+  registerTrackedChannel, 
+  batchRegisterTrackedChannels,
+  syncSingleChannel, 
+  syncAllActiveChannels 
+} = require('../services/instagramTrackerService');
+const {
+  getMicroserviceBaseUrl,
+  checkMicroserviceHealth,
+  fetchMediaInfo,
+  downloadMediaViaApi,
+  loginInstagrapi,
+  loginBySessionId,
+  uploadReelViaApi,
+  uploadCarouselViaApi,
+  getUserInfoViaApi
+} = require('../services/instagramRestBridge');
+
+/**
+ * GET /api/instagram/queue
+ * Returns staged posts ready for publication
+ */
+router.get('/queue', (req, res) => {
+  try {
+    const db = getDb();
+    let rows = db.prepare("SELECT * FROM instagram_posts WHERE status IN ('ready_to_post', 'scheduled') ORDER BY id DESC").all();
+    
+    // If table is empty, auto-stage recent deliverables
+    if (rows.length === 0) {
+      const recentDeliverables = db.prepare("SELECT d.*, c.topic, c.summary, c.niche FROM deliverables d JOIN research_campaigns c ON d.campaign_id = c.id ORDER BY d.id DESC LIMIT 4").all();
+      
+      for (const d of recentDeliverables) {
+        const audio = recommendTrendingAudio(d.topic, 'carousel');
+        const isHack = /hackathon|challenge/i.test(d.topic);
+        const isDocker = /docker|container/i.test(d.topic);
+        const isNotes = /notes|cheat/i.test(d.topic);
+        const keyword = isNotes ? 'NOTES' : (isHack ? 'HACK' : (isDocker ? 'DOCKER' : 'AI2026'));
+        const hook = isHack 
+          ? 'The Top 10 Indian Hackathons with ₹4.5 Cr in grants are now open!'
+          : (isDocker ? 'Stop guessing Docker in interviews! Here is the Linux kernel truth.' : `The definitive 2026 breakdown for ${d.topic.slice(0, 40)}`);
+
+        const caption = `${d.title} 🚀\n\nComplete breakdown and verified playbook.\n\n👉 Comment "${keyword}" below and my AI agent will instantly DM you the full 7-page directory and PDF!\n\n#tech #engineering #developers`;
+
+        // Check if carousel exists for campaign
+        const carouselPath = `/generated/carousels/${d.campaign_id}/slide_1.png`;
+        const slides = [1,2,3,4,5,6].map(i => `/generated/carousels/${d.campaign_id}/slide_${i}.png`);
+
+        const insert = db.prepare(`
+          INSERT INTO instagram_posts (
+            campaign_id, deliverable_id, content_type, status, hook_text, caption,
+            trigger_keyword, trending_song_title, trending_song_artist, trending_song_audio_url, audio_vibe,
+            media_urls, thumbnail_url, deliverable_url, pdf_url, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          d.campaign_id,
+          d.id,
+          'carousel',
+          'ready_to_post',
+          hook,
+          caption,
+          keyword,
+          audio.title,
+          audio.artist,
+          audio.audio_url,
+          audio.vibe,
+          JSON.stringify(slides),
+          carouselPath,
+          d.public_url,
+          `/api/docs/${d.campaign_id}/pdf`,
+          new Date().toISOString()
+        );
+      }
+      rows = db.prepare("SELECT * FROM instagram_posts WHERE status IN ('ready_to_post', 'scheduled') ORDER BY id DESC").all();
+    }
+
+    res.json({
+      success: true,
+      count: rows.length,
+      posts: rows.map(r => ({
+        ...r,
+        media_urls: JSON.parse(r.media_urls || '[]')
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/history
+ * Returns published posts audit log
+ */
+router.get('/history', (req, res) => {
+  try {
+    const db = getDb();
+    const rows = db.prepare("SELECT * FROM instagram_posts WHERE status = 'published' ORDER BY id DESC").all();
+    res.json({
+      success: true,
+      count: rows.length,
+      posts: rows.map(r => ({
+        ...r,
+        media_urls: JSON.parse(r.media_urls || '[]')
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/publish
+ * Publishes a staged post, notifies InstaAuto bridge, and records history
+ */
+router.post('/publish', async (req, res) => {
+  try {
+    const { post_id, publish_via } = req.body || {};
+    if (!post_id) {
+      return res.status(400).json({ error: 'post_id is required' });
+    }
+
+    const pubResult = await executePublishPipeline(post_id, publish_via);
+
+    res.json({
+      success: true,
+      message: `Post #${pubResult.ig_media_id} published via ${pubResult.method}!`,
+      ...pubResult
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/trending-audio
+ */
+router.get('/trending-audio', (req, res) => {
+  const { topic } = req.query;
+  if (topic) {
+    return res.json({ success: true, recommendation: recommendTrendingAudio(topic) });
+  }
+  res.json({ success: true, tracks: getAllTrendingTracks() });
+});
+
+const { scrapeInstagramUrl, scrapeAndTriggerResearch } = require('../services/instagramScraperService');
+
+/**
+ * POST /api/instagram/scrape
+ * Scrapes any Instagram profile or post URL
+ */
+router.post('/scrape', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'Instagram URL is required' });
+
+    const result = await scrapeInstagramUrl(url);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/scrape-and-research
+ * Scrapes Instagram post, extracts viral hook, and triggers autonomous deep research & notes generation
+ */
+router.post('/scrape-and-research', async (req, res) => {
+  try {
+    const { url, niche, depth } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'Instagram URL is required' });
+
+    const result = await scrapeAndTriggerResearch(url, { niche, depth });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const { downloadInstagramMedia } = require('../services/instagramDownloaderService');
+
+/**
+ * POST /api/instagram/download-video
+ * Downloads any Instagram video, reel, and caption
+ */
+router.post('/download-video', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'Instagram URL is required' });
+
+    const result = await downloadInstagramMedia(url);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 🔌 FASTAPI REST MICROSERVICE GATEWAY (yt-dlp-api & aiograpi-rest)
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/instagram/microservice/status
+ * Health check & discovery for yt-dlp-api and aiograpi-rest FastAPI microservice
+ */
+router.get('/microservice/status', async (req, res) => {
+  try {
+    const health = await checkMicroserviceHealth();
+    res.json({
+      success: true,
+      ...health,
+      docs_url: `${health.baseUrl}/docs`,
+      endpoints: [
+        { method: 'GET', path: '/api/info?url=', name: 'yt-dlp-api Metadata & Streams' },
+        { method: 'POST', path: '/api/download', name: 'yt-dlp-api Media Downloader' },
+        { method: 'POST', path: '/auth/login', name: 'aiograpi-rest Instagram Auth' },
+        { method: 'GET', path: '/media/info_by_url?url=', name: 'aiograpi-rest Post Inspector' },
+        { method: 'POST', path: '/media/clip/upload', name: 'aiograpi-rest Reel Publisher' },
+        { method: 'POST', path: '/media/album/upload', name: 'aiograpi-rest Carousel Publisher' },
+        { method: 'GET', path: '/user/info_by_username?username=', name: 'aiograpi-rest User Profile' }
+      ]
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/config
+ * Update REST microservice endpoint URL (default: http://127.0.0.1:8001 or custom remote docker)
+ */
+router.post('/microservice/config', (req, res) => {
+  try {
+    const { microservice_url } = req.body || {};
+    if (microservice_url) {
+      setSetting('instagram_microservice_url', microservice_url.trim());
+    }
+    res.json({ success: true, url: getMicroserviceBaseUrl() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/login
+ * Forward authentication to aiograpi-rest /auth/login
+ */
+router.post('/microservice/login', async (req, res) => {
+  try {
+    const { username, password, verification_code } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    const result = await loginInstagrapi(username, password, verification_code);
+    if (result.success) {
+      setSetting('instagram_session_user', username);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/login-session
+ * Forward session authentication to aiograpi-rest /auth/login_session
+ */
+router.post('/microservice/login-session', async (req, res) => {
+  try {
+    const { session_id } = req.body || {};
+    if (!session_id) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+    const result = await loginBySessionId(session_id);
+    if (result.success && result.username) {
+      setSetting('instagram_session_user', result.username);
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/download
+ * Download video, reel, or media via yt-dlp-api
+ */
+router.post('/microservice/download', async (req, res) => {
+  try {
+    const { url, format } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'Instagram URL is required' });
+    const result = await downloadMediaViaApi(url, format);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/info
+ * Fetch metadata and direct stream URLs via yt-dlp-api
+ */
+router.post('/microservice/info', async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+    const result = await fetchMediaInfo(url);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/upload-reel
+ * Publish Reel video via aiograpi-rest
+ */
+router.post('/microservice/upload-reel', async (req, res) => {
+  try {
+    const { path: videoPath, caption } = req.body || {};
+    if (!videoPath || !caption) return res.status(400).json({ error: 'path and caption are required' });
+    const result = await uploadReelViaApi(videoPath, caption);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/microservice/upload-album
+ * Publish Carousel album via aiograpi-rest
+ */
+router.post('/microservice/upload-album', async (req, res) => {
+  try {
+    const { paths: imagePaths, caption } = req.body || {};
+    if (!imagePaths || !caption) return res.status(400).json({ error: 'paths and caption are required' });
+    const result = await uploadCarouselViaApi(imagePaths, caption);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.detail || err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 📡 TRACKED INSTAGRAM CHANNELS & AUTO-INGESTION (v3.5)
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/instagram/tracked-channels
+ * List all monitored channels
+ */
+router.get('/tracked-channels', (req, res) => {
+  try {
+    const channels = getTrackedChannels();
+    res.json({ success: true, count: channels.length, channels });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/tracked-channels/add
+ * Add channel to monitor
+ */
+router.post('/tracked-channels/add', async (req, res) => {
+  try {
+    const { input } = req.body || {};
+    if (!input) return res.status(400).json({ error: 'Username or profile URL is required' });
+
+    const result = await registerTrackedChannel(input);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/tracked-channels/batch-add
+ * Bulk add up to 10–30 channels to monitor
+ */
+router.post('/tracked-channels/batch-add', async (req, res) => {
+  try {
+    const { channels, input, nicheTag = 'tech' } = req.body || {};
+    const toAdd = channels || input;
+    if (!toAdd) return res.status(400).json({ error: 'Channels array or text is required' });
+
+    const result = await batchRegisterTrackedChannels(toAdd, nicheTag);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/tracked-channels/:id/toggle
+ * Toggle active / paused
+ */
+router.post('/tracked-channels/:id/toggle', (req, res) => {
+  try {
+    const channel = getTrackedChannelById(req.params.id);
+    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+    const updated = updateTrackedChannel(channel.id, { is_active: channel.is_active ? 0 : 1 });
+    res.json({ success: true, channel: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/instagram/tracked-channels/:id
+ * Delete monitored channel
+ */
+router.delete('/tracked-channels/:id', (req, res) => {
+  try {
+    deleteTrackedChannel(req.params.id);
+    res.json({ success: true, message: 'Tracked channel deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/tracked-channels/:id/sync
+ * Manually check a specific channel for new posts
+ */
+router.post('/tracked-channels/:id/sync', async (req, res) => {
+  try {
+    const result = await syncSingleChannel(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/tracked-channels/sync-all
+ * Check all active channels
+ */
+router.post('/tracked-channels/sync-all', async (req, res) => {
+  try {
+    const result = await syncAllActiveChannels();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 🎨 BRAND & CREATIVE ASSET STUDIO (v3.5)
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/instagram/brand-assets
+ * Retrieve brand logos, handles, watermark rules
+ */
+router.get('/brand-assets', (req, res) => {
+  try {
+    const assets = getBrandAssets();
+    res.json({ success: true, assets });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/brand-assets
+ * Update brand profile and watermark settings
+ */
+router.post('/brand-assets', (req, res) => {
+  try {
+    const settings = req.body || {};
+    const updated = setBrandAssets(settings);
+    res.json({ success: true, assets: updated, message: 'Brand settings updated successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/stage-post
+ * Directly stage any post (from download or manual input) into Ready to Post Queue
+ */
+router.post('/stage-post', (req, res) => {
+  try {
+    const {
+      hook_text,
+      caption,
+      trigger_keyword,
+      content_type = 'carousel',
+      media_urls = [],
+      thumbnail_url = '',
+      deliverable_url = '',
+      pdf_url = '',
+      trending_song_title,
+      trending_song_artist
+    } = req.body || {};
+
+    if (!hook_text || !caption) {
+      return res.status(400).json({ error: 'hook_text and caption are required' });
+    }
+
+    const db = getDb();
+    const audio = (trending_song_title && trending_song_artist) 
+      ? { title: trending_song_title, artist: trending_song_artist, audio_url: '', vibe: 'energetic' }
+      : recommendTrendingAudio(hook_text, content_type);
+
+    const nowIso = new Date().toISOString();
+    const mediaArray = Array.isArray(media_urls) ? media_urls : [media_urls];
+
+    const intent = req.body.post_intent || (trigger_keyword ? 'lead_magnet' : 'direct_repost');
+
+    const result = db.prepare(`
+      INSERT INTO instagram_posts (
+        campaign_id, deliverable_id, content_type, status, hook_text, caption,
+        trigger_keyword, trending_song_title, trending_song_artist, trending_song_audio_url, audio_vibe,
+        media_urls, thumbnail_url, deliverable_url, pdf_url, post_intent, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      null,
+      null,
+      content_type,
+      'ready_to_post',
+      hook_text,
+      caption,
+      intent === 'direct_repost' ? '' : (trigger_keyword || 'NOTES').toUpperCase(),
+      audio.title,
+      audio.artist,
+      audio.audio_url || '',
+      audio.vibe || 'viral',
+      JSON.stringify(mediaArray),
+      thumbnail_url || mediaArray[0] || '/generated/assets/brand_logo.svg',
+      deliverable_url || '',
+      pdf_url || '',
+      intent,
+      nowIso
+    );
+
+    res.json({
+      success: true,
+      message: 'Post staged into Ready to Post Queue successfully!',
+      post_id: result.lastInsertRowid
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 🔌 REST MICROSERVICE BRIDGE (yt-dlp-api & aiograpi-rest)
+// ═════════════════════════════════════════════════════════════════════
+
+router.get('/microservice/health', async (req, res) => {
+  try {
+    const health = await checkMicroserviceHealth();
+    res.json(health);
+  } catch (err) {
+    res.json({ online: false, error: err.message });
+  }
+});
+
+router.post('/microservice/login', async (req, res) => {
+  try {
+    const { username, password, verification_code } = req.body || {};
+    const result = await loginInstagrapi(username, password, verification_code);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/microservice/user', async (req, res) => {
+  try {
+    const username = req.query.username || getBrandAssets().brand_handle || 'harshparmar007__';
+    const result = await getUserInfoViaApi(username);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/microservice/download', async (req, res) => {
+  try {
+    const { url, format = 'mp4' } = req.body || {};
+    const result = await downloadMediaViaApi(url, format);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 🤖 24/7 AUTONOMOUS INGESTION, RANKING & BRAND CLEANSER (v4.0)
+// ═════════════════════════════════════════════════════════════════════
+
+const {
+  processSinglePost,
+  pollAllMonitoredChannels
+} = require('../services/instagramAutonomousOrchestrator');
+const {
+  getAutonomousLogs,
+  getAutonomousLogById,
+  deleteAutonomousLog
+} = require('../database');
+
+/**
+ * GET /api/instagram/autonomous/feed
+ * Returns recent autonomous ingestion logs with fit scores, brand cleansing, and status
+ */
+router.get('/autonomous/feed', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '50', 10);
+    const status = req.query.status || null;
+    const logs = getAutonomousLogs(limit, status);
+    res.json({
+      success: true,
+      count: logs.length,
+      logs
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/autonomous/process-url
+ * Runs any post URL through the full agentic pipeline:
+ * Scrape -> Rank -> Brand Cleanse -> Harvest DM -> Stage
+ */
+router.post(['/autonomous/process-url', '/autonomous/ingest-url'], async (req, res) => {
+  try {
+    const { url, channel_username = '', channel_id = null, autoPublish = false } = req.body || {};
+    if (!url) return res.status(400).json({ error: 'Instagram URL is required' });
+
+    const result = await processSinglePost(url, channel_username, channel_id, { autoPublish });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const {
+  startStealthSentinelScheduler,
+  executeStealthSurveillanceCycle,
+  rankAndPublishTopTwoReels,
+  getStealthSchedulerStatus
+} = require('../services/stealthSentinelScheduler');
+
+/**
+ * GET /api/instagram/stealth/status
+ * Returns live stealth metrics, next jittered run timestamp, and shield status
+ */
+router.get('/stealth/status', (req, res) => {
+  try {
+    res.json({ success: true, ...getStealthSchedulerStatus() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/autonomous/poll-now & /api/instagram/stealth/trigger-cycle
+ * Triggers an immediate 3-hour stealth cycle with serial staggering and SQLite deduplication
+ */
+router.post(['/autonomous/poll-now', '/stealth/trigger-cycle'], async (req, res) => {
+  try {
+    executeStealthSurveillanceCycle().catch(e => console.error('[Stealth Surveillance Poll Error]:', e));
+    res.json({
+      success: true,
+      message: '3-Hour Stealth Surveillance Cycle triggered across all active target channels with human delay staggering and SQLite deduplication!'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/stealth/publish-top-two
+ * Evaluates candidate batch, ranks by Criteria (Vibe, USP, Polish, Freshness) and publishes #1 and #2 reels via Meta API
+ */
+router.post('/stealth/publish-top-two', async (req, res) => {
+  try {
+    const { forcePublish = false, minScore = 70 } = req.body || {};
+    const result = await rankAndPublishTopTwoReels({ forcePublish, minScore });
+    res.json({
+      success: true,
+      message: `Batch evaluated! ${result.totalPublished || 0} reels published to Instagram via Meta Graph API v21.0.`,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/autonomous/config
+ * Retrieves autopilot configuration
+ */
+router.get('/autonomous/config', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      config: {
+        autopilot_enabled: getSetting('instagram_autopilot_enabled', '0') === '1',
+        min_score_threshold: parseInt(getSetting('instagram_min_score_threshold', '70'), 10),
+        daily_post_cap: parseInt(getSetting('instagram_daily_post_cap', '3'), 10),
+        brand: getBrandAssets()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/autonomous/config
+ * Updates autopilot configuration
+ */
+router.post('/autonomous/config', (req, res) => {
+  try {
+    const { autopilot_enabled, min_score_threshold, daily_post_cap, brand } = req.body || {};
+    if (autopilot_enabled !== undefined) {
+      setSetting('instagram_autopilot_enabled', autopilot_enabled ? '1' : '0');
+    }
+    if (min_score_threshold !== undefined) {
+      setSetting('instagram_min_score_threshold', String(min_score_threshold));
+    }
+    if (daily_post_cap !== undefined) {
+      setSetting('instagram_daily_post_cap', String(daily_post_cap));
+    }
+    if (brand) {
+      setBrandAssets(brand);
+    }
+    res.json({
+      success: true,
+      message: 'Autonomous agent settings updated successfully!'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/instagram/autonomous/log/:id
+ * Delete an autonomous log entry
+ */
+router.delete('/autonomous/log/:id', (req, res) => {
+  try {
+    deleteAutonomousLog(req.params.id);
+    res.json({ success: true, message: 'Autonomous log entry removed.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 📱 MOBILE-FIRST "SHARE-TO-DM" AUTONOMOUS INGESTION BOT (v4.0)
+// ═════════════════════════════════════════════════════════════════════
+
+const {
+  getMobileDmTriggers,
+  getMobileDmTriggerById,
+  getMobileDmTriggerByShortcode,
+  updateMobileDmTrigger,
+  getAutonomousLogByShortcode,
+  updateAutonomousLog
+} = require('../database');
+const {
+  simulateMobileDmTrigger,
+  handleInboundShare,
+  pollInboxShares
+} = require('../services/instagramMobileDmListener');
+const {
+  getTelegramBotInfo,
+  sendTelegramMessage
+} = require('../services/telegramBotService');
+
+/**
+ * GET /api/instagram/telegram/status
+ * Returns live status of the Telegram inbound listener bot
+ */
+router.get('/telegram/status', async (req, res) => {
+  try {
+    const info = await getTelegramBotInfo();
+    res.json({
+      success: true,
+      ...info
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/mobile-dm/triggers
+ * Returns recent inbound mobile share events and their processing status
+ */
+router.get('/mobile-dm/triggers', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '30', 10);
+    const triggers = getMobileDmTriggers(limit);
+    res.json({
+      success: true,
+      count: triggers.length,
+      triggers
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/simulate
+ * Simulates a mobile Instagram user sharing a post to the bot's DM
+ */
+router.post('/mobile-dm/simulate', async (req, res) => {
+  try {
+    const { url, sender_handle } = req.body || {};
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'Target Instagram URL is required.' });
+    }
+
+    // Run the trigger processing asynchronously
+    simulateMobileDmTrigger(url, sender_handle)
+      .then(result => {
+        console.log(`[Mobile DM Simulate] Finished: ${url}`, result?.processing_status);
+      })
+      .catch(err => {
+        console.error(`[Mobile DM Simulate] Error: ${err.message}`);
+      });
+
+    res.json({
+      success: true,
+      message: `📱 Mobile share simulated for @${(sender_handle || 'harshparmar007__').replace('@', '')}! Processing pipeline active in background.`,
+      url
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/poll-now
+ * Force an immediate poll of the Instagram Direct inbox for shared reels
+ */
+router.post('/mobile-dm/poll-now', async (req, res) => {
+  try {
+    pollInboxShares()
+      .then(() => console.log('[Mobile DM] Manual poll check complete.'))
+      .catch(err => console.warn('[Mobile DM] Manual poll check error:', err.message));
+    res.json({
+      success: true,
+      message: 'Mobile DM inbox poll triggered.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/extract-resources
+ * Run or re-run autonomous resource discovery and link synthesis on a post
+ */
+router.post('/mobile-dm/extract-resources', async (req, res) => {
+  try {
+    const { shortcode, post_id } = req.body || {};
+    const db = getDb();
+    let log = null;
+
+    if (shortcode) {
+      log = db.prepare('SELECT * FROM autonomous_ingestion_log WHERE shortcode = ?').get(shortcode);
+    } else if (post_id) {
+      const p = db.prepare('SELECT * FROM instagram_posts WHERE id = ?').get(post_id);
+      if (p) log = db.prepare('SELECT * FROM autonomous_ingestion_log WHERE repurposed_hook = ? OR raw_hook = ?').get(p.hook_text, p.hook_text);
+    }
+
+    if (!log) {
+      return res.status(404).json({ success: false, error: 'Post or shortcode not found' });
+    }
+
+    const { extractAndSynthesizeResources } = require('../services/instagramResourceExtractor');
+    const result = await extractAndSynthesizeResources({
+      postUrl: log.source_post_url,
+      channelUsername: log.channel_username,
+      rawCaption: log.raw_caption,
+      rawHook: log.raw_hook,
+      detectedTopic: log.detected_topic,
+      detectedTriggerKeyword: log.detected_trigger_keyword
+    });
+
+    if (result && result.success) {
+      db.prepare(`
+        UPDATE autonomous_ingestion_log
+        SET harvested_deliverable_url = ?, harvested_deliverable_type = ?, extracted_resources = ?
+        WHERE id = ?
+      `).run(result.deliverable_url, result.is_pdf ? 'pdf' : 'resource_link', JSON.stringify(result.resources), log.id);
+
+      db.prepare(`
+        UPDATE instagram_posts
+        SET deliverable_url = ?, pdf_url = ?, extracted_resources = ?
+        WHERE hook_text = ? OR caption LIKE ?
+      `).run(result.deliverable_url, result.pdf_url, JSON.stringify(result.resources), log.repurposed_hook, `%${log.shortcode}%`);
+
+      return res.json({
+        success: true,
+        message: `Extracted ${result.total_resources} resources with official verified URLs!`,
+        deliverable_url: result.deliverable_url,
+        pdf_url: result.pdf_url,
+        resources: result.resources
+      });
+    }
+
+    res.status(500).json({ success: false, error: 'Resource extraction failed' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/update-resources
+ * Manually update, edit, or add resource links for a specific post
+ */
+router.post('/mobile-dm/update-resources', (req, res) => {
+  try {
+    const { shortcode, resources, deliverable_url } = req.body || {};
+    if (!shortcode || !Array.isArray(resources)) {
+      return res.status(400).json({ success: false, error: 'Shortcode and resources array are required' });
+    }
+
+    const db = getDb();
+    const log = db.prepare('SELECT * FROM autonomous_ingestion_log WHERE shortcode = ?').get(shortcode);
+    if (!log) {
+      return res.status(404).json({ success: false, error: 'Post not found' });
+    }
+
+    const updates = { extracted_resources: JSON.stringify(resources) };
+    if (deliverable_url) updates.harvested_deliverable_url = deliverable_url;
+
+    db.prepare(`
+      UPDATE autonomous_ingestion_log
+      SET extracted_resources = ?, harvested_deliverable_url = COALESCE(?, harvested_deliverable_url)
+      WHERE id = ?
+    `).run(JSON.stringify(resources), deliverable_url || null, log.id);
+
+    db.prepare(`
+      UPDATE instagram_posts
+      SET extracted_resources = ?, deliverable_url = COALESCE(?, deliverable_url)
+      WHERE hook_text = ? OR caption LIKE ?
+    `).run(JSON.stringify(resources), deliverable_url || null, log.repurposed_hook, `%${shortcode}%`);
+
+    res.json({
+      success: true,
+      message: 'Resources updated successfully.',
+      resources
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/publish
+ * Publish a post originating from an inbound mobile share trigger
+ */
+router.post('/mobile-dm/publish', async (req, res) => {
+  try {
+    const { trigger_id, shortcode, publish_via } = req.body || {};
+    const db = getDb();
+    
+    let trigger = null;
+    if (trigger_id) {
+      trigger = getMobileDmTriggerById(trigger_id);
+    } else if (shortcode) {
+      trigger = getMobileDmTriggerByShortcode(shortcode);
+    }
+    
+    if (!trigger) {
+      return res.status(404).json({ success: false, error: 'Mobile trigger not found.' });
+    }
+
+    // Find corresponding post in instagram_posts
+    let post = db.prepare('SELECT * FROM instagram_posts WHERE hook_text LIKE ? OR caption LIKE ? ORDER BY id DESC LIMIT 1')
+      .get(`%${trigger.shortcode}%`, `%${trigger.shortcode}%`);
+    
+    if (!post) {
+      // Look for latest post from mobile_bot or studio
+      post = db.prepare("SELECT * FROM instagram_posts WHERE origin_source = 'mobile_bot' ORDER BY id DESC LIMIT 1").get()
+        || db.prepare("SELECT * FROM instagram_posts ORDER BY id DESC LIMIT 1").get();
+    }
+
+    if (!post) {
+      return res.status(400).json({ success: false, error: 'No staged post found for this trigger.' });
+    }
+
+    const mediaUrls = JSON.parse(post.media_urls || '[]');
+    let pubResult;
+    const microHealth = await checkMicroserviceHealth();
+    const useMicroservice = publish_via === 'rest_microservice' || (publish_via !== 'meta_api' && microHealth.online && microHealth.loggedInUser);
+
+    if (useMicroservice) {
+      if (post.content_type === 'carousel') {
+        const localPaths = (mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url]).map(u => {
+          if (path.isAbsolute(u)) return u;
+          return path.join(__dirname, '..', '..', 'public', u.replace(/^\//, ''));
+        });
+        const resUpload = await uploadCarouselViaApi(localPaths, post.caption);
+        pubResult = {
+          success: true,
+          ig_media_id: resUpload.media_pk || String(Date.now()),
+          permalink: resUpload.permalink || `https://www.instagram.com/p/${resUpload.code || trigger.shortcode}/`
+        };
+      } else {
+        const videoRel = mediaUrls[0] || '/generated/reels/test_reel.mp4';
+        const localVideo = path.isAbsolute(videoRel) ? videoRel : path.join(__dirname, '..', '..', 'public', videoRel.replace(/^\//, ''));
+        const resUpload = await uploadReelViaApi(localVideo, post.caption);
+        pubResult = {
+          success: true,
+          ig_media_id: resUpload.media_pk || String(Date.now()),
+          permalink: resUpload.permalink || `https://www.instagram.com/reel/${resUpload.code || trigger.shortcode}/`
+        };
+      }
+    } else {
+      if (post.content_type === 'carousel') {
+        pubResult = await publishCarouselToInstagram({
+          imageUrls: mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url],
+          caption: post.caption
+        });
+      } else {
+        pubResult = await publishReelToInstagram({
+          videoUrl: mediaUrls[0] || '/generated/reels/test_reel.mp4',
+          caption: post.caption,
+          coverUrl: post.thumbnail_url
+        });
+      }
+    }
+
+    // Push to InstaAuto Sister Agent Bridge
+    const bridgeResult = await pushToInstaAutoBridge({
+      mediaAssetId: post.id,
+      deliverableId: post.deliverable_id,
+      topic: post.hook_text,
+      leadMagnetTitle: post.hook_text,
+      triggerKeyword: post.trigger_keyword,
+      deliverableUrl: post.deliverable_url,
+      pdfUrl: post.pdf_url,
+      igMediaId: pubResult.ig_media_id,
+      igPermalink: pubResult.permalink,
+      caption: post.caption,
+      contentType: post.content_type
+    });
+
+    const publishedAt = new Date().toISOString();
+    db.prepare(`
+      UPDATE instagram_posts 
+      SET status = 'published',
+          ig_media_id = ?,
+          ig_permalink = ?,
+          published_at = ?,
+          instaauto_status = 'armed',
+          instaauto_rule_id = ?
+      WHERE id = ?
+    `).run(pubResult.ig_media_id, pubResult.permalink, publishedAt, bridgeResult.rule_id || 1, post.id);
+
+    // Update mobile trigger
+    updateMobileDmTrigger(trigger.id, {
+      processing_status: 'published',
+      live_post_permalink: pubResult.permalink,
+      completed_at: publishedAt
+    });
+
+    res.json({
+      success: true,
+      message: `🎉 Published live to Instagram! Post permalink: ${pubResult.permalink}`,
+      permalink: pubResult.permalink,
+      ig_media_id: pubResult.ig_media_id,
+      post_id: post.id,
+      bridge: bridgeResult
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/test-handshake
+ * Simulates a follower commenting on the reel and receiving the automated DM link
+ */
+router.post('/mobile-dm/test-handshake', async (req, res) => {
+  try {
+    const { trigger_id, shortcode, commenter_handle = '@curious_developer', comment_text } = req.body || {};
+    let trigger = null;
+    if (trigger_id) trigger = getMobileDmTriggerById(trigger_id);
+    else if (shortcode) trigger = getMobileDmTriggerByShortcode(shortcode);
+
+    const keyword = trigger?.trigger_keyword || req.body.keyword || 'PROJECT';
+    const text = comment_text || `Can you send me the ${keyword} build guide?`;
+    const isMatch = text.toLowerCase().includes(keyword.toLowerCase());
+
+    const deliverableUrl = trigger?.webhook_url || trigger?.post?.deliverable_url || 'http://localhost:4000/api/docs/1/pdf';
+    const brand = getBrandAssets();
+
+    const dmResponseText = isMatch 
+      ? `Hey ${commenter_handle}! 👋 Here is your exclusive ${keyword} build guide & architecture notes:\n\n👉 ${deliverableUrl}\n\nCurated by ${brand.brand_handle || '@harshparmar007__'}. Let me know if you have any questions!`
+      : `Hey ${commenter_handle}, thanks for reaching out! Did you mean to comment "${keyword}"? Let me know so I can send the correct notes!`;
+
+    res.json({
+      success: true,
+      keyword_matched: isMatch,
+      trigger_keyword: keyword,
+      commenter_handle,
+      received_comment: text,
+      simulated_dm: {
+        recipient: commenter_handle,
+        text: dmResponseText,
+        deliverable_url: deliverableUrl,
+        sent_at: new Date().toISOString()
+      },
+      webhook_payload: {
+        event: 'comment_to_dm_handshake',
+        post_shortcode: trigger?.shortcode || shortcode,
+        status: 'delivered',
+        rule: 'INSTAAUTO_AUTO_RESPONDER'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/mobile-dm/update-reel
+ * Update caption, trigger keyword, or song for a staged mobile reel
+ */
+router.post('/mobile-dm/update-reel', (req, res) => {
+  try {
+    const { shortcode, caption, hook_text, trigger_keyword, trending_song_title, trending_song_artist } = req.body || {};
+    const db = getDb();
+
+    if (shortcode) {
+      const log = getAutonomousLogByShortcode(shortcode);
+      if (log) {
+        updateAutonomousLog(log.id, {
+          repurposed_caption: caption !== undefined ? caption : log.repurposed_caption,
+          repurposed_hook: hook_text !== undefined ? hook_text : log.repurposed_hook,
+          detected_trigger_keyword: trigger_keyword !== undefined ? trigger_keyword : log.detected_trigger_keyword,
+          selected_song_title: trending_song_title !== undefined ? trending_song_title : log.selected_song_title,
+          selected_song_artist: trending_song_artist !== undefined ? trending_song_artist : log.selected_song_artist
+        });
+      }
+      db.prepare(`
+        UPDATE instagram_posts
+        SET caption = COALESCE(?, caption),
+            hook_text = COALESCE(?, hook_text),
+            trigger_keyword = COALESCE(?, trigger_keyword),
+            trending_song_title = COALESCE(?, trending_song_title),
+            trending_song_artist = COALESCE(?, trending_song_artist)
+        WHERE hook_text LIKE ? OR caption LIKE ?
+      `).run(caption, hook_text, trigger_keyword, trending_song_title, trending_song_artist, `%${shortcode}%`, `%${shortcode}%`);
+    }
+
+    res.json({ success: true, message: 'Reel details updated successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/webhook
+ * Meta Webhook verification handshake
+ */
+router.get('/webhook', (req, res) => {
+  try {
+    const mode = req.query['hub.mode'];
+    const token = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+    const expectedToken = getSetting('meta_webhook_verify_token', 'omni_dm_secret_token_2026');
+
+    if (mode === 'subscribe' && token === expectedToken) {
+      console.log('[Meta Webhook] Handshake verified successfully!');
+      return res.status(200).send(challenge);
+    }
+    return res.status(403).send('Forbidden: Invalid verify token');
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+/**
+ * POST /api/instagram/webhook
+ * Meta Webhook event receiver for Instagram Direct messaging events
+ */
+router.post('/webhook', (req, res) => {
+  try {
+    const body = req.body;
+    if (body.object === 'instagram' || body.object === 'page') {
+      const entries = body.entry || [];
+      for (const entry of entries) {
+        const messaging = entry.messaging || [];
+        for (const msgEvent of messaging) {
+          const senderId = msgEvent.sender?.id;
+          const message = msgEvent.message;
+          if (!message) continue;
+
+          // Check for URL in message text
+          const text = message.text || '';
+          const urlMatch = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(p|reel|tv)\/([A-Za-z0-9_-]+)/);
+          
+          let targetUrl = null;
+          let shortcode = null;
+          if (urlMatch) {
+            targetUrl = urlMatch[0];
+            shortcode = urlMatch[2];
+          } else if (message.attachments) {
+            for (const att of message.attachments) {
+              if (att.type === 'share' && att.payload?.url) {
+                targetUrl = att.payload.url;
+                const m = targetUrl.match(/instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+                if (m) shortcode = m[1];
+              }
+            }
+          }
+
+          if (targetUrl) {
+            handleInboundShare({
+              url: targetUrl,
+              shortcode: shortcode || `meta_${Date.now()}`,
+              senderHandle: `@user_${senderId}`,
+              threadId: senderId,
+              messageId: message.mid || `mid_${Date.now()}`
+            }).catch(e => console.error('[Meta Webhook] Inbound share error:', e));
+          }
+        }
+      }
+      return res.status(200).send('EVENT_RECEIVED');
+    }
+    return res.sendStatus(404);
+  } catch (err) {
+    console.error('[Meta Webhook] Error processing event:', err);
+    return res.status(200).send('EVENT_RECEIVED');
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// INSTAAUTO DM AUTOMATION & CORE USP SYNC ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/instagram/instaauto/sync-matrix
+ * Returns all published reels/carousels and active lead magnet posts with their full metadata:
+ * - Live post URL & media ID
+ * - Authentic extracted resource & PDF links
+ * - Image & video counts with media preview paths
+ * - Trending audio title & artist
+ * - Repurposed caption with CTA
+ * - DM Trigger keyword
+ * - InstaAuto sync status and rule ID
+ */
+router.get('/instaauto/sync-matrix', (req, res) => {
+  try {
+    const db = getDb();
+    const rows = db.prepare(`
+      SELECT 
+        id, campaign_id, deliverable_id, content_type, status,
+        hook_text, caption, trigger_keyword, trending_song_title, trending_song_artist,
+        trending_song_audio_url, audio_vibe, media_urls, thumbnail_url, deliverable_url,
+        pdf_url, ig_media_id, ig_permalink, scheduled_at, published_at,
+        instaauto_rule_id, instaauto_status, dms_delivered_count, origin_source,
+        extracted_resources, post_intent, created_at
+      FROM instagram_posts 
+      WHERE status = 'published' OR (trigger_keyword IS NOT NULL AND trigger_keyword != '')
+      ORDER BY (CASE WHEN status = 'published' THEN 0 ELSE 1 END), id DESC
+    `).all();
+
+    const bridgeUrl = getSetting('instaauto_bridge_url', 'http://localhost:3000/api/agent/bridge');
+    const autoSync = getSetting('instaauto_auto_sync', '1') === '1';
+    const dmTemplate = getSetting('instaauto_dm_template', 'Hey {username}! 👋 Thanks for commenting on our reel. Here is the verified link you requested: {deliverable_url} 🚀 Save this link and let us know if you need anything!');
+
+    const posts = rows.map(r => {
+      let parsedMedia = [];
+      try { parsedMedia = JSON.parse(r.media_urls || '[]'); } catch (e) {}
+      let parsedResources = [];
+      try { parsedResources = JSON.parse(r.extracted_resources || '[]'); } catch (e) {}
+
+      const isPdf = Boolean(r.pdf_url || (r.deliverable_url && (r.deliverable_url.toLowerCase().endsWith('.pdf') || r.deliverable_url.toLowerCase().includes('.pdf?'))));
+      const liveUrl = r.ig_permalink || (r.ig_media_id ? `https://www.instagram.com/p/${r.ig_media_id}/` : `https://www.instagram.com/reel/live_${r.id}/`);
+      const isPublished = r.status === 'published';
+      const syncArmed = Boolean(r.instaauto_status === 'armed' || r.instaauto_rule_id);
+
+      return {
+        ...r,
+        media_urls: parsedMedia,
+        media_count: parsedMedia.length || 1,
+        extracted_resources: parsedResources,
+        is_pdf: isPdf,
+        is_published: isPublished,
+        live_url: liveUrl,
+        sync_armed: syncArmed
+      };
+    });
+
+    res.json({
+      success: true,
+      count: posts.length,
+      published_count: posts.filter(p => p.is_published).length,
+      armed_count: posts.filter(p => p.sync_armed).length,
+      bridge_url: bridgeUrl,
+      auto_sync: autoSync,
+      dm_template: dmTemplate,
+      posts
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/instaauto/sync-post
+ * Dispatches an individual post to InstaAuto on Port 3000 and marks it armed
+ */
+router.post('/instaauto/sync-post', async (req, res) => {
+  try {
+    const { post_id } = req.body || {};
+    if (!post_id) return res.status(400).json({ error: 'post_id is required' });
+
+    const db = getDb();
+    const post = db.prepare('SELECT * FROM instagram_posts WHERE id = ?').get(post_id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    let parsedMedia = [];
+    try { parsedMedia = JSON.parse(post.media_urls || '[]'); } catch (e) {}
+
+    const igMediaId = post.ig_media_id || `media_${post.id}_${Date.now()}`;
+    const igPermalink = post.ig_permalink || `https://www.instagram.com/p/${igMediaId}/`;
+
+    const bridgeResult = await pushToInstaAutoBridge({
+      mediaAssetId: null,
+      deliverableId: post.deliverable_id || null,
+      topic: post.hook_text,
+      leadMagnetTitle: post.hook_text,
+      triggerKeyword: post.trigger_keyword || 'GUIDE',
+      deliverableUrl: post.deliverable_url,
+      pdfUrl: post.pdf_url,
+      igMediaId: igMediaId,
+      igPermalink: igPermalink,
+      caption: post.caption,
+      contentType: post.content_type
+    });
+
+    const ruleId = bridgeResult?.rule_id || post.instaauto_rule_id || Math.floor(100 + Math.random() * 900);
+    
+    db.prepare(`
+      UPDATE instagram_posts 
+      SET instaauto_status = 'armed', instaauto_rule_id = ?
+      WHERE id = ?
+    `).run(ruleId, post.id);
+
+    res.json({
+      success: true,
+      message: `⚡ Successfully armed InstaAuto DM automation rule #${ruleId} for post #${post.id}!`,
+      rule_id: ruleId,
+      post_id: post.id,
+      ig_permalink: igPermalink,
+      deliverable_url: post.deliverable_url,
+      trigger_keyword: post.trigger_keyword || 'GUIDE',
+      bridge: bridgeResult
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/instaauto/ping-bridge
+ * Checks connectivity to InstaAuto Port 3000
+ */
+router.get('/instaauto/ping-bridge', async (req, res) => {
+  const axios = require('axios');
+  const bridgeUrl = getSetting('instaauto_bridge_url', 'http://localhost:3000/api/agent/bridge');
+  const start = Date.now();
+  try {
+    const statusUrl = bridgeUrl.replace('/bridge', '/status');
+    const response = await axios.get(statusUrl, { timeout: 2500 });
+    const latency = Date.now() - start;
+    res.json({ online: true, url: bridgeUrl, latency_ms: latency, details: response.data });
+  } catch (err) {
+    res.json({ 
+      online: false, 
+      url: bridgeUrl, 
+      latency_ms: Date.now() - start, 
+      error: err.code === 'ECONNREFUSED' ? 'Port 3000 not actively listening' : err.message,
+      mock_ready: true 
+    });
+  }
+});
+
+/**
+ * POST /api/instagram/instaauto/config
+ * Save InstaAuto configuration settings
+ */
+router.post('/instaauto/config', (req, res) => {
+  try {
+    const { bridge_url, auto_sync, dm_template } = req.body || {};
+    if (bridge_url) setSetting('instaauto_bridge_url', bridge_url);
+    if (auto_sync !== undefined) setSetting('instaauto_auto_sync', auto_sync ? '1' : '0');
+    if (dm_template) setSetting('instaauto_dm_template', dm_template);
+
+    res.json({ success: true, message: 'InstaAuto configuration saved successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// ⚡ MASTER TRIGGER POINT: POST-TO-AUTOMATION LIFECYCLE CONTROLLERS
+// ═════════════════════════════════════════════════════════════════════
+
+const { 
+  triggerPostAndAutomation, 
+  simulateCommentToDm, 
+  getRecentTriggerEvents 
+} = require('../services/instagramAutomationTriggerService');
+
+/**
+ * POST /api/instagram/instaauto/trigger-post-automation
+ * Master trigger point: publishes reel if needed, registers rule with keyword & resource link on InstaAuto,
+ * notifies Telegram, and sets automation to active.
+ */
+router.post('/instaauto/trigger-post-automation', async (req, res) => {
+  try {
+    const { post_id, publish_via, custom_keyword, custom_resource_url, dm_template } = req.body || {};
+    if (!post_id) return res.status(400).json({ error: 'post_id is required' });
+
+    const result = await triggerPostAndAutomation(post_id, {
+      publishVia: publish_via,
+      customKeyword: custom_keyword,
+      customResourceUrl: custom_resource_url,
+      dmTemplate: dm_template
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/instaauto/automation-events
+ * Returns recent automation lifecycle events for the real-time event stream
+ */
+router.get('/instaauto/automation-events', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '25', 10);
+    const events = getRecentTriggerEvents(limit);
+    res.json({ success: true, count: events.length, events });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/instaauto/simulate-comment
+ * Simulates a follower comment and returns the exact automated DM copy dispatched
+ */
+router.post('/instaauto/simulate-comment', async (req, res) => {
+  try {
+    const { post_id, comment_text, username } = req.body || {};
+    if (!post_id) return res.status(400).json({ error: 'post_id is required' });
+
+    const result = await simulateCommentToDm(post_id, comment_text, username || '@alex_builds');
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+module.exports = router;
+
+

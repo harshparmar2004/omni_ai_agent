@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Local SQLite Database & Wal Files
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Downloaded & Generated Media Cache
+public/generated/downloads/
+public/generated/pdfs/
+public/generated/reels/
+public/generated/carousels/
+public/generated/images/
+public/generated/diagrams/
+!public/generated/assets/
+!public/generated/assets/**
+
+# Scratch & Logs
+scratch/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# OS & Temporary
+.DS_Store
+Thumbs.db
+test.png
+test.svg
