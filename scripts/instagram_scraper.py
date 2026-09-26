@@ -142,6 +142,35 @@ async def scrape_profile(username, url):
             await page.mouse.wheel(0, random.randint(250, 480))
             await page.wait_for_timeout(random.randint(800, 1600))
 
+            # Dismiss any login dialog overlays & unblock scrolling
+            try:
+                await page.keyboard.press("Escape")
+                await page.wait_for_timeout(350)
+                await page.evaluate("""
+                    () => {
+                        try {
+                            const dialogs = document.querySelectorAll('div[role="dialog"], [aria-label*="Close"], [aria-label*="close"]');
+                            dialogs.forEach(d => {
+                                if (d.tagName === 'BUTTON' || d.getAttribute('role') === 'button') {
+                                    d.click();
+                                } else if (d.getAttribute('role') === 'dialog') {
+                                    d.remove();
+                                }
+                            });
+                            const backdrops = document.querySelectorAll('div[style*="position: fixed"], div[style*="opacity"]');
+                            backdrops.forEach(b => {
+                                if (parseInt(window.getComputedStyle(b).zIndex || '0') > 10) {
+                                    b.remove();
+                                }
+                            });
+                            document.body.style.overflow = 'auto';
+                            document.documentElement.style.overflow = 'auto';
+                        } catch(e) {}
+                    }
+                """)
+            except Exception:
+                pass
+
             title = await page.title()
             meta_desc = await page.get_attribute('meta[property="og:description"]', 'content') or ''
             meta_image = await page.get_attribute('meta[property="og:image"]', 'content') or ''
@@ -153,7 +182,31 @@ async def scrape_profile(username, url):
             bio_match = re.search(r':\s+"(.*)"', meta_desc, re.DOTALL)
 
             # Find post and reel links on page if rendered
-            post_links = await page.eval_on_selector_all('a[href*="/p/"], a[href*="/reel/"]', 'elements => elements.map(el => el.href)')
+            post_links = []
+            try:
+                found_links = await page.eval_on_selector_all('a[href*="/p/"], a[href*="/reel/"]', 'elements => elements.map(el => el.href)')
+                if found_links:
+                    post_links.extend(found_links)
+            except Exception:
+                pass
+
+            # Fallback: Polaris server-state script extraction if DOM grid has not mounted
+            if len(post_links) == 0:
+                try:
+                    script_contents = await page.eval_on_selector_all('script[type="application/json"], script:not([src])', 'els => els.map(e => e.innerText)')
+                    for sc in script_contents:
+                        if not sc:
+                            continue
+                        if 'xdt_api__v1__feed__user_timeline' in sc or 'shortcode' in sc or '/reel/' in sc or '/p/' in sc:
+                            matches = re.findall(r'"shortcode":"([A-Za-z0-9_-]+)"', sc)
+                            for code in matches:
+                                post_links.append(f"https://www.instagram.com/reel/{code}/")
+                            url_matches = re.findall(r'(?:/p/|/reel/)([A-Za-z0-9_-]{10,13})', sc)
+                            for code in url_matches:
+                                post_links.append(f"https://www.instagram.com/reel/{code}/")
+                except Exception:
+                    pass
+
             unique_posts = list(dict.fromkeys(post_links))[:12]
 
             return {

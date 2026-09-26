@@ -250,7 +250,7 @@ async function callGemini(model, messages, apiKey, options = {}) {
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     body,
-    { timeout: 60000 }
+    { timeout: options.timeout || 15000 }
   );
 
   const candidate = response.data?.candidates?.[0];
@@ -344,7 +344,7 @@ async function callOllama(model, messages, options = {}) {
         num_predict: options.maxTokens || 1024
       }
     },
-    { timeout: 12000 }
+    { timeout: options.timeout || 35000 }
   );
 
   const data = response.data;

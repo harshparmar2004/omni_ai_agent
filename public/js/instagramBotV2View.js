@@ -55,6 +55,8 @@ const instagramBotV2View = {
 
   techAccountConfig: {
     handle: '@technews_daily_ai',
+    pageToken: '',
+    igUserId: '',
     niche: 'Tech News, AI Breakthroughs & Developer Tools',
     dailyQuota: 3,
     autopilotEnabled: false,
@@ -101,6 +103,12 @@ const instagramBotV2View = {
       if (settingsJson.settings) {
         if (settingsJson.settings.tech_instagram_handle) {
           this.techAccountConfig.handle = settingsJson.settings.tech_instagram_handle;
+        }
+        if (settingsJson.settings.tech_meta_page_token) {
+          this.techAccountConfig.pageToken = settingsJson.settings.tech_meta_page_token;
+        }
+        if (settingsJson.settings.tech_meta_ig_user_id) {
+          this.techAccountConfig.igUserId = settingsJson.settings.tech_meta_ig_user_id;
         }
         if (settingsJson.settings.tech_autopilot_enabled) {
           this.techAccountConfig.autopilotEnabled = settingsJson.settings.tech_autopilot_enabled === '1';
@@ -1164,6 +1172,17 @@ const instagramBotV2View = {
           </div>
 
           <div class="form-group mb-3">
+            <label class="form-label font-bold text-xs">Tech Meta Page Access Token (graph.facebook.com)</label>
+            <input type="password" id="tech-page-token-input" class="form-input" placeholder="EAAB..." value="${escapeHtml(this.techAccountConfig.pageToken || '')}">
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Sandboxed token for posting exclusively to your Tech account.</div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-xs">Tech Instagram Business User ID</label>
+            <input type="text" id="tech-user-id-input" class="form-input" placeholder="17841..." value="${escapeHtml(this.techAccountConfig.igUserId || '')}">
+          </div>
+
+          <div class="form-group mb-3">
             <label class="form-label font-bold text-xs">Attribution Format Template</label>
             <textarea class="form-input" id="tech-attr-input" style="font-size: 0.8rem; min-height: 80px;">${escapeHtml(this.techAccountConfig.attributionTemplate)}</textarea>
           </div>
@@ -1495,10 +1514,14 @@ const instagramBotV2View = {
 
   async saveTechSettings() {
     const handle = document.getElementById('tech-handle-input')?.value;
+    const pageToken = document.getElementById('tech-page-token-input')?.value;
+    const igUserId = document.getElementById('tech-user-id-input')?.value;
     const attr = document.getElementById('tech-attr-input')?.value;
     const quota = document.getElementById('tech-quota-input')?.value;
 
     if (handle) this.techAccountConfig.handle = handle;
+    if (pageToken !== undefined) this.techAccountConfig.pageToken = pageToken;
+    if (igUserId !== undefined) this.techAccountConfig.igUserId = igUserId;
     if (attr) this.techAccountConfig.attributionTemplate = attr;
     if (quota) this.techAccountConfig.dailyQuota = parseInt(quota, 10);
 
@@ -1508,11 +1531,13 @@ const instagramBotV2View = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           settings: {
-            tech_instagram_handle: this.techAccountConfig.handle
+            tech_instagram_handle: this.techAccountConfig.handle,
+            tech_meta_page_token: this.techAccountConfig.pageToken,
+            tech_meta_ig_user_id: this.techAccountConfig.igUserId
           }
         })
       });
-      app.showToast('Tech account settings saved successfully!', 'success');
+      app.showToast('Tech account credentials & settings saved successfully!', 'success');
       this.renderDashboard();
     } catch (e) {
       app.showToast('Settings saved locally', 'info');

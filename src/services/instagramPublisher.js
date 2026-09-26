@@ -24,12 +24,39 @@ function getGraphBaseUrl(token) {
 }
 
 /**
+ * Contextual Multi-Tenant Credential Resolver
+ * Strictly isolates destination credentials so Tech news never posts to GTA 6 account
+ */
+function resolvePublishCredentials(destination = 'gta6') {
+  if (destination === 'tech') {
+    const techToken = getSetting('tech_meta_page_token');
+    const techUserId = getSetting('tech_meta_ig_user_id');
+    if (techToken && techToken.length > 20 && techUserId) {
+      return {
+        pageToken: techToken,
+        igUserId: techUserId,
+        handle: getSetting('tech_instagram_handle', '@technews_daily_ai'),
+        destination: 'tech'
+      };
+    }
+  }
+  // Default GTA 6 fallback (strictly preserves existing flow 100%)
+  return {
+    pageToken: getSetting('meta_page_token') || process.env.META_PAGE_TOKEN,
+    igUserId: getSetting('meta_ig_user_id') || process.env.META_IG_USER_ID,
+    handle: getSetting('instagram_handle', '@gta6_updates_007'),
+    destination: 'gta6'
+  };
+}
+
+/**
  * Publish a Reel (video) to Instagram
  */
-async function publishReelToInstagram({ videoUrl, caption, coverUrl }) {
+async function publishReelToInstagram({ videoUrl, caption, coverUrl, destination = 'gta6' }) {
   const mode = getSetting('mode', 'mock');
-  const pageToken = getSetting('meta_page_token') || process.env.META_PAGE_TOKEN;
-  const igUserId = getSetting('meta_ig_user_id') || process.env.META_IG_USER_ID;
+  const creds = resolvePublishCredentials(destination);
+  const pageToken = creds.pageToken;
+  const igUserId = creds.igUserId;
   const publicBaseUrl = await ensureTunnelOnline();
   const baseUrl = getGraphBaseUrl(pageToken);
 
@@ -123,16 +150,17 @@ async function publishReelToInstagram({ videoUrl, caption, coverUrl }) {
 /**
  * Publish a single Image Post to Instagram
  */
-async function publishImageToInstagram({ imageUrl, caption }) {
+async function publishImageToInstagram({ imageUrl, caption, destination = 'gta6' }) {
   const mode = getSetting('mode', 'mock');
-  const pageToken = getSetting('meta_page_token') || process.env.META_PAGE_TOKEN;
-  const igUserId = getSetting('meta_ig_user_id') || process.env.META_IG_USER_ID;
+  const creds = resolvePublishCredentials(destination);
+  const pageToken = creds.pageToken;
+  const igUserId = creds.igUserId;
   const publicBaseUrl = await ensureTunnelOnline();
   const baseUrl = getGraphBaseUrl(pageToken);
 
   if (mode === 'live' && pageToken && igUserId && pageToken.length > 20) {
     try {
-      console.log(`[IG Publisher] 📸 Publishing Image Post via Meta Graph API (${baseUrl})...`);
+      console.log(`[IG Publisher] 📸 Publishing Image Post via Meta Graph API (${baseUrl}) for [${creds.destination.toUpperCase()}: ${creds.handle}]...`);
       
       const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${publicBaseUrl}${imageUrl}`;
 
@@ -198,10 +226,11 @@ async function publishImageToInstagram({ imageUrl, caption }) {
 /**
  * Publish a Carousel (2-10 images) to Instagram
  */
-async function publishCarouselToInstagram({ imageUrls, caption }) {
+async function publishCarouselToInstagram({ imageUrls, caption, destination = 'gta6' }) {
   const mode = getSetting('mode', 'mock');
-  const pageToken = getSetting('meta_page_token') || process.env.META_PAGE_TOKEN;
-  const igUserId = getSetting('meta_ig_user_id') || process.env.META_IG_USER_ID;
+  const creds = resolvePublishCredentials(destination);
+  const pageToken = creds.pageToken;
+  const igUserId = creds.igUserId;
   const publicBaseUrl = await ensureTunnelOnline();
   const baseUrl = getGraphBaseUrl(pageToken);
 
@@ -211,7 +240,7 @@ async function publishCarouselToInstagram({ imageUrls, caption }) {
 
   if (mode === 'live' && pageToken && igUserId && pageToken.length > 20) {
     try {
-      console.log(`[IG Publisher] 🎠 Publishing Carousel (${imageUrls.length} images) via Meta Graph API (${baseUrl})...`);
+      console.log(`[IG Publisher] 🎠 Publishing Carousel (${imageUrls.length} images) via Meta Graph API (${baseUrl}) for [${creds.destination.toUpperCase()}: ${creds.handle}]...`);
 
       // Step 1: Create individual item containers
       const childIds = [];
@@ -408,22 +437,26 @@ async function executePublishPipeline(postId, publishVia = null) {
     }
   } else {
     // 2. Publish via official Meta Content Publishing API v21.0
-    console.log(`[IG Publisher Pipeline] 🚀 Publishing Post #${postId} via Meta Graph API v21.0...`);
+    const destination = post.destination_account || 'gta6';
+    console.log(`[IG Publisher Pipeline] 🚀 Publishing Post #${postId} (${post.content_type}) via Meta Graph API v21.0 [Destination: ${destination.toUpperCase()}]...`);
     if (post.content_type === 'carousel') {
       pubResult = await publishCarouselToInstagram({
         imageUrls: mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url],
-        caption: post.caption
+        caption: post.caption,
+        destination
       });
     } else if (post.content_type === 'reel') {
       pubResult = await publishReelToInstagram({
         videoUrl: mediaUrls[0] || '/generated/reels/test_reel.mp4',
         caption: post.caption,
-        coverUrl: post.thumbnail_url
+        coverUrl: post.thumbnail_url,
+        destination
       });
     } else {
       pubResult = await publishImageToInstagram({
         imageUrl: post.thumbnail_url || mediaUrls[0],
-        caption: post.caption
+        caption: post.caption,
+        destination
       });
     }
   }
@@ -536,5 +569,6 @@ module.exports = {
   publishReelToInstagram,
   publishImageToInstagram,
   publishCarouselToInstagram,
-  executePublishPipeline
+  executePublishPipeline,
+  resolvePublishCredentials
 };

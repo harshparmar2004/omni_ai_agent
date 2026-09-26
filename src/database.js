@@ -273,7 +273,9 @@ function initSchema(db) {
     "ALTER TABLE instagram_posts ADD COLUMN extracted_resources TEXT DEFAULT '[]'",
     "ALTER TABLE instagram_posts ADD COLUMN post_intent TEXT DEFAULT 'lead_magnet'",
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN post_intent TEXT DEFAULT 'lead_magnet'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN staged_post_id INTEGER"
+    "ALTER TABLE autonomous_ingestion_log ADD COLUMN staged_post_id INTEGER",
+    "ALTER TABLE instagram_posts ADD COLUMN destination_account TEXT DEFAULT 'gta6'",
+    "ALTER TABLE autonomous_ingestion_log ADD COLUMN destination_account TEXT DEFAULT 'tech'"
   ];
 
   for (const sql of migrations) {
@@ -337,7 +339,11 @@ function seedInitialData(db) {
     brand_watermark_position: 'top-right',
     brand_watermark_opacity: '0.9',
     brand_primary_color: '#D97757',
-    brand_accent_color: '#1A73E8'
+    brand_accent_color: '#1A73E8',
+    // Secondary Tech News Profile Credentials (Bot v2)
+    tech_meta_page_token: '',
+    tech_meta_ig_user_id: '',
+    tech_instagram_handle: '@technews_daily_ai'
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

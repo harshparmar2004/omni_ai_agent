@@ -223,12 +223,14 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
 
   const originSource = channelId ? `channel:@${author || 'monitored'}` : 'mobile_bot';
 
+  const destination = options.destination || (channelId ? 'tech' : 'gta6');
+
   const insertPost = db.prepare(`
     INSERT INTO instagram_posts (
       campaign_id, deliverable_id, content_type, status, hook_text, caption,
       trigger_keyword, trending_song_title, trending_song_artist, trending_song_audio_url, audio_vibe,
-      media_urls, thumbnail_url, deliverable_url, pdf_url, origin_source, extracted_resources, post_intent, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      media_urls, thumbnail_url, deliverable_url, pdf_url, origin_source, extracted_resources, post_intent, destination_account, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     null,
     null,
@@ -248,11 +250,12 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     originSource,
     JSON.stringify(harvestResult.extracted_resources || []),
     isDirectRepost ? 'direct_repost' : 'lead_magnet',
+    destination,
     new Date().toISOString()
   );
 
   const postId = insertPost.lastInsertRowid;
-  updateAutonomousLog(log.id, { staged_post_id: postId });
+  updateAutonomousLog(log.id, { staged_post_id: postId, destination_account: destination });
 
   // ── Step 7: Check Auto-Pilot / Direct Publish Mode ───────────────────────
   const autoPilotGlobal = getSetting('instagram_autopilot_enabled', '0') === '1';

@@ -708,6 +708,60 @@ router.post('/stealth/publish-top-two', async (req, res) => {
 });
 
 /**
+ * POST /api/instagram/stealth/process-queue
+ * Manually dispatches the Phase 2 async ingestion & transcoding worker pool
+ */
+router.post('/stealth/process-queue', async (req, res) => {
+  try {
+    const { processQueuedIngestionWorkerPool } = require('../services/stealthSentinelScheduler');
+    setImmediate(() => {
+      processQueuedIngestionWorkerPool().catch(e => console.error('[Queue Worker Error]:', e));
+    });
+    res.json({ success: true, message: 'Phase 2 Async Worker Pool dispatched in background (concurrency: 2).' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/stealth/queue-status
+ * Returns current count of queued, processing, and ranked items
+ */
+router.get('/stealth/queue-status', (req, res) => {
+  try {
+    const db = getDb();
+    const queued = db.prepare("SELECT count(*) as count FROM autonomous_ingestion_log WHERE status = 'queued_for_ingestion'").get();
+    const ranked = db.prepare("SELECT count(*) as count FROM autonomous_ingestion_log WHERE status IN ('ranked', 'cleansed', 'harvested')").get();
+    const published = db.prepare("SELECT count(*) as count FROM autonomous_ingestion_log WHERE status = 'published'").get();
+    const { getStealthSchedulerStatus } = require('../services/stealthSentinelScheduler');
+    res.json({
+      success: true,
+      queuedForIngestion: queued.count,
+      activeRanked: ranked.count,
+      totalPublished: published.count,
+      scheduler: getStealthSchedulerStatus()
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/media/prune
+ * Manually executes media cache garbage collection (Pillar 4)
+ */
+router.post('/media/prune', (req, res) => {
+  try {
+    const { retentionHours = 48 } = req.body || {};
+    const { pruneExpiredMediaCache } = require('../services/mediaCleanerService');
+    const result = pruneExpiredMediaCache(retentionHours);
+    res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * GET /api/instagram/autonomous/config
  * Retrieves autopilot configuration
  */

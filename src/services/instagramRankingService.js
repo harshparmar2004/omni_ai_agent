@@ -81,7 +81,7 @@ CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, s
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      { jsonMode: true, temperature: 0.3 }
+      { jsonMode: true, temperature: 0.3, timeout: 20000 }
     );
 
     let parsed;

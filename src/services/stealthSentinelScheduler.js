@@ -24,6 +24,7 @@ function randomInt(min, max) {
 const schedulerState = {
   isRunning: false,
   isScanning: false,
+  isWorkerRunning: false,
   currentCycleBatch: 42,
   lastRunTimestamp: null,
   nextRunTimestamp: null,
@@ -68,9 +69,11 @@ function calculateNextIntervalMs() {
 }
 
 /**
- * Strategy 2 & 4: Serial Staggered Surveillance Scan with Head-Only Deduplication
+ * Strategy 2 & 4: Serial Staggered Surveillance Scan (Phase 1: Lightweight Radar)
+ * Rapidly inspects target creator profiles (<25KB head check), discovers fresh reels,
+ * stages them with 'queued_for_ingestion' status, and dispatches to the Phase 2 async worker.
  */
-async function executeStealthSurveillanceCycle() {
+async function executeStealthSurveillanceCycle(options = {}) {
   if (schedulerState.isScanning) {
     console.log('[Stealth Sentinel] Scan already in progress, skipping concurrent trigger.');
     return { success: false, message: 'Scan already in progress' };
@@ -81,25 +84,25 @@ async function executeStealthSurveillanceCycle() {
   schedulerState.lastRunTimestamp = new Date().toISOString();
   console.log(`\n======================================================`);
   console.log(`[Stealth Sentinel] 🛡️ Starting 3-Hour Surveillance Cycle: Batch #${schedulerState.currentCycleBatch}`);
-  console.log(`[Stealth Sentinel] Pacing: Serial Stagger (8–22s sleep) + SQLite Head-Check Deduplication`);
+  console.log(`[Stealth Sentinel] Phase 1: Lightweight Radar (<25KB) + SQLite Head-Check Deduplication`);
   console.log(`======================================================\n`);
 
   const activeChannels = getTrackedChannels().filter(c => c.is_active);
   const results = [];
-  let newPostsIngested = 0;
+  let newPostsDiscovered = 0;
 
   for (let i = 0; i < activeChannels.length; i++) {
     const ch = activeChannels[i];
     
-    // Strategy 2: Inter-Account Delay (except before the first request)
+    // Strategy 2: Inter-Account Human Delay (except before the first request)
     if (i > 0) {
-      const staggerDelay = randomInt(schedulerState.config.minAccountDelayMs, schedulerState.config.maxAccountDelayMs);
+      const staggerDelay = options.quick ? 1500 : randomInt(schedulerState.config.minAccountDelayMs, schedulerState.config.maxAccountDelayMs);
       console.log(`[Stealth Pacing] ⏳ Sleeping for ${(staggerDelay / 1000).toFixed(1)}s before checking @${ch.username} (Human Emulation)...`);
       await sleep(staggerDelay);
     }
 
     try {
-      console.log(`[Stealth Sentinel] 🔍 Inspecting @${ch.username} [${i + 1}/${activeChannels.length}]...`);
+      console.log(`[Stealth Sentinel Radar] 🔍 Inspecting @${ch.username} [${i + 1}/${activeChannels.length}]...`);
       
       // Strategy 4: Fetch profile metadata (head check)
       const scrapeRes = await scrapeInstagramUrl(ch.profile_url || `https://www.instagram.com/${ch.username}/`);
@@ -122,9 +125,23 @@ async function executeStealthSurveillanceCycle() {
         continue;
       }
 
-      // Fresh post found: Process through transformative pipeline
-      console.log(`[Stealth Sentinel] ⚡ NEW reel detected on @${ch.username}: ${latestPostUrl}! Ingesting...`);
-      const procRes = await processSinglePost(latestPostUrl, ch.username, ch.id);
+      // Fresh post found: Stage into autonomous_ingestion_log for Phase 2 async worker
+      console.log(`[Stealth Sentinel Radar] ⚡ NEW reel detected on @${ch.username}: ${latestPostUrl}! Staging for async worker...`);
+      getDb().prepare(`
+        INSERT INTO autonomous_ingestion_log (
+          channel_id, channel_username, source_post_url, shortcode,
+          content_type, status, destination_account, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        ch.id,
+        ch.username,
+        latestPostUrl,
+        latestShortcode,
+        'reel',
+        'queued_for_ingestion',
+        'tech',
+        new Date().toISOString()
+      );
 
       updateTrackedChannel(ch.id, {
         last_post_shortcode: latestShortcode,
@@ -132,8 +149,8 @@ async function executeStealthSurveillanceCycle() {
         last_scraped_at: new Date().toISOString()
       });
 
-      newPostsIngested++;
-      results.push({ channel: ch.username, status: 'ingested_and_evaluated', shortcode: latestShortcode, ...procRes });
+      newPostsDiscovered++;
+      results.push({ channel: ch.username, status: 'queued_for_ingestion', shortcode: latestShortcode, url: latestPostUrl });
 
     } catch (err) {
       console.warn(`[Stealth Sentinel Warning] Error inspecting @${ch.username}: ${err.message}`);
@@ -144,18 +161,14 @@ async function executeStealthSurveillanceCycle() {
   schedulerState.isScanning = false;
   schedulerState.lastResults = results;
 
-  console.log(`\n[Stealth Sentinel] ✓ Batch #${schedulerState.currentCycleBatch} complete: ${activeChannels.length} profiles scanned, ${newPostsIngested} new reels evaluated.\n`);
+  console.log(`\n[Stealth Sentinel Radar] ✓ Phase 1 Complete: ${activeChannels.length} profiles scanned, ${newPostsDiscovered} new reels queued for ingestion.\n`);
 
-  // Check if Autopilot is enabled to auto-publish Top 2 reels (#1 and #2)
-  const isAutopilot = getSetting('tech_autopilot_enabled', '0') === '1' || getSetting('instagram_autopilot_enabled', '0') === '1';
-  let autoPublishResults = null;
-  if (isAutopilot && newPostsIngested > 0) {
-    console.log('[Stealth Sentinel] ⚡ Autopilot active! Ranking candidate reels and publishing Top 2 via Meta Graph API...');
-    try {
-      autoPublishResults = await rankAndPublishTopTwoReels();
-    } catch (pubErr) {
-      console.error('[Stealth Sentinel Top-2 Publish Error]:', pubErr);
-    }
+  // Phase 2: Dispatch Asynchronous Ingestion & Transcoding Worker Pool (Non-Blocking)
+  if (newPostsDiscovered > 0 || options.forceProcessQueue) {
+    console.log('[Stealth Sentinel] 🚀 Dispatching Phase 2 Async Ingestion Worker Pool in background...');
+    setImmediate(() => {
+      processQueuedIngestionWorkerPool().catch(wErr => console.error('[Async Ingestion Worker Pool Error]:', wErr));
+    });
   }
 
   // Plan next jittered cycle
@@ -165,10 +178,104 @@ async function executeStealthSurveillanceCycle() {
     success: true,
     batch: schedulerState.currentCycleBatch,
     totalScanned: activeChannels.length,
-    newPostsIngested,
-    autoPublishResults,
+    newPostsDiscovered,
+    phase: 'radar_complete',
     results
   };
+}
+
+/**
+ * Phase 2: Asynchronous Ingestion & Transcoding Worker Pool
+ * Concurrency limit: 2 workers to prevent CPU starvation.
+ * Downloads MP4, transcodes via FFmpeg, cleanses brand tags, ranks with Gemini, and auto-publishes Top 2.
+ */
+async function processQueuedIngestionWorkerPool() {
+  if (schedulerState.isWorkerRunning) {
+    console.log('[Async Ingestion Pool] Worker pool is already running. Current queue will be processed.');
+    return { success: false, message: 'Worker pool already running' };
+  }
+
+  schedulerState.isWorkerRunning = true;
+  console.log(`\n======================================================`);
+  console.log(`[Async Ingestion Pool] ⚡ Starting Async Worker Pool (Concurrency: 2)`);
+  console.log(`======================================================\n`);
+
+  try {
+    const db = getDb();
+    const queuedItems = db.prepare(`
+      SELECT * FROM autonomous_ingestion_log 
+      WHERE status = 'queued_for_ingestion'
+      ORDER BY id ASC
+      LIMIT 20
+    `).all();
+
+    if (queuedItems.length === 0) {
+      console.log('[Async Ingestion Pool] No queued items found.');
+      schedulerState.isWorkerRunning = false;
+      return { success: true, processedCount: 0 };
+    }
+
+    console.log(`[Async Ingestion Pool] 📦 Found ${queuedItems.length} queued reels to download, transcode & rank...`);
+
+    const concurrencyLimit = 2;
+    let processedCount = 0;
+    const errors = [];
+    let currentIndex = 0;
+
+    const workerTask = async () => {
+      while (currentIndex < queuedItems.length) {
+        const item = queuedItems[currentIndex++];
+        console.log(`[Async Worker] 🚀 Processing queued reel #${item.shortcode} from @${item.channel_username} [Item ${currentIndex}/${queuedItems.length}]...`);
+        try {
+          await processSinglePost(item.source_post_url, item.channel_username, item.channel_id, {
+            destination: item.destination_account || 'tech'
+          });
+          processedCount++;
+          console.log(`[Async Worker] ✅ Reel #${item.shortcode} successfully ingested and ranked!`);
+        } catch (err) {
+          console.error(`[Async Worker Error] Failed processing #${item.shortcode}: ${err.message}`);
+          db.prepare(`UPDATE autonomous_ingestion_log SET status = 'error', llm_reasoning = ? WHERE id = ?`).run(`Worker error: ${err.message}`, item.id);
+          errors.push({ shortcode: item.shortcode, error: err.message });
+        }
+      }
+    };
+
+    // Spawn up to concurrencyLimit concurrent workers
+    const activeWorkers = [];
+    for (let w = 0; w < Math.min(concurrencyLimit, queuedItems.length); w++) {
+      activeWorkers.push(workerTask());
+    }
+    await Promise.all(activeWorkers);
+
+    console.log(`\n[Async Ingestion Pool] ✓ Worker batch complete: ${processedCount} reels processed (${errors.length} errors).\n`);
+
+    // ── Autopilot check: Rank & publish Top 2 (#1 and #2) ──
+    const isAutopilot = getSetting('tech_autopilot_enabled', '0') === '1' || getSetting('instagram_autopilot_enabled', '0') === '1';
+    let autoPublishResults = null;
+    if (isAutopilot && processedCount > 0) {
+      console.log('[Stealth Sentinel] ⚡ Autopilot active! Ranking candidate reels and publishing Top 2 via Meta Graph API...');
+      try {
+        autoPublishResults = await rankAndPublishTopTwoReels({ destination: 'tech' });
+      } catch (pubErr) {
+        console.error('[Stealth Sentinel Top-2 Publish Error]:', pubErr);
+      }
+    }
+
+    // ── Pillar 4: Auto-Prune expired temporary files ──
+    try {
+      const { pruneExpiredMediaCache } = require('./mediaCleanerService');
+      pruneExpiredMediaCache(48);
+    } catch (cleanErr) {
+      console.warn('[Media Cleaner Auto-Prune Notice]:', cleanErr.message);
+    }
+
+    schedulerState.isWorkerRunning = false;
+    return { success: true, processedCount, errors, autoPublishResults };
+  } catch (outerErr) {
+    schedulerState.isWorkerRunning = false;
+    console.error('[Async Ingestion Pool Fatal Error]:', outerErr);
+    return { success: false, error: outerErr.message };
+  }
 }
 
 /**
@@ -281,7 +388,8 @@ async function rankAndPublishTopTwoReels(options = {}) {
         pubRes = await publishReelToInstagram({
           videoUrl,
           caption: candidate.repurposed_caption || candidate.raw_caption,
-          coverUrl: null
+          coverUrl: null,
+          destination: candidate.destination_account || options.destination || 'tech'
         });
       }
 
@@ -379,6 +487,7 @@ function getStealthSchedulerStatus() {
 module.exports = {
   startStealthSentinelScheduler,
   executeStealthSurveillanceCycle,
+  processQueuedIngestionWorkerPool,
   rankAndPublishTopTwoReels,
   getStealthSchedulerStatus,
   calculateNextIntervalMs

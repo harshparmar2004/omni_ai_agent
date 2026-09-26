@@ -78,6 +78,14 @@ app.listen(PORT, () => {
 
   // Start Untrackable Stealth Sentinel Scheduler (5 Anti-Tracking Strategies Active)
   startStealthSentinelScheduler();
+
+  // Prune expired temporary media cache on boot (Pillar 4)
+  const { pruneExpiredMediaCache } = require('./src/services/mediaCleanerService');
+  try {
+    pruneExpiredMediaCache(48);
+  } catch (e) {
+    console.warn('[Media Cleaner Boot Notice]:', e.message);
+  }
 });
 
 module.exports = app;
