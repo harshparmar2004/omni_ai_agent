@@ -2,7 +2,16 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const FormData = require('form-data');
-const { getSetting, getBrandAssets, addMobileDmTrigger, updateMobileDmTrigger } = require('../database');
+const {
+  getSetting,
+  getBrandAssets,
+  addMobileDmTrigger,
+  updateMobileDmTrigger,
+  getMobileDmTriggerById,
+  getConnectedPages,
+  getConnectedPageBySlug,
+  getConnectedPageById
+} = require('../database');
 const { processSinglePost } = require('./instagramAutonomousOrchestrator');
 
 let isPolling = false;
@@ -57,6 +66,51 @@ async function sendTelegramMessage(chatId, text, extra = {}) {
     return { success: true, data: res.data };
   } catch (err) {
     console.warn(`[Telegram Bot] Send text error: ${err.response?.data?.description || err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Answer an incoming Telegram inline callback query
+ */
+async function answerCallbackQuery(callbackQueryId, text = '', showAlert = false) {
+  const token = getCleanTelegramToken();
+  if (!token) return { success: false };
+
+  try {
+    const res = await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+      callback_query_id: String(callbackQueryId),
+      text: text,
+      show_alert: showAlert
+    }, { timeout: 8000 });
+    return { success: true, data: res.data };
+  } catch (err) {
+    console.warn(`[Telegram Bot] answerCallbackQuery error: ${err.response?.data?.description || err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Edit an existing Telegram message's text and markup
+ */
+async function editTelegramMessageText(chatId, messageId, text, extra = {}) {
+  const token = getCleanTelegramToken();
+  if (!token) return { success: false };
+
+  try {
+    let safeText = typeof text === 'string' && typeof text.toWellFormed === 'function' ? text.toWellFormed() : String(text || '');
+    safeText = safeText.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '');
+
+    const res = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
+      chat_id: String(chatId),
+      message_id: messageId,
+      text: safeText,
+      parse_mode: 'HTML',
+      ...extra
+    }, { timeout: 15000 });
+    return { success: true, data: res.data };
+  } catch (err) {
+    console.warn(`[Telegram Bot] editTelegramMessageText error: ${err.response?.data?.description || err.message}`);
     return { success: false, error: err.message };
   }
 }
@@ -189,71 +243,18 @@ async function sendTelegramDocument(chatId, docPath, caption = '') {
 }
 
 /**
- * Handle a message containing an Instagram link received on Telegram
+ * Execute the autonomous post processing and deliver media/reports back to Telegram
  */
-async function handleTelegramMessage(message) {
-  const chatId = message.chat?.id;
-  const fromUser = message.from?.username || message.from?.first_name || 'User';
-  const text = message.text || message.caption || '';
-
-  // Extract Instagram URL (handles reels, p, tv, and mobile share queries)
-  const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)[^\s]*/);
-  if (!match) {
-    if (text.startsWith('/start') || text.startsWith('/help')) {
-      const brand = getBrandAssets();
-      const currentHandle = brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007');
-      await sendTelegramMessage(
-        chatId,
-        `🚀 <b>OmniResearch — Viral Content & Auto-Publishing Agent</b>\n\n` +
-        `Target Account: <b>${currentHandle}</b>\n\n` +
-        `<b>How to Auto-Post Any Reel to Your Account:</b>\n` +
-        `1. Open Instagram on your phone.\n` +
-        `2. Find ANY reel, clip, tutorial, gameplay, or video (in any niche).\n` +
-        `3. Tap <b>Share</b> ➔ choose <b>Telegram</b> ➔ tap <b>@Harsh_insta_omni_ai_agent_bot</b>.\n\n` +
-        `<b>What happens autonomously:</b>\n` +
-        `• 📥 Downloads original uncropped 1080p MP4 media (watermark-free)\n` +
-        `• 🧠 Detects the true niche & topic, crafts viral caption + 6-10 trending hashtags\n` +
-        `• 🎯 Branches automatically: Comment-to-DM Lead Magnet vs Direct Viral Repost\n` +
-        `• 🚀 Publishes directly to <b>${currentHandle}</b> via Meta Graph API v21.0\n` +
-        `• 📱 Immediately replies with the live Instagram post link and sends the clean video file here!`
-      );
-      return;
-    }
-    return;
-  }
-
-  const rawUrl = match[0];
-  const shortcode = match[1];
-  const brand = getBrandAssets();
-  const currentHandle = brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007');
-
-  console.log(`[Telegram Bot] 📱 Shared Reel/Post received from @${fromUser}: ${rawUrl}`);
-
-  // Acknowledge receipt immediately with clear instructions
-  await sendTelegramMessage(
-    chatId,
-    `⏳ <b>Reel Received!</b> (<code>${shortcode}</code>)\n\n` +
-    `🤖 <b>Autonomous Pipeline Activated:</b>\n` +
-    `1. 📥 Downloading high-res 1080p MP4 media...\n` +
-    `2. 🧠 Analyzing topic, stripping competitor tags & writing viral caption + hashtags...\n` +
-    `3. 🚀 Publishing directly to <b>${currentHandle}</b> via Meta Graph API v21.0...\n\n` +
-    `<i>Hold tight! I will notify you here with the live link and video as soon as it is posted.</i>`
-  );
-
-  // Log in mobile_dm_triggers
-  let trigger = addMobileDmTrigger({
-    sender_handle: `@${fromUser}`,
-    source_post_url: rawUrl,
-    shortcode,
-    thread_id: String(chatId),
-    message_id: String(message.message_id || Date.now()),
-    processing_status: 'processing'
-  });
+async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser, chatId }) {
+  const destination = page?.slug || 'gta6';
+  const targetHandle = page?.handle || getSetting('instagram_handle', '@gta6_updates_007');
+  const isLeadMagnetWorkflow = page?.workflow_type === 'lead_magnet';
 
   try {
     const result = await processSinglePost(rawUrl, fromUser, null, {
+      destination: destination,
       autoPublish: true,
-      directPostOnly: false,
+      directPostOnly: !isLeadMagnetWorkflow,
       forceApprove: true
     });
     const log = result.log || {};
@@ -312,14 +313,14 @@ async function handleTelegramMessage(message) {
         // Send MP4 Video
         const vidFile = localMediaFiles.find(f => f.endsWith('.mp4')) || localMediaFiles[0];
         console.log(`[Telegram Bot] 🎥 Uploading video reel to Telegram chat ${chatId}...`);
-        await sendTelegramVideo(chatId, vidFile, `🎬 <b>${escapeHtml(log.repurposed_hook || 'Viral Reel')}</b>\nTarget: ${currentHandle}`);
+        await sendTelegramVideo(chatId, vidFile, `🎬 <b>${escapeHtml(log.repurposed_hook || 'Viral Reel')}</b>\nTarget: ${targetHandle}`);
       } else if (localMediaFiles.length > 0) {
         // Send Multi-Photo Album (up to 10 slides)
         console.log(`[Telegram Bot] 📸 Uploading ${localMediaFiles.length} carousel slides as photo album to chat ${chatId}...`);
         await sendTelegramMediaGroup(
           chatId,
           localMediaFiles.slice(0, 10),
-          `🖼️ <b>${escapeHtml(log.repurposed_hook || 'Carousel Post')}</b> (${localMediaFiles.length} Slides)\nTarget: ${currentHandle}`
+          `🖼️ <b>${escapeHtml(log.repurposed_hook || 'Carousel Post')}</b> (${localMediaFiles.length} Slides)\nTarget: ${targetHandle}`
         );
 
         // If ZIP archive exists, send ZIP document
@@ -341,7 +342,7 @@ async function handleTelegramMessage(message) {
 
       const successHtml = isDirectRepost ? [
         isPublished 
-          ? `🎉 <b>Reel Successfully Published to ${currentHandle}!</b>`
+          ? `🎉 <b>Reel Successfully Published to ${targetHandle}!</b>`
           : `🎬 <b>[Direct Viral Repost] Repurposed & Staged in Queue!</b>`,
         ``,
         ...(isPublished ? [
@@ -353,16 +354,16 @@ async function handleTelegramMessage(message) {
           `🔗 <b>Original Reel Source:</b> <a href="https://www.instagram.com/p/${shortcode}/">https://www.instagram.com/p/${shortcode}/</a>`,
           ``
         ]),
-        `🎬 <b>Target Account:</b> ${currentHandle}`,
-        `⚡ <b>Pipeline Mode:</b> Direct Video Repost (Universal Media / Clean Video)`,
+        `🎬 <b>Target Account:</b> ${targetHandle} (${page?.name || destination})`,
+        `⚡ <b>Pipeline Mode:</b> Direct Video Repost (Clean 1080p MP4 / Competitor Tags Stripped)`,
         `🏷️ <b>Publish Engine:</b> ${publishMethod}`,
         `🎵 <b>Audio Attached:</b> <code>${log.selected_song_title || 'Trending Viral Audio'}</code> (${log.selected_song_artist || 'Original'})`,
-        `🧼 <b>Brand Cleansed:</b> Cleaned for ${currentHandle}`,
+        `🧼 <b>Brand Cleansed:</b> Cleaned for ${targetHandle}`,
         ``,
         `📝 <b>Published Caption:</b>`,
         `<blockquote>${escapeHtml(log.repurposed_caption || log.raw_caption)}</blockquote>`,
         ``,
-        `🚀 <i>The clean video file has been sent below for your records!</i>`
+        `🚀 <i>The clean video file has been sent above for your records!</i>`
       ].join('\n') : [
         isPublished 
           ? `🚀 <b>Directly Published to Instagram!</b>`
@@ -377,12 +378,13 @@ async function handleTelegramMessage(message) {
           `🔗 <b>Original Post Source:</b> <a href="https://www.instagram.com/p/${shortcode}/">https://www.instagram.com/p/${shortcode}/</a>`,
           ``
         ]),
+        `🎬 <b>Target Account:</b> ${targetHandle} (${page?.name || destination})`,
         `⭐ <b>Quality Fit Score:</b> ${log.llm_fit_score || 95}/100 (APPROVED)`,
-        `🎯 <b>Pipeline Mode:</b> Lead Magnet (Comment-to-DM Automation)`,
-        `🎯 <b>DM Trigger Keyword:</b> "${log.detected_trigger_keyword || 'PROJECT'}"`,
+        `🎯 <b>Pipeline Mode:</b> Lead Magnet (Comment Trigger ➔ ManyChat DM ➔ InstaAuto Bridge)`,
+        `🎯 <b>DM Trigger Keyword:</b> "${log.detected_trigger_keyword || page?.custom_trigger_keyword || 'PROJECT'}"`,
         `🏷️ <b>Publish Engine:</b> ${publishMethod}`,
         `🎵 <b>Audio Attached:</b> <code>${log.selected_song_title || 'Trending Viral Audio'}</code> (${log.selected_song_artist || 'Original'})`,
-        `🧼 <b>Brand Cleansed:</b> Watermarks replaced with ${brand.brand_handle || currentHandle}`,
+        `🧼 <b>Brand Cleansed:</b> Watermarks replaced with ${targetHandle}`,
         ``,
         ...(assetUrl ? [
           `🎯 <b>Extracted Creator Resource Link (Sent via DM):</b>`,
@@ -425,6 +427,188 @@ async function handleTelegramMessage(message) {
   }
 }
 
+/**
+ * Handle a message containing an Instagram link received on Telegram
+ */
+async function handleTelegramMessage(message) {
+  const chatId = message.chat?.id;
+  const fromUser = message.from?.username || message.from?.first_name || 'User';
+  const text = message.text || message.caption || '';
+
+  // Extract Instagram URL (handles reels, p, tv, and mobile share queries)
+  const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)[^\s]*/);
+  if (!match) {
+    if (text.startsWith('/start') || text.startsWith('/help')) {
+      const activePages = getConnectedPages({ isActiveOnly: true });
+      const pagesListStr = activePages.length > 0
+        ? activePages.map(p => `• ${p.icon || '📱'} <b>${p.name}</b> (<code>${p.handle}</code>) — <i>${p.workflow_type === 'lead_magnet' ? 'Lead Magnet (DM Harvest + Bridge)' : 'Direct Viral Repost'}</i>`).join('\n')
+        : '• 🎮 <b>GTA 6 Updates 007</b> (<code>@gta6_updates_007</code>)';
+
+      await sendTelegramMessage(
+        chatId,
+        `🚀 <b>OmniResearch — Universal Multi-Account Instagram Hub</b>\n\n` +
+        `<b>Connected Instagram Destination Accounts:</b>\n` +
+        `${pagesListStr}\n\n` +
+        `<b>How to Auto-Post Any Reel from Mobile:</b>\n` +
+        `1. Open Instagram on your mobile device.\n` +
+        `2. Find ANY reel, gameplay clip, tech tutorial, or carousel post.\n` +
+        `3. Tap <b>Share</b> ➔ choose <b>Telegram</b> ➔ send to this bot.\n` +
+        `4. <b>Interactive Selection:</b> The bot will ask which account you want to post to.\n` +
+        `5. Tap the desired account button and the specialized pipeline runs autonomously!\n\n` +
+        `<i>Try sharing any Instagram Reel here right now!</i>`
+      );
+      return;
+    }
+    return;
+  }
+
+  const rawUrl = match[0];
+  const shortcode = match[1];
+
+  console.log(`[Telegram Bot] 📱 Shared Reel/Post received from @${fromUser}: ${rawUrl}`);
+
+  // Fetch active connected pages
+  const activePages = getConnectedPages({ isActiveOnly: true });
+
+  // If active pages exist, present interactive destination selection buttons
+  if (activePages && activePages.length > 0) {
+    const trigger = addMobileDmTrigger({
+      sender_handle: `@${fromUser}`,
+      source_post_url: rawUrl,
+      shortcode,
+      thread_id: String(chatId),
+      message_id: String(message.message_id || Date.now()),
+      processing_status: 'waiting_selection'
+    });
+
+    // Build inline keyboard rows (max 2 buttons per row)
+    const inline_keyboard = [];
+    let currentRow = [];
+    for (const p of activePages) {
+      currentRow.push({
+        text: `${p.icon || '📱'} ${p.name}`,
+        callback_data: `dest:${p.slug}:${trigger.id}`
+      });
+      if (currentRow.length === 2) {
+        inline_keyboard.push(currentRow);
+        currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) {
+      inline_keyboard.push(currentRow);
+    }
+
+    const promptText = `🎯 <b>New Reel Received!</b> (<code>${shortcode}</code>)\n\n` +
+      `<b>Where should this content be published?</b>\n` +
+      `Select the destination account below to dispatch its specialized pipeline:`;
+
+    await sendTelegramMessage(chatId, promptText, {
+      reply_markup: {
+        inline_keyboard
+      }
+    });
+    return;
+  }
+
+  // Fallback: Legacy single-account flow
+  const brand = getBrandAssets();
+  const currentHandle = brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007');
+
+  await sendTelegramMessage(
+    chatId,
+    `⏳ <b>Reel Received!</b> (<code>${shortcode}</code>)\n\n` +
+    `🤖 <b>Autonomous Pipeline Activated for ${currentHandle}:</b>\n` +
+    `1. 📥 Downloading high-res 1080p MP4 media...\n` +
+    `2. 🧠 Analyzing topic, stripping competitor tags & writing viral caption + hashtags...\n` +
+    `3. 🚀 Publishing directly to <b>${currentHandle}</b> via Meta Graph API v21.0...\n\n` +
+    `<i>Hold tight! Media file and live link will be delivered shortly.</i>`
+  );
+
+  const trigger = addMobileDmTrigger({
+    sender_handle: `@${fromUser}`,
+    source_post_url: rawUrl,
+    shortcode,
+    thread_id: String(chatId),
+    message_id: String(message.message_id || Date.now()),
+    processing_status: 'processing'
+  });
+
+  await executePostWorkflow({
+    trigger,
+    page: { slug: 'gta6', name: 'GTA 6 Updates', handle: currentHandle, workflow_type: 'direct_repost' },
+    rawUrl,
+    shortcode,
+    fromUser,
+    chatId
+  });
+}
+
+/**
+ * Handle incoming callback query from interactive Telegram inline buttons
+ */
+async function handleTelegramCallbackQuery(query) {
+  const data = query.data || '';
+  const queryId = query.id;
+  const chatId = query.message?.chat?.id;
+  const messageId = query.message?.message_id;
+  const fromUser = query.from?.username || query.from?.first_name || 'User';
+
+  if (!data.startsWith('dest:')) return;
+
+  const parts = data.split(':');
+  const slug = parts[1];
+  const triggerId = parseInt(parts[2], 10);
+
+  const page = getConnectedPageBySlug(slug);
+  const trigger = getMobileDmTriggerById(triggerId);
+
+  if (!trigger) {
+    await answerCallbackQuery(queryId, '⚠️ Request not found or expired.', true);
+    return;
+  }
+
+  if (trigger.processing_status !== 'waiting_selection') {
+    await answerCallbackQuery(queryId, '⚠️ This post has already been dispatched.', true);
+    return;
+  }
+
+  const pageName = page?.name || slug;
+  const pageHandle = page?.handle || '@' + slug;
+  await answerCallbackQuery(queryId, `🚀 Routing to ${pageName}...`);
+
+  // Update trigger status
+  updateMobileDmTrigger(trigger.id, {
+    destination_account: slug,
+    connected_page_id: page?.id || null,
+    selected_workflow: page?.workflow_type || 'direct_repost',
+    processing_status: 'processing'
+  });
+
+  const isLeadMagnet = page?.workflow_type === 'lead_magnet';
+  const workflowLabel = isLeadMagnet
+    ? '🎯 Lead Magnet (Trigger Comment ➔ ManyChat DM Harvest ➔ InstaAuto Bridge)'
+    : '🎬 Direct Viral Repost (Clean 1080p MP4 Transcode ➔ Direct Feed Publish)';
+
+  // Edit original message to remove buttons and show confirmation
+  await editTelegramMessageText(
+    chatId,
+    messageId,
+    `✅ <b>Destination Selected: ${page?.icon || '📱'} ${pageName}</b> (<code>${pageHandle}</code>)\n\n` +
+    `⚙️ <b>Pipeline Workflow:</b>\n${workflowLabel}\n\n` +
+    `⏳ <i>Autonomous pipeline is now running... I will deliver the clean media file and live post link right here!</i>`
+  );
+
+  // Execute pipeline
+  await executePostWorkflow({
+    trigger,
+    page: page || { slug, name: slug, handle: pageHandle, workflow_type: 'direct_repost' },
+    rawUrl: trigger.source_post_url,
+    shortcode: trigger.shortcode,
+    fromUser,
+    chatId
+  });
+}
+
 function escapeHtml(text) {
   if (!text) return '';
   return String(text)
@@ -434,7 +618,7 @@ function escapeHtml(text) {
 }
 
 /**
- * Long-polling loop for Telegram updates
+ * Long-polling loop for Telegram updates (supports message and callback_query)
  */
 async function pollTelegramUpdates() {
   if (!isPolling) return;
@@ -449,7 +633,7 @@ async function pollTelegramUpdates() {
       params: {
         offset: lastUpdateId + 1,
         timeout: 15,
-        allowed_updates: JSON.stringify(['message'])
+        allowed_updates: JSON.stringify(['message', 'callback_query'])
       },
       timeout: 25000
     });
@@ -457,7 +641,9 @@ async function pollTelegramUpdates() {
     const updates = res.data?.result || [];
     for (const update of updates) {
       lastUpdateId = Math.max(lastUpdateId, update.update_id);
-      if (update.message) {
+      if (update.callback_query) {
+        handleTelegramCallbackQuery(update.callback_query).catch(e => console.error('[Telegram Callback Error]:', e));
+      } else if (update.message) {
         handleTelegramMessage(update.message).catch(e => console.error('[Telegram Handler Error]:', e));
       }
     }
@@ -480,7 +666,7 @@ function startTelegramListener() {
       return;
     }
     isPolling = true;
-    console.log('[Telegram Bot] 🚀 Starting Telegram Mobile Share Listener with Full-Media Delivery...');
+    console.log('[Telegram Bot] 🚀 Starting Telegram Multi-Account Interactive Listener...');
     pollTelegramUpdates();
   }
 }
@@ -499,6 +685,10 @@ module.exports = {
   sendTelegramMediaGroup,
   sendTelegramVideo,
   sendTelegramDocument,
+  answerCallbackQuery,
+  editTelegramMessageText,
   handleTelegramMessage,
+  handleTelegramCallbackQuery,
+  executePostWorkflow,
   getTelegramBotInfo
 };

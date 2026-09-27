@@ -10,7 +10,13 @@ const {
   getBrandAssets, 
   setBrandAssets,
   getSetting,
-  setSetting
+  setSetting,
+  getConnectedPages,
+  getConnectedPageBySlug,
+  getConnectedPageById,
+  createConnectedPage,
+  updateConnectedPage,
+  deleteConnectedPage
 } = require('../database');
 const { recommendTrendingAudio, getAllTrendingTracks } = require('../services/trendingAudioService');
 const { publishCarouselToInstagram, publishReelToInstagram, publishImageToInstagram, executePublishPipeline } = require('../services/instagramPublisher');
@@ -1550,6 +1556,146 @@ router.post('/instaauto/simulate-comment', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/instagram/pages
+ * Returns all connected Instagram destination pages
+ */
+router.get('/pages', (req, res) => {
+  try {
+    const isActiveOnly = req.query.active === '1' || req.query.active === 'true';
+    const pages = getConnectedPages({ isActiveOnly });
+    res.json({ success: true, count: pages.length, pages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/instagram/pages/:id
+ */
+router.get('/pages/:id', (req, res) => {
+  try {
+    const page = getConnectedPageById(parseInt(req.params.id, 10));
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+    res.json({ success: true, page });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/pages
+ * Register a new connected Instagram destination page
+ */
+router.post('/pages', (req, res) => {
+  try {
+    const { slug, name, handle, meta_page_token, meta_ig_user_id, niche, workflow_type } = req.body || {};
+    if (!slug || !name) return res.status(400).json({ success: false, error: 'slug and name are required' });
+    const existing = getConnectedPageBySlug(slug);
+    if (existing) return res.status(409).json({ success: false, error: `Page with slug "${slug}" already exists` });
+    const page = createConnectedPage({
+      slug, name,
+      handle: handle || `@${slug}`,
+      meta_page_token: meta_page_token || '',
+      meta_ig_user_id: meta_ig_user_id || '',
+      niche: niche || 'general',
+      workflow_type: workflow_type || 'direct_repost',
+      icon: req.body.icon || '📱',
+      theme_color: req.body.theme_color || '#7C3AED',
+      has_dm_automation: req.body.has_dm_automation !== undefined ? req.body.has_dm_automation : (workflow_type === 'lead_magnet' ? 1 : 0),
+      custom_trigger_keyword: req.body.custom_trigger_keyword || 'PROJECT',
+      instaauto_enabled: req.body.instaauto_enabled !== undefined ? req.body.instaauto_enabled : 1,
+      attribution_template: req.body.attribution_template || `Credit: ${handle || slug}`,
+      autopilot_enabled: req.body.autopilot_enabled !== undefined ? req.body.autopilot_enabled : 0,
+      daily_quota: req.body.daily_quota || 10,
+      is_active: req.body.is_active !== undefined ? req.body.is_active : 1
+    });
+    res.json({ success: true, page, message: `Page "${name}" registered successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/instagram/pages/:id
+ */
+router.put('/pages/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getConnectedPageById(id);
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+    const updated = updateConnectedPage(id, req.body);
+    res.json({ success: true, page: updated, message: 'Page updated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/instagram/pages/:id
+ */
+router.delete('/pages/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getConnectedPageById(id);
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+    deleteConnectedPage(id);
+    res.json({ success: true, message: `Page "${page.name}" deleted successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/pages/:id/toggle
+ */
+router.post('/pages/:id/toggle', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getConnectedPageById(id);
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+    const updated = updateConnectedPage(id, { is_active: page.is_active ? 0 : 1 });
+    res.json({ success: true, page: updated, message: `Page "${page.name}" ${updated.is_active ? 'activated' : 'paused'} successfully` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/pages/:id/test-handshake
+ * Live-test Meta Graph API credentials for a connected page
+ */
+router.post('/pages/:id/test-handshake', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getConnectedPageById(id);
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+
+    const { meta_page_token: token, meta_ig_user_id: igUserId } = page;
+    if (!token || token.length < 20 || !igUserId) {
+      return res.json({ success: false, status: 'unconfigured', message: 'Meta credentials not configured. Enter Page Token & IG User ID in Settings.' });
+    }
+
+    const graphBase = (token.startsWith('IGAA') || token.startsWith('IGQJ') || token.startsWith('IG'))
+      ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0';
+
+    const axios = require('axios');
+    const apiRes = await axios.get(`${graphBase}/${igUserId}`, {
+      params: { fields: 'id,username,name,biography,followers_count,media_count', access_token: token },
+      timeout: 10000
+    });
+    const data = apiRes.data;
+    res.json({
+      success: true, status: 'connected',
+      page: page.name, handle: page.handle,
+      meta_username: data.username,
+      followers: data.followers_count, media_count: data.media_count,
+      bio: data.biography, graph_endpoint: graphBase
+    });
+  } catch (err) {
+    const errMsg = err.response?.data?.error?.message || err.message;
+    res.json({ success: false, status: 'error', message: `Graph API handshake failed: ${errMsg}` });
+  }
+});
+
 module.exports = router;
-
-

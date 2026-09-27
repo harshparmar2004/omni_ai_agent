@@ -10,7 +10,8 @@ const {
   getAutonomousLogs,
   getAutonomousLogById,
   getAutonomousLogByShortcode,
-  getBrandAssets
+  getBrandAssets,
+  getConnectedPageBySlug
 } = require('../database');
 
 const { downloadInstagramMedia } = require('./instagramDownloaderService');
@@ -166,7 +167,30 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   });
 
   // ── Step 4: Autonomous Lead Magnet vs Direct Repost Branching ────────────
-  const isDirectRepost = Boolean(options.directPostOnly) || rankResult.post_intent === 'direct_repost' || !rankResult.detected_trigger_keyword;
+  const channel = channelId ? getTrackedChannelById(channelId) : null;
+  const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
+  const targetPage = getConnectedPageBySlug(destination);
+
+  let isDirectRepost;
+  if (options.directPostOnly) {
+    isDirectRepost = true;
+  } else if (targetPage) {
+    if (targetPage.workflow_type === 'direct_repost') {
+      isDirectRepost = true;
+    } else if (targetPage.workflow_type === 'lead_magnet') {
+      isDirectRepost = false;
+    } else {
+      isDirectRepost = rankResult.post_intent === 'direct_repost' || !rankResult.detected_trigger_keyword;
+    }
+  } else {
+    isDirectRepost = rankResult.post_intent === 'direct_repost' || !rankResult.detected_trigger_keyword;
+  }
+
+  // Ensure trigger keyword is set if lead magnet mode is active
+  if (!isDirectRepost && !rankResult.detected_trigger_keyword) {
+    rankResult.detected_trigger_keyword = targetPage?.custom_trigger_keyword || 'PROJECT';
+  }
+
   let harvestResult = {
     harvested_deliverable_url: '',
     harvested_deliverable_type: 'none',
@@ -177,13 +201,13 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   };
 
   if (isDirectRepost) {
-    console.log(`[Autonomous Agent] ⚡ Direct Viral Repost Mode (Video Posting Only): Skipping resource extraction and PDF synthesis.`);
+    console.log(`[Autonomous Agent] ⚡ Direct Viral Repost Mode [${destination.toUpperCase()}]: Skipping resource extraction and PDF synthesis.`);
     log = updateAutonomousLog(log.id, {
       post_intent: 'direct_repost',
       status: 'cleansed'
     });
   } else {
-    console.log(`[Autonomous Agent] 🎯 Lead Magnet Mode: Harvesting lead magnet for keyword "${rankResult.detected_trigger_keyword}"...`);
+    console.log(`[Autonomous Agent] 🎯 Lead Magnet Mode [${destination.toUpperCase()}]: Harvesting lead magnet for keyword "${rankResult.detected_trigger_keyword}"...`);
     harvestResult = await harvestLeadMagnet({
       source_post_url: postUrl,
       channel_username: author,
@@ -192,7 +216,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       repurposed_hook: rankResult.repurposed_hook,
       detected_topic: rankResult.detected_topic,
       detected_trigger_keyword: rankResult.detected_trigger_keyword,
-      brand_handle: brand.brand_handle,
+      brand_handle: targetPage?.handle || brand.brand_handle,
       shortcode
     });
 
@@ -216,15 +240,12 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   });
 
   // ── Step 6: Stage into Ready to Post Queue (instagram_posts) ───────────
-  console.log(`[Autonomous Agent] 📥 Staging into Ready to Post Queue (${isDirectRepost ? 'Direct Repost' : 'Lead Magnet'})...`);
+  console.log(`[Autonomous Agent] 📥 Staging into Ready to Post Queue for [${destination.toUpperCase()}] (${isDirectRepost ? 'Direct Repost' : 'Lead Magnet'})...`);
   const db = getDb();
   const effectiveMediaUrls = mediaCleanse.cleanedMediaPaths.length > 0 ? mediaCleanse.cleanedMediaPaths : mediaPaths;
   const thumbnail = effectiveMediaUrls[0] || '/generated/assets/brand_logo.svg';
 
   const originSource = channelId ? `channel:@${author || 'monitored'}` : 'mobile_bot';
-
-  const channel = channelId ? getTrackedChannelById(channelId) : null;
-  const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
 
   const insertPost = db.prepare(`
     INSERT INTO instagram_posts (
@@ -259,13 +280,13 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   updateAutonomousLog(log.id, { staged_post_id: postId, destination_account: destination });
 
   // ── Step 7: Check Auto-Pilot / Direct Publish Mode ───────────────────────
-  const autoPilotGlobal = getSetting('instagram_autopilot_enabled', '0') === '1';
+  const autoPilotGlobal = getSetting('instagram_autopilot_enabled', '0') === '1' || (targetPage?.autopilot_enabled === 1);
   const autoPilotChannel = channelId ? (getTrackedChannelById(channelId)?.auto_post_enabled === 1) : false;
   const shouldAutoPublish = Boolean(options.autoPublish || autoPilotGlobal || autoPilotChannel);
 
   let publishResult = null;
   if (shouldAutoPublish) {
-    console.log(`[Autonomous Agent] 🚀 Auto-Publish is ACTIVE! Direct publishing post #${postId} via Meta/Microservice API...`);
+    console.log(`[Autonomous Agent] 🚀 Auto-Publish is ACTIVE! Direct publishing post #${postId} via Meta/Microservice API to [${destination.toUpperCase()}]...`);
     try {
       const { executePublishPipeline } = require('./instagramPublisher');
       publishResult = await executePublishPipeline(postId);
@@ -277,6 +298,25 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
         ig_permalink: publishResult.permalink,
         published_at: publishResult.published_at
       });
+
+      // Arm InstaAuto Bridge if lead magnet
+      if (publishResult?.success && publishResult?.ig_media_id && targetPage?.workflow_type === 'lead_magnet' && targetPage?.instaauto_enabled !== 0) {
+        try {
+          const { pushToInstaAutoBridge } = require('./bridgeService');
+          await pushToInstaAutoBridge({
+            topic: rankResult.detected_topic || 'Lead Magnet',
+            leadMagnetTitle: rankResult.repurposed_hook || 'Free Resource',
+            triggerKeyword: rankResult.detected_trigger_keyword || targetPage?.custom_trigger_keyword || 'PROJECT',
+            deliverableUrl: harvestResult.harvested_deliverable_url || '',
+            igMediaId: publishResult.ig_media_id,
+            igPermalink: publishResult.permalink,
+            caption: captionCleanse.cleanedCaption,
+            contentType: contentType === 'reel' ? 'reel' : 'carousel'
+          });
+        } catch (bridgeErr) {
+          console.warn(`[Autonomous Agent] Bridge auto-arm notice: ${bridgeErr.message}`);
+        }
+      }
     } catch (pubErr) {
       console.error(`[Autonomous Agent] Auto-publish error: ${pubErr.message}`);
       log = updateAutonomousLog(log.id, { status: 'staged' });

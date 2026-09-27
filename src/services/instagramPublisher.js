@@ -1,7 +1,7 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
-const { getSetting } = require('../database');
+const { getSetting, getConnectedPageBySlug } = require('../database');
 const { ensureTunnelOnline, getTunnelUrl } = require('./tunnelService');
 
 /**
@@ -25,9 +25,28 @@ function getGraphBaseUrl(token) {
 
 /**
  * Contextual Multi-Tenant Credential Resolver
+ * Dynamically resolves credentials from connected_pages registry or legacy settings
  * Strictly isolates destination credentials so Tech news never posts to GTA 6 account
  */
 function resolvePublishCredentials(destination = 'gta6') {
+  try {
+    const page = getConnectedPageBySlug(destination);
+    if (page && page.meta_page_token && page.meta_page_token.length > 20 && page.meta_ig_user_id) {
+      return {
+        pageToken: page.meta_page_token,
+        igUserId: page.meta_ig_user_id,
+        handle: page.handle || '@' + page.slug,
+        destination: page.slug,
+        workflowType: page.workflow_type,
+        pageId: page.id,
+        name: page.name
+      };
+    }
+  } catch (err) {
+    console.warn(`[IG Publisher] Warning looking up connected page for ${destination}: ${err.message}`);
+  }
+
+  // Legacy fallback for 'tech'
   if (destination === 'tech') {
     const techToken = getSetting('tech_meta_page_token');
     const techUserId = getSetting('tech_meta_ig_user_id');
@@ -36,16 +55,19 @@ function resolvePublishCredentials(destination = 'gta6') {
         pageToken: techToken,
         igUserId: techUserId,
         handle: getSetting('tech_instagram_handle', '@technews_daily_ai'),
-        destination: 'tech'
+        destination: 'tech',
+        workflowType: 'lead_magnet'
       };
     }
   }
+
   // Default GTA 6 fallback (strictly preserves existing flow 100%)
   return {
     pageToken: getSetting('meta_page_token') || process.env.META_PAGE_TOKEN,
     igUserId: getSetting('meta_ig_user_id') || process.env.META_IG_USER_ID,
     handle: getSetting('instagram_handle', '@gta6_updates_007'),
-    destination: 'gta6'
+    destination: 'gta6',
+    workflowType: 'direct_repost'
   };
 }
 
