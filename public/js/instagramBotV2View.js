@@ -528,6 +528,9 @@ const instagramBotV2View = {
           <button class="bot-tab-btn ${this.activeTab === 'compliance' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('compliance')">
             <span>🛡️ Meta Compliance & Anti-Ban</span>
           </button>
+          <button class="bot-tab-btn ${this.activeTab === 'harvest_monitor' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('harvest_monitor')">
+            <span>🎯 Resource Harvest Monitor</span>
+          </button>
           <button class="bot-tab-btn ${this.activeTab === 'engine' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('engine')">
             <span>⚙️ Automation Settings</span>
           </button>
@@ -552,6 +555,7 @@ const instagramBotV2View = {
     if (this.activeTab === 'feed') return this.renderFeedTab();
     if (this.activeTab === 'history') return this.renderHistoryArchiveTab();
     if (this.activeTab === 'compliance') return this.renderComplianceTab();
+    if (this.activeTab === 'harvest_monitor') return this.renderHarvestMonitorTab();
     if (this.activeTab === 'engine') return this.renderEngineTab();
     return this.renderRankingArenaTab();
   },
@@ -1351,6 +1355,70 @@ const instagramBotV2View = {
 
       </div>
     `;
+  },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // TAB: RESOURCE HARVEST MONITOR (V2) — shared with V1 bot
+  // ══════════════════════════════════════════════════════════════════════════
+  renderHarvestMonitorTab() {
+    if (!this._harvestData) {
+      fetch('/api/instagram/mobile-dm/harvest-monitor?limit=50')
+        .then(r => r.json())
+        .then(data => {
+          this._harvestData = data;
+          if (this.activeTab === 'harvest_monitor') {
+            const area = document.getElementById('v2-harvest-monitor-area');
+            if (area) area.innerHTML = (typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable)
+              ? instagramBotView._buildHarvestTable(data)
+              : this._buildHarvestTable(data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    const data = this._harvestData;
+    const stats = data?.stats || {};
+    const tableHtml = data
+      ? ((typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable)
+          ? instagramBotView._buildHarvestTable(data)
+          : this._buildHarvestTable(data))
+      : '<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">⏳ Loading harvest events...</div>';
+
+    return `
+      <div style="display:flex;flex-direction:column;gap:1.5rem;" id="v2-harvest-monitor-area">
+        <div class="card" style="padding:1.5rem;border-left:4px solid var(--accent);background:linear-gradient(135deg,rgba(217,119,87,0.04),rgba(124,58,237,0.04));">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+            <div>
+              <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;color:var(--accent);margin-bottom:4px;">🎯 Resource Harvest Intelligence</div>
+              <h3 style="font-size:1.25rem;font-weight:800;margin:0 0 0.3rem 0;">Comment → DM → Extract Monitor</h3>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin:0;max-width:600px;">
+                Real-time log of every reel our agent harvested — trigger keyword detected by LLM, comment posted on creator's post, ManyChat DM intercepted, resource link extracted. All clicks open the actual resource or live post.
+              </p>
+            </div>
+            <button class="btn btn-secondary" onclick="instagramBotV2View._harvestData=null;instagramBotV2View.switchTab('harvest_monitor');" style="font-weight:700;">🔄 Refresh</button>
+          </div>
+          ${stats.total !== undefined ? `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.75rem;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border-color);">
+            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;">${stats.total}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Total Events</div></div>
+            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#0284C7;">${stats.comments_posted}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">💬 Comments</div></div>
+            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#7C3AED;">${stats.dms_received}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">📨 DMs Received</div></div>
+            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:var(--accent);">${stats.resources_extracted}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">🔗 Resources</div></div>
+            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#10B981;">${stats.published}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">✅ Published</div></div>
+          </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">⏳ Loading...</div>'}
+        </div>
+        ${tableHtml}
+      </div>
+    `;
+  },
+
+  // Fallback table builder for V2 (delegates to V1 if available)
+  _buildHarvestTable(data) {
+    if (typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable) {
+      return instagramBotView._buildHarvestTable(data);
+    }
+    const events = data?.events || [];
+    if (!events.length) return '<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">No harvest events found.</div>';
+    return '<div class="card" style="padding:1rem;color:var(--text-muted);font-size:0.85rem;">Open V1 Share-to-DM Bot to see the full harvest monitor table.</div>';
   },
 
   // ══════════════════════════════════════════════════════════════════════════

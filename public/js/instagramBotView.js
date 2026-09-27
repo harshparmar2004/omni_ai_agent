@@ -258,6 +258,9 @@ const instagramBotView = {
           <button class="bot-tab-btn ${this.activeTab === 'inspector' ? 'active' : ''}" onclick="instagramBotView.switchTab('inspector')">
             <span>🔍 Deep Reel Inspector & Studio</span>
           </button>
+          <button class="bot-tab-btn ${this.activeTab === 'harvest_monitor' ? 'active' : ''}" onclick="instagramBotView.switchTab('harvest_monitor')">
+            <span>🎯 Resource Harvest Monitor</span>
+          </button>
           <button class="bot-tab-btn ${this.activeTab === 'bot_settings' ? 'active' : ''}" onclick="instagramBotView.switchTab('bot_settings')">
             <span>⚙️ Bot Controls & Automation</span>
           </button>
@@ -277,6 +280,8 @@ const instagramBotView = {
       return this.renderDeepInspectorTab(activeTrigger, parsedUrl);
     } else if (this.activeTab === 'bot_settings') {
       return this.renderBotSettingsTab();
+    } else if (this.activeTab === 'harvest_monitor') {
+      return this.renderHarvestMonitorTab();
     }
     // Default: 'pipeline'
     return this.renderVisualPipelineTab(activeTrigger, parsedUrl);
@@ -918,6 +923,165 @@ const instagramBotView = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════════
+  // TAB: RESOURCE HARVEST MONITOR — Comment → DM → Extract → Publish tracker
+  // ══════════════════════════════════════════════════════════════════════════
+  renderHarvestMonitorTab() {
+    // Async-load and re-render when data arrives
+    if (!this._harvestData) {
+      fetch('/api/instagram/mobile-dm/harvest-monitor?limit=50')
+        .then(r => r.json())
+        .then(data => {
+          this._harvestData = data;
+          if (this.activeTab === 'harvest_monitor') {
+            const area = document.getElementById('bot-harvest-monitor-area');
+            if (area) area.innerHTML = instagramBotView._buildHarvestTable(data);
+          }
+        })
+        .catch(() => {});
+    }
+
+    const data = this._harvestData;
+    const stats = data?.stats || {};
+
+    return `
+      <div style="display:flex; flex-direction:column; gap:1.5rem;" id="bot-harvest-monitor-area">
+        <!-- Header -->
+        <div class="card" style="padding:1.5rem; border-left:4px solid var(--accent); background: linear-gradient(135deg,rgba(217,119,87,0.04),rgba(124,58,237,0.04));">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem;">
+            <div>
+              <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;color:var(--accent);margin-bottom:4px;">🎯 Resource Harvest Intelligence</div>
+              <h3 style="font-size:1.25rem;font-weight:800;margin:0 0 0.3rem 0;">Comment → DM → Extract Monitor</h3>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin:0;max-width:600px;">
+                Every reel our agent processed is tracked here: the source post, the trigger keyword extracted by LLM, whether our bot commented, whether the ManyChat DM was received, and the extracted resource link.
+              </p>
+            </div>
+            <button class="btn btn-secondary" onclick="instagramBotView._harvestData=null; instagramBotView.switchTab('harvest_monitor');" style="font-weight:700;">🔄 Refresh</button>
+          </div>
+
+          <!-- KPI Strip -->
+          ${stats.total !== undefined ? `
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:0.75rem; margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid var(--border-color);">
+            <div style="text-align:center;">
+              <div style="font-size:1.6rem;font-weight:800;color:var(--text-primary);">${stats.total}</div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Total Events</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:1.6rem;font-weight:800;color:#0284C7;">${stats.comments_posted}</div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">💬 Comments Posted</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:1.6rem;font-weight:800;color:#7C3AED;">${stats.dms_received}</div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">📨 DMs Received</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:1.6rem;font-weight:800;color:var(--accent);">${stats.resources_extracted}</div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">🔗 Resources Extracted</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:1.6rem;font-weight:800;color:#10B981;">${stats.published}</div>
+              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">✅ Published</div>
+            </div>
+          </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">⏳ Loading harvest data...</div>'}
+        </div>
+
+        <!-- Table -->
+        ${data ? this._buildHarvestTable(data) : '<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">⏳ Loading harvest events...</div>'}
+      </div>
+    `;
+  },
+
+  _buildHarvestTable(data) {
+    const events = data?.events || [];
+    if (events.length === 0) {
+      return `<div class="card" style="padding:3rem;text-align:center;">
+        <div style="font-size:2rem;margin-bottom:1rem;">🎯</div>
+        <h4 style="font-weight:800;margin:0 0 0.5rem 0;">No Harvest Events Yet</h4>
+        <p style="color:var(--text-secondary);font-size:0.85rem;">Share a reel with a "Comment FREE" style caption via Telegram to start the harvest pipeline.</p>
+      </div>`;
+    }
+
+    const stepBadge = (done, label, ts) => {
+      if (done) return `<span style="background:#E8F5E9;color:#2E7D32;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap;">✅ ${label}${ts ? '<br><span style=\\'font-size:0.65rem;color:#555;\\'>' + new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</span>`;
+      return `<span style="background:#F3F4F6;color:#9CA3AF;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;">⏸ ${label}</span>`;
+    };
+
+    return `
+      <div class="card" style="padding:1.5rem;overflow-x:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.5rem;">
+          <h4 style="font-size:1.05rem;font-weight:800;margin:0;">🎯 Harvest Event Log <span style="font-weight:400;font-size:0.8rem;color:var(--text-muted);">(${events.length} events)</span></h4>
+          <span style="font-size:0.78rem;color:var(--text-muted);">Newest first · All times IST</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;min-width:900px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border-color);color:var(--text-muted);font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">
+              <th style="padding:0.6rem 0.75rem;text-align:left;">#</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">Source Reel</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">Trigger Keyword</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">💬 Comment</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">📨 DM Received</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">🔗 Extracted Resource</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">⏱ Extracted At</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">Destination</th>
+              <th style="padding:0.6rem 0.75rem;text-align:left;">Status</th>
+              <th style="padding:0.6rem 0.75rem;text-align:right;">Live Post</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${events.map((e, i) => {
+              const sourceUrl = e.source_post_url || '#';
+              const shortcode = e.shortcode || '—';
+              const creator = e.source_creator || '—';
+              const keyword = e.detected_trigger_keyword;
+              const delivUrl = e.harvested_deliverable_url;
+              const delivType = e.harvested_deliverable_type || 'resource';
+              const extractedAt = e.extracted_at ? new Date(e.extracted_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'}) : '—';
+              const createdAt = e.created_at ? new Date(e.created_at).toLocaleString('en-IN',{dateStyle:'short',timeStyle:'short'}) : '—';
+              const statusColors = { published:'#E8F5E9::#2E7D32', processing:'#FFF3E0::#E65100', failed:'#FFEBEE::#C62828', waiting_selection:'#F0F4FF::#3B4BC8', pending:'#F9FAFB::#6B7280' };
+              const [bgC, txtC] = (statusColors[e.processing_status] || '#F9FAFB::#6B7280').split('::');
+              const statusLabel = { published:'✅ Published', processing:'⚙️ Processing', failed:'❌ Failed', waiting_selection:'⏳ Awaiting Page', pending:'⏸ Pending' }[e.processing_status] || e.processing_status;
+              return `
+              <tr style="border-bottom:1px solid var(--border-color);" onmouseover="this.style.background='var(--bg-hover,#F8FAFC)'" onmouseout="this.style.background=''">
+                <td style="padding:0.7rem 0.75rem;color:var(--text-muted);font-size:0.75rem;">${events.length - i}</td>
+                <td style="padding:0.7rem 0.75rem;">
+                  <a href="${escapeHtml(sourceUrl)}" target="_blank" style="font-weight:700;color:var(--accent);text-decoration:none;font-size:0.8rem;">
+                    📹 ${escapeHtml(shortcode)}
+                  </a>
+                  <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">by ${escapeHtml(creator)}</div>
+                  <div style="font-size:0.68rem;color:var(--text-muted);">${createdAt}</div>
+                </td>
+                <td style="padding:0.7rem 0.75rem;">
+                  ${keyword ? `<span style="background:var(--accent);color:#fff;font-weight:800;font-size:0.72rem;padding:3px 9px;border-radius:12px;">"${escapeHtml(keyword)}"</span>` : `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">No keyword</span>`}
+                </td>
+                <td style="padding:0.7rem 0.75rem;">${stepBadge(e.dm_comment_posted, 'Commented', e.comment_posted_at)}</td>
+                <td style="padding:0.7rem 0.75rem;">${stepBadge(e.dm_response_received, 'DM Received', e.dm_received_at)}</td>
+                <td style="padding:0.7rem 0.75rem;max-width:200px;">
+                  ${delivUrl ? `
+                    <a href="${escapeHtml(delivUrl)}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:700;font-size:0.78rem;display:inline-flex;align-items:center;gap:4px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(delivUrl)}">
+                      ${delivType === 'pdf' ? '📄 PDF' : delivType === 'notion' ? '📓 Notion' : delivType === 'github' ? '💻 GitHub' : '🔗 Resource'} ↗
+                    </a>
+                    <div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(delivUrl)}</div>
+                  ` : `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">Not extracted</span>`}
+                </td>
+                <td style="padding:0.7rem 0.75rem;color:var(--text-muted);font-size:0.75rem;white-space:nowrap;">${extractedAt}</td>
+                <td style="padding:0.7rem 0.75rem;">
+                  ${e.destination_account ? `<span style="font-weight:700;font-size:0.78rem;">@${escapeHtml(e.destination_account)}</span>` : '—'}
+                  ${e.selected_workflow ? `<div style="font-size:0.68rem;color:var(--text-muted);">${e.selected_workflow === 'lead_magnet' ? '🎯 Lead Magnet' : '⚡ Direct Repost'}</div>` : ''}
+                </td>
+                <td style="padding:0.7rem 0.75rem;">
+                  <span style="background:${bgC};color:${txtC};font-weight:700;font-size:0.72rem;padding:3px 8px;border-radius:10px;">${statusLabel}</span>
+                </td>
+                <td style="padding:0.7rem 0.75rem;text-align:right;">
+                  ${e.live_post_permalink ? `<a href="${escapeHtml(e.live_post_permalink)}" target="_blank" class="btn btn-secondary btn-xs" style="font-weight:700;text-decoration:none;padding:4px 9px;font-size:0.75rem;white-space:nowrap;">View IG ↗</a>` : `<span style="font-size:0.75rem;color:var(--text-muted);">—</span>`}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
   // TAB 4: BOT CONTROL CENTER & OPTIONS
   // ══════════════════════════════════════════════════════════════════════════
   renderBotSettingsTab() {

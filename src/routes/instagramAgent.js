@@ -893,6 +893,69 @@ router.get('/mobile-dm/triggers', (req, res) => {
 });
 
 /**
+ * GET /api/instagram/mobile-dm/harvest-monitor
+ * Returns structured resource harvest event log for the UI monitor panel.
+ * Shows every trigger that had lead magnet / comment harvesting activity.
+ */
+router.get('/mobile-dm/harvest-monitor', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit || '50', 10);
+    const all = getMobileDmTriggers(limit);
+
+    const events = all.map(t => {
+      const log = typeof t.log === 'string' ? (() => { try { return JSON.parse(t.log); } catch(e) { return {}; } })() : (t.log || {});
+      const post = typeof t.post === 'string' ? (() => { try { return JSON.parse(t.post); } catch(e) { return {}; } })() : (t.post || {});
+      const resources = typeof t.extracted_resources === 'string' ? (() => { try { return JSON.parse(t.extracted_resources); } catch(e) { return []; } })() : (t.extracted_resources || []);
+
+      return {
+        id: t.id,
+        // Source reel info
+        source_post_url: t.source_post_url || log.source_post_url || '',
+        shortcode: t.shortcode || log.shortcode || '',
+        source_creator: t.sender_handle || log.channel_username || '',
+        // Keyword extracted by LLM
+        detected_trigger_keyword: t.detected_trigger_keyword || t.trigger_keyword || log.detected_trigger_keyword || '',
+        // Comment step
+        dm_comment_posted: Boolean(t.dm_comment_posted || log.dm_comment_posted),
+        comment_posted_at: t.comment_posted_at || log.comment_posted_at || null,
+        // DM received step
+        dm_response_received: Boolean(t.dm_response_received || log.dm_response_received),
+        dm_received_at: t.dm_received_at || log.dm_received_at || null,
+        // Resource extracted
+        harvested_deliverable_url: t.harvested_deliverable_url || log.harvested_deliverable_url || post.deliverable_url || '',
+        harvested_deliverable_type: t.harvested_deliverable_type || log.harvested_deliverable_type || '',
+        extracted_at: t.extracted_at || log.extracted_at || t.completed_at || null,
+        extracted_resources: resources,
+        // Published result
+        processing_status: t.processing_status || 'pending',
+        live_post_permalink: t.live_post_permalink || post.ig_permalink || '',
+        destination_account: t.destination_account || log.destination_account || '',
+        selected_workflow: t.selected_workflow || log.selected_workflow || 'direct_repost',
+        // Timestamps
+        created_at: t.created_at,
+        completed_at: t.completed_at,
+        // LLM info
+        llm_fit_score: t.llm_fit_score || log.llm_fit_score || null,
+        repurposed_hook: t.repurposed_hook || log.repurposed_hook || ''
+      };
+    });
+
+    // Stats
+    const stats = {
+      total: events.length,
+      comments_posted: events.filter(e => e.dm_comment_posted).length,
+      dms_received: events.filter(e => e.dm_response_received).length,
+      resources_extracted: events.filter(e => e.harvested_deliverable_url).length,
+      published: events.filter(e => e.processing_status === 'published').length
+    };
+
+    res.json({ success: true, stats, events });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/instagram/mobile-dm/simulate
  * Simulates a mobile Instagram user sharing a post to the bot's DM
  */
