@@ -1207,9 +1207,6 @@ const instagramView = {
   // 3. MONITORED CHANNELS VIEW (Channel Tracker & Auto-Ingest)
   // ═════════════════════════════════════════════════════════════════════
 
-  renderChannelsView(container) {
-
-
   // ═════════════════════════════════════════════════════════════════════
   // 3. MONITORED CHANNELS VIEW (Channel Tracker & Auto-Ingest)
   // ═════════════════════════════════════════════════════════════════════

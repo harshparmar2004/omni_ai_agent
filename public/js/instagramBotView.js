@@ -1002,7 +1002,10 @@ const instagramBotView = {
     }
 
     const stepBadge = (done, label, ts) => {
-      if (done) return `<span style="background:#E8F5E9;color:#2E7D32;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap;">✅ ${label}${ts ? '<br><span style=\\'font-size:0.65rem;color:#555;\\'>' + new Date(ts).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}</span>`;
+      if (done) {
+        const timeStr = ts ? (' · ' + new Date(ts).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})) : '';
+        return `<span style="background:#E8F5E9;color:#2E7D32;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;white-space:nowrap;">✅ ${label}${timeStr}</span>`;
+      }
       return `<span style="background:#F3F4F6;color:#9CA3AF;font-weight:700;font-size:0.7rem;padding:2px 8px;border-radius:10px;">⏸ ${label}</span>`;
     };
 
