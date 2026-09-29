@@ -116,15 +116,102 @@ router.get('/queue', (req, res) => {
 router.get('/history', (req, res) => {
   try {
     const db = getDb();
-    const rows = db.prepare("SELECT * FROM instagram_posts WHERE status = 'published' ORDER BY id DESC").all();
-    res.json({
-      success: true,
-      count: rows.length,
-      posts: rows.map(r => ({
+    const limit = parseInt(req.query.limit || '100', 10);
+
+    // Fetch published posts joined with connected_pages for page name/icon
+    const rows = db.prepare(`
+      SELECT 
+        p.*,
+        cp.name  AS page_name,
+        cp.icon  AS page_icon,
+        cp.handle AS page_handle,
+        cp.theme_color AS page_color
+      FROM instagram_posts p
+      LEFT JOIN connected_pages cp ON cp.slug = p.destination_account
+      WHERE p.status = 'published'
+      ORDER BY p.id DESC
+      LIMIT ?
+    `).all(limit);
+
+    // Fetch the latest mobile_dm_trigger for each published post (by ig_media_id or shortcode)
+    const triggers = db.prepare(`
+      SELECT * FROM mobile_dm_triggers WHERE processing_status = 'published' ORDER BY id DESC LIMIT 200
+    `).all();
+    const triggerByMediaId = {};
+    for (const t of triggers) {
+      const post = typeof t.post === 'string' ? (() => { try { return JSON.parse(t.post); } catch(e) { return {}; } })() : (t.post || {});
+      const mediaId = post.ig_media_id || t.ig_media_id;
+      if (mediaId && !triggerByMediaId[mediaId]) triggerByMediaId[mediaId] = t;
+    }
+
+    const posts = rows.map(r => {
+      const mediaUrls = (() => { try { return JSON.parse(r.media_urls || '[]'); } catch(e) { return []; } })();
+      const extractedResources = (() => { try { return JSON.parse(r.extracted_resources || '[]'); } catch(e) { return []; } })();
+      const trigger = triggerByMediaId[r.ig_media_id] || null;
+      const triggerLog = trigger && (typeof trigger.log === 'string' ? (() => { try { return JSON.parse(trigger.log); } catch(e) { return {}; } })() : (trigger.log || {})) || {};
+
+      // Determine publish origin label
+      let publishOrigin = 'Dashboard Studio';
+      let publishOriginIcon = '🖥️';
+      if (r.origin_source === 'mobile_bot' && trigger?.telegram_message_id) {
+        publishOrigin = 'Telegram Bot';
+        publishOriginIcon = '📲';
+      } else if (r.origin_source === 'mobile_bot') {
+        publishOrigin = 'Telegram / Mobile Share';
+        publishOriginIcon = '📲';
+      } else if (r.origin_source === 'autonomous' || r.origin_source === 'autopilot') {
+        publishOrigin = '24/7 Autonomous Autopilot';
+        publishOriginIcon = '🤖';
+      } else if (r.origin_source === 'studio') {
+        publishOrigin = 'Dashboard Studio (1-Click)';
+        publishOriginIcon = '🖥️';
+      }
+
+      // Slide/image count for carousels
+      const slideCount = r.content_type === 'carousel' ? mediaUrls.length || 1 : null;
+
+      return {
         ...r,
-        media_urls: JSON.parse(r.media_urls || '[]')
-      }))
+        media_urls: mediaUrls,
+        extracted_resources: extractedResources,
+        // Page info
+        page_name: r.page_name || r.destination_account || 'gta6',
+        page_icon: r.page_icon || '📱',
+        page_handle: r.page_handle || `@${r.destination_account || 'gta6_updates_007'}`,
+        page_color: r.page_color || '#D97757',
+        // Publish origin
+        publish_origin: publishOrigin,
+        publish_origin_icon: publishOriginIcon,
+        origin_source: r.origin_source || 'studio',
+        // Media details
+        slide_count: slideCount,
+        has_video: r.content_type === 'reel' || mediaUrls.some(u => u.endsWith('.mp4')),
+        // Trigger data if available
+        trigger_sender: trigger?.sender_handle || null,
+        trigger_source_url: trigger?.source_post_url || null,
+        trigger_shortcode: trigger?.shortcode || null,
+        // Resource/DM info
+        has_dm_automation: Boolean(r.trigger_keyword && r.trigger_keyword.length > 0),
+        dms_delivered_count: r.dms_delivered_count || 0,
+        instaauto_status: r.instaauto_status || 'n/a',
+        // Timestamps
+        published_at_formatted: r.published_at ? new Date(r.published_at).toISOString() : null
+      };
     });
+
+    // Summary stats
+    const stats = {
+      total: posts.length,
+      reels: posts.filter(p => p.content_type === 'reel').length,
+      carousels: posts.filter(p => p.content_type === 'carousel').length,
+      via_telegram: posts.filter(p => p.origin_source === 'mobile_bot').length,
+      via_autopilot: posts.filter(p => p.origin_source === 'autonomous' || p.origin_source === 'autopilot').length,
+      via_studio: posts.filter(p => p.origin_source === 'studio').length,
+      total_dms: posts.reduce((a, p) => a + (p.dms_delivered_count || 0), 0),
+      with_dm_automation: posts.filter(p => p.has_dm_automation).length
+    };
+
+    res.json({ success: true, count: posts.length, stats, posts });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

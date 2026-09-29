@@ -154,6 +154,7 @@ const instagramView = {
 
       this.queueData = queueJson.posts || [];
       this.historyData = histJson.posts || [];
+      this._historyStats = histJson.stats || null;
       this.trackedChannels = channelsJson.channels || [];
       this.autonomousLogs = autoJson.logs || [];
       if (autoCfgJson.config) this.autonomousConfig = autoCfgJson.config;
@@ -1019,170 +1020,194 @@ const instagramView = {
   // 2. PUBLISHING HISTORY ARCHIVE (Standalone dedicated tab)
   // ═════════════════════════════════════════════════════════════════════
   renderHistoryView(container) {
-    if (this.historyData.length === 0) {
+    const data = this.historyData;
+    const stats = this._historyStats || {};
+
+    if (!data || data.length === 0) {
       container.innerHTML = `
-        <div class="card" style="text-align: center; padding: 4rem 2rem;">
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">📜</div>
-          <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem;">No Published Posts Yet</h3>
-          <p style="color: var(--text-secondary); max-width: 480px; margin: 0 auto 1.5rem auto; font-size: 0.9rem;">
-            When you publish staged posts from your Ready to Post Queue, they will be archived here with direct links, DM bridge audit logs, and trigger keywords.
+        <div class="card" style="text-align:center;padding:4rem 2rem;">
+          <div style="font-size:3rem;margin-bottom:1rem;">📡</div>
+          <h3 style="font-size:1.25rem;font-weight:800;margin-bottom:0.5rem;">No Live Posts Yet</h3>
+          <p style="color:var(--text-secondary);max-width:480px;margin:0 auto 1.5rem auto;font-size:0.9rem;">
+            Every post published via Telegram bot, 24/7 autopilot, or dashboard will appear here with the full audit trail — origin, page, content type, and live Instagram link.
           </p>
           <button class="btn btn-primary" onclick="instagramView.switchSubTab('overview')">
             Go to Ready to Post Queue ➔
           </button>
-        </div>
-      `;
+        </div>`;
       return;
     }
 
-    const totalPosts = this.historyData.length;
-    const leadMagnetPosts = this.historyData.filter(p => p.post_intent === 'lead_magnet' || (p.trigger_keyword && p.trigger_keyword.length > 0)).length;
-    const dmArmed = this.historyData.filter(p => p.instaauto_status === 'armed' || p.instaauto_status === 'active').length;
-    const totalDms = this.historyData.reduce((acc, p) => acc + (p.dms_delivered_count || 0), 0);
+    // ── KPI Strip ──────────────────────────────────────────────────────────
+    const kpiHtml = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;">
+        <div class="card" style="padding:1rem;border-left:4px solid #10B981;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">📡 Total Live Posts</div>
+          <div style="font-size:2rem;font-weight:800;color:var(--text-primary);">${stats.total || data.length}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid #7C3AED;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">🎬 Reels</div>
+          <div style="font-size:2rem;font-weight:800;color:#7C3AED;">${stats.reels ?? data.filter(p=>p.content_type==='reel').length}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid #0284C7;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">🖼️ Carousels</div>
+          <div style="font-size:2rem;font-weight:800;color:#0284C7;">${stats.carousels ?? data.filter(p=>p.content_type==='carousel').length}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid var(--accent);">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">📲 Via Telegram</div>
+          <div style="font-size:2rem;font-weight:800;color:var(--accent);">${stats.via_telegram ?? data.filter(p=>p.origin_source==='mobile_bot').length}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid #059669;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">🤖 Via Autopilot</div>
+          <div style="font-size:2rem;font-weight:800;color:#059669;">${stats.via_autopilot ?? 0}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid #9CA3AF;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">🖥️ Via Studio</div>
+          <div style="font-size:2rem;font-weight:800;color:var(--text-primary);">${stats.via_studio ?? data.filter(p=>p.origin_source==='studio').length}</div>
+        </div>
+        <div class="card" style="padding:1rem;border-left:4px solid #EF4444;">
+          <div style="font-size:0.7rem;font-weight:800;text-transform:uppercase;color:var(--text-muted);">💌 DMs Delivered</div>
+          <div style="font-size:2rem;font-weight:800;color:#EF4444;">${stats.total_dms ?? data.reduce((a,p)=>a+(p.dms_delivered_count||0),0)}</div>
+        </div>
+      </div>`;
+
+    // ── Cards Grid ─────────────────────────────────────────────────────────
+    const cardsHtml = data.map(post => {
+      const permalink = post.ig_permalink || post.live_post_permalink || '#';
+      const mediaId = post.ig_media_id ? `#${String(post.ig_media_id).slice(-10)}` : `#${post.id}`;
+      const publishedAt = post.published_at
+        ? new Date(post.published_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—';
+      const isReel = post.content_type === 'reel' || post.has_video;
+      const isCarousel = post.content_type === 'carousel';
+      const slideCount = post.slide_count || (post.media_urls?.length) || 1;
+      const thumb = post.thumbnail_url || (post.media_urls?.[0]) || '';
+      const pageColor = post.page_color || '#D97757';
+
+      // Origin badge color
+      const originBg = post.origin_source === 'mobile_bot' ? '#E0F2FE' : post.origin_source === 'autonomous' ? '#F0FDF4' : '#F3F4F6';
+      const originColor = post.origin_source === 'mobile_bot' ? '#0369A1' : post.origin_source === 'autonomous' ? '#15803D' : '#374151';
+
+      return `
+        <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--border-color);border-radius:12px;display:flex;flex-direction:column;">
+          
+          <!-- Top: Thumbnail strip + type badge -->
+          <div style="position:relative;height:80px;background:linear-gradient(135deg,${pageColor}22,${pageColor}44);overflow:hidden;flex-shrink:0;">
+            ${thumb ? `<img src="${escapeHtml(thumb)}" style="width:100%;height:100%;object-fit:cover;opacity:0.5;" loading="lazy" onerror="this.style.display='none'">` : ''}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0.75rem;gap:0.5rem;justify-content:space-between;">
+              <span style="background:rgba(0,0,0,0.6);color:#fff;font-weight:800;font-size:0.72rem;padding:3px 9px;border-radius:20px;backdrop-filter:blur(4px);">
+                ${isReel ? '🎬 Reel' : isCarousel ? `🖼️ Carousel · ${slideCount} Slides` : '📷 Image'}
+              </span>
+              <span style="background:rgba(0,0,0,0.55);color:#fff;font-family:monospace;font-size:0.7rem;padding:2px 7px;border-radius:10px;">
+                ${mediaId}
+              </span>
+            </div>
+          </div>
+
+          <!-- Body -->
+          <div style="padding:1rem;flex:1;display:flex;flex-direction:column;gap:0.6rem;">
+
+            <!-- Hook / Title -->
+            <div style="font-weight:800;font-size:0.9rem;color:var(--text-primary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="${escapeHtml(post.hook_text||'')}">
+              ${escapeHtml(post.hook_text || '—')}
+            </div>
+
+            <!-- Published origin row -->
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+              <span style="background:${originBg};color:${originColor};font-weight:700;font-size:0.72rem;padding:2px 8px;border-radius:10px;">
+                ${post.publish_origin_icon || '📲'} ${post.publish_origin || post.origin_source}
+              </span>
+              ${post.trigger_sender ? `<span style="font-size:0.72rem;color:var(--text-muted);">from ${escapeHtml(post.trigger_sender)}</span>` : ''}
+            </div>
+
+            <!-- Page destination -->
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+              <span style="font-size:1rem;">${post.page_icon || '📱'}</span>
+              <span style="font-weight:700;font-size:0.82rem;">${escapeHtml(post.page_name || post.destination_account || '—')}</span>
+              <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(post.page_handle || '')}</span>
+            </div>
+
+            <!-- Divider -->
+            <div style="border-top:1px solid var(--border-color);"></div>
+
+            <!-- DM trigger row -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem;flex-wrap:wrap;">
+              <div>
+                ${post.trigger_keyword ? `
+                  <div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:2px;">DM Trigger</div>
+                  <span style="background:var(--accent);color:#fff;font-weight:800;font-size:0.75rem;padding:2px 9px;border-radius:12px;">"${escapeHtml(post.trigger_keyword)}"</span>
+                ` : `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">No DM Automation</span>`}
+              </div>
+              <div style="text-align:right;">
+                ${post.dms_delivered_count > 0 ? `
+                  <div style="font-size:0.7rem;color:var(--text-muted);">💌 DMs Sent</div>
+                  <div style="font-size:1.1rem;font-weight:800;color:#7C3AED;">${post.dms_delivered_count}</div>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Audio if reel -->
+            ${post.trending_song_title ? `
+              <div style="font-size:0.75rem;color:var(--text-muted);">🎵 ${escapeHtml(post.trending_song_title)}</div>
+            ` : ''}
+
+            <!-- Deliverable link -->
+            ${post.deliverable_url || post.ig_permalink ? `
+              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:auto;">
+                ${post.deliverable_url ? `
+                  <a href="${escapeHtml(post.deliverable_url)}" target="_blank" style="font-size:0.75rem;color:var(--accent);text-decoration:none;font-weight:700;display:flex;align-items:center;gap:3px;">
+                    ${post.deliverable_url.toLowerCase().includes('.pdf') ? '📄 PDF Resource' : '🔗 Resource Link'} ↗
+                  </a>
+                ` : ''}
+              </div>
+            ` : ''}
+
+          </div>
+
+          <!-- Footer: Published At + IG link -->
+          <div style="padding:0.75rem 1rem;background:var(--bg-hover,#F8FAFC);border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <div style="font-size:0.72rem;color:var(--text-muted);">🕐 ${publishedAt}</div>
+            ${permalink !== '#' ? `
+              <a href="${escapeHtml(permalink)}" target="_blank" class="btn btn-secondary btn-xs" style="font-weight:700;text-decoration:none;font-size:0.75rem;padding:4px 10px;white-space:nowrap;">
+                View Live on IG ↗
+              </a>
+            ` : `<span style="font-size:0.75rem;color:var(--text-muted);">Link pending</span>`}
+          </div>
+
+        </div>`;
+    }).join('');
 
     container.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-
-        <!-- Header KPI Ribbon -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 1rem;">
-          <div class="card" style="padding: 1rem; border-left: 4px solid #10B981;">
-            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted);">📜 Total Published</div>
-            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary);">${totalPosts}</div>
+      <div style="display:flex;flex-direction:column;gap:1.5rem;">
+        
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h3 style="font-size:1.2rem;font-weight:800;margin:0;">📡 Live Published Posts — Audit Log</h3>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin:0.2rem 0 0 0;">
+              Every post live on Instagram — showing publish origin, destination page, content type, DMs delivered, and live link.
+            </p>
           </div>
-          <div class="card" style="padding: 1rem; border-left: 4px solid var(--accent);">
-            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted);">🎯 Lead Magnet Posts</div>
-            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary);">${leadMagnetPosts}</div>
-          </div>
-          <div class="card" style="padding: 1rem; border-left: 4px solid #7C3AED;">
-            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted);">🤖 InstaAuto Armed</div>
-            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary);">${dmArmed}</div>
-          </div>
-          <div class="card" style="padding: 1rem; border-left: 4px solid #0284C7;">
-            <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted);">💌 DMs Delivered</div>
-            <div style="font-size: 1.8rem; font-weight: 800; color: var(--text-primary);">${totalDms}</div>
-          </div>
+          <button class="btn btn-secondary btn-sm" onclick="instagramView.loadAll()" style="font-weight:700;">🔄 Refresh</button>
         </div>
 
-        <!-- Main History Table -->
-        <div class="card" style="padding: 1.5rem; overflow-x: auto;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary); margin: 0;">📜 Published Post History</h3>
-              <p style="font-size: 0.83rem; color: var(--text-secondary); margin: 0.2rem 0 0 0;">
-                All live posts — Post IDs, hooks, DM triggers, InstaAuto bridge status, deliverables & DM counts.
-              </p>
-            </div>
-            <button class="btn btn-secondary btn-sm" onclick="instagramView.loadAll()" style="font-weight: 700;">🔄 Refresh</button>
-          </div>
+        <!-- KPI Strip -->
+        ${kpiHtml}
 
-          <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-            <thead>
-              <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-muted); font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;">
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Post ID</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Hook & Title</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Source Creator</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Page / Workflow</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">DM Trigger</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">InstaAuto Status</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Deliverable</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">Published At</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: left;">💌 DMs</th>
-                <th style="padding: 0.6rem 0.75rem; text-align: right;">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${this.historyData.map(post => {
-                const isLeadMagnet = post.post_intent === 'lead_magnet' || (post.trigger_keyword && post.trigger_keyword.length > 0);
-                const permalink = post.ig_permalink || post.live_post_permalink || '#';
-                const mediaId = post.ig_media_id || post.id || '—';
-                const publishedAt = post.published_at ? new Date(post.published_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-                const contentType = post.content_type === 'carousel' ? '🖼️ Carousel' : '🎬 Reel';
-                const sourceCreator = (post.log && post.log.channel_username) ? post.log.channel_username : (post.channel_username || '—');
-                const sourceUrl = post.source_post_url || (post.log && post.log.source_post_url) || '#';
-                const destPage = post.destination_account || (post.log && post.log.destination_account) || 'gta6';
-                const workflow = isLeadMagnet ? 'lead_magnet' : 'direct_repost';
-                const delivUrl = post.deliverable_url || (post.log && post.log.harvested_deliverable_url) || '';
-                const dmsCount = post.dms_delivered_count || 0;
-                const instaAutoStatus = post.instaauto_status || (isLeadMagnet ? 'armed' : 'n/a');
-
-                return `
-                <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s;" onmouseover="this.style.background='var(--bg-hover,#F8FAFC)'" onmouseout="this.style.background=''">
-                  <!-- Post ID -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    ${permalink !== '#' ? `
-                      <a href="${permalink}" target="_blank" style="font-weight: 700; font-family: monospace; font-size: 0.78rem; color: var(--accent); text-decoration: none;" title="View on Instagram">
-                        #${String(mediaId).slice(-12)}
-                      </a>
-                    ` : `
-                      <span style="font-weight: 700; font-family: monospace; font-size: 0.78rem; color: var(--text-muted);">#${String(mediaId).slice(-12)}</span>
-                    `}
-                  </td>
-                  <!-- Hook & Title -->
-                  <td style="padding: 0.7rem 0.75rem; max-width: 220px;">
-                    <div style="font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${escapeHtml(post.hook_text || '')}">${escapeHtml(post.hook_text || '—')}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${contentType} · 🎵 ${escapeHtml(post.trending_song_title || 'No Audio')}</div>
-                  </td>
-                  <!-- Source Creator -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    <a href="${escapeHtml(sourceUrl)}" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.82rem;">@${escapeHtml(sourceCreator)}</a>
-                  </td>
-                  <!-- Page / Workflow -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    <div style="font-weight: 700; font-size: 0.8rem;">@${escapeHtml(destPage)}</div>
-                    <span style="font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 700; background: ${workflow === 'lead_magnet' ? '#F3E8FF' : '#E0F2FE'}; color: ${workflow === 'lead_magnet' ? '#7C3AED' : '#0369A1'};">
-                      ${workflow === 'lead_magnet' ? '🎯 Lead Magnet' : '⚡ Direct Repost'}
-                    </span>
-                  </td>
-                  <!-- DM Trigger -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    ${isLeadMagnet && post.trigger_keyword ? `
-                      <span style="background: var(--accent); color: #fff; font-weight: 800; font-size: 0.75rem; padding: 3px 9px; border-radius: 12px;">"${escapeHtml(post.trigger_keyword)}"</span>
-                    ` : `
-                      <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No DM</span>
-                    `}
-                  </td>
-                  <!-- InstaAuto Status -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    ${instaAutoStatus === 'armed' || instaAutoStatus === 'active' ? `
-                      <span style="background: #E8F5E9; color: #2E7D32; font-weight: 700; font-size: 0.75rem; padding: 3px 9px; border-radius: 12px;">🟢 Armed & Delivering</span>
-                    ` : instaAutoStatus === 'n/a' ? `
-                      <span style="background: #E0F2FE; color: #0369A1; font-weight: 700; font-size: 0.75rem; padding: 3px 9px; border-radius: 12px;">🟢 Direct Published</span>
-                    ` : `
-                      <span style="background: #FFF3E0; color: #E65100; font-weight: 700; font-size: 0.75rem; padding: 3px 9px; border-radius: 12px;">⚠️ ${escapeHtml(instaAutoStatus)}</span>
-                    `}
-                  </td>
-                  <!-- Deliverable -->
-                  <td style="padding: 0.7rem 0.75rem;">
-                    ${delivUrl ? `
-                      <a href="${escapeHtml(delivUrl)}" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: 700; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">
-                        ${delivUrl.toLowerCase().includes('.pdf') ? '📄 PDF' : '🔗 Resource'} ↗
-                      </a>
-                    ` : `
-                      <span style="font-size: 0.75rem; color: var(--text-muted); font-style: italic;">No DM Needed</span>
-                    `}
-                  </td>
-                  <!-- Published At -->
-                  <td style="padding: 0.7rem 0.75rem; color: var(--text-muted); font-size: 0.78rem; white-space: nowrap;">${publishedAt}</td>
-                  <!-- DMs Delivered -->
-                  <td style="padding: 0.7rem 0.75rem; text-align: center;">
-                    <span style="font-weight: 800; font-size: 0.9rem; color: ${dmsCount > 0 ? '#7C3AED' : 'var(--text-muted)'};">${dmsCount}</span>
-                  </td>
-                  <!-- Action -->
-                  <td style="padding: 0.7rem 0.75rem; text-align: right;">
-                    ${permalink !== '#' ? `
-                      <a href="${permalink}" target="_blank" class="btn btn-secondary btn-xs" style="font-weight: 700; text-decoration: none; padding: 4px 10px; font-size: 0.78rem; white-space: nowrap;">View on IG ↗</a>
-                    ` : `
-                      <span style="font-size: 0.75rem; color: var(--text-muted);">—</span>
-                    `}
-                  </td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+        <!-- Cards Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.25rem;">
+          ${cardsHtml}
         </div>
-      </div>
-    `;
+
+      </div>`;
   },
+
+
+  // ═════════════════════════════════════════════════════════════════════
+  // 3. MONITORED CHANNELS VIEW (Channel Tracker & Auto-Ingest)
+  // ═════════════════════════════════════════════════════════════════════
+
+  renderChannelsView(container) {
 
 
   // ═════════════════════════════════════════════════════════════════════
