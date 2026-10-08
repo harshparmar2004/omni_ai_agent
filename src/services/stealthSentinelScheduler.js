@@ -117,7 +117,7 @@ async function executeStealthSurveillanceCycle(options = {}) {
       }
 
       const latestPostUrl = recentUrls[0];
-      const m = latestPostUrl.match(/\/p\/([A-Za-z0-9_-]+)/) || latestPostUrl.match(/\/reel\/([A-Za-z0-9_-]+)/);
+      const m = latestPostUrl.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       const latestShortcode = m ? m[1] : '';
 
       // Strategy 4: SQLite Deduplication Gate

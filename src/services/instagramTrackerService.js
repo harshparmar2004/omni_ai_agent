@@ -48,7 +48,7 @@ async function registerTrackedChannel(input, destinationAccount = 'tech') {
   }
 
   const latestShortcode = (scraped && scraped.recent_post_urls && scraped.recent_post_urls[0])
-    ? (scraped.recent_post_urls[0].match(/\/p\/([A-Za-z0-9_-]+)/) || [])[1] || ''
+    ? (scraped.recent_post_urls[0].match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/) || [])[1] || ''
     : '';
 
   const nicheTag = destinationAccount === 'gta6' ? 'gaming' : 'tech';
@@ -118,24 +118,30 @@ async function syncSingleChannel(channelId) {
   }
 
   const latestPostUrl = recentUrls[0];
-  const shortcodeMatch = latestPostUrl.match(/\/p\/([A-Za-z0-9_-]+)/);
+  const shortcodeMatch = latestPostUrl.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
   const latestShortcode = shortcodeMatch ? shortcodeMatch[1] : '';
 
-  // Check if we already staged this post
+  // Check if we already staged this post or if it's already in autonomous_ingestion_log
   const db = getDb();
-  const existingPost = db.prepare("SELECT id FROM instagram_posts WHERE caption LIKE ? OR hook_text LIKE ?").get(
-    `%${latestShortcode}%`,
-    `%${channel.username}%`
-  );
+  const existingLogged = latestShortcode
+    ? db.prepare("SELECT id FROM autonomous_ingestion_log WHERE shortcode = ?").get(latestShortcode)
+    : null;
+  const existingPost = latestShortcode
+    ? db.prepare("SELECT id FROM instagram_posts WHERE caption LIKE ? OR media_urls LIKE ? OR thumbnail_url LIKE ?").get(
+        `%${latestShortcode}%`,
+        `%${latestShortcode}%`,
+        `%${latestShortcode}%`
+      )
+    : null;
 
-  const isNewPost = latestShortcode && latestShortcode !== channel.last_post_shortcode && !existingPost;
+  const isNewPost = latestShortcode && latestShortcode !== channel.last_post_shortcode && !existingLogged && !existingPost;
 
   if (!isNewPost) {
     updateTrackedChannel(channel.id, updates);
     return {
       success: true,
       synced: false,
-      message: `Checked @${channel.username}. Up to date (latest post shortcode: ${channel.last_post_shortcode || 'active'}).`,
+      message: `Checked @${channel.username}. Up to date (latest post shortcode: ${channel.last_post_shortcode || latestShortcode || 'active'}).`,
       channel: getTrackedChannelById(channel.id)
     };
   }
@@ -146,7 +152,7 @@ async function syncSingleChannel(channelId) {
   
   let procRes;
   try {
-    procRes = await processSinglePost(latestPostUrl, channel.username, channel.id);
+    procRes = await processSinglePost(latestPostUrl, channel.username, channel.id, { destination: channel.destination_account || 'tech' });
   } catch (err) {
     console.error(`[Channel Tracker] Error in autonomous pipeline for @${channel.username}: ${err.message}`);
     throw err;
@@ -178,7 +184,12 @@ async function syncAllActiveChannels() {
   const results = [];
   let newPostsCount = 0;
 
-  for (const ch of channels) {
+  for (let i = 0; i < channels.length; i++) {
+    const ch = channels[i];
+    if (i > 0) {
+      // 1.5s human pacing delay between channel profile queries
+      await new Promise(r => setTimeout(r, 1500));
+    }
     try {
       const res = await syncSingleChannel(ch.id);
       results.push({ channel: ch.username, success: true, ...res });
