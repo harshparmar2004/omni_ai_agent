@@ -144,6 +144,18 @@ async function pushToInstaAutoBridge({
       matrixRowId = res.lastInsertRowid;
     }
 
+    // Sync instagram_posts table if igMediaId is present
+    if (igMediaId) {
+      try {
+        db.prepare(`
+          UPDATE instagram_posts 
+          SET instaauto_rule_id = ?, 
+              instaauto_status = 'armed' 
+          WHERE ig_media_id = ?
+        `).run(ruleId ? String(ruleId) : null, igMediaId);
+      } catch (postSyncErr) {}
+    }
+
     return {
       success: true,
       matrixRowId,
@@ -188,7 +200,7 @@ async function pushToInstaAutoBridge({
     if (matrixRowId) {
       db.prepare(`
         UPDATE deliverables_matrix
-        SET status = 'published',
+        SET status = 'pending_bridge',
             instaauto_response = ?,
             content_type = ?,
             thumbnail_url = COALESCE(NULLIF(?, ''), thumbnail_url),
@@ -219,7 +231,7 @@ async function pushToInstaAutoBridge({
         igMediaId,
         igPermalink,
         caption,
-        'published',
+        'pending_bridge',
         null,
         JSON.stringify(errorPayload),
         formattedNow,
@@ -234,12 +246,23 @@ async function pushToInstaAutoBridge({
       matrixRowId = res.lastInsertRowid;
     }
 
+    // Also mark pending in instagram_posts
+    if (igMediaId) {
+      try {
+        db.prepare(`
+          UPDATE instagram_posts 
+          SET instaauto_status = 'pending_bridge' 
+          WHERE ig_media_id = ?
+        `).run(igMediaId);
+      } catch (e) {}
+    }
+
     return {
       success: false,
       matrixRowId,
-      status: 'published',
+      status: 'pending_bridge',
       error: err.message,
-      note: 'InstaAuto was unreachable or returned an error. Post is saved in Virtual Sheet and can be retried.'
+      note: 'InstaAuto was unreachable. Post is queued with status pending_bridge and can be retried.'
     };
   }
 }
@@ -262,7 +285,130 @@ async function pushBatchToInstaAutoBridge(posts) {
   }
 }
 
+/**
+ * Health check for InstaAuto (Port 3000)
+ */
+async function checkInstaAutoHealth() {
+  const bridgeUrl = getSetting('instaauto_bridge_url', 'http://localhost:3000/api/agent/bridge');
+  const baseUrl = bridgeUrl.replace(/\/api\/agent\/bridge.*$/, '');
+  const db = getDb();
+
+  let pendingCount = 0;
+  let armedCount = 0;
+  try {
+    const rowPending = db.prepare("SELECT COUNT(*) as count FROM deliverables_matrix WHERE status = 'pending_bridge'").get();
+    pendingCount = rowPending?.count || 0;
+    const rowArmed = db.prepare("SELECT COUNT(*) as count FROM deliverables_matrix WHERE status = 'armed'").get();
+    armedCount = rowArmed?.count || 0;
+  } catch (e) {}
+
+  try {
+    const res = await axios.get(`${baseUrl}/api/agent/status`, { timeout: 3500 });
+    const data = res.data || {};
+    return {
+      online: true,
+      port: 3000,
+      engine: data.engine || 'InstaAuto External Sentinel & Bridge Engine',
+      version: data.version || '2.1.0',
+      autoPilot: Boolean(data.autoPilot),
+      mode: data.mode || 'high_scale_external_listener',
+      capabilities: data.capabilities || [],
+      pendingDeliverablesCount: pendingCount,
+      armedDeliverablesCount: armedCount
+    };
+  } catch (err) {
+    return {
+      online: false,
+      port: 3000,
+      error: err.message,
+      pendingDeliverablesCount: pendingCount,
+      armedDeliverablesCount: armedCount
+    };
+  }
+}
+
+/**
+ * Retries all deliverables currently pending bridge dispatch
+ */
+async function retryPendingBridgeDeliverables() {
+  const db = getDb();
+  const pending = db.prepare(`
+    SELECT * FROM deliverables_matrix 
+    WHERE (status = 'pending_bridge' OR (status = 'published' AND (instaauto_rule_id IS NULL OR instaauto_rule_id = '')))
+      AND ig_media_id IS NOT NULL AND ig_media_id != ''
+  `).all();
+
+  console.log(`[Bridge Service] 🔄 Retrying ${pending.length} pending deliverables to InstaAuto...`);
+  const results = [];
+  for (const item of pending) {
+    try {
+      const res = await pushToInstaAutoBridge({
+        matrixRowId: item.id,
+        mediaAssetId: item.media_asset_id,
+        deliverableId: item.deliverable_id,
+        topic: item.topic,
+        leadMagnetTitle: item.lead_magnet_title,
+        triggerKeyword: item.trigger_keyword,
+        deliverableUrl: item.deliverable_url,
+        igMediaId: item.ig_media_id,
+        igPermalink: item.ig_permalink,
+        caption: item.caption,
+        contentType: item.content_type
+      });
+      results.push({ id: item.id, igMediaId: item.ig_media_id, success: res.success, ruleId: res.ruleId });
+    } catch (err) {
+      results.push({ id: item.id, igMediaId: item.ig_media_id, success: false, error: err.message });
+    }
+  }
+
+  return {
+    total: pending.length,
+    armed: results.filter(r => r.success).length,
+    failed: results.filter(r => !r.success).length,
+    details: results
+  };
+}
+
+/**
+ * Manually arms any single post or candidate in InstaAuto on demand
+ */
+async function armSinglePostToBridge({ postId, igMediaId, triggerKeyword, deliverableUrl, caption, title }) {
+  const db = getDb();
+  let post = null;
+  if (postId) {
+    post = db.prepare('SELECT * FROM instagram_posts WHERE id = ?').get(postId);
+  } else if (igMediaId) {
+    post = db.prepare('SELECT * FROM instagram_posts WHERE ig_media_id = ?').get(igMediaId);
+  }
+
+  const effectiveIgMediaId = igMediaId || post?.ig_media_id;
+  if (!effectiveIgMediaId) {
+    throw new Error('A valid Instagram media_id is required to arm a rule in InstaAuto');
+  }
+
+  const effectiveKeyword = triggerKeyword || post?.trigger_keyword || 'PROJECT';
+  const effectiveUrl = deliverableUrl || post?.deliverable_url || post?.pdf_url || '';
+  const effectiveCaption = caption || post?.caption || `Comment "${effectiveKeyword}" for the link!`;
+  const effectiveTitle = title || post?.hook_text || 'Resource Link';
+
+  return await pushToInstaAutoBridge({
+    mediaAssetId: post?.id || null,
+    deliverableId: post?.deliverable_id || null,
+    topic: effectiveTitle,
+    leadMagnetTitle: effectiveTitle,
+    triggerKeyword: effectiveKeyword,
+    deliverableUrl: effectiveUrl,
+    igMediaId: effectiveIgMediaId,
+    igPermalink: post?.ig_permalink || `https://www.instagram.com/p/${effectiveIgMediaId}/`,
+    caption: effectiveCaption,
+    contentType: post?.content_type || 'reel'
+  });
+}
+
 module.exports = {
   pushToInstaAutoBridge,
-  pushBatchToInstaAutoBridge
+  pushBatchToInstaAutoBridge,
+  checkInstaAutoHealth,
+  retryPendingBridgeDeliverables,
+  armSinglePostToBridge
 };

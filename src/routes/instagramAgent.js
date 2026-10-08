@@ -1978,4 +1978,54 @@ router.post('/pages/:id/test-handshake', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/instagram/bridge/status
+ * Get connection health of InstaAuto DM automation bridge (Port 3000)
+ */
+router.get('/bridge/status', async (req, res) => {
+  try {
+    const { checkInstaAutoHealth } = require('../services/bridgeService');
+    const health = await checkInstaAutoHealth();
+    res.json({ success: true, ...health });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/bridge/retry-pending
+ * Flushes the queue and retries all pending deliverables into InstaAuto
+ */
+router.post('/bridge/retry-pending', async (req, res) => {
+  try {
+    const { retryPendingBridgeDeliverables } = require('../services/bridgeService');
+    const result = await retryPendingBridgeDeliverables();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/bridge/arm-single
+ * Manually arms a post / reel into InstaAuto with keyword and deliverable link
+ */
+router.post('/bridge/arm-single', async (req, res) => {
+  try {
+    const { postId, igMediaId, triggerKeyword, deliverableUrl, caption, title } = req.body || {};
+    const { armSinglePostToBridge } = require('../services/bridgeService');
+    const result = await armSinglePostToBridge({
+      postId: postId ? parseInt(postId, 10) : null,
+      igMediaId,
+      triggerKeyword,
+      deliverableUrl,
+      caption,
+      title
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

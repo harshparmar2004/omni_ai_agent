@@ -23,20 +23,42 @@ const MICROSERVICE_URL = 'http://localhost:8001';
 function extractTriggerKeywordFromCaption(caption = '', hook = '') {
   const text = `${hook || ''} ${caption || ''}`;
 
-  // 1. Quoted keyword after Comment / Drop / Reply / Type / Send / DM
-  const quotedRegex = /(?:comment|drop|reply|type|send|dm)\s+(?:me\s+)?(?:below\s+with\s+|with\s+)?["“'«]([A-Za-z0-9_-]{2,20})["”'»]/i;
+  // 1. Quoted / Bracketed keyword after Comment / Drop / Reply / Type / Send / DM / Message
+  // Matches: Comment "FREE", Comment ‘PROJECT’, Drop “LINK”, Type [CODE], DM (GUIDE), Comment the word "AGENT"
+  const quotedRegex = /(?:comment|drop|reply|type|send|dm|message)\s+(?:me\s+)?(?:below\s+with\s+|with\s+|the\s+word\s+)?["“'«\[\(]([A-Za-z0-9_-]{2,20})["”'»\]\)]/i;
   const matchQuoted = text.match(quotedRegex);
   if (matchQuoted) return matchQuoted[1].toUpperCase().trim();
 
-  // 2. Unquoted uppercase keyword after Comment / Drop / Reply / Type
-  const unquotedRegex = /(?:comment|drop|reply|type)\s+([A-Z0-9_-]{3,15})\s+(?:below|down|to|and|for|in)/i;
-  const matchUnquoted = text.match(unquotedRegex);
-  if (matchUnquoted) return matchUnquoted[1].toUpperCase().trim();
+  // 2. Colon / dash syntax: Comment: "PROJECT", Drop - CODE, Comment below: LINK
+  const colonRegex = /(?:comment|drop|reply|type|send|dm|message)\s*(?:below|down)?\s*[:\-]\s*["“'«]?([A-Za-z0-9_-]{2,20})["”'»]?/i;
+  const matchColon = text.match(colonRegex);
+  if (matchColon && !/^(the|a|an|here|link|this|below|down)$/i.test(matchColon[1])) {
+    return matchColon[1].toUpperCase().trim();
+  }
 
-  // 3. Fallback explicit common trigger patterns (e.g., "comment FREE", "comment LINK")
-  const common = ['FREE', 'LINK', 'GUIDE', 'PROJECT', 'ROADMAP', 'CODE', 'PROMPT', 'AI', 'PYTHON', 'GOOGLE', 'PLAYBOOK', 'NOTES', 'CHEATSHEET', 'RESOURCES', 'CERTIFICATE', 'BOT'];
+  // 3. "the word [KEYWORD]" without quotes: Comment the word PROJECT, Type the word CODE
+  const theWordRegex = /(?:comment|drop|reply|type|send|dm)\s+(?:me\s+)?(?:the\s+word\s+)([A-Za-z0-9_-]{2,20})/i;
+  const matchTheWord = text.match(theWordRegex);
+  if (matchTheWord && !/^(the|a|an|below|down)$/i.test(matchTheWord[1])) {
+    return matchTheWord[1].toUpperCase().trim();
+  }
+
+  // 4. Unquoted uppercase keyword after Comment / Drop / Reply / Type / Send / DM
+  // e.g. Comment PROJECT below, Drop CODE to get, Type AGENT for link
+  const unquotedRegex = /(?:comment|drop|reply|type|send|dm)\s+([A-Z0-9_-]{3,15})\s+(?:below|down|to|and|for|in|on|here)/i;
+  const matchUnquoted = text.match(unquotedRegex);
+  if (matchUnquoted && !/^(BELOW|DOWN|AND|FOR|HERE|LINK|THIS|YOUR|SOME|MORE)$/i.test(matchUnquoted[1])) {
+    return matchUnquoted[1].toUpperCase().trim();
+  }
+
+  // 5. Fallback explicit common trigger patterns
+  const common = [
+    'FREE', 'LINK', 'GUIDE', 'PROJECT', 'ROADMAP', 'CODE', 'PROMPT', 'AI', 'PYTHON',
+    'GOOGLE', 'PLAYBOOK', 'NOTES', 'CHEATSHEET', 'RESOURCES', 'CERTIFICATE', 'BOT',
+    'AGENT', 'TOOL', 'TEMPLATE', 'DATA', 'REPO', 'API', 'SYSTEM', 'BOOK'
+  ];
   for (const kw of common) {
-    const r = new RegExp(`\\b(?:comment|drop|reply|type)\\s+${kw}\\b`, 'i');
+    const r = new RegExp(`\\b(?:comment|drop|reply|type|send|dm)\\s+(?:the\\s+word\\s+)?["“'«]?${kw}["”'»]?\\b`, 'i');
     if (r.test(text)) return kw;
   }
 
@@ -77,22 +99,36 @@ function extractLinksFromText(text) {
 async function unshortenUrl(shortUrl, maxRedirects = 5) {
   if (!shortUrl) return shortUrl;
   try {
-    let currentUrl = shortUrl;
-    for (let i = 0; i < maxRedirects; i++) {
-      const res = await axios.head(currentUrl, {
-        maxRedirects: 0,
-        validateStatus: status => status >= 200 && status < 400,
-        timeout: 6000
-      });
-      if (res.headers && res.headers.location) {
-        currentUrl = new URL(res.headers.location, currentUrl).href;
-      } else {
-        break;
-      }
-    }
-    return currentUrl;
+    const res = await axios.get(shortUrl, {
+      maxRedirects,
+      timeout: 7000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      validateStatus: status => status >= 200 && status < 400
+    });
+    const finalUrl = res.request?.res?.responseUrl || res.config?.url || shortUrl;
+    return finalUrl;
   } catch (err) {
-    return shortUrl;
+    try {
+      let currentUrl = shortUrl;
+      for (let i = 0; i < maxRedirects; i++) {
+        const headRes = await axios.head(currentUrl, {
+          maxRedirects: 0,
+          validateStatus: status => status >= 200 && status < 400,
+          timeout: 5000,
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        if (headRes.headers && headRes.headers.location) {
+          currentUrl = new URL(headRes.headers.location, currentUrl).href;
+        } else {
+          break;
+        }
+      }
+      return currentUrl;
+    } catch (headErr) {
+      return shortUrl;
+    }
   }
 }
 

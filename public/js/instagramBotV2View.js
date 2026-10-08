@@ -70,6 +70,8 @@ const instagramBotV2View = {
   ],
 
   isLoading: false,
+  bridgeStatus: null,
+  bridgeOnline: false,
 
   async render() {
     const container = document.getElementById('view-instagram-bot-v2');
@@ -94,12 +96,13 @@ const instagramBotV2View = {
   async loadData() {
     this.isLoading = true;
     try {
-      const [channelsRes, feedRes, pagesRes, summaryRes, settingsRes] = await Promise.all([
+      const [channelsRes, feedRes, pagesRes, summaryRes, settingsRes, bridgeRes] = await Promise.all([
         fetch('/api/instagram/tracked-channels').catch(() => ({ json: () => ({ channels: [] }) })),
         fetch('/api/instagram/autonomous/feed?limit=100').catch(() => ({ json: () => ({ logs: [] }) })),
         fetch('/api/instagram/pages').catch(() => ({ json: () => ({ pages: [] }) })),
         fetch(`/api/instagram/pipeline-summary?destination=${this.activeAccount}`).catch(() => ({ json: () => ({ stages: {} }) })),
-        fetch('/api/settings').catch(() => ({ json: () => ({ settings: {} }) }))
+        fetch('/api/settings').catch(() => ({ json: () => ({ settings: {} }) })),
+        fetch('/api/instagram/bridge/status').catch(() => ({ json: () => ({ online: false }) }))
       ]);
 
       const channelsJson = await channelsRes.json();
@@ -107,11 +110,14 @@ const instagramBotV2View = {
       const pagesJson = await pagesRes.json();
       const summaryJson = await summaryRes.json();
       const settingsJson = await settingsRes.json();
+      const bridgeJson = await bridgeRes.json();
 
       this.trackedChannels = channelsJson.channels || [];
       this.autonomousFeed = feedJson.logs || [];
       this.connectedPages = pagesJson.pages || [];
       this.pipelineSummary = summaryJson.stages ? summaryJson : null;
+      this.bridgeStatus = bridgeJson || null;
+      this.bridgeOnline = Boolean(bridgeJson?.online);
 
       // Dynamically build accounts
       if (this.connectedPages.length > 0) {
@@ -309,7 +315,18 @@ const instagramBotV2View = {
           </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <!-- InstaAuto Sister Agent Bridge Status Pill -->
+          <div 
+            id="v2-instaauto-bridge-pill" 
+            onclick="instagramBotV2View.checkBridgeStatus(true)" 
+            title="InstaAuto Comment-to-DM Engine (Port 3000). Click to test connection or flush pending queue."
+            style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: ${this.bridgeOnline ? '#EFF6FF' : '#FEF3C7'}; border: 1px solid ${this.bridgeOnline ? '#3B82F6' : '#F59E0B'}; font-size: 0.78rem; font-weight: 800; color: ${this.bridgeOnline ? '#1D4ED8' : '#B45309'}; cursor: pointer; transition: all 0.2s;"
+          >
+            <span class="pulse-dot" style="background: ${this.bridgeOnline ? '#2563EB' : '#F59E0B'}; width: 7px; height: 7px; border-radius: 50%;"></span>
+            <span>InstaAuto: Port 3000 (${this.bridgeOnline ? 'Armed' : 'Standby'}${this.bridgeStatus?.pendingDeliverablesCount > 0 ? ` • ${this.bridgeStatus.pendingDeliverablesCount} Queued` : ''})</span>
+          </div>
+
           <!-- Autopilot Status Pill -->
           <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: ${currentAccount.autopilotEnabled ? '#DEF7EC' : 'var(--bg-base)'}; border: 1px solid ${currentAccount.autopilotEnabled ? '#31C48D' : 'var(--border-color)'}; font-size: 0.78rem; font-weight: 800; color: ${currentAccount.autopilotEnabled ? '#03543F' : 'var(--text-muted)'};">
             <span class="pulse-dot" style="background: ${currentAccount.autopilotEnabled ? '#10B981' : '#9CA3AF'}; width: 7px; height: 7px; border-radius: 50%;"></span>
@@ -588,6 +605,22 @@ const instagramBotV2View = {
           </div>
         </div>
 
+        <!-- Lead Magnet & Trigger Badges (if present) -->
+        ${(item.detected_trigger_keyword || item.harvested_deliverable_url) ? `
+          <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; margin-top: -2px;">
+            ${item.detected_trigger_keyword ? `
+              <span style="font-size: 0.68rem; font-weight: 800; color: #7C3AED; background: #F5F3FF; padding: 2px 6px; border-radius: 4px; border: 1px solid #DDD6FE;" title="Follower Comment Trigger">
+                💬 "${escapeHtml(item.detected_trigger_keyword)}"
+              </span>
+            ` : ''}
+            ${item.harvested_deliverable_url ? `
+              <a href="${item.harvested_deliverable_url}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.68rem; font-weight: 700; color: #2563EB; background: #EFF6FF; padding: 2px 6px; border-radius: 4px; border: 1px solid #BFDBFE; text-decoration: none; display: inline-flex; align-items: center; gap: 3px;" title="Harvested Deliverable URL">
+                🔗 ${item.harvested_deliverable_type === 'pdf' ? 'PDF Doc' : 'Deliverable'} ↗
+              </a>
+            ` : ''}
+          </div>
+        ` : ''}
+
         <!-- 2-Line Caption Preview -->
         <div class="v2-reel-caption-preview" style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: var(--bg-base); padding: 6px 8px; border-radius: 6px;">
           ${escapeHtml(captionPreview.slice(0, 95))}...
@@ -712,6 +745,51 @@ const instagramBotV2View = {
                   <span style="color: var(--text-muted);">Freshness:</span>
                   <strong style="color: #F59E0B; margin-left: 4px;">${breakdown.freshnessScore}%</strong>
                 </div>
+              </div>
+            </div>
+
+            <!-- Lead Magnet & Comment-to-DM Setup (InstaAuto Port 3000) -->
+            <div style="background: var(--bg-card); border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.85rem 1rem; background: linear-gradient(180deg, rgba(239, 246, 255, 0.6) 0%, var(--bg-card) 60%);">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 4px;">
+                <div style="font-size: 0.78rem; font-weight: 800; color: #1E40AF; display: flex; align-items: center; gap: 5px;">
+                  <span>🎯</span> Lead Magnet & Comment-to-DM Fulfillment
+                </div>
+                <span style="font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: ${this.bridgeOnline ? '#DEF7EC' : '#FEF3C7'}; color: ${this.bridgeOnline ? '#03543F' : '#92400E'};">
+                  ${this.bridgeOnline ? '● InstaAuto Port 3000 Online' : '○ Standby'}
+                </span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.78rem; margin-bottom: 0.65rem;">
+                <div style="background: var(--bg-base); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <span style="color: var(--text-muted); font-size: 0.7rem; display: block;">Trigger Keyword:</span>
+                  <strong style="color: #7C3AED; font-size: 0.85rem;">${escapeHtml(item.detected_trigger_keyword || 'PROJECT')}</strong>
+                </div>
+                <div style="background: var(--bg-base); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+                  <span style="color: var(--text-muted); font-size: 0.7rem; display: block;">Deliverable Type:</span>
+                  <strong style="color: #2563EB; font-size: 0.85rem; text-transform: uppercase;">${escapeHtml(item.harvested_deliverable_type || 'web')}</strong>
+                </div>
+              </div>
+
+              <div style="font-size: 0.75rem; margin-bottom: 0.5rem;">
+                <span style="color: var(--text-muted); font-weight: 700;">Deliverable URL:</span>
+                ${item.harvested_deliverable_url ? `
+                  <a href="${item.harvested_deliverable_url}" target="_blank" style="color: #2563EB; font-weight: 700; word-break: break-all; text-decoration: underline; margin-left: 4px;">
+                    ${escapeHtml(item.harvested_deliverable_url)} ↗
+                  </a>
+                ` : `
+                  <span style="color: var(--text-muted); font-style: italic; margin-left: 4px;">Will be extracted/synthesized from creator post</span>
+                `}
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+                <button 
+                  type="button" 
+                  class="btn btn-secondary btn-sm" 
+                  onclick="instagramBotV2View.armCandidateInInstaAuto('${item.shortcode}')"
+                  style="font-size: 0.74rem; font-weight: 800; color: #1D4ED8; background: #EFF6FF; border: 1px solid #93C5FD;"
+                >
+                  ⚡ Arm Rule in InstaAuto (Port 3000)
+                </button>
               </div>
             </div>
 
@@ -1908,6 +1986,84 @@ const instagramBotV2View = {
       this.renderDashboard();
     } catch (e) {
       app.showToast(`Publish notice: ${e.message}`, 'error');
+    }
+  },
+
+  async checkBridgeStatus(showToast = false) {
+    try {
+      const res = await fetch('/api/instagram/bridge/status');
+      const data = await res.json();
+      this.bridgeStatus = data;
+      this.bridgeOnline = Boolean(data.online);
+      if (showToast) {
+        if (data.online) {
+          app.showToast(`✅ InstaAuto (Port 3000) Online! ${data.armedDeliverablesCount || 0} reels armed with Follow-First DM rules.`, 'success');
+          if (data.pendingDeliverablesCount > 0) {
+            await this.retryPendingDeliverables();
+          }
+        } else {
+          app.showToast(`⚠️ InstaAuto (Port 3000) is Offline. Reels are queued and will auto-arm once port 3000 is running.`, 'warning');
+        }
+      }
+      this.renderDashboard();
+    } catch (err) {
+      this.bridgeOnline = false;
+      if (showToast) app.showToast(`Error connecting to bridge: ${err.message}`, 'error');
+    }
+  },
+
+  async retryPendingDeliverables() {
+    try {
+      app.showToast('Flushing pending deliverables queue to InstaAuto...', 'info');
+      const res = await fetch('/api/instagram/bridge/retry-pending', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`🎉 Retried ${data.total} posts: ${data.armed} armed in InstaAuto!`, 'success');
+        await this.loadData();
+        this.renderDashboard();
+      }
+    } catch (err) {
+      app.showToast(`Retry failed: ${err.message}`, 'error');
+    }
+  },
+
+  async armCandidateInInstaAuto(shortcode) {
+    const feed = this.getFilteredFeed();
+    const item = feed.find(f => f.shortcode === shortcode);
+    if (!item) {
+      app.showToast(`Candidate #${shortcode} not found`, 'warning');
+      return;
+    }
+
+    const mediaId = item.ig_media_id || `candidate_${item.shortcode}`;
+    const keyword = item.detected_trigger_keyword || 'PROJECT';
+    const deliverableUrl = item.harvested_deliverable_url || item.source_post_url || '';
+    const caption = document.getElementById('drawer-caption-input')?.value || item.repurposed_caption || item.raw_caption;
+    const title = item.repurposed_hook || item.raw_hook || 'Lead Magnet Resource';
+
+    try {
+      app.showToast(`⚡ Arming rule in InstaAuto for #${shortcode} (Keyword: "${keyword}")...`, 'info');
+      const res = await fetch('/api/instagram/bridge/arm-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          igMediaId: mediaId,
+          triggerKeyword: keyword,
+          deliverableUrl: deliverableUrl,
+          caption: caption,
+          title: title
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`🎉 Armed in InstaAuto! Rule ID: ${data.ruleId || 'Active'}. Follow-First DM funnel ready!`, 'success');
+        await this.loadData();
+        this.renderDashboard();
+      } else {
+        throw new Error(data.error || 'Failed to arm in InstaAuto');
+      }
+    } catch (err) {
+      app.showToast(`Arm notice: ${err.message}`, 'error');
     }
   },
 
