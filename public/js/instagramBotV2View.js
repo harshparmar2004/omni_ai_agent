@@ -749,46 +749,70 @@ const instagramBotV2View = {
             </div>
 
             <!-- Lead Magnet & Comment-to-DM Setup (InstaAuto Port 3000) -->
-            <div style="background: var(--bg-card); border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.85rem 1rem; background: linear-gradient(180deg, rgba(239, 246, 255, 0.6) 0%, var(--bg-card) 60%);">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 4px;">
-                <div style="font-size: 0.78rem; font-weight: 800; color: #1E40AF; display: flex; align-items: center; gap: 5px;">
+            <div style="background: var(--bg-card); border: 1.5px solid #BFDBFE; border-radius: 12px; padding: 1rem 1.15rem; background: linear-gradient(180deg, rgba(239, 246, 255, 0.7) 0%, var(--bg-card) 60%); display: flex; flex-direction: column; gap: 0.75rem;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 4px;">
+                <div style="font-size: 0.82rem; font-weight: 800; color: #1E40AF; display: flex; align-items: center; gap: 6px;">
                   <span>🎯</span> Lead Magnet & Comment-to-DM Fulfillment
                 </div>
                 <span style="font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: ${this.bridgeOnline ? '#DEF7EC' : '#FEF3C7'}; color: ${this.bridgeOnline ? '#03543F' : '#92400E'};">
-                  ${this.bridgeOnline ? '● InstaAuto Port 3000 Online' : '○ Standby'}
+                  ${this.bridgeOnline ? '● AI Agent: InstaAuto (Port 3000) Online' : '○ Standby'}
                 </span>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.78rem; margin-bottom: 0.65rem;">
-                <div style="background: var(--bg-base); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <span style="color: var(--text-muted); font-size: 0.7rem; display: block;">Trigger Keyword:</span>
-                  <strong style="color: #7C3AED; font-size: 0.85rem;">${escapeHtml(item.detected_trigger_keyword || 'PROJECT')}</strong>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+                <div>
+                  <label style="color: var(--text-muted); font-size: 0.72rem; font-weight: 700; margin-bottom: 3px; display: block;">
+                    💬 Follower Trigger Keyword:
+                  </label>
+                  <input 
+                    type="text" 
+                    id="drawer-keyword-input" 
+                    class="form-input" 
+                    value="${escapeHtml(item.detected_trigger_keyword || 'PROJECT')}" 
+                    style="font-size: 0.84rem; font-weight: 800; color: #7C3AED; padding: 6px 10px; border-radius: 6px; text-transform: uppercase;"
+                    placeholder="e.g. PROJECT, GUIDE, CODE"
+                  />
                 </div>
-                <div style="background: var(--bg-base); padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
-                  <span style="color: var(--text-muted); font-size: 0.7rem; display: block;">Deliverable Type:</span>
-                  <strong style="color: #2563EB; font-size: 0.85rem; text-transform: uppercase;">${escapeHtml(item.harvested_deliverable_type || 'web')}</strong>
+                <div>
+                  <label style="color: var(--text-muted); font-size: 0.72rem; font-weight: 700; margin-bottom: 3px; display: block;">
+                    📦 Deliverable Type:
+                  </label>
+                  <div style="padding: 7px 10px; background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.8rem; font-weight: 800; color: #2563EB; text-transform: uppercase;">
+                    ${escapeHtml(item.harvested_deliverable_type || 'web')}
+                  </div>
                 </div>
               </div>
 
-              <div style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                <span style="color: var(--text-muted); font-weight: 700;">Deliverable URL:</span>
-                ${item.harvested_deliverable_url ? `
-                  <a href="${item.harvested_deliverable_url}" target="_blank" style="color: #2563EB; font-weight: 700; word-break: break-all; text-decoration: underline; margin-left: 4px;">
-                    ${escapeHtml(item.harvested_deliverable_url)} ↗
-                  </a>
-                ` : `
-                  <span style="color: var(--text-muted); font-style: italic; margin-left: 4px;">Will be extracted/synthesized from creator post</span>
-                `}
+              <div>
+                <label style="color: var(--text-muted); font-size: 0.72rem; font-weight: 700; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center;">
+                  <span>🔗 Exact Deliverable Link (Sent to User's DM):</span>
+                  ${item.harvested_deliverable_url ? `
+                    <a href="${item.harvested_deliverable_url}" target="_blank" style="color: #2563EB; text-decoration: underline; font-weight: 700;">
+                      Test Open Link ↗
+                    </a>
+                  ` : ''}
+                </label>
+                <input 
+                  type="url" 
+                  id="drawer-deliverable-url-input" 
+                  class="form-input" 
+                  value="${escapeHtml(item.harvested_deliverable_url || '')}" 
+                  style="font-size: 0.82rem; font-family: monospace; color: #1D4ED8; padding: 7px 10px; border-radius: 6px;"
+                  placeholder="https://github.com/..., https://notion.site/..., https://drive.google.com/..."
+                />
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">
+                  ✨ This is the exact destination URL registered in the AI Agent (InstaAuto). When followers comment, InstaAuto will DM this exact link.
+                </div>
               </div>
 
-              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem;">
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem;">
                 <button 
                   type="button" 
                   class="btn btn-secondary btn-sm" 
                   onclick="instagramBotV2View.armCandidateInInstaAuto('${item.shortcode}')"
                   style="font-size: 0.74rem; font-weight: 800; color: #1D4ED8; background: #EFF6FF; border: 1px solid #93C5FD;"
                 >
-                  ⚡ Arm Rule in InstaAuto (Port 3000)
+                  ⚡ Arm Exact Link in InstaAuto (Port 3000)
                 </button>
               </div>
             </div>
@@ -1972,6 +1996,12 @@ const instagramBotV2View = {
       const payload = { shortcode, destination: this.activeAccount };
       if (editedCaption) payload.caption = editedCaption;
 
+      const keywordInput = document.getElementById('drawer-keyword-input')?.value?.trim();
+      if (keywordInput) payload.trigger_keyword = keywordInput;
+
+      const urlInput = document.getElementById('drawer-deliverable-url-input')?.value?.trim();
+      if (urlInput) payload.deliverable_url = urlInput;
+
       const res = await fetch('/api/instagram/mobile-dm/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1997,12 +2027,12 @@ const instagramBotV2View = {
       this.bridgeOnline = Boolean(data.online);
       if (showToast) {
         if (data.online) {
-          app.showToast(`✅ InstaAuto (Port 3000) Online! ${data.armedDeliverablesCount || 0} reels armed with Follow-First DM rules.`, 'success');
+          app.showToast(`✅ InstaAuto AI Agent (Port 3000) Online! ${data.armedDeliverablesCount || 0} reels armed with Follow-First DM rules.`, 'success');
           if (data.pendingDeliverablesCount > 0) {
             await this.retryPendingDeliverables();
           }
         } else {
-          app.showToast(`⚠️ InstaAuto (Port 3000) is Offline. Reels are queued and will auto-arm once port 3000 is running.`, 'warning');
+          app.showToast(`⚠️ InstaAuto AI Agent (Port 3000) is Offline. Reels are queued and will auto-arm once port 3000 is running.`, 'warning');
         }
       }
       this.renderDashboard();
@@ -2035,14 +2065,19 @@ const instagramBotV2View = {
       return;
     }
 
-    const mediaId = item.ig_media_id || `candidate_${item.shortcode}`;
-    const keyword = item.detected_trigger_keyword || 'PROJECT';
-    const deliverableUrl = item.harvested_deliverable_url || item.source_post_url || '';
+    const keyword = document.getElementById('drawer-keyword-input')?.value?.trim() || item.detected_trigger_keyword || 'PROJECT';
+    const deliverableUrl = document.getElementById('drawer-deliverable-url-input')?.value?.trim() || item.harvested_deliverable_url || item.source_post_url || '';
     const caption = document.getElementById('drawer-caption-input')?.value || item.repurposed_caption || item.raw_caption;
     const title = item.repurposed_hook || item.raw_hook || 'Lead Magnet Resource';
+    const mediaId = item.ig_media_id || `candidate_${item.shortcode}`;
+
+    if (!deliverableUrl) {
+      app.showToast('Please enter or verify the Deliverable URL before arming!', 'warning');
+      return;
+    }
 
     try {
-      app.showToast(`⚡ Arming rule in InstaAuto for #${shortcode} (Keyword: "${keyword}")...`, 'info');
+      app.showToast(`⚡ Arming exact link in InstaAuto for #${shortcode} (Keyword: "${keyword}")...`, 'info');
       const res = await fetch('/api/instagram/bridge/arm-single', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2056,7 +2091,9 @@ const instagramBotV2View = {
       });
       const data = await res.json();
       if (data.success) {
-        app.showToast(`🎉 Armed in InstaAuto! Rule ID: ${data.ruleId || 'Active'}. Follow-First DM funnel ready!`, 'success');
+        app.showToast(`🎉 Exact link armed in InstaAuto AI Agent! Rule ID: ${data.ruleId || 'Active'}. Follow-First DM funnel ready!`, 'success');
+        item.detected_trigger_keyword = keyword;
+        item.harvested_deliverable_url = deliverableUrl;
         await this.loadData();
         this.renderDashboard();
       } else {

@@ -1345,6 +1345,34 @@ router.post('/mobile-dm/publish', async (req, res) => {
       return res.status(400).json({ success: false, error: 'No staged post found for this candidate.' });
     }
 
+    // Allow overriding caption, exact deliverable link, and keyword from review drawer
+    const { caption: customCaption, deliverable_url: customDeliverableUrl, trigger_keyword: customKeyword } = req.body || {};
+    if (customCaption) post.caption = customCaption;
+    if (customDeliverableUrl) post.deliverable_url = customDeliverableUrl;
+    if (customKeyword) post.trigger_keyword = customKeyword;
+
+    if (customDeliverableUrl || customKeyword || customCaption) {
+      try {
+        db.prepare(`
+          UPDATE instagram_posts 
+          SET caption = COALESCE(?, caption),
+              deliverable_url = COALESCE(?, deliverable_url),
+              trigger_keyword = COALESCE(?, trigger_keyword)
+          WHERE id = ?
+        `).run(customCaption || null, customDeliverableUrl || null, customKeyword || null, post.id);
+
+        if (trigger.shortcode) {
+          db.prepare(`
+            UPDATE autonomous_ingestion_log
+            SET repurposed_caption = COALESCE(?, repurposed_caption),
+                harvested_deliverable_url = COALESCE(?, harvested_deliverable_url),
+                detected_trigger_keyword = COALESCE(?, detected_trigger_keyword)
+            WHERE shortcode = ?
+          `).run(customCaption || null, customDeliverableUrl || null, customKeyword || null, trigger.shortcode);
+        }
+      } catch (e) {}
+    }
+
     const mediaUrls = JSON.parse(post.media_urls || '[]');
     let pubResult;
     const microHealth = await checkMicroserviceHealth();
