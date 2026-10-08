@@ -276,30 +276,30 @@ const instagramBotV2View = {
       return `
         <button 
           class="v2-page-pill ${isSelected ? 'active' : ''}" 
-          style="${isSelected ? `--active-pill-bg: ${acc.lightBg}; --active-pill-border: ${acc.color}; --active-pill-color: ${acc.color};` : ''}"
+          style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 9999px; font-size: 0.82rem; font-weight: 700; border: 1.5px solid ${isSelected ? acc.color : 'var(--border-color)'}; background: ${isSelected ? acc.lightBg : 'var(--bg-base)'}; color: ${isSelected ? acc.color : 'var(--text-secondary)'}; cursor: pointer; transition: all 0.18s ease; ${isSelected ? `box-shadow: 0 2px 8px ${acc.lightBg};` : ''}"
           onclick="instagramBotV2View.switchAccount('${acc.id}')"
         >
-          <span>${acc.icon || '📱'}</span>
+          <span style="font-size: 1.1rem;">${acc.icon || '📱'}</span>
           <span>${escapeHtml(acc.name)}</span>
-          <span style="opacity: 0.7; font-size: 0.75rem;">${escapeHtml(acc.handle)}</span>
+          <span style="opacity: 0.75; font-size: 0.74rem; font-weight: 600;">${escapeHtml(acc.handle)}</span>
         </button>
       `;
     }).join('');
 
     return `
-      <div class="v2-page-bar">
+      <div class="v2-page-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1.25rem; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-sm); flex-wrap: wrap;">
         <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
           <span style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
             Workspaces:
           </span>
-          <div class="v2-page-pills">
+          <div class="v2-page-pills" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
             ${pagePills}
           </div>
         </div>
 
         <div style="display: flex; align-items: center; gap: 0.75rem;">
           <!-- Autopilot Status Pill -->
-          <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 9999px; background: ${currentAccount.autopilotEnabled ? '#DEF7EC' : 'var(--bg-base)'}; border: 1px solid ${currentAccount.autopilotEnabled ? '#31C48D' : 'var(--border-color)'}; font-size: 0.78rem; font-weight: 800; color: ${currentAccount.autopilotEnabled ? '#03543F' : 'var(--text-muted)'};">
+          <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 9999px; background: ${currentAccount.autopilotEnabled ? '#DEF7EC' : 'var(--bg-base)'}; border: 1px solid ${currentAccount.autopilotEnabled ? '#31C48D' : 'var(--border-color)'}; font-size: 0.78rem; font-weight: 800; color: ${currentAccount.autopilotEnabled ? '#03543F' : 'var(--text-muted)'};">
             <span class="pulse-dot" style="background: ${currentAccount.autopilotEnabled ? '#10B981' : '#9CA3AF'}; width: 7px; height: 7px; border-radius: 50%;"></span>
             <span>Autopilot ${currentAccount.autopilotEnabled ? 'ACTIVE (3h)' : 'OFF'}</span>
           </div>
@@ -328,63 +328,63 @@ const instagramBotV2View = {
     };
 
     return `
-      <div class="v2-stepper-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
-          <div style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-            <span>⚡</span> Autonomous Ingestion & Publishing Pipeline Stage
+      <div class="v2-stepper-container" style="background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: 14px; padding: 1.1rem 1.35rem; box-shadow: var(--shadow-sm);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-size: 0.78rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 1rem;">⚡</span> Autonomous Ingestion & Publishing Pipeline Stage
           </div>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">
-            Auto-Cadence: <strong>Every 3 Hours ± 20m Jitter</strong>
+          <div style="font-size: 0.76rem; color: var(--text-muted);">
+            Surveillance Cadence: <strong>Every 3 Hours ± 20m Jitter</strong>
           </div>
         </div>
 
-        <div class="v2-stepper">
+        <div class="v2-stepper" style="display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; overflow-x: auto; padding-bottom: 0.35rem;">
           <!-- Stage 1: Sources -->
-          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('sources')">
-            <div class="v2-step-num">1</div>
-            <div class="v2-step-info">
-              <span class="v2-step-label">Sources</span>
-              <span class="v2-step-count">${summary.sources} Profiles</span>
+          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('sources')" style="display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--bg-base); border: 1.5px solid var(--border-color); cursor: pointer; flex: 1; min-width: 140px;">
+            <div class="v2-step-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);">1</div>
+            <div class="v2-step-info" style="display: flex; flex-direction: column;">
+              <span class="v2-step-label" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sources</span>
+              <span class="v2-step-count" style="font-size: 0.96rem; font-weight: 800; color: var(--text-primary);">${summary.sources} Profiles</span>
             </div>
           </div>
-          <div class="v2-step-arrow">→</div>
+          <div class="v2-step-arrow" style="color: var(--text-muted); font-size: 1.1rem; font-weight: 700; opacity: 0.6; padding: 0 2px;">→</div>
 
           <!-- Stage 2: Scanned -->
-          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='scanned'; instagramBotV2View.renderDashboard();">
-            <div class="v2-step-num">2</div>
-            <div class="v2-step-info">
-              <span class="v2-step-label">Scanned</span>
-              <span class="v2-step-count">${summary.scanned} Ingested</span>
+          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='scanned'; instagramBotV2View.renderDashboard();" style="display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--bg-base); border: 1.5px solid var(--border-color); cursor: pointer; flex: 1; min-width: 140px;">
+            <div class="v2-step-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);">2</div>
+            <div class="v2-step-info" style="display: flex; flex-direction: column;">
+              <span class="v2-step-label" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Scanned</span>
+              <span class="v2-step-count" style="font-size: 0.96rem; font-weight: 800; color: var(--text-primary);">${summary.scanned} Ingested</span>
             </div>
           </div>
-          <div class="v2-step-arrow">→</div>
+          <div class="v2-step-arrow" style="color: var(--text-muted); font-size: 1.1rem; font-weight: 700; opacity: 0.6; padding: 0 2px;">→</div>
 
           <!-- Stage 3: Ranked -->
-          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline');">
-            <div class="v2-step-num">3</div>
-            <div class="v2-step-info">
-              <span class="v2-step-label">Ranked</span>
-              <span class="v2-step-count">${summary.ranked} Scored</span>
+          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline');" style="display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--bg-base); border: 1.5px solid var(--border-color); cursor: pointer; flex: 1; min-width: 140px;">
+            <div class="v2-step-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);">3</div>
+            <div class="v2-step-info" style="display: flex; flex-direction: column;">
+              <span class="v2-step-label" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ranked</span>
+              <span class="v2-step-count" style="font-size: 0.96rem; font-weight: 800; color: var(--text-primary);">${summary.ranked} Scored</span>
             </div>
           </div>
-          <div class="v2-step-arrow">→</div>
+          <div class="v2-step-arrow" style="color: var(--text-muted); font-size: 1.1rem; font-weight: 700; opacity: 0.6; padding: 0 2px;">→</div>
 
           <!-- Stage 4: Ready to Post -->
-          <div class="v2-step-node ${summary.ready > 0 ? 'active-stage' : ''}" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='ready'; instagramBotV2View.renderDashboard();">
-            <div class="v2-step-num">4</div>
-            <div class="v2-step-info">
-              <span class="v2-step-label">Ready</span>
-              <span class="v2-step-count" style="${summary.ready > 0 ? 'color: #10B981;' : ''}">${summary.ready} Approved</span>
+          <div class="v2-step-node ${summary.ready > 0 ? 'active-stage' : ''}" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='ready'; instagramBotV2View.renderDashboard();" style="display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: ${summary.ready > 0 ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-base)'}; border: 1.5px solid ${summary.ready > 0 ? '#10B981' : 'var(--border-color)'}; cursor: pointer; flex: 1; min-width: 140px;">
+            <div class="v2-step-num" style="width: 28px; height: 28px; border-radius: 50%; background: ${summary.ready > 0 ? '#10B981' : 'var(--bg-card)'}; border: 1.5px solid ${summary.ready > 0 ? '#10B981' : 'var(--border-color)'}; color: ${summary.ready > 0 ? '#fff' : 'var(--text-secondary)'}; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800;">4</div>
+            <div class="v2-step-info" style="display: flex; flex-direction: column;">
+              <span class="v2-step-label" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Ready</span>
+              <span class="v2-step-count" style="font-size: 0.96rem; font-weight: 800; color: ${summary.ready > 0 ? '#10B981' : 'var(--text-primary)'};">${summary.ready} Approved</span>
             </div>
           </div>
-          <div class="v2-step-arrow">→</div>
+          <div class="v2-step-arrow" style="color: var(--text-muted); font-size: 1.1rem; font-weight: 700; opacity: 0.6; padding: 0 2px;">→</div>
 
           <!-- Stage 5: Published Live -->
-          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='published'; instagramBotV2View.renderDashboard();">
-            <div class="v2-step-num">5</div>
-            <div class="v2-step-info">
-              <span class="v2-step-label">Live Posts</span>
-              <span class="v2-step-count" style="color: #2563EB;">${summary.published} Live</span>
+          <div class="v2-step-node" onclick="instagramBotV2View.switchTab('pipeline'); instagramBotV2View.activeKanbanFilter='published'; instagramBotV2View.renderDashboard();" style="display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--bg-base); border: 1.5px solid var(--border-color); cursor: pointer; flex: 1; min-width: 140px;">
+            <div class="v2-step-num" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);">5</div>
+            <div class="v2-step-info" style="display: flex; flex-direction: column;">
+              <span class="v2-step-label" style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Live Posts</span>
+              <span class="v2-step-count" style="font-size: 0.96rem; font-weight: 800; color: #2563EB;">${summary.published} Live</span>
             </div>
           </div>
         </div>
@@ -417,23 +417,23 @@ const instagramBotV2View = {
     }
 
     return `
-      <div class="v2-primary-cta-bar">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <button class="v2-primary-btn" onclick="${primaryActionOnClick}">
+      <div class="v2-primary-cta-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: var(--bg-card); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 0.95rem 1.35rem; box-shadow: var(--shadow-sm); flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+          <button class="v2-primary-btn" onclick="${primaryActionOnClick}" style="display: inline-flex; align-items: center; gap: 0.65rem; padding: 0.75rem 1.4rem; border-radius: 10px; font-size: 0.92rem; font-weight: 800; color: #FFFFFF; background: linear-gradient(135deg, #10B981, #059669); border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3); transition: all 0.2s ease;">
             <span>${primaryActionTitle}</span>
           </button>
           <div>
-            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">
+            <div style="font-size: 0.84rem; font-weight: 800; color: var(--text-primary);">
               ${escapeHtml(primaryActionSubtitle)}
             </div>
-            <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 1px;">
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 1px;">
               Destination: <strong>${escapeHtml(currentAccount.handle)}</strong> • Single-click action
             </div>
           </div>
         </div>
 
         <!-- Secondary Actions in Compact Format -->
-        <div style="display: flex; align-items: center; gap: 0.45rem;">
+        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
           <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.pollAllSourcesNow()" title="Scan monitored sources immediately">
             📡 Scan Sources
           </button>
@@ -480,17 +480,17 @@ const instagramBotV2View = {
         </div>
 
         <!-- 3-Column Kanban Board -->
-        <div class="v2-kanban-board">
+        <div class="v2-kanban-board" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; align-items: start;">
           
           <!-- Column 1: Incoming / Scanned -->
-          <div class="v2-kanban-col">
-            <div class="v2-kanban-header">
-              <div class="v2-kanban-title">
+          <div class="v2-kanban-col" style="background: var(--bg-base); border: 1.5px solid var(--border-color); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 480px;">
+            <div class="v2-kanban-header" style="padding: 0.85rem 1.15rem; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+              <div class="v2-kanban-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 800; color: var(--text-primary);">
                 <span>📥</span> Incoming Scraped
               </div>
-              <span class="v2-kanban-badge">${incomingItems.length}</span>
+              <span class="v2-kanban-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: rgba(0, 0, 0, 0.06); color: var(--text-muted);">${incomingItems.length}</span>
             </div>
-            <div class="v2-kanban-content">
+            <div class="v2-kanban-content" style="padding: 0.85rem; display: flex; flex-direction: column; gap: 0.85rem; flex: 1;">
               ${incomingItems.length === 0 ? `
                 <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.8rem;">
                   <div>📡</div>
@@ -501,14 +501,14 @@ const instagramBotV2View = {
           </div>
 
           <!-- Column 2: Ready to Post (Approved Candidates) -->
-          <div class="v2-kanban-col" style="border-top: 3px solid #10B981;">
-            <div class="v2-kanban-header">
-              <div class="v2-kanban-title" style="color: #03543F;">
+          <div class="v2-kanban-col" style="background: var(--bg-base); border: 1.5px solid var(--border-color); border-top: 3.5px solid #10B981; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 480px;">
+            <div class="v2-kanban-header" style="padding: 0.85rem 1.15rem; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+              <div class="v2-kanban-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 800; color: #03543F;">
                 <span>🥇</span> Ready to Post
               </div>
-              <span class="v2-kanban-badge" style="background: #DEF7EC; color: #03543F;">${readyItems.length} QUALIFIED</span>
+              <span class="v2-kanban-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #DEF7EC; color: #03543F;">${readyItems.length} QUALIFIED</span>
             </div>
-            <div class="v2-kanban-content">
+            <div class="v2-kanban-content" style="padding: 0.85rem; display: flex; flex-direction: column; gap: 0.85rem; flex: 1;">
               ${readyItems.length === 0 ? `
                 <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.8rem;">
                   <div>⏱️</div>
@@ -520,14 +520,14 @@ const instagramBotV2View = {
           </div>
 
           <!-- Column 3: Published Live -->
-          <div class="v2-kanban-col" style="border-top: 3px solid #2563EB;">
-            <div class="v2-kanban-header">
-              <div class="v2-kanban-title" style="color: #1E40AF;">
+          <div class="v2-kanban-col" style="background: var(--bg-base); border: 1.5px solid var(--border-color); border-top: 3.5px solid #2563EB; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; min-height: 480px;">
+            <div class="v2-kanban-header" style="padding: 0.85rem 1.15rem; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+              <div class="v2-kanban-title" style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; font-weight: 800; color: #1E40AF;">
                 <span>🟢</span> Published Live
               </div>
-              <span class="v2-kanban-badge" style="background: #DBEAFE; color: #1E40AF;">${publishedItems.length} POSTS</span>
+              <span class="v2-kanban-badge" style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 9999px; background: #DBEAFE; color: #1E40AF;">${publishedItems.length} POSTS</span>
             </div>
-            <div class="v2-kanban-content">
+            <div class="v2-kanban-content" style="padding: 0.85rem; display: flex; flex-direction: column; gap: 0.85rem; flex: 1;">
               ${publishedItems.length === 0 ? `
                 <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-size: 0.8rem;">
                   <div>📭</div>
@@ -555,34 +555,34 @@ const instagramBotV2View = {
     const captionPreview = item.repurposed_caption || item.raw_caption || 'No caption available.';
 
     return `
-      <div class="v2-reel-card-slim ${isTopPick ? 'top-pick' : ''}">
+      <div class="v2-reel-card-slim ${isTopPick ? 'top-pick' : ''}" style="background: var(--bg-card); border: ${isTopPick ? '2px solid #10B981' : '1px solid var(--border-color)'}; border-radius: 12px; padding: 0.85rem; display: flex; flex-direction: column; gap: 0.65rem; box-shadow: var(--shadow-sm); position: relative; ${isTopPick ? 'background: linear-gradient(180deg, rgba(16, 185, 129, 0.04), var(--bg-card) 25%);' : ''}">
         
-        <div class="v2-reel-card-header">
+        <div class="v2-reel-card-header" style="display: flex; gap: 0.75rem; align-items: flex-start;">
           <!-- Thumbnail -->
-          <div class="v2-reel-thumb-sm" onclick="instagramBotV2View.openReviewDrawer(${item.id})" title="Click to review & preview video">
-            <img src="${thumb}" onerror="this.src='/generated/assets/brand_logo.svg'">
-            <div class="play-icon">▶</div>
+          <div class="v2-reel-thumb-sm" onclick="instagramBotV2View.openReviewDrawer(${item.id})" title="Click to review & preview video" style="width: 58px; height: 80px; border-radius: 8px; overflow: hidden; background: #111; position: relative; flex-shrink: 0; cursor: pointer;">
+            <img src="${thumb}" onerror="this.src='/generated/assets/brand_logo.svg'" style="width: 100%; height: 100%; object-fit: cover;">
+            <div class="play-icon" style="position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #FFFFFF;">▶</div>
           </div>
 
           <!-- Meta -->
-          <div class="v2-reel-meta">
-            <div class="v2-reel-creator">
+          <div class="v2-reel-meta" style="flex: 1; min-width: 0;">
+            <div class="v2-reel-creator" style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
               <span>@${escapeHtml(item.channel_username || 'creator')}</span>
-              <span class="v2-reel-score-badge">${score}/100</span>
+              <span class="v2-reel-score-badge" style="font-size: 0.72rem; font-weight: 900; padding: 2px 7px; border-radius: 6px; background: #DEF7EC; color: #03543F;">${score}/100</span>
             </div>
-            <div class="v2-reel-hook" title="${escapeHtml(hook)}">
+            <div class="v2-reel-hook" title="${escapeHtml(hook)}" style="font-size: 0.88rem; font-weight: 800; color: var(--text-primary); margin-top: 3px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
               ${isTopPick ? '🥇 ' : ''}${escapeHtml(hook)}
             </div>
           </div>
         </div>
 
         <!-- 2-Line Caption Preview -->
-        <div class="v2-reel-caption-preview">
+        <div class="v2-reel-caption-preview" style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: var(--bg-base); padding: 6px 8px; border-radius: 6px;">
           ${escapeHtml(captionPreview.slice(0, 95))}...
         </div>
 
         <!-- Bottom Actions -->
-        <div class="v2-reel-card-actions">
+        <div class="v2-reel-card-actions" style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 2px;">
           <div>
             ${isPublished ? `
               <a href="${item.ig_permalink || '#'}" target="_blank" class="table-action-btn btn-live" style="text-decoration: none; font-weight: 800; font-size: 0.72rem; padding: 3px 8px;">

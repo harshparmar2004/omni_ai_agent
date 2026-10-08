@@ -2157,6 +2157,9 @@ code, pre, .font-mono {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 1.1rem;
+}
+
 /* ==========================================================================
    OmniStudio AI v5.2 — Pipeline-First UI/UX System (Bot v2 Redesign)
    ========================================================================== */
