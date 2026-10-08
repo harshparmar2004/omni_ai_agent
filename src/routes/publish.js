@@ -95,6 +95,10 @@ router.post('/image', async (req, res) => {
       contentType: 'image'
     });
 
+    if (!pubResult || !pubResult.success || !pubResult.ig_media_id) {
+      throw new Error(pubResult?.error || 'Failed to publish image post');
+    }
+
     res.json({
       success: true,
       message: `Image post published (#${pubResult.ig_media_id})!`,
@@ -137,6 +141,10 @@ router.post('/carousel', async (req, res) => {
     const activeCaption = caption || asset?.caption || 'Swipe for the full breakdown!';
 
     const pubResult = await publishCarouselToInstagram({ imageUrls: images, caption: activeCaption });
+
+    if (!pubResult || !pubResult.success || !pubResult.ig_media_id) {
+      throw new Error(pubResult?.error || 'Failed to publish carousel');
+    }
 
     const bridgeResult = await pushToInstaAutoBridge({
       mediaAssetId: asset?.id || null,

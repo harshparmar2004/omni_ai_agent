@@ -177,14 +177,26 @@ async function publishImageToInstagram({ imageUrl, caption, destination = 'gta6'
   const creds = resolvePublishCredentials(destination);
   const pageToken = creds.pageToken;
   const igUserId = creds.igUserId;
-  const publicBaseUrl = await ensureTunnelOnline();
   const baseUrl = getGraphBaseUrl(pageToken);
 
   if (mode === 'live' && pageToken && igUserId && pageToken.length > 20) {
     try {
       console.log(`[IG Publisher] 📸 Publishing Image Post via Meta Graph API (${baseUrl}) for [${creds.destination.toUpperCase()}: ${creds.handle}]...`);
       
-      const fullImageUrl = imageUrl.startsWith('http') ? imageUrl : `${publicBaseUrl}${imageUrl}`;
+      // Ensure image is Meta-compliant JPEG (converts PNG/WebP to .jpg if needed)
+      const { ensureMetaCompliantImage } = require('../utils/ffmpegHelper');
+      let effectiveUrl = imageUrl;
+      if (!imageUrl.startsWith('http')) {
+        const localImgPath = path.isAbsolute(imageUrl) ? imageUrl : path.join(__dirname, '..', '..', 'public', imageUrl.replace(/^\//, ''));
+        if (fs.existsSync(localImgPath)) {
+          const compResult = await ensureMetaCompliantImage(localImgPath);
+          effectiveUrl = compResult.url;
+        }
+      }
+
+      const publicBaseUrl = await ensureTunnelOnline();
+      const fullImageUrl = effectiveUrl.startsWith('http') ? effectiveUrl : `${publicBaseUrl}${effectiveUrl}`;
+      console.log(`[IG Publisher] 🌐 Uploading image container with public URL: ${fullImageUrl}`);
 
       // Step 1: Create image container
       const initResponse = await axios.post(
@@ -203,10 +215,10 @@ async function publishImageToInstagram({ imageUrl, caption, destination = 'gta6'
       const containerId = initResponse.data?.id;
       if (!containerId) throw new Error('Meta API did not return container ID');
 
-      // Wait brief moment for processing
-      await new Promise(r => setTimeout(r, 2000));
+      // Step 2: Poll container status until FINISHED
+      await pollContainerStatus(containerId, pageToken, baseUrl);
 
-      // Step 2: Publish
+      // Step 3: Publish
       const publishRes = await axios.post(
         `${baseUrl}/${igUserId}/media_publish`,
         null,
@@ -214,6 +226,7 @@ async function publishImageToInstagram({ imageUrl, caption, destination = 'gta6'
       );
 
       const igMediaId = publishRes.data?.id;
+      if (!igMediaId) throw new Error('Meta API media_publish did not return media ID');
       console.log(`[IG Publisher] ✅ Image Post Published! Media ID: ${igMediaId}`);
 
       let permalink = `https://www.instagram.com/p/${igMediaId}/`;
@@ -253,21 +266,40 @@ async function publishCarouselToInstagram({ imageUrls, caption, destination = 'g
   const creds = resolvePublishCredentials(destination);
   const pageToken = creds.pageToken;
   const igUserId = creds.igUserId;
-  const publicBaseUrl = await ensureTunnelOnline();
   const baseUrl = getGraphBaseUrl(pageToken);
 
-  if (!Array.isArray(imageUrls) || imageUrls.length < 2) {
-    return { success: false, error: 'Carousel requires at least 2 images' };
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+    return { success: false, error: 'Carousel requires at least 1 image' };
+  }
+
+  // If only 1 image provided, route seamlessly to single image publisher
+  if (imageUrls.length === 1) {
+    console.log(`[IG Publisher] 📸 Carousel has 1 image. Routing to single image publisher...`);
+    return publishImageToInstagram({ imageUrl: imageUrls[0], caption, destination });
   }
 
   if (mode === 'live' && pageToken && igUserId && pageToken.length > 20) {
     try {
       console.log(`[IG Publisher] 🎠 Publishing Carousel (${imageUrls.length} images) via Meta Graph API (${baseUrl}) for [${creds.destination.toUpperCase()}: ${creds.handle}]...`);
 
-      // Step 1: Create individual item containers
+      const { ensureMetaCompliantImage } = require('../utils/ffmpegHelper');
+      const publicBaseUrl = await ensureTunnelOnline();
+
+      // Step 1: Ensure each image is a Meta-compliant JPEG, then create child containers
       const childIds = [];
       for (const imgUrl of imageUrls.slice(0, 10)) {
-        const fullUrl = imgUrl.startsWith('http') ? imgUrl : `${publicBaseUrl}${imgUrl}`;
+        let effectiveUrl = imgUrl;
+        if (!imgUrl.startsWith('http')) {
+          const localImgPath = path.isAbsolute(imgUrl) ? imgUrl : path.join(__dirname, '..', '..', 'public', imgUrl.replace(/^\//, ''));
+          if (fs.existsSync(localImgPath)) {
+            const compResult = await ensureMetaCompliantImage(localImgPath);
+            effectiveUrl = compResult.url;
+          }
+        }
+
+        const fullUrl = effectiveUrl.startsWith('http') ? effectiveUrl : `${publicBaseUrl}${effectiveUrl}`;
+        console.log(`[IG Publisher] 🌐 Creating carousel item container for: ${fullUrl}`);
+
         const itemRes = await axios.post(
           `${baseUrl}/${igUserId}/media`,
           null,
@@ -280,10 +312,17 @@ async function publishCarouselToInstagram({ imageUrls, caption, destination = 'g
             timeout: 25000
           }
         );
-        childIds.push(itemRes.data?.id);
+        const childId = itemRes.data?.id;
+        if (!childId) throw new Error(`Meta API failed to create carousel item container for ${imgUrl}`);
+        childIds.push(childId);
+      }
+
+      if (childIds.length < 2) {
+        throw new Error(`Need at least 2 valid child containers for Carousel, got ${childIds.length}`);
       }
 
       // Step 2: Create carousel container
+      console.log(`[IG Publisher] 🎠 Creating parent carousel container with ${childIds.length} items...`);
       const carouselRes = await axios.post(
         `${baseUrl}/${igUserId}/media`,
         null,
@@ -301,7 +340,10 @@ async function publishCarouselToInstagram({ imageUrls, caption, destination = 'g
       const containerId = carouselRes.data?.id;
       if (!containerId) throw new Error('Meta API did not return carousel container ID');
 
-      // Step 3: Publish
+      // Step 3: Poll carousel container status until FINISHED
+      await pollContainerStatus(containerId, pageToken, baseUrl);
+
+      // Step 4: Publish
       const publishRes = await axios.post(
         `${baseUrl}/${igUserId}/media_publish`,
         null,
@@ -309,6 +351,7 @@ async function publishCarouselToInstagram({ imageUrls, caption, destination = 'g
       );
 
       const igMediaId = publishRes.data?.id;
+      if (!igMediaId) throw new Error('Meta API media_publish did not return media ID');
       console.log(`[IG Publisher] ✅ Carousel Published! Media ID: ${igMediaId}`);
 
       let permalink = `https://www.instagram.com/p/${igMediaId}/`;
@@ -462,8 +505,9 @@ async function executePublishPipeline(postId, publishVia = null) {
     const destination = post.destination_account || 'gta6';
     console.log(`[IG Publisher Pipeline] 🚀 Publishing Post #${postId} (${post.content_type}) via Meta Graph API v21.0 [Destination: ${destination.toUpperCase()}]...`);
     if (post.content_type === 'carousel') {
+      const candidateUrls = mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url].filter(Boolean);
       pubResult = await publishCarouselToInstagram({
-        imageUrls: mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url],
+        imageUrls: candidateUrls,
         caption: post.caption,
         destination
       });
@@ -481,6 +525,16 @@ async function executePublishPipeline(postId, publishVia = null) {
         destination
       });
     }
+  }
+
+  // Strict Validation: Guarantee live publish did not fail or return mock in live mode
+  if (!pubResult || !pubResult.success || !pubResult.ig_media_id) {
+    throw new Error(pubResult?.error || 'Publishing pipeline failed to generate an Instagram media ID');
+  }
+
+  const configuredMode = getSetting('mode', 'mock');
+  if (configuredMode === 'live' && pubResult.mode === 'mock') {
+    throw new Error(pubResult?.note || 'Publishing could not complete live to Instagram. Ensure Meta credentials are configured and try again.');
   }
 
   // 3. Push to InstaAuto Sister Agent Bridge if lead magnet or has trigger keyword

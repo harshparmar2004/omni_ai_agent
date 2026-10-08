@@ -262,7 +262,7 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
 
     if (isApproved) {
       const isDirectRepost = log.post_intent === 'direct_repost' || !log.detected_trigger_keyword;
-      const isPublished = Boolean(result.published || result.publishResult?.success);
+      const isPublished = Boolean((result.published || result.publishResult?.success) && result.publishResult?.mode !== 'mock');
       const liveLink = isPublished ? (result.publishResult?.permalink || log.ig_permalink || '') : '';
       const publishMethod = result.publishResult?.method || 'Meta Verified Content Publishing API v21.0';
       const assetUrl = log.harvested_deliverable_url || '';

@@ -246,9 +246,35 @@ function initSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_auto_event_post ON instagram_automation_events(post_id);
     CREATE INDEX IF NOT EXISTS idx_auto_event_type ON instagram_automation_events(event_type);
+
+    -- 12. Connected Instagram Pages & Multi-Tenant Registry (v5.0)
+    CREATE TABLE IF NOT EXISTS connected_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT UNIQUE NOT NULL,             -- e.g. 'tech', 'gta6', 'politics', 'fitness'
+      name TEXT NOT NULL,                    -- e.g. 'Tech News Daily AI', 'GTA 6 Updates 007'
+      handle TEXT NOT NULL,                  -- e.g. '@technews_daily_ai'
+      meta_page_token TEXT NOT NULL,         -- Meta Graph API System User / Page Access Token
+      meta_ig_user_id TEXT NOT NULL,         -- Instagram Business Account ID
+      niche TEXT NOT NULL DEFAULT 'tech',    -- 'tech', 'gaming', 'politics', 'finance', 'gadgets'
+      workflow_type TEXT NOT NULL DEFAULT 'lead_magnet', -- 'lead_magnet', 'direct_repost', 'editorial'
+      icon TEXT DEFAULT '📱',                -- Emoji for UI & Telegram buttons
+      theme_color TEXT DEFAULT '#7C3AED',    -- Hex color for UI branding
+      has_dm_automation INTEGER DEFAULT 1,   -- 1 = ManyChat Comment-to-DM Harvester, 0 = No DM harvesting
+      custom_trigger_keyword TEXT DEFAULT 'PROJECT', -- Keyword users comment on OUR post
+      lead_magnet_instructions TEXT,         -- Custom system prompt for caption generation
+      instaauto_enabled INTEGER DEFAULT 1,
+      instaauto_rule_template TEXT DEFAULT '{"follow_required": true, "reply_message": "Hey! Here is your requested link: {deliverable_url}"}',
+      attribution_template TEXT DEFAULT '💡 Reel Source: @{author} | Follow @{my_handle} for daily updates!',
+      autopilot_enabled INTEGER DEFAULT 0,
+      daily_quota INTEGER DEFAULT 3,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_connected_pages_slug ON connected_pages(slug);
   `);
 
-  // ─── v2.0, v3.0 & v4.0 Schema Migration ─────────────────────────────
+  // ─── v2.0, v3.0, v4.0 & v5.0 Schema Migration ─────────────────────────────
   const migrations = [
     "ALTER TABLE research_campaigns ADD COLUMN provider TEXT DEFAULT 'synthetic'",
     "ALTER TABLE research_campaigns ADD COLUMN model TEXT DEFAULT ''",
@@ -276,7 +302,14 @@ function initSchema(db) {
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN staged_post_id INTEGER",
     "ALTER TABLE instagram_posts ADD COLUMN destination_account TEXT DEFAULT 'gta6'",
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN destination_account TEXT DEFAULT 'tech'",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN destination_account TEXT DEFAULT 'tech'"
+    "ALTER TABLE tracked_instagram_channels ADD COLUMN destination_account TEXT DEFAULT 'tech'",
+    "ALTER TABLE mobile_dm_triggers ADD COLUMN destination_account TEXT DEFAULT NULL",
+    "ALTER TABLE mobile_dm_triggers ADD COLUMN connected_page_id INTEGER",
+    "ALTER TABLE mobile_dm_triggers ADD COLUMN selected_workflow TEXT DEFAULT NULL",
+    "ALTER TABLE mobile_dm_triggers ADD COLUMN telegram_message_id TEXT",
+    "ALTER TABLE instagram_posts ADD COLUMN connected_page_id INTEGER",
+    "ALTER TABLE tracked_instagram_channels ADD COLUMN connected_page_id INTEGER",
+    "ALTER TABLE autonomous_ingestion_log ADD COLUMN connected_page_id INTEGER"
   ];
 
   for (const sql of migrations) {
@@ -396,6 +429,9 @@ function seedInitialData(db) {
       seedTime
     );
   }
+
+  // Seed connected_pages registry (v5.0 Multi-Account Hub)
+  seedConnectedPages(db);
 
   // Check if deliverables_matrix has data
   const count = db.prepare('SELECT count(*) as count FROM deliverables_matrix').get().count;
@@ -656,6 +692,77 @@ function seedInitialData(db) {
   );
 
   console.log('[OmniResearch Database] Initial schema initialized and pre-seeded with 3 realistic enterprise deliverables.');
+}
+
+function seedConnectedPages(db) {
+  try {
+    const pageCount = db.prepare('SELECT count(*) as count FROM connected_pages').get().count;
+    if (pageCount === 0) {
+      const now = new Date().toISOString();
+      const insertPage = db.prepare(`
+        INSERT INTO connected_pages (
+          slug, name, handle, meta_page_token, meta_ig_user_id, niche, workflow_type,
+          icon, theme_color, has_dm_automation, custom_trigger_keyword, instaauto_enabled,
+          attribution_template, autopilot_enabled, daily_quota, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      // Seed GTA 6 Updates 007
+      const gtaToken = getSetting('meta_page_token', '');
+      const gtaUserId = getSetting('meta_ig_user_id', '17841428668115319');
+      const gtaHandle = getSetting('instagram_handle', '@gta6_updates_007');
+
+      insertPage.run(
+        'gta6',
+        'GTA 6 Updates 007',
+        gtaHandle,
+        gtaToken,
+        gtaUserId,
+        'gaming',
+        'direct_repost',
+        '🎮',
+        '#F59E0B',
+        0,
+        'GTA6',
+        0,
+        '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
+        0,
+        3,
+        1,
+        now,
+        now
+      );
+
+      // Seed Tech News Daily AI
+      const techToken = getSetting('tech_meta_page_token', '');
+      const techUserId = getSetting('tech_meta_ig_user_id', '');
+      const techHandle = getSetting('tech_instagram_handle', '@technews_daily_ai');
+
+      insertPage.run(
+        'tech',
+        'Tech News Daily AI',
+        techHandle,
+        techToken,
+        techUserId,
+        'tech',
+        'lead_magnet',
+        '💻',
+        '#7C3AED',
+        1,
+        'PROJECT',
+        1,
+        '💡 Reel Source: @{author} | Follow @technews_daily_ai for high-signal AI breakthroughs! #technews #ai',
+        0,
+        3,
+        1,
+        now,
+        now
+      );
+      console.log('[OmniResearch Database] Pre-seeded connected_pages registry with [gta6] and [tech] workspaces.');
+    }
+  } catch (err) {
+    console.warn('[Database Seed Notice]:', err.message);
+  }
 }
 
 // ─── Tracked Channels Helpers ─────────────────────────────────────
@@ -1085,6 +1192,105 @@ function getAutomationEvents(limit = 25) {
   `).all(limit);
 }
 
+// ─── Connected Instagram Pages Multi-Tenant Registry (v5.0) ─────────
+function getConnectedPages(options = {}) {
+  const db = getDb();
+  if (options.isActiveOnly) {
+    return db.prepare('SELECT * FROM connected_pages WHERE is_active = 1 ORDER BY id ASC').all();
+  }
+  return db.prepare('SELECT * FROM connected_pages ORDER BY id ASC').all();
+}
+
+function getConnectedPageBySlug(slug) {
+  if (!slug) return null;
+  return getDb().prepare('SELECT * FROM connected_pages WHERE lower(slug) = ?').get(String(slug).toLowerCase().trim());
+}
+
+function getConnectedPageById(id) {
+  return getDb().prepare('SELECT * FROM connected_pages WHERE id = ?').get(id);
+}
+
+function createConnectedPage(data) {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const rawSlug = data.slug || data.name || 'page';
+  const slug = rawSlug.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || `page_${Date.now()}`;
+  
+  const stmt = db.prepare(`
+    INSERT INTO connected_pages (
+      slug, name, handle, meta_page_token, meta_ig_user_id, niche, workflow_type,
+      icon, theme_color, has_dm_automation, custom_trigger_keyword, lead_magnet_instructions,
+      instaauto_enabled, instaauto_rule_template, attribution_template, autopilot_enabled,
+      daily_quota, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const info = stmt.run(
+    slug,
+    data.name || 'New Instagram Page',
+    data.handle || '@new_account',
+    data.meta_page_token || '',
+    data.meta_ig_user_id || '',
+    data.niche || 'tech',
+    data.workflow_type || 'lead_magnet',
+    data.icon || '📱',
+    data.theme_color || '#7C3AED',
+    data.has_dm_automation !== undefined ? (data.has_dm_automation ? 1 : 0) : 1,
+    data.custom_trigger_keyword || 'PROJECT',
+    data.lead_magnet_instructions || '',
+    data.instaauto_enabled !== undefined ? (data.instaauto_enabled ? 1 : 0) : 1,
+    data.instaauto_rule_template || '{"follow_required": true}',
+    data.attribution_template || '💡 Source: @{author} | Follow @{my_handle} for daily updates!',
+    data.autopilot_enabled ? 1 : 0,
+    parseInt(data.daily_quota || '3', 10),
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    now,
+    now
+  );
+
+  return getConnectedPageById(info.lastInsertRowid);
+}
+
+function updateConnectedPage(id, data) {
+  const db = getDb();
+  const page = getConnectedPageById(id);
+  if (!page) return null;
+
+  const now = new Date().toISOString();
+  const fields = [];
+  const values = [];
+
+  const allowed = [
+    'name', 'handle', 'meta_page_token', 'meta_ig_user_id', 'niche', 'workflow_type',
+    'icon', 'theme_color', 'has_dm_automation', 'custom_trigger_keyword', 'lead_magnet_instructions',
+    'instaauto_enabled', 'instaauto_rule_template', 'attribution_template', 'autopilot_enabled',
+    'daily_quota', 'is_active'
+  ];
+
+  for (const key of allowed) {
+    if (data[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      let val = data[key];
+      if (typeof val === 'boolean') val = val ? 1 : 0;
+      values.push(val);
+    }
+  }
+
+  if (fields.length === 0) return page;
+
+  fields.push('updated_at = ?');
+  values.push(now);
+  values.push(id);
+
+  db.prepare(`UPDATE connected_pages SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return getConnectedPageById(id);
+}
+
+function deleteConnectedPage(id) {
+  const db = getDb();
+  return db.prepare('DELETE FROM connected_pages WHERE id = ?').run(id);
+}
+
 module.exports = {
   getDb,
   getSetting,
@@ -1116,5 +1322,11 @@ module.exports = {
   getActiveRelayJobs,
   updateRelayJob,
   addAutomationEvent,
-  getAutomationEvents
+  getAutomationEvents,
+  getConnectedPages,
+  getConnectedPageBySlug,
+  getConnectedPageById,
+  createConnectedPage,
+  updateConnectedPage,
+  deleteConnectedPage
 };

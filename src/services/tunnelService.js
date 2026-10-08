@@ -34,10 +34,10 @@ function launchCloudflareTunnel(port = 4000) {
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        console.warn('[Tunnel Service] Cloudflare startup timeout (15s). Falling back to localtunnel.');
+        console.warn('[Tunnel Service] Cloudflare startup timeout (45s). Falling back to localtunnel.');
         resolve(null);
       }
-    }, 18000);
+    }, 45000);
 
     const onData = (chunk) => {
       const text = chunk.toString();
@@ -108,33 +108,35 @@ async function launchLocaltunnelFallback(port = 4000) {
  */
 async function startTunnel(port = 4000) {
   currentPort = port;
-  if (activeTunnelUrl) return activeTunnelUrl;
-  if (isStarting) return activeTunnelUrl || getSetting('ngrok_url', '');
+  if (activeTunnelUrl && !activeTunnelUrl.includes('loca.lt')) return activeTunnelUrl;
+  if (isStarting) return activeTunnelUrl || getSetting('public_media_url') || getSetting('ngrok_url', '');
   isStarting = true;
 
   try {
-    // 1. Try Cloudflare Tunnel first
+    // 1. Try Cloudflare Tunnel first (Meta Graph API requires Cloudflare, blocks localtunnel)
     const cfUrl = await launchCloudflareTunnel(port);
     if (cfUrl) {
       isStarting = false;
       return cfUrl;
     }
 
-    // 2. Fall back to localtunnel
+    // 2. Fall back to localtunnel if Cloudflare is unreachable
     const ltUrl = await launchLocaltunnelFallback(port);
     isStarting = false;
     return ltUrl;
   } catch (err) {
     isStarting = false;
     console.error(`[Tunnel Service] Tunnel initialization error: ${err.message}`);
-    return getSetting('ngrok_url', `http://localhost:${port}`);
+    return getSetting('public_media_url') || getSetting('ngrok_url', `http://localhost:${port}`);
   }
 }
 
 async function isUrlReachable(url) {
   if (!url || !url.startsWith('http')) return false;
+  // Meta Graph API cannot fetch media from localtunnel due to anti-phishing interstitial screen
+  if (url.includes('loca.lt')) return false;
   try {
-    const res = await axios.get(`${url}/api/settings`, { timeout: 3500 });
+    const res = await axios.get(`${url}/api/settings`, { timeout: 4000 });
     return res.status === 200;
   } catch (e) {
     return false;
@@ -149,7 +151,7 @@ async function ensureTunnelOnline() {
     return activeTunnelUrl;
   }
 
-  const currentDbUrl = getSetting('ngrok_url', '');
+  const currentDbUrl = getSetting('public_media_url') || getSetting('ngrok_url', '');
   if (currentDbUrl && (await isUrlReachable(currentDbUrl))) {
     activeTunnelUrl = currentDbUrl;
     return currentDbUrl;

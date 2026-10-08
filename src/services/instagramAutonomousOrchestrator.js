@@ -292,12 +292,14 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       publishResult = await executePublishPipeline(postId);
       console.log(`[Autonomous Agent] ✅ Post #${postId} directly published! Permalink: ${publishResult.permalink}`);
       
-      log = updateAutonomousLog(log.id, {
-        status: 'published',
-        ig_media_id: publishResult.ig_media_id,
-        ig_permalink: publishResult.permalink,
-        published_at: publishResult.published_at
-      });
+      if (publishResult && publishResult.success && publishResult.mode !== 'mock') {
+        log = updateAutonomousLog(log.id, {
+          status: 'published',
+          ig_media_id: publishResult.ig_media_id,
+          ig_permalink: publishResult.permalink,
+          published_at: publishResult.published_at
+        });
+      }
 
       // Arm InstaAuto Bridge if lead magnet
       if (publishResult?.success && publishResult?.ig_media_id && targetPage?.workflow_type === 'lead_magnet' && targetPage?.instaauto_enabled !== 0) {
