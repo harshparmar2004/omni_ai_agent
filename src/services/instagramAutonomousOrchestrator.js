@@ -115,6 +115,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   const channel = channelId ? getTrackedChannelById(channelId) : null;
   const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
   const targetPage = getConnectedPageBySlug(destination);
+  const brand = getBrandAssets();
 
   console.log(`[Autonomous Agent] ⚡ Concurrently evaluating post with LLM ranker & cleansing media assets for [${destination.toUpperCase()}]...`);
   const competitorHandles = [author, channelUsername].filter(Boolean);
@@ -218,7 +219,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       repurposed_hook: rankResult.repurposed_hook,
       detected_topic: rankResult.detected_topic,
       detected_trigger_keyword: rankResult.detected_trigger_keyword,
-      brand_handle: targetPage?.handle || brand.brand_handle,
+      brand_handle: targetPage?.handle || brand?.brand_handle || '@harshparmar007__',
       shortcode
     });
 
