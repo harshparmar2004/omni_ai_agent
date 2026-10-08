@@ -134,14 +134,15 @@ async function executeStealthSurveillanceCycle(options = {}) {
       getDb().prepare(`
         INSERT INTO autonomous_ingestion_log (
           channel_id, channel_username, source_post_url, shortcode,
-          content_type, status, destination_account, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          content_type, downloaded_media_paths, status, destination_account, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         ch.id,
         ch.username,
         latestPostUrl,
         latestShortcode,
         'reel',
+        '[]',
         'queued_for_ingestion',
         targetDestination,
         new Date().toISOString()
