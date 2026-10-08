@@ -569,9 +569,10 @@ async function handleTelegramMessage(message) {
     processing_status: 'processing'
   });
 
+  const gtaPage = getConnectedPageBySlug('gta6');
   await executePostWorkflow({
     trigger,
-    page: { slug: 'gta6', name: 'GTA 6 Updates', handle: currentHandle, workflow_type: 'direct_repost' },
+    page: gtaPage || { slug: 'gta6', name: 'GTA 6 Updates', handle: currentHandle, workflow_type: 'lead_magnet' },
     rawUrl,
     shortcode,
     fromUser,
