@@ -33,6 +33,12 @@ const instagramBotV2View = {
   showActionsMenu: false,
   activeAccordion: 'connection', // 'connection', 'autopilot', 'scoring', 'safety'
   activeKanbanFilter: 'all', // 'all', 'ready', 'scanned', 'published'
+  creatorViewMode: 'cards', // 'cards' or 'table'
+  creatorSearchQuery: '',
+  creatorFilterStatus: 'all', // 'all', 'active', 'paused'
+  syncingChannelId: null, // channel ID currently syncing
+  showBulkImporter: false,
+  isScanningAll: false,
 
   // Dynamic Workspace Palette Configuration
   palettePresets: [
@@ -235,22 +241,28 @@ const instagramBotV2View = {
         <!-- ── 3. CONTEXTUAL PRIMARY ACTION BAR ──────────────────────────── -->
         ${this.renderPrimaryActionBar(currentAccount)}
 
-        <!-- ── 4. CLEAN 3-TAB NAVIGATION ─────────────────────────────────── -->
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-top: 0.5rem;">
-          <div style="display: flex; gap: 0.5rem;">
-            <button class="bot-tab-btn ${this.activeTab === 'pipeline' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('pipeline')">
+        <!-- ── 4. MODERN SEGMENTED TAB NAVIGATION ────────────────────────── -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.85rem; margin-top: 0.25rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div class="v2-segmented-control">
+            <button class="v2-segmented-btn ${this.activeTab === 'pipeline' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('pipeline')">
               <span>📊 Pipeline Board</span>
             </button>
-            <button class="bot-tab-btn ${this.activeTab === 'sources' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('sources')">
-              <span>🎯 Sources (${this.getFilteredChannels().length})</span>
+            <button class="v2-segmented-btn ${this.activeTab === 'sources' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('sources')">
+              <span>🎯 Monitored Sources</span>
+              <span class="v2-segmented-badge">${this.getFilteredChannels().length}</span>
             </button>
-            <button class="bot-tab-btn ${this.activeTab === 'settings' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('settings')">
-              <span>⚙️ Settings</span>
+            <button class="v2-segmented-btn ${this.activeTab === 'settings' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('settings')">
+              <span>⚙️ Settings & Rules</span>
             </button>
           </div>
 
-          <div style="font-size: 0.78rem; color: var(--text-muted);">
-            Workspace: <strong style="color: ${currentAccount.color};">${escapeHtml(currentAccount.name)}</strong> (${escapeHtml(currentAccount.handle)})
+          <div style="display: flex; align-items: center; gap: 0.65rem; background: var(--bg-card); border: 1.5px solid var(--border-color); padding: 0.35rem 0.85rem; border-radius: 9999px; box-shadow: var(--shadow-xs);">
+            <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Workspace:</span>
+            <span style="font-size: 0.82rem; font-weight: 800; color: ${currentAccount.color}; display: flex; align-items: center; gap: 0.35rem;">
+              <span>${currentAccount.icon || '📱'}</span>
+              <span>${escapeHtml(currentAccount.name)}</span>
+            </span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-family: monospace;">(${escapeHtml(currentAccount.handle)})</span>
           </div>
         </div>
 
@@ -750,149 +762,428 @@ const instagramBotV2View = {
   // ══════════════════════════════════════════════════════════════════════════
   renderSourcesTab(currentAccount) {
     const channels = this.getFilteredChannels();
+    const q = (this.creatorSearchQuery || '').toLowerCase().trim();
+    const statusFilter = this.creatorFilterStatus || 'all';
+
+    // Curated Instant Suggestions by account or niche
+    const suggestionsByAccount = {
+      gta6: [
+        { handle: 'rockstargames', name: 'Rockstar Games', niche: 'gaming' },
+        { handle: 'gtaleaks', name: 'GTA 6 Leaks & News', niche: 'gaming' },
+        { handle: 'gamespot', name: 'GameSpot', niche: 'gaming' },
+        { handle: 'ign', name: 'IGN', niche: 'gaming' },
+        { handle: 'gtainformer', name: 'GTA Informer', niche: 'gaming' },
+        { handle: 'playstation', name: 'PlayStation', niche: 'gaming' }
+      ],
+      tech: [
+        { handle: 'theverge', name: 'The Verge', niche: 'tech' },
+        { handle: 'techcrunch', name: 'TechCrunch', niche: 'tech' },
+        { handle: 'mkbhd', name: 'MKBHD', niche: 'tech' },
+        { handle: 'wired', name: 'WIRED', niche: 'tech' },
+        { handle: 'ycombinator', name: 'Y Combinator', niche: 'tech' },
+        { handle: 'openai', name: 'OpenAI', niche: 'tech' }
+      ]
+    };
+
+    const defaultSuggestions = suggestionsByAccount[currentAccount.id] || 
+      suggestionsByAccount[currentAccount.defaultNiche] || 
+      suggestionsByAccount.tech;
+
+    // Filter channels based on search and status
+    const filteredChannels = channels.filter(c => {
+      if (statusFilter === 'active' && !c.is_active) return false;
+      if (statusFilter === 'paused' && c.is_active) return false;
+      if (q) {
+        const handleMatch = (c.username || '').toLowerCase().includes(q);
+        const nameMatch = (c.display_name || '').toLowerCase().includes(q);
+        const postMatch = (c.last_post_shortcode || '').toLowerCase().includes(q);
+        if (!handleMatch && !nameMatch && !postMatch) return false;
+      }
+      return true;
+    });
+
+    const activeCount = channels.filter(c => c.is_active).length;
+    const pausedCount = channels.filter(c => !c.is_active).length;
 
     return `
       <div style="display: flex; flex-direction: column; gap: 1.25rem;">
         
-        <!-- Add Source Box -->
-        <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+        <!-- ── SECTION 1: TARGET MANAGER & INSTANT DISCOVERY CHIPS ───────── -->
+        <div style="display: grid; grid-template-columns: minmax(320px, 1.25fr) minmax(280px, 1fr); gap: 1.25rem; align-items: stretch;">
+          
+          <!-- Card 1: Quick Add Target -->
+          <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <span class="section-label">Add Creator or Competitor Account to Monitor</span>
-              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                Enter Instagram username (e.g. <code>gtaleaks</code>, <code>theverge</code>) to monitor 24/7 for ${escapeHtml(currentAccount.name)}.
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+                <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+                  <span>⚡</span> Quick Add Creator Target
+                </span>
+                <span class="v2-segmented-badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 800;">
+                  ${escapeHtml(currentAccount.name)}
+                </span>
+              </div>
+              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+                Enter any Instagram handle or URL to monitor 24/7 for fresh reels.
+              </div>
+
+              <!-- Input Group -->
+              <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+                <div class="v2-input-group" style="flex: 1; min-width: 220px;">
+                  <span class="v2-input-prefix">@</span>
+                  <input 
+                    type="text" 
+                    id="new-channel-input" 
+                    class="v2-input-field" 
+                    placeholder="username or instagram.com/..." 
+                    onkeydown="if(event.key==='Enter') instagramBotV2View.addNewChannel()"
+                  >
+                </div>
+                <select id="new-channel-niche" class="form-input" style="width: 140px; border-radius: 10px; font-weight: 600;">
+                  <option value="tech" ${currentAccount.defaultNiche === 'tech' ? 'selected' : ''}>💻 Tech / AI</option>
+                  <option value="gaming" ${currentAccount.defaultNiche === 'gaming' ? 'selected' : ''}>🎮 Gaming / GTA</option>
+                  <option value="general" ${currentAccount.defaultNiche === 'general' ? 'selected' : ''}>📱 General</option>
+                </select>
+                <button class="btn btn-primary" onclick="instagramBotV2View.addNewChannel()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff; padding: 0.65rem 1.15rem; border-radius: 10px; box-shadow: var(--shadow-btn);">
+                  ➕ Add Target
+                </button>
               </div>
             </div>
-          </div>
 
-          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <input 
-              type="text" 
-              id="new-channel-input" 
-              class="form-input" 
-              placeholder="@username or https://www.instagram.com/username/" 
-              style="flex: 1; min-width: 280px;"
-            >
-            <select id="new-channel-niche" class="form-input" style="width: 170px;">
-              <option value="tech" ${currentAccount.defaultNiche === 'tech' ? 'selected' : ''}>💻 Tech / AI</option>
-              <option value="gaming" ${currentAccount.defaultNiche === 'gaming' ? 'selected' : ''}>🎮 Gaming / GTA 6</option>
-              <option value="general" ${currentAccount.defaultNiche === 'general' ? 'selected' : ''}>📱 General</option>
-            </select>
-            <button class="btn btn-primary" onclick="instagramBotV2View.addNewChannel()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff;">
-              ➕ Add Target
-            </button>
-          </div>
+            <!-- Bulk Importer Toggle -->
+            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
+              <button 
+                onclick="instagramBotV2View.showBulkImporter = !instagramBotV2View.showBulkImporter; instagramBotV2View.renderDashboard();" 
+                style="background: transparent; border: none; color: var(--text-secondary); font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; padding: 0;"
+              >
+                <span>📂</span>
+                <span>${this.showBulkImporter ? 'Hide Bulk Importer ▲' : 'Paste 10–30 Creator Handles at Once ▸'}</span>
+              </button>
 
-          <!-- Bulk Paste Collapsible -->
-          <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
-              <span style="font-size: 0.78rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase;">
-                ⚡ Bulk Paste Creator Profiles (10–30 Handles)
-              </span>
-              <span style="font-size: 0.72rem; color: var(--text-muted);">
-                Separate by commas, spaces, or lines
-              </span>
+              ${this.showBulkImporter ? `
+                <div style="margin-top: 0.75rem; background: var(--bg-deep); border: 1.5px dashed var(--border-color); border-radius: 10px; padding: 0.85rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <span style="font-size: 0.75rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase;">Batch Paste Handles</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Commas, spaces, or lines</span>
+                  </div>
+                  <textarea 
+                    id="bulk-channels-input" 
+                    class="form-input" 
+                    style="min-height: 65px; font-family: monospace; font-size: 0.82rem; width: 100%; border-radius: 8px;" 
+                    placeholder="@creator1, @creator2, @competitor3..."
+                  ></textarea>
+                  <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.bulkAddChannels()" style="font-weight: 800;">
+                      ➕ Bulk Import All
+                    </button>
+                  </div>
+                </div>
+              ` : ''}
             </div>
-            <textarea 
-              id="bulk-channels-input" 
-              class="form-input" 
-              style="min-height: 60px; font-family: monospace; font-size: 0.8rem; width: 100%;" 
-              placeholder="@creator1, @creator2, @competitor3..."
-            ></textarea>
-            <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
-              <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.bulkAddChannels()" style="font-weight: 800;">
-                ➕ Bulk Import All
+          </div>
+
+          <!-- Card 2: Instant Niche Suggestions -->
+          <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); display: flex; flex-direction: column;">
+            <div style="font-size: 0.92rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+              <span>💡</span> Instant Suggestions for ${escapeHtml(currentAccount.name)}
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+              Click any verified creator to add them to your sentinel monitoring fleet:
+            </div>
+
+            <!-- Chips -->
+            <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; flex: 1; align-content: flex-start;">
+              ${defaultSuggestions.map(s => {
+                const isAdded = channels.some(c => (c.username || '').toLowerCase() === s.handle.toLowerCase());
+                if (isAdded) {
+                  return `
+                    <span class="v2-chip-btn" style="opacity: 0.6; cursor: default; background: var(--bg-deep); border-color: var(--border-color); color: var(--text-muted);" title="Already added to monitoring fleet">
+                      ✓ @${escapeHtml(s.handle)}
+                    </span>
+                  `;
+                }
+                return `
+                  <button 
+                    class="v2-chip-btn" 
+                    onclick="instagramBotV2View.quickAddSuggestedTarget('${s.handle}', '${s.niche}')" 
+                    title="Click to add @${escapeHtml(s.handle)} to ${escapeHtml(currentAccount.name)}"
+                  >
+                    <span>➕</span>
+                    <span>@${escapeHtml(s.handle)}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── SECTION 2: MONITORED CREATOR FLEET TOOLBAR ────────────────── -->
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+              <span>Monitored Creator Fleet</span>
+              <span class="v2-segmented-badge" style="font-size: 0.78rem;">${channels.length}</span>
+            </div>
+
+            <!-- Status Filter Segment -->
+            <div class="v2-segmented-control" style="padding: 2px;">
+              <button 
+                class="v2-segmented-btn ${statusFilter === 'all' ? 'active' : ''}" 
+                style="padding: 0.3rem 0.75rem; font-size: 0.75rem;" 
+                onclick="instagramBotV2View.creatorFilterStatus = 'all'; instagramBotV2View.renderDashboard();"
+              >
+                All (${channels.length})
+              </button>
+              <button 
+                class="v2-segmented-btn ${statusFilter === 'active' ? 'active' : ''}" 
+                style="padding: 0.3rem 0.75rem; font-size: 0.75rem;" 
+                onclick="instagramBotV2View.creatorFilterStatus = 'active'; instagramBotV2View.renderDashboard();"
+              >
+                Active (${activeCount})
+              </button>
+              <button 
+                class="v2-segmented-btn ${statusFilter === 'paused' ? 'active' : ''}" 
+                style="padding: 0.3rem 0.75rem; font-size: 0.75rem;" 
+                onclick="instagramBotV2View.creatorFilterStatus = 'paused'; instagramBotV2View.renderDashboard();"
+              >
+                Paused (${pausedCount})
               </button>
             </div>
           </div>
-        </div>
 
-        <!-- Sources Table -->
-        <div class="pipeline-flow-container">
-          <div style="padding: 0.85rem 1.25rem; background: var(--bg-base); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 800; font-size: 0.92rem; color: var(--text-primary);">
-              Monitored Profiles for ${escapeHtml(currentAccount.name)} (${channels.length})
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <!-- Search Box -->
+            <div class="v2-input-group" style="width: 200px; height: 34px;">
+              <span style="padding: 0 0.5rem; font-size: 0.8rem; color: var(--text-muted);">🔍</span>
+              <input 
+                type="text" 
+                class="v2-input-field" 
+                placeholder="Filter handles..." 
+                value="${escapeHtml(this.creatorSearchQuery || '')}"
+                oninput="instagramBotV2View.creatorSearchQuery = this.value; instagramBotV2View.renderDashboard();"
+                style="font-size: 0.78rem; padding: 0.3rem 0.5rem;"
+              >
+              ${this.creatorSearchQuery ? `
+                <button onclick="instagramBotV2View.creatorSearchQuery = ''; instagramBotV2View.renderDashboard();" style="border: none; background: transparent; cursor: pointer; padding-right: 6px; color: var(--text-muted); font-size: 0.75rem;">✕</button>
+              ` : ''}
             </div>
-            <button class="table-action-btn" onclick="instagramBotV2View.pollAllSourcesNow()" style="font-weight: 700;">
-              🔄 Scan Now
+
+            <!-- View Mode Switch -->
+            <div class="v2-segmented-control" style="padding: 2px;">
+              <button 
+                class="v2-segmented-btn ${this.creatorViewMode === 'cards' ? 'active' : ''}" 
+                style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" 
+                onclick="instagramBotV2View.creatorViewMode = 'cards'; instagramBotV2View.renderDashboard();" 
+                title="Visual Cards View"
+              >
+                ⊞ Cards
+              </button>
+              <button 
+                class="v2-segmented-btn ${this.creatorViewMode === 'table' ? 'active' : ''}" 
+                style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" 
+                onclick="instagramBotV2View.creatorViewMode = 'table'; instagramBotV2View.renderDashboard();" 
+                title="High-Density Table View"
+              >
+                ☰ Table
+              </button>
+            </div>
+
+            <!-- Scan All Button -->
+            <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.pollAllSourcesNow()" style="font-weight: 800; font-size: 0.78rem; height: 34px;">
+              🔄 Scan All Now
             </button>
           </div>
-
-          <div style="overflow-x: auto;">
-            <table class="reel-dictionary-table">
-              <thead>
-                <tr>
-                  <th style="width: 45px;">Avatar</th>
-                  <th style="min-width: 180px;">Account & Handle</th>
-                  <th style="min-width: 120px;">Niche</th>
-                  <th style="min-width: 140px;">Last Harvested Post</th>
-                  <th style="width: 120px;">Sentinel Status</th>
-                  <th style="width: 140px; text-align: right;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${channels.length === 0 ? `
-                  <tr>
-                    <td colspan="6" style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-                      <div style="font-size: 1.8rem; margin-bottom: 0.35rem;">🎯</div>
-                      <div style="font-weight: 800; color: var(--text-primary);">No creator profiles monitored for ${escapeHtml(currentAccount.name)} yet</div>
-                      <div style="font-size: 0.8rem; margin-top: 0.25rem;">Use the form above to add creator handles to scrape!</div>
-                    </td>
-                  </tr>
-                ` : channels.map(c => `
-                  <tr>
-                    <td>
-                      <div style="width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: #222; border: 1px solid var(--border-color);">
-                        <img src="${c.avatar_url || '/generated/assets/brand_logo.svg'}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/generated/assets/brand_logo.svg'">
-                      </div>
-                    </td>
-                    <td>
-                      <div style="font-weight: 800; color: var(--text-primary); font-size: 0.88rem;">
-                        ${escapeHtml(c.display_name || c.username)}
-                      </div>
-                      <a href="${c.profile_url || `https://www.instagram.com/${c.username}/`}" target="_blank" style="color: var(--accent-primary); font-size: 0.74rem; font-weight: 700;">
-                        @${escapeHtml(c.username)} ↗
-                      </a>
-                    </td>
-                    <td>
-                      <span class="badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 700; font-size: 0.72rem;">
-                        ${escapeHtml(c.niche_tag || 'General')}
-                      </span>
-                    </td>
-                    <td>
-                      ${c.last_post_shortcode ? `
-                        <div style="font-size: 0.8rem; font-family: monospace; font-weight: 700; color: var(--text-primary);">
-                          #${escapeHtml(c.last_post_shortcode)}
-                        </div>
-                      ` : '<span style="font-size: 0.75rem; color: var(--text-muted);">Ready to scan</span>'}
-                    </td>
-                    <td>
-                      ${c.is_active ? `
-                        <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800; font-size: 0.72rem;">
-                          ● ACTIVE
-                        </span>
-                      ` : `
-                        <span class="badge" style="background: rgba(0, 0, 0, 0.05); color: var(--text-muted); font-size: 0.72rem;">
-                          PAUSED
-                        </span>
-                      `}
-                    </td>
-                    <td style="text-align: right;">
-                      <div style="display: flex; gap: 4px; justify-content: flex-end;">
-                        <button class="table-action-btn" onclick="instagramBotV2View.toggleChannel(${c.id})">
-                          ${c.is_active ? '⏸️' : '▶️'}
-                        </button>
-                        <button class="table-action-btn" onclick="instagramBotV2View.deleteChannel(${c.id})" style="color: #DC2626;">
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
         </div>
+
+        <!-- ── SECTION 3: CREATOR FLEET CONTENT (CARDS OR TABLE) ─────────── -->
+        ${filteredChannels.length === 0 ? `
+          <div class="card" style="padding: 3.5rem 1rem; text-align: center; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm);">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎯</div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary);">
+              ${q ? `No creators match "${escapeHtml(q)}"` : `No monitored creators for ${escapeHtml(currentAccount.name)}`}
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.35rem; max-width: 420px; margin-left: auto; margin-right: auto;">
+              ${q ? 'Try clearing your search query or switching the status filter above.' : 'Add your first creator handle using the quick add box or instant suggestion chips above!'}
+            </div>
+            ${q ? `
+              <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.creatorSearchQuery = ''; instagramBotV2View.creatorFilterStatus = 'all'; instagramBotV2View.renderDashboard();" style="margin-top: 1rem; font-weight: 700;">
+                Reset Filters
+              </button>
+            ` : ''}
+          </div>
+        ` : this.creatorViewMode === 'cards' ? `
+          <!-- ── CARDS GRID VIEW ── -->
+          <div class="v2-creator-grid">
+            ${filteredChannels.map(c => {
+              const isSyncing = this.syncingChannelId === c.id;
+              const formattedDate = c.last_scraped_at ? new Date(c.last_scraped_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Ready to scan';
+              return `
+                <div class="v2-creator-card" style="${c.is_active ? '' : 'opacity: 0.8;'}">
+                  <!-- Top Row: Avatar, Name, Handle, Active Switch -->
+                  <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0;">
+                      <div class="v2-creator-avatar-ring ${c.is_active ? '' : 'paused'}">
+                        <img src="${c.avatar_url || '/generated/assets/brand_logo.svg'}" onerror="this.src='/generated/assets/brand_logo.svg'" alt="${escapeHtml(c.username)}">
+                      </div>
+                      <div style="min-width: 0;">
+                        <div style="font-size: 0.92rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                          ${escapeHtml(c.display_name || c.username)}
+                        </div>
+                        <a href="${c.profile_url || `https://www.instagram.com/${c.username}/`}" target="_blank" style="font-size: 0.76rem; font-weight: 700; color: var(--accent-primary); text-decoration: none; display: inline-flex; align-items: center; gap: 2px;">
+                          @${escapeHtml(c.username)} <span style="font-size: 0.68rem;">↗</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    <!-- Sentinel Active Toggle -->
+                    <label class="v2-switch" title="${c.is_active ? 'Sentinel Active: monitoring 24/7' : 'Sentinel Paused'}">
+                      <input type="checkbox" ${c.is_active ? 'checked' : ''} onchange="instagramBotV2View.toggleChannel(${c.id})">
+                      <span class="v2-slider"></span>
+                    </label>
+                  </div>
+
+                  <!-- Metrics Row -->
+                  <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: var(--bg-deep); color: var(--text-secondary); border: 1px solid var(--border-color);">
+                      👥 ${c.followers_count && c.followers_count !== 'N/A' ? c.followers_count : 'Active'} Followers
+                    </span>
+                    <span style="font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.08); color: #03543F; border: 1px solid rgba(16, 185, 129, 0.2);">
+                      📥 ${c.synced_posts_count || 0} Harvested
+                    </span>
+                    <span style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: ${currentAccount.lightBg}; color: ${currentAccount.color}; border: 1px solid ${currentAccount.borderColor};">
+                      🏷️ ${escapeHtml(c.niche_tag || currentAccount.defaultNiche)}
+                    </span>
+                  </div>
+
+                  <!-- Last Harvested Box -->
+                  <div style="background: var(--bg-base); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem;">
+                    <div style="display: flex; align-items: center; gap: 0.45rem;">
+                      <span>🎬</span>
+                      ${c.last_post_shortcode ? `
+                        <a href="https://www.instagram.com/p/${c.last_post_shortcode}/" target="_blank" style="font-family: monospace; font-weight: 800; color: var(--text-primary); text-decoration: none;" title="Open harvested reel on Instagram">
+                          #${escapeHtml(c.last_post_shortcode)} ↗
+                        </a>
+                      ` : `
+                        <span style="color: var(--text-muted); font-weight: 600;">Ready for initial scan</span>
+                      `}
+                    </div>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">${formattedDate}</span>
+                  </div>
+
+                  <!-- Action Row -->
+                  <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: auto; padding-top: 0.35rem;">
+                    <button 
+                      class="btn btn-secondary btn-sm" 
+                      onclick="instagramBotV2View.syncSingleChannelNow(${c.id})" 
+                      style="flex: 1; font-weight: 800; font-size: 0.78rem; justify-content: center; display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.75rem;" 
+                      ${isSyncing ? 'disabled' : ''}
+                      title="Scan this specific creator immediately for new reels"
+                    >
+                      ${isSyncing ? '⏳ Scraping...' : '⚡ Harvest Reel Now'}
+                    </button>
+                    <button 
+                      class="table-action-btn" 
+                      onclick="instagramBotV2View.deleteChannel(${c.id})" 
+                      style="color: #EF4444; padding: 6px 10px; border-radius: 8px;" 
+                      title="Remove Target"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : `
+          <!-- ── ENHANCED TABLE VIEW ── -->
+          <div class="card" style="padding: 0; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); overflow: hidden;">
+            <div style="overflow-x: auto;">
+              <table class="reel-dictionary-table" style="margin: 0; width: 100%;">
+                <thead>
+                  <tr style="background: var(--bg-base); border-bottom: 1.5px solid var(--border-color);">
+                    <th style="width: 50px; padding: 0.85rem 1rem;">Avatar</th>
+                    <th style="min-width: 180px; padding: 0.85rem 1rem;">Creator & Handle</th>
+                    <th style="min-width: 110px; padding: 0.85rem 1rem;">Followers</th>
+                    <th style="min-width: 110px; padding: 0.85rem 1rem;">Niche</th>
+                    <th style="min-width: 160px; padding: 0.85rem 1rem;">Last Harvested Post</th>
+                    <th style="width: 110px; padding: 0.85rem 1rem;">Status</th>
+                    <th style="width: 170px; text-align: right; padding: 0.85rem 1rem;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filteredChannels.map(c => {
+                    const isSyncing = this.syncingChannelId === c.id;
+                    const formattedDate = c.last_scraped_at ? new Date(c.last_scraped_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Ready';
+                    return `
+                      <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s ease;">
+                        <td style="padding: 0.85rem 1rem;">
+                          <div class="v2-creator-avatar-ring ${c.is_active ? '' : 'paused'}" style="width: 36px; height: 36px;">
+                            <img src="${c.avatar_url || '/generated/assets/brand_logo.svg'}" onerror="this.src='/generated/assets/brand_logo.svg'" alt="${escapeHtml(c.username)}">
+                          </div>
+                        </td>
+                        <td style="padding: 0.85rem 1rem;">
+                          <div style="font-weight: 800; color: var(--text-primary); font-size: 0.88rem;">
+                            ${escapeHtml(c.display_name || c.username)}
+                          </div>
+                          <a href="${c.profile_url || `https://www.instagram.com/${c.username}/`}" target="_blank" style="color: var(--accent-primary); font-size: 0.75rem; font-weight: 700; text-decoration: none;">
+                            @${escapeHtml(c.username)} ↗
+                          </a>
+                        </td>
+                        <td style="padding: 0.85rem 1rem;">
+                          <span style="font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);">
+                            👥 ${c.followers_count && c.followers_count !== 'N/A' ? c.followers_count : 'Active'}
+                          </span>
+                        </td>
+                        <td style="padding: 0.85rem 1rem;">
+                          <span class="badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 700; font-size: 0.72rem;">
+                            ${escapeHtml(c.niche_tag || currentAccount.defaultNiche)}
+                          </span>
+                        </td>
+                        <td style="padding: 0.85rem 1rem;">
+                          ${c.last_post_shortcode ? `
+                            <div style="font-size: 0.8rem; font-family: monospace; font-weight: 800; color: var(--text-primary);">
+                              <a href="https://www.instagram.com/p/${c.last_post_shortcode}/" target="_blank" style="color: var(--text-primary); text-decoration: none;">
+                                #${escapeHtml(c.last_post_shortcode)} ↗
+                              </a>
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">${formattedDate}</div>
+                          ` : '<span style="font-size: 0.75rem; color: var(--text-muted);">Ready to scan</span>'}
+                        </td>
+                        <td style="padding: 0.85rem 1rem;">
+                          <label class="v2-switch" title="${c.is_active ? 'Sentinel Active' : 'Sentinel Paused'}">
+                            <input type="checkbox" ${c.is_active ? 'checked' : ''} onchange="instagramBotV2View.toggleChannel(${c.id})">
+                            <span class="v2-slider"></span>
+                          </label>
+                        </td>
+                        <td style="text-align: right; padding: 0.85rem 1rem;">
+                          <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                            <button 
+                              class="table-action-btn" 
+                              onclick="instagramBotV2View.syncSingleChannelNow(${c.id})" 
+                              style="font-size: 0.75rem; font-weight: 700; padding: 4px 8px; border-radius: 6px;" 
+                              ${isSyncing ? 'disabled' : ''}
+                              title="Scrape this channel immediately"
+                            >
+                              ${isSyncing ? '⏳' : '⚡ Scrape'}
+                            </button>
+                            <button 
+                              class="table-action-btn" 
+                              onclick="instagramBotV2View.deleteChannel(${c.id})" 
+                              style="color: #EF4444; padding: 4px 8px; border-radius: 6px;" 
+                              title="Remove target"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `}
 
       </div>
     `;
@@ -1260,6 +1551,8 @@ const instagramBotV2View = {
 
   async pollAllSourcesNow() {
     const acc = this.accounts[this.activeAccount] || Object.values(this.accounts)[0];
+    this.isScanningAll = true;
+    this.renderDashboard();
     app.showToast(`📡 Scanning all monitored profiles for [${acc.name}]...`, 'info');
     try {
       await fetch('/api/instagram/autonomous/poll-now', { 
@@ -1269,11 +1562,14 @@ const instagramBotV2View = {
       });
       app.showToast(`Scan initiated for ${acc.name}. Refreshing pipeline...`, 'success');
       setTimeout(async () => {
+        this.isScanningAll = false;
         await this.loadData();
         this.renderDashboard();
       }, 2500);
     } catch (e) {
+      this.isScanningAll = false;
       app.showToast('Scan triggered.', 'info');
+      this.renderDashboard();
     }
   },
 
@@ -1309,6 +1605,54 @@ const instagramBotV2View = {
       this.renderDashboard();
     } catch (e) {
       app.showToast(`Error: ${e.message}`, 'error');
+    }
+  },
+
+  async quickAddSuggestedTarget(handle, niche) {
+    const acc = this.accounts[this.activeAccount] || Object.values(this.accounts)[0];
+    app.showToast(`Adding @${handle} to [${acc.name}]...`, 'info');
+    try {
+      const res = await fetch('/api/instagram/tracked-channels/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: handle,
+          niche_tag: niche || acc.defaultNiche || 'general',
+          destination_account: this.activeAccount
+        })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to add target');
+      app.showToast(`✓ Added @${handle} to ${acc.name}!`, 'success');
+      await this.loadData();
+      this.renderDashboard();
+    } catch (e) {
+      app.showToast(`Error: ${e.message}`, 'error');
+    }
+  },
+
+  async syncSingleChannelNow(channelId) {
+    this.syncingChannelId = channelId;
+    this.renderDashboard();
+    app.showToast('📡 Scraping latest reel from target creator...', 'info');
+    try {
+      const res = await fetch(`/api/instagram/tracked-channels/${channelId}/sync`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        if (data.newPostsCount > 0) {
+          app.showToast(`🎉 Harvested ${data.newPostsCount} new reel(s) from this creator!`, 'success');
+        } else {
+          app.showToast(`Checked creator. No new reels found since last scan.`, 'info');
+        }
+      } else {
+        app.showToast(data.error || 'Scan finished', 'info');
+      }
+      await this.loadData();
+    } catch (e) {
+      app.showToast(`Scrape error: ${e.message}`, 'error');
+    } finally {
+      this.syncingChannelId = null;
+      this.renderDashboard();
     }
   },
 
