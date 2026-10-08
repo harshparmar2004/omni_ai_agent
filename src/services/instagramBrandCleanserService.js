@@ -120,15 +120,18 @@ async function cleanseAndBrandMedia(mediaPaths, contentType = 'carousel', compet
 
     let cleanedAbs = res.cleaned_video || absoluteVideo;
 
-    // Guarantee pristine Meta Graph API compliance (h264, yuv420p, aac, faststart)
-    try {
-      const { ensureMetaCompliantVideo } = require('../utils/ffmpegHelper');
-      const compRes = await ensureMetaCompliantVideo(cleanedAbs);
-      if (compRes?.outputPath) {
-        cleanedAbs = compRes.outputPath;
+    // If brand_cleanser.py already produced cleaned_video, it already rendered libx264/yuv420p/aac.
+    // Only invoke ensureMetaCompliantVideo as fallback if brand_cleanser.py failed or bypassed transcode.
+    if (!res.cleaned_video || res.cleaned_video === absoluteVideo) {
+      try {
+        const { ensureMetaCompliantVideo } = require('../utils/ffmpegHelper');
+        const compRes = await ensureMetaCompliantVideo(cleanedAbs);
+        if (compRes?.outputPath) {
+          cleanedAbs = compRes.outputPath;
+        }
+      } catch (transcodeErr) {
+        console.warn(`[Brand Cleanser] Video compliance warning: ${transcodeErr.message}`);
       }
-    } catch (transcodeErr) {
-      console.warn(`[Brand Cleanser] Video compliance warning: ${transcodeErr.message}`);
     }
 
     const rel = cleanedAbs.replace(/\\/g, '/');

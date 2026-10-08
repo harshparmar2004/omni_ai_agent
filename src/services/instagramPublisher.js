@@ -100,7 +100,6 @@ async function publishReelToInstagram({ videoUrl, caption, coverUrl, destination
         }
       }
 
-      const publicBaseUrl = await ensureTunnelOnline();
       const fullVideoUrl = videoUrl.startsWith('http') ? videoUrl : `${publicBaseUrl}${videoUrl}`;
       console.log(`[IG Publisher] 🌐 Uploading reel container with public URL: ${fullVideoUrl}`);
 
@@ -392,7 +391,8 @@ async function pollContainerStatus(containerId, pageToken, baseUrl = null) {
   let attempts = 0;
   const maxAttempts = 45;
   while (!isReady && attempts < maxAttempts) {
-    await new Promise(r => setTimeout(r, 3000));
+    const delay = attempts === 0 ? 1500 : 2500;
+    await new Promise(r => setTimeout(r, delay));
     attempts++;
     const statusRes = await axios.get(`${apiBase}/${containerId}`, {
       params: { fields: 'status_code,status', access_token: pageToken },

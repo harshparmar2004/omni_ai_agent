@@ -111,18 +111,24 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     });
   }
 
-  // ── Step 2: LLM Quality & Relevance Ranking ─────────────────────────────
-  console.log(`[Autonomous Agent] 🧠 Evaluating post with LLM ranker...`);
-  const rankResult = await evaluateAndTransformPost({
-    caption: rawCaption,
-    hook: rawHook,
-    author,
-    content_type: contentType,
-    slides_count: mediaPaths.length,
-    min_score_threshold: 70,
-    directPostOnly: Boolean(options.directPostOnly),
-    forceApprove: Boolean(options.forceApprove)
-  });
+  // ── Step 2 & 3: Concurrently Run LLM Ranking & Media Cleansing ─────────
+  console.log(`[Autonomous Agent] ⚡ Concurrently evaluating post with LLM ranker & cleansing media assets...`);
+  const brand = getBrandAssets();
+  const competitorHandles = [author, channelUsername].filter(Boolean);
+
+  const [rankResult, mediaCleanse] = await Promise.all([
+    evaluateAndTransformPost({
+      caption: rawCaption,
+      hook: rawHook,
+      author,
+      content_type: contentType,
+      slides_count: mediaPaths.length,
+      min_score_threshold: 70,
+      directPostOnly: Boolean(options.directPostOnly),
+      forceApprove: Boolean(options.forceApprove)
+    }),
+    cleanseAndBrandMedia(mediaPaths, contentType, competitorHandles)
+  ]);
 
   log = updateAutonomousLog(log.id, {
     llm_fit_score: rankResult.fit_score,
@@ -148,16 +154,8 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
 
   console.log(`[Autonomous Agent] ⭐ Post APPROVED (Score: ${rankResult.fit_score}/100) — Mode: [${rankResult.post_intent?.toUpperCase() || 'DIRECT_REPOST'}]`);
 
-  // ── Step 3: Brand Cleanser & Visual Tag Replacer Agent ──────────────────
-  console.log(`[Autonomous Agent] 🧼 Cleansing competitor tags & stamping brand watermark...`);
-  const brand = getBrandAssets();
-  const competitorHandles = [author, channelUsername].filter(Boolean);
-
-  // 3a. Cleanse Caption
+  // Cleanse Caption (instant string regex replacement)
   const captionCleanse = await cleanseCaption(rankResult.repurposed_caption, competitorHandles);
-  
-  // 3b. Cleanse & Brand Media Files (Images / Videos)
-  const mediaCleanse = await cleanseAndBrandMedia(mediaPaths, contentType, competitorHandles);
 
   log = updateAutonomousLog(log.id, {
     repurposed_caption: captionCleanse.cleanedCaption,

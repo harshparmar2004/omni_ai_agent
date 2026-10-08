@@ -243,8 +243,8 @@ def clean_and_brand_video(video_path, output_path, our_brand_handle, brand_logo_
         cmd.extend([
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
-            "-preset", "fast",
-            "-crf", "18",
+            "-preset", "veryfast",
+            "-crf", "20",
             "-movflags", "+faststart",
             output_path
         ])

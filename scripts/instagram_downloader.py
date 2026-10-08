@@ -317,33 +317,41 @@ def download_instagram_media(url, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     shortcode = extract_shortcode(url)
 
-    # ── 1. Check yt-dlp first for Video/Reel content ──────────────────────────
-    output_template = os.path.join(output_dir, "%(id)s.%(ext)s")
+    # ── 1. Fast Path: Single-Pass yt-dlp Stream Extractor (< 5 seconds) ────────
+    output_template = os.path.join(output_dir, f"{shortcode}.%(ext)s")
     try:
-        cmd = [sys.executable, "-m", "yt_dlp", "--dump-json", "--no-playlist", url]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        cmd = [
+            sys.executable, "-m", "yt_dlp",
+            "--format", "best[ext=mp4]/best",
+            "-o", output_template,
+            "--print-json",
+            "--no-playlist",
+            url
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
         if res.returncode == 0 and res.stdout.strip():
-            info = json.loads(res.stdout.strip().split('\n')[0])
-            ext = info.get('ext', 'mp4')
-            if ext in ['mp4', 'mkv', 'webm'] or info.get('vcodec') not in ['none', None]:
-                dl_cmd = [
-                    sys.executable, "-m", "yt_dlp",
-                    "--format", "bestvideo[vcodec^=avc]+bestaudio/best[vcodec^=avc]/bestvideo+bestaudio/best",
-                    "--recode-video", "mp4",
-                    "-o", output_template,
-                    "--no-playlist", url
-                ]
-                subprocess.run(dl_cmd, capture_output=True, text=True, timeout=60, check=True)
-                media_id = info.get('id', shortcode)
-                local_filename = f"{media_id}.mp4"
-                if not os.path.exists(os.path.join(output_dir, local_filename)):
-                    local_filename = f"{media_id}.{ext}"
+            # Find the JSON metadata line
+            lines = [ln.strip() for ln in res.stdout.strip().split('\n') if ln.strip().startswith('{')]
+            if lines:
+                info = json.loads(lines[0])
+                ext = info.get('ext', 'mp4')
+                local_filename = f"{shortcode}.{ext}"
+                target_file_path = os.path.join(output_dir, local_filename)
+                
+                # Check if file was saved with shortcode or media id
+                if not os.path.exists(target_file_path):
+                    alt_id = info.get('id', '')
+                    if alt_id and os.path.exists(os.path.join(output_dir, f"{alt_id}.{ext}")):
+                        local_filename = f"{alt_id}.{ext}"
+                    elif os.path.exists(os.path.join(output_dir, f"{shortcode}.mp4")):
+                        local_filename = f"{shortcode}.mp4"
+
                 caption = info.get('description') or info.get('title') or ''
                 uploader = info.get('uploader') or info.get('uploader_id') or 'instagram'
                 return {
                     "success": True,
                     "type": "video",
-                    "id": media_id,
+                    "id": shortcode,
                     "title": info.get('title', ''),
                     "caption": caption,
                     "uploader": uploader,
@@ -360,7 +368,7 @@ def download_instagram_media(url, output_dir):
                     "slides": []
                 }
     except Exception as yt_err:
-        print(f"[yt-dlp note: {yt_err} -> proceeding to Scoped Playwright Extractor]", file=sys.stderr)
+        print(f"[yt-dlp fast path notice: {yt_err} -> proceeding to Scoped Playwright Extractor]", file=sys.stderr)
 
     # ── 2. Playwright Scoped Post Media Extractor ─────────────────────────────
     try:
