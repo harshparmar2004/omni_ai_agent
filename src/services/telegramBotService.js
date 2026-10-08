@@ -415,7 +415,7 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
         ]),
         `🎬 <b>Target Account:</b> ${targetHandle} (${page?.name || destination})`,
         `⭐ <b>Quality Fit Score:</b> ${log.llm_fit_score || 95}/100 (APPROVED)`,
-        `🎯 <b>Pipeline Mode:</b> Lead Magnet (Comment Trigger ➔ ManyChat DM ➔ InstaAuto Bridge)`,
+        `🎯 <b>Pipeline Mode:</b> Lead Magnet (Comment Trigger ➔ Creator Inbound DM ➔ InstaAuto Bridge)`,
         ``,
         `━━━━━━━━━━━━━━━━━━━━`,
         `🔗 <b>VERIFIED EXTRACTED SOURCE / DELIVERABLE LINK:</b>`,
@@ -622,7 +622,7 @@ async function handleTelegramCallbackQuery(query) {
 
   const isLeadMagnet = page?.workflow_type === 'lead_magnet';
   const workflowLabel = isLeadMagnet
-    ? '🎯 Lead Magnet (Trigger Comment ➔ ManyChat DM Harvest ➔ InstaAuto Bridge)'
+    ? '🎯 Lead Magnet (Trigger Comment ➔ Creator DM Harvest ➔ InstaAuto AI Agent)'
     : '🎬 Direct Viral Repost (Clean 1080p MP4 Transcode ➔ Direct Feed Publish)';
 
   // Edit original message to remove buttons and show confirmation
