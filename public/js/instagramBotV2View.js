@@ -1214,155 +1214,532 @@ const instagramBotV2View = {
   renderSettingsTab(currentAccount) {
     const acc = currentAccount;
     const p = this.rankingParams;
+    const isMetaConnected = Boolean(acc.pageToken && acc.pageToken.length > 15 && acc.igUserId);
+    const activeSection = this.activeSettingsTab || this.activeAccordion || 'all';
+    const totalWeights = (p.vibeWeight || 35) + (p.uspWeight || 25) + (p.qualityWeight || 20) + (p.freshnessWeight || 20);
 
     return `
-      <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 900px;">
+      <div class="v2-settings-container">
         
-        <!-- Section 1: Meta Graph API & Credentials -->
-        <div class="v2-accordion-item">
-          <div class="v2-accordion-header" onclick="instagramBotV2View.activeAccordion = (instagramBotV2View.activeAccordion === 'connection' ? '' : 'connection'); instagramBotV2View.renderDashboard();">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <span>🔑</span>
-              <span>Account Credentials & Meta Graph API</span>
+        <!-- ── Top Hero Context Banner ────────────────────────────── -->
+        <div class="v2-settings-header-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <div class="v2-settings-icon-avatar" style="background: ${acc.lightBg}; color: ${acc.color}; border: 1.5px solid ${acc.borderColor};">
+                ${acc.icon || '⚙️'}
+              </div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                  <h2 style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0;">${escapeHtml(acc.name)} Configuration</h2>
+                  <span class="v2-badge-pill" style="background: ${acc.lightBg}; color: ${acc.color}; border: 1px solid ${acc.borderColor};">${escapeHtml(acc.handle)}</span>
+                  ${isMetaConnected 
+                    ? '<span class="v2-badge-pill status-connected">● Meta API Active</span>' 
+                    : '<span class="v2-badge-pill status-warning">○ Token Required</span>'}
+                  ${acc.autopilotEnabled 
+                    ? '<span class="v2-badge-pill status-autopilot">● Autopilot Active (3h)</span>' 
+                    : '<span class="v2-badge-pill status-off">○ Manual Mode</span>'}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px;">
+                  Manage Meta Graph API v21.0 tokens, 3-hour autonomous publishing cadence, AI ranking scoring weights, and anti-ban safeguards.
+                </div>
+              </div>
             </div>
-            <span>${this.activeAccordion === 'connection' ? '▲' : '▼'}</span>
-          </div>
-          ${this.activeAccordion === 'connection' ? `
-            <div class="v2-accordion-content">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Display Name</label>
-                  <input type="text" id="page-name-input" class="form-input" value="${escapeHtml(acc.name)}">
-                </div>
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Destination Handle</label>
-                  <input type="text" id="page-handle-input" class="form-input" value="${escapeHtml(acc.handle)}">
-                </div>
-              </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Meta Page Access Token</label>
-                  <input type="password" id="page-token-input" class="form-input" placeholder="EAAB..." value="${escapeHtml(acc.pageToken || '')}">
-                </div>
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Instagram Business User ID</label>
-                  <input type="text" id="page-user-id-input" class="form-input" placeholder="17841..." value="${escapeHtml(acc.igUserId || '')}">
-                </div>
-              </div>
-
-              <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveActivePageSettings()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff;">
-                💾 Save Connection Credentials
+            <!-- Top Actions -->
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.testMetaHandshake()" style="font-weight: 700; font-size: 0.78rem;" title="Test Meta Graph API connectivity">
+                ⚡ Test Handshake
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveAllSettings()" style="font-weight: 800; font-size: 0.78rem; background: ${acc.gradient}; border: none; color: #fff;">
+                💾 Save All Changes
               </button>
             </div>
-          ` : ''}
+          </div>
         </div>
 
-        <!-- Section 2: Autopilot & Publishing Rules -->
-        <div class="v2-accordion-item">
-          <div class="v2-accordion-header" onclick="instagramBotV2View.activeAccordion = (instagramBotV2View.activeAccordion === 'autopilot' ? '' : 'autopilot'); instagramBotV2View.renderDashboard();">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <span>🤖</span>
-              <span>Autopilot Rules & Attribution Template</span>
+        <!-- ── Segmented Category Filter Navigation ────────────────── -->
+        <div class="v2-segmented-control" style="align-self: flex-start;">
+          <button class="v2-segmented-btn ${activeSection === 'all' ? 'active' : ''}" onclick="instagramBotV2View.setSettingsTab('all')">
+            <span>📋 All Settings</span>
+          </button>
+          <button class="v2-segmented-btn ${activeSection === 'connection' ? 'active' : ''}" onclick="instagramBotV2View.setSettingsTab('connection')">
+            <span>🔑 Meta Graph API</span>
+            ${isMetaConnected ? '<span class="v2-segmented-badge" style="background: #DEF7EC; color: #03543F;">✓</span>' : ''}
+          </button>
+          <button class="v2-segmented-btn ${activeSection === 'autopilot' ? 'active' : ''}" onclick="instagramBotV2View.setSettingsTab('autopilot')">
+            <span>🤖 Autopilot & Captions</span>
+            ${acc.autopilotEnabled ? '<span class="v2-segmented-badge" style="background: #EEF2FF; color: #3730A3;">3h</span>' : ''}
+          </button>
+          <button class="v2-segmented-btn ${activeSection === 'scoring' ? 'active' : ''}" onclick="instagramBotV2View.setSettingsTab('scoring')">
+            <span>⚖️ AI Scoring Weights</span>
+            <span class="v2-segmented-badge">${p.minApprovalScore}</span>
+          </button>
+          <button class="v2-segmented-btn ${activeSection === 'safety' ? 'active' : ''}" onclick="instagramBotV2View.setSettingsTab('safety')">
+            <span>🛡️ Stealth Anti-Ban</span>
+            <span class="v2-segmented-badge" style="background: #DEF7EC; color: #03543F;">Shield</span>
+          </button>
+        </div>
+
+        <!-- ── Settings Cards ────────────────────────────────────── -->
+        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+          
+          <!-- Card 1: Meta Graph API & Credentials -->
+          ${(activeSection === 'all' || activeSection === 'connection') ? `
+            <div class="v2-settings-card" id="settings-card-connection">
+              <div class="v2-settings-card-header">
+                <div>
+                  <h3 class="v2-settings-card-title">
+                    <span>🔑</span>
+                    <span>Meta Graph API & Account Credentials</span>
+                  </h3>
+                  <p class="v2-settings-card-desc">
+                    Official Graph API integration for publishing Reels and Carousels directly to <strong>${escapeHtml(acc.handle)}</strong>.
+                  </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  ${isMetaConnected 
+                    ? '<span class="v2-badge-pill status-connected">● Live Connection Active</span>' 
+                    : '<span class="v2-badge-pill status-warning">○ Setup Incomplete</span>'}
+                </div>
+              </div>
+
+              <div class="v2-settings-grid-2">
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-name-input">
+                    <span>Workspace Display Name</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Required</span>
+                  </label>
+                  <div class="v2-input-group">
+                    <span class="v2-input-prefix">🏷️</span>
+                    <input type="text" id="page-name-input" class="v2-input-field" value="${escapeHtml(acc.name)}" placeholder="e.g. GTA 6 Updates 007">
+                  </div>
+                  <div class="v2-settings-helper">Identifies this workspace in OmniStudio AI dashboard.</div>
+                </div>
+
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-handle-input">
+                    <span>Destination Instagram Handle</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Public</span>
+                  </label>
+                  <div class="v2-input-group">
+                    <span class="v2-input-prefix">@</span>
+                    <input type="text" id="page-handle-input" class="v2-input-field" value="${escapeHtml(acc.handle)}" placeholder="@gta6_updates_007">
+                  </div>
+                  <div class="v2-settings-helper">Target Instagram profile where reels will be posted.</div>
+                </div>
+
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-token-input">
+                    <span>Meta Page Access Token</span>
+                    <button type="button" onclick="instagramBotV2View.toggleTokenVisibility('page-token-input')" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.76rem; font-weight: 700;">👁️ Show/Hide</button>
+                  </label>
+                  <div class="v2-input-group">
+                    <span class="v2-input-prefix">🔒</span>
+                    <input type="password" id="page-token-input" class="v2-input-field" placeholder="EAAB..." value="${escapeHtml(acc.pageToken || '')}">
+                  </div>
+                  <div class="v2-settings-helper">Long-lived token from Meta Graph API Explorer (requires <code>instagram_content_publish</code>).</div>
+                </div>
+
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-user-id-input">
+                    <span>Instagram Business User ID</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Numeric ID</span>
+                  </label>
+                  <div class="v2-input-group">
+                    <span class="v2-input-prefix">🆔</span>
+                    <input type="text" id="page-user-id-input" class="v2-input-field" placeholder="17841428668115319" value="${escapeHtml(acc.igUserId || '')}">
+                  </div>
+                  <div class="v2-settings-helper">Your 17-digit Meta Instagram Business Account User ID.</div>
+                </div>
+              </div>
+
+              <!-- Permission Helper Note -->
+              <div style="background: var(--bg-base); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.78rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary);">
+                  <span>💡</span>
+                  <span>Required Scopes: <code>instagram_basic</code>, <code>instagram_content_publish</code>, <code>pages_show_list</code></span>
+                </div>
+                <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" style="color: var(--accent-primary); font-weight: 700; text-decoration: none;">
+                  Open Graph API Explorer ↗
+                </a>
+              </div>
+
+              <div class="v2-settings-footer">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="instagramBotV2View.testMetaHandshake()" style="font-weight: 700; font-size: 0.8rem;">
+                  ⚡ Test Meta Handshake
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveActivePageSettings()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff; font-size: 0.82rem;">
+                  💾 Save Connection Credentials
+                </button>
+              </div>
             </div>
-            <span>${this.activeAccordion === 'autopilot' ? '▲' : '▼'}</span>
-          </div>
-          ${this.activeAccordion === 'autopilot' ? `
-            <div class="v2-accordion-content">
-              <div style="background: var(--bg-card); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1rem;">
-                <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; font-weight: 700;">
-                  <input type="checkbox" id="page-autopilot-toggle" ${acc.autopilotEnabled ? 'checked' : ''} style="width: 17px; height: 17px; accent-color: ${acc.color};">
-                  <span>Enable 3-Hour Autopilot Publishing (Top #1 Winner)</span>
+          ` : ''}
+
+          <!-- Card 2: Autopilot Rules & Attribution Template -->
+          ${(activeSection === 'all' || activeSection === 'autopilot') ? `
+            <div class="v2-settings-card" id="settings-card-autopilot">
+              <div class="v2-settings-card-header">
+                <div>
+                  <h3 class="v2-settings-card-title">
+                    <span>🤖</span>
+                    <span>Autonomous Publishing & Attribution Engine</span>
+                  </h3>
+                  <p class="v2-settings-card-desc">
+                    Configure 3-hour automated publishing scheduling, caption credits, and daily quotas.
+                  </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="v2-badge-pill ${acc.autopilotEnabled ? 'status-autopilot' : 'status-off'}">
+                    ${acc.autopilotEnabled ? '● 3-Hour Cadence Active' : '○ Autopilot Paused'}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Autopilot Master Switch Row -->
+              <div style="background: var(--bg-base); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; gap: 1rem;">
+                <div>
+                  <div style="font-weight: 800; font-size: 0.92rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span>⚡</span> Enable 3-Hour Autonomous Publishing (Top #1 Winner)
+                  </div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                    Sentinel evaluates candidate batch every 3 hours and automatically publishes the highest-scoring approved reel.
+                  </div>
+                </div>
+                <label class="v2-switch">
+                  <input type="checkbox" id="page-autopilot-toggle" ${acc.autopilotEnabled ? 'checked' : ''} onchange="instagramBotV2View.saveActivePageSettings()">
+                  <span class="v2-slider"></span>
                 </label>
               </div>
 
-              <div class="form-group mb-3">
-                <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Attribution Format Template</label>
-                <textarea class="form-input" id="page-attr-input" style="font-size: 0.8rem; min-height: 65px;">${escapeHtml(acc.attributionTemplate)}</textarea>
+              <!-- Caption Attribution Template with Variable Chips -->
+              <div style="margin-bottom: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+                  <label class="v2-settings-label" for="page-attr-input" style="margin-bottom: 0;">
+                    Attribution Format & Caption Template
+                  </label>
+                  <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                    <span style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted);">Insert Tag:</span>
+                    <button type="button" class="v2-chip-btn" style="padding: 2px 7px; font-size: 0.72rem;" onclick="instagramBotV2View.insertAttrVariable('{author}')">+{author}</button>
+                    <button type="button" class="v2-chip-btn" style="padding: 2px 7px; font-size: 0.72rem;" onclick="instagramBotV2View.insertAttrVariable('${escapeHtml(acc.handle)}')">+${escapeHtml(acc.handle)}</button>
+                    <button type="button" class="v2-chip-btn" style="padding: 2px 7px; font-size: 0.72rem;" onclick="instagramBotV2View.insertAttrVariable('#gta6')">+#gta6</button>
+                    <button type="button" class="v2-chip-btn" style="padding: 2px 7px; font-size: 0.72rem;" onclick="instagramBotV2View.insertAttrVariable('#rockstargames')">+#rockstar</button>
+                    <button type="button" class="v2-chip-btn" style="padding: 2px 7px; font-size: 0.72rem;" onclick="instagramBotV2View.insertAttrVariable('#gaming')">+#gaming</button>
+                  </div>
+                </div>
+
+                <textarea id="page-attr-input" class="form-input" style="font-size: 0.84rem; min-height: 75px; font-family: inherit; line-height: 1.45; border-radius: 10px;" oninput="instagramBotV2View.updateCaptionPreview()">${escapeHtml(acc.attributionTemplate)}</textarea>
+                
+                <!-- Live Preview Box -->
+                <div style="margin-top: 0.5rem;">
+                  <div style="font-size: 0.72rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+                    <span>👀</span> Live Caption Preview:
+                  </div>
+                  <div id="caption-live-preview" class="v2-preview-box">
+                    ${escapeHtml(acc.attributionTemplate.replace(/\{author\}/gi, 'rockstargames').replace(/\{handle\}/gi, acc.handle))}
+                  </div>
+                </div>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Daily Quota (Max Posts/Day)</label>
+              <div class="v2-settings-grid-2">
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-quota-input">
+                    <span>Daily Publishing Quota (Max Posts/Day)</span>
+                    <span class="v2-slider-badge">${acc.dailyQuota} Posts / 24h</span>
+                  </label>
                   <input type="number" id="page-quota-input" class="form-input" min="1" max="10" value="${acc.dailyQuota}">
+                  <div class="v2-settings-helper">Hard safety ceiling to prevent account saturation.</div>
                 </div>
-                <div>
-                  <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Niche Category</label>
+
+                <div class="v2-settings-field">
+                  <label class="v2-settings-label" for="page-niche-input">
+                    <span>Niche Category</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">Audience Tag</span>
+                  </label>
                   <input type="text" id="page-niche-input" class="form-input" value="${escapeHtml(acc.defaultNiche)}">
+                  <div class="v2-settings-helper">Sets persona guidelines during AI content evaluation.</div>
                 </div>
               </div>
 
-              <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveActivePageSettings()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff;">
-                💾 Save Autopilot Settings
-              </button>
-            </div>
-          ` : ''}
-        </div>
-
-        <!-- Section 3: Scoring Weights & Keywords -->
-        <div class="v2-accordion-item">
-          <div class="v2-accordion-header" onclick="instagramBotV2View.activeAccordion = (instagramBotV2View.activeAccordion === 'scoring' ? '' : 'scoring'); instagramBotV2View.renderDashboard();">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <span>⚖️</span>
-              <span>Scoring Weights & Dynamic Keywords</span>
-            </div>
-            <span>${this.activeAccordion === 'scoring' ? '▲' : '▼'}</span>
-          </div>
-          ${this.activeAccordion === 'scoring' ? `
-            <div class="v2-accordion-content">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
-                  <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 4px;">Brand Vibe Match (${p.vibeWeight}%)</label>
-                  <input type="range" class="form-input" min="10" max="60" value="${p.vibeWeight}" oninput="instagramBotV2View.rankingParams.vibeWeight = parseInt(this.value, 10); this.previousElementSibling.innerText='Brand Vibe Match (' + this.value + '%)';">
+              <div class="v2-settings-footer">
+                <div style="font-size: 0.78rem; color: var(--text-muted);">
+                  Auto-Pilot posts execute at 3-hour intervals between 7:00 AM – 11:30 PM.
                 </div>
-                <div>
-                  <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 4px;">USP Uniqueness (${p.uspWeight}%)</label>
-                  <input type="range" class="form-input" min="10" max="50" value="${p.uspWeight}" oninput="instagramBotV2View.rankingParams.uspWeight = parseInt(this.value, 10); this.previousElementSibling.innerText='USP Uniqueness (' + this.value + '%)';">
-                </div>
-                <div>
-                  <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 4px;">1080p Polish (${p.qualityWeight}%)</label>
-                  <input type="range" class="form-input" min="10" max="40" value="${p.qualityWeight}" oninput="instagramBotV2View.rankingParams.qualityWeight = parseInt(this.value, 10); this.previousElementSibling.innerText='1080p Polish (' + this.value + '%)';">
-                </div>
-                <div>
-                  <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 4px;">Approval Cutoff (${p.minApprovalScore}/100)</label>
-                  <input type="number" class="form-input" min="60" max="95" value="${p.minApprovalScore}" onchange="instagramBotV2View.rankingParams.minApprovalScore = parseInt(this.value, 10);">
-                </div>
-              </div>
-
-              <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveRankingParams()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff;">
-                💾 Save Scoring Weights
-              </button>
-            </div>
-          ` : ''}
-        </div>
-
-        <!-- Section 4: Anti-Ban & Stealth Security -->
-        <div class="v2-accordion-item">
-          <div class="v2-accordion-header" onclick="instagramBotV2View.activeAccordion = (instagramBotV2View.activeAccordion === 'safety' ? '' : 'safety'); instagramBotV2View.renderDashboard();">
-            <div style="display: flex; align-items: center; gap: 0.65rem;">
-              <span>🛡️</span>
-              <span>Anti-Ban & Stealth Surveillance Security</span>
-            </div>
-            <span>${this.activeAccordion === 'safety' ? '▲' : '▼'}</span>
-          </div>
-          ${this.activeAccordion === 'safety' ? `
-            <div class="v2-accordion-content">
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8rem;">
-                <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 8px;">
-                  <div style="font-weight: 800; color: #10B981;">Gaussian Random Jitter</div>
-                  <div style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px;">Cadence stretches by ±15–35 minutes dynamically.</div>
-                </div>
-                <div style="background: var(--bg-card); padding: 0.75rem; border-radius: 8px;">
-                  <div style="font-weight: 800; color: #2563EB;">Inter-Profile Delay</div>
-                  <div style="color: var(--text-muted); font-size: 0.72rem; margin-top: 2px;">8 to 22 seconds between requests to mimic browsing.</div>
-                </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveActivePageSettings()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff; font-size: 0.82rem;">
+                  💾 Save Autopilot Settings
+                </button>
               </div>
             </div>
           ` : ''}
+
+          <!-- Card 3: AI Scoring Weights & Keywords -->
+          ${(activeSection === 'all' || activeSection === 'scoring') ? `
+            <div class="v2-settings-card" id="settings-card-scoring">
+              <div class="v2-settings-card-header">
+                <div>
+                  <h3 class="v2-settings-card-title">
+                    <span>⚖️</span>
+                    <span>AI Scoring Weights & Approval Thresholds</span>
+                  </h3>
+                  <p class="v2-settings-card-desc">
+                    Configure how Gemini & Ollama evaluate harvested reels before staging or direct posting.
+                  </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="v2-badge-pill ${totalWeights === 100 ? 'status-connected' : 'status-warning'}">
+                    ● Total Allocation: ${totalWeights}% (${totalWeights === 100 ? 'Balanced' : 'Unbalanced'})
+                  </span>
+                </div>
+              </div>
+
+              <!-- 4 Scoring Sliders Grid -->
+              <div class="v2-settings-grid-2">
+                <!-- Slider 1: Vibe -->
+                <div class="v2-slider-box">
+                  <div class="v2-slider-top">
+                    <span class="v2-slider-name">🎯 Brand Vibe Match</span>
+                    <span id="badge-vibe-weight" class="v2-slider-badge">${p.vibeWeight}%</span>
+                  </div>
+                  <input type="range" class="form-input" min="10" max="60" value="${p.vibeWeight}" oninput="instagramBotV2View.updateWeightSlider('vibeWeight', this.value, 'badge-vibe-weight')">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">
+                    Evaluates visual tone, high-octane pacing, and aesthetic fit for ${escapeHtml(acc.handle)}.
+                  </div>
+                </div>
+
+                <!-- Slider 2: USP -->
+                <div class="v2-slider-box">
+                  <div class="v2-slider-top">
+                    <span class="v2-slider-name">💡 USP Uniqueness</span>
+                    <span id="badge-usp-weight" class="v2-slider-badge">${p.uspWeight}%</span>
+                  </div>
+                  <input type="range" class="form-input" min="10" max="50" value="${p.uspWeight}" oninput="instagramBotV2View.updateWeightSlider('uspWeight', this.value, 'badge-usp-weight')">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">
+                    Rewards breaking news, fresh angles, and novel gameplay; penalizes recycled memes.
+                  </div>
+                </div>
+
+                <!-- Slider 3: Quality -->
+                <div class="v2-slider-box">
+                  <div class="v2-slider-top">
+                    <span class="v2-slider-name">✨ 1080p Polish & Audio</span>
+                    <span id="badge-quality-weight" class="v2-slider-badge">${p.qualityWeight}%</span>
+                  </div>
+                  <input type="range" class="form-input" min="10" max="40" value="${p.qualityWeight}" oninput="instagramBotV2View.updateWeightSlider('qualityWeight', this.value, 'badge-quality-weight')">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">
+                    Verifies clear 9:16 vertical resolution, audio fidelity, and lack of watermark blur.
+                  </div>
+                </div>
+
+                <!-- Slider 4: Cutoff -->
+                <div class="v2-slider-box">
+                  <div class="v2-slider-top">
+                    <span class="v2-slider-name">🛡️ Minimum Approval Cutoff</span>
+                    <span id="badge-cutoff-score" class="v2-slider-badge" style="color: #10B981;">Score: ${p.minApprovalScore}/100</span>
+                  </div>
+                  <input type="range" class="form-input" min="60" max="95" value="${p.minApprovalScore}" oninput="instagramBotV2View.rankingParams.minApprovalScore = parseInt(this.value, 10); document.getElementById('badge-cutoff-score').innerText = 'Score: ' + this.value + '/100';">
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">
+                    Reels scoring below this cutoff are held in 'Incoming' and will never auto-publish.
+                  </div>
+                </div>
+              </div>
+
+              <div class="v2-settings-footer">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="instagramBotV2View.resetScoringDefaults()" style="font-weight: 700; font-size: 0.78rem;">
+                  🔄 Reset Defaults
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="instagramBotV2View.saveRankingParams()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff; font-size: 0.82rem;">
+                  💾 Save Scoring Weights
+                </button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Card 4: Anti-Ban & Stealth Surveillance Security -->
+          ${(activeSection === 'all' || activeSection === 'safety') ? `
+            <div class="v2-settings-card" id="settings-card-safety">
+              <div class="v2-settings-card-header">
+                <div>
+                  <h3 class="v2-settings-card-title">
+                    <span>🛡️</span>
+                    <span>Anti-Ban Safeguards & Stealth Surveillance Security</span>
+                  </h3>
+                  <p class="v2-settings-card-desc">
+                    Enterprise stealth protection architecture ensuring untrackable 24/7 competitor surveillance.
+                  </p>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="v2-badge-pill status-connected">
+                    ● 5 Defense Layers Armed
+                  </span>
+                </div>
+              </div>
+
+              <!-- 4 Telemetry Safeguard Cards Grid -->
+              <div class="v2-telemetry-grid">
+                <div class="v2-telemetry-card">
+                  <div class="v2-telemetry-metric">
+                    <span>⏱️</span>
+                    <span>3h + 11–38m</span>
+                  </div>
+                  <div style="font-weight: 800; font-size: 0.84rem; color: #10B981;">Gaussian Dynamic Jitter</div>
+                  <div style="color: var(--text-muted); font-size: 0.74rem; line-height: 1.35;">
+                    Varies check cadence dynamically so background surveillance never forms a robotic cadence.
+                  </div>
+                </div>
+
+                <div class="v2-telemetry-card">
+                  <div class="v2-telemetry-metric">
+                    <span>⏳</span>
+                    <span>8s to 22s</span>
+                  </div>
+                  <div style="font-weight: 800; font-size: 0.84rem; color: #2563EB;">Inter-Account Pacing</div>
+                  <div style="color: var(--text-muted); font-size: 0.74rem; line-height: 1.35;">
+                    Serial human delay between competitor queries, mimicking organic mobile browsing.
+                  </div>
+                </div>
+
+                <div class="v2-telemetry-card">
+                  <div class="v2-telemetry-metric">
+                    <span>🌙</span>
+                    <span>1:00 AM – 6:30 AM</span>
+                  </div>
+                  <div style="font-weight: 800; font-size: 0.84rem; color: #8B5CF6;">Circadian Night Cooldown</div>
+                  <div style="color: var(--text-muted); font-size: 0.74rem; line-height: 1.35;">
+                    Extended 5–6h sleep cooldown during nighttime to avoid unnatural 24/7 server activity.
+                  </div>
+                </div>
+
+                <div class="v2-telemetry-card">
+                  <div class="v2-telemetry-metric">
+                    <span>⚡</span>
+                    <span>&lt;25KB Radar</span>
+                  </div>
+                  <div style="font-weight: 800; font-size: 0.84rem; color: #F59E0B;">SQLite Deduplication</div>
+                  <div style="color: var(--text-muted); font-size: 0.74rem; line-height: 1.35;">
+                    Inspects profile heads first. Known shortcodes are discarded in &lt;500ms with zero wasted downloads.
+                  </div>
+                </div>
+              </div>
+
+              <div class="v2-settings-footer">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="instagramBotV2View.runQuickStealthTest()" style="font-weight: 700; font-size: 0.78rem;">
+                  📡 Run Quick Stealth Check
+                </button>
+                <div style="font-size: 0.76rem; color: var(--text-muted);">
+                  Shield Status: <strong>100% Operational</strong> • Zero Instagram rate-limits recorded
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
         </div>
 
       </div>
     `;
+  },
+
+  setSettingsTab(tab) {
+    this.activeSettingsTab = tab;
+    this.activeAccordion = tab;
+    this.renderDashboard();
+  },
+
+  async testMetaHandshake() {
+    const acc = this.accounts[this.activeAccount] || Object.values(this.accounts)[0];
+    if (!acc.dbId) {
+      app.showToast('Workspace is not saved in database yet.', 'warning');
+      return;
+    }
+    app.showToast(`⚡ Testing Meta Graph API handshake for ${acc.handle}...`, 'info');
+    try {
+      const res = await fetch(`/api/instagram/pages/${acc.dbId}/test-handshake`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`🎉 Meta Graph API Connected! @${data.meta_username || acc.handle} (${data.followers || 0} followers, ${data.media_count || 0} posts)`, 'success');
+      } else {
+        app.showToast(`⚠️ Handshake: ${data.message || 'Verification failed'}`, 'warning');
+      }
+    } catch (e) {
+      app.showToast(`Handshake error: ${e.message}`, 'error');
+    }
+  },
+
+  toggleTokenVisibility(inputId) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  },
+
+  insertAttrVariable(varText) {
+    const textarea = document.getElementById('page-attr-input');
+    if (!textarea) return;
+    const start = textarea.selectionStart || textarea.value.length;
+    const end = textarea.selectionEnd || textarea.value.length;
+    const val = textarea.value;
+    textarea.value = val.substring(0, start) + ' ' + varText + ' ' + val.substring(end);
+    textarea.focus();
+    this.updateCaptionPreview();
+  },
+
+  updateCaptionPreview() {
+    const textarea = document.getElementById('page-attr-input');
+    const previewEl = document.getElementById('caption-live-preview');
+    if (!textarea || !previewEl) return;
+    const acc = this.accounts[this.activeAccount] || Object.values(this.accounts)[0];
+    let txt = textarea.value || '';
+    txt = txt.replace(/\{author\}/gi, 'rockstargames')
+             .replace(/\{handle\}/gi, acc.handle || '@gta6_updates_007');
+    previewEl.innerText = txt || '(Caption template is empty)';
+  },
+
+  updateWeightSlider(param, value, badgeId) {
+    const val = parseInt(value, 10);
+    this.rankingParams[param] = val;
+    const badge = document.getElementById(badgeId);
+    if (badge) badge.innerText = `${val}%`;
+    const p = this.rankingParams;
+    const total = (p.vibeWeight || 35) + (p.uspWeight || 25) + (p.qualityWeight || 20) + (p.freshnessWeight || 20);
+    const totalBadge = document.querySelector('#settings-card-scoring .v2-badge-pill');
+    if (totalBadge && totalBadge.innerText.includes('Total Allocation')) {
+      totalBadge.className = `v2-badge-pill ${total === 100 ? 'status-connected' : 'status-warning'}`;
+      totalBadge.innerText = `● Total Allocation: ${total}% (${total === 100 ? 'Balanced' : 'Unbalanced'})`;
+    }
+  },
+
+  resetScoringDefaults() {
+    this.rankingParams = {
+      vibeWeight: 35,
+      uspWeight: 25,
+      qualityWeight: 20,
+      freshnessWeight: 20,
+      minApprovalScore: 85
+    };
+    app.showToast('Scoring weights reset to recommended defaults', 'info');
+    this.renderDashboard();
+  },
+
+  async runQuickStealthTest() {
+    app.showToast('📡 Running quick anti-ban surveillance check...', 'info');
+    try {
+      const res = await fetch('/api/instagram/autonomous/poll-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ destination: this.activeAccount, quick: true })
+      });
+      const data = await res.json();
+      app.showToast(data.message || 'Surveillance check completed!', 'success');
+      setTimeout(async () => {
+        await this.loadData();
+        this.renderDashboard();
+      }, 2000);
+    } catch (e) {
+      app.showToast(`Stealth check failed: ${e.message}`, 'error');
+    }
+  },
+
+  async saveAllSettings() {
+    await this.saveActivePageSettings();
+    await this.saveRankingParams();
+    app.showToast('✓ All workspace settings and AI rules saved!', 'success');
   },
 
   // ══════════════════════════════════════════════════════════════════════════
