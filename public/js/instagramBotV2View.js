@@ -808,112 +808,131 @@ const instagramBotV2View = {
     return `
       <div style="display: flex; flex-direction: column; gap: 1.25rem;">
         
-        <!-- ── SECTION 1: TARGET MANAGER & INSTANT DISCOVERY CHIPS ───────── -->
-        <div style="display: grid; grid-template-columns: minmax(320px, 1.25fr) minmax(280px, 1fr); gap: 1.25rem; align-items: stretch;">
+        <!-- ── SECTION 1: UNIFIED CREATOR TARGET COMMAND CENTER ───────────── -->
+        <div class="card" style="padding: 1.35rem 1.6rem; background: var(--bg-card); border-radius: 16px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 1.15rem;">
           
-          <!-- Card 1: Quick Add Target -->
-          <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
-            <div>
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
-                <span style="font-size: 0.92rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
-                  <span>⚡</span> Quick Add Creator Target
-                </span>
-                <span class="v2-segmented-badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 800;">
-                  ${escapeHtml(currentAccount.name)}
-                </span>
+          <!-- Header Row: Icon, Title, Description, Mode Switcher -->
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 36px; height: 36px; border-radius: 10px; background: ${currentAccount.lightBg}; color: ${currentAccount.color}; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; border: 1px solid ${currentAccount.borderColor};">
+                🎯
               </div>
-              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
-                Enter any Instagram handle or URL to monitor 24/7 for fresh reels.
+              <div>
+                <div style="font-size: 0.98rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                  <span>Add Monitored Creators</span>
+                  <span class="v2-segmented-badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 800; font-size: 0.72rem;">
+                    ${escapeHtml(currentAccount.name)}
+                  </span>
+                </div>
+                <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 1px;">
+                  Sentinel autonomously surveils these creators 24/7 for high-performing reels.
+                </div>
+              </div>
+            </div>
+
+            <!-- Mode Switcher: Single vs Bulk -->
+            <div class="v2-segmented-control" style="padding: 3px;">
+              <button 
+                class="v2-segmented-btn ${!this.showBulkImporter ? 'active' : ''}" 
+                style="padding: 0.35rem 0.85rem; font-size: 0.76rem;" 
+                onclick="instagramBotV2View.showBulkImporter = false; instagramBotV2View.renderDashboard();"
+              >
+                <span>⚡ Quick Add</span>
+              </button>
+              <button 
+                class="v2-segmented-btn ${this.showBulkImporter ? 'active' : ''}" 
+                style="padding: 0.35rem 0.85rem; font-size: 0.76rem;" 
+                onclick="instagramBotV2View.showBulkImporter = true; instagramBotV2View.renderDashboard();"
+              >
+                <span>📂 Bulk Import</span>
+              </button>
+            </div>
+          </div>
+
+          ${!this.showBulkImporter ? `
+            <!-- Quick Add Input Row -->
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+              <div class="v2-input-group" style="flex: 1; min-width: 280px; height: 42px;">
+                <span class="v2-input-prefix" style="font-size: 1rem; color: var(--text-muted); background: var(--bg-deep); padding: 0 1rem;">@</span>
+                <input 
+                  type="text" 
+                  id="new-channel-input" 
+                  class="v2-input-field" 
+                  placeholder="Enter creator handle (e.g. gtaleaks, ign, mkbhd) or profile URL..." 
+                  onkeydown="if(event.key==='Enter') instagramBotV2View.addNewChannel()"
+                  style="font-size: 0.88rem;"
+                >
               </div>
 
-              <!-- Input Group -->
-              <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-                <div class="v2-input-group" style="flex: 1; min-width: 220px;">
-                  <span class="v2-input-prefix">@</span>
-                  <input 
-                    type="text" 
-                    id="new-channel-input" 
-                    class="v2-input-field" 
-                    placeholder="username or instagram.com/..." 
-                    onkeydown="if(event.key==='Enter') instagramBotV2View.addNewChannel()"
-                  >
-                </div>
-                <select id="new-channel-niche" class="form-input" style="width: 140px; border-radius: 10px; font-weight: 600;">
-                  <option value="tech" ${currentAccount.defaultNiche === 'tech' ? 'selected' : ''}>💻 Tech / AI</option>
-                  <option value="gaming" ${currentAccount.defaultNiche === 'gaming' ? 'selected' : ''}>🎮 Gaming / GTA</option>
-                  <option value="general" ${currentAccount.defaultNiche === 'general' ? 'selected' : ''}>📱 General</option>
-                </select>
-                <button class="btn btn-primary" onclick="instagramBotV2View.addNewChannel()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff; padding: 0.65rem 1.15rem; border-radius: 10px; box-shadow: var(--shadow-btn);">
-                  ➕ Add Target
+              <select id="new-channel-niche" class="form-input" style="width: 180px; height: 42px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; border: 1.5px solid var(--border-color); background: var(--bg-card); cursor: pointer;">
+                <option value="tech" ${currentAccount.defaultNiche === 'tech' ? 'selected' : ''}>💻 Tech / AI</option>
+                <option value="gaming" ${currentAccount.defaultNiche === 'gaming' ? 'selected' : ''}>🎮 Gaming / GTA 6</option>
+                <option value="general" ${currentAccount.defaultNiche === 'general' ? 'selected' : ''}>📱 General Niche</option>
+              </select>
+
+              <button class="btn btn-primary" onclick="instagramBotV2View.addNewChannel()" style="font-weight: 800; font-size: 0.85rem; background: ${currentAccount.gradient}; border: none; color: #fff; height: 42px; padding: 0 1.4rem; border-radius: 10px; box-shadow: var(--shadow-btn); display: inline-flex; align-items: center; gap: 0.45rem; white-space: nowrap; cursor: pointer;">
+                <span>➕</span>
+                <span>Add to Monitoring</span>
+              </button>
+            </div>
+
+            <!-- Suggested Targets Shelf -->
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color); flex-wrap: wrap;">
+              <div style="font-size: 0.76rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 0.35rem; white-space: nowrap;">
+                <span>💡 Suggested Targets:</span>
+              </div>
+
+              <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center;">
+                ${defaultSuggestions.map(s => {
+                  const isAdded = channels.some(c => (c.username || '').toLowerCase() === s.handle.toLowerCase());
+                  if (isAdded) {
+                    return `
+                      <span class="v2-chip-btn" style="opacity: 0.55; cursor: default; background: var(--bg-deep); border-color: var(--border-color); color: var(--text-muted); padding: 0.3rem 0.65rem; font-size: 0.74rem;" title="Already monitored">
+                        ✓ @${escapeHtml(s.handle)}
+                      </span>
+                    `;
+                  }
+                  return `
+                    <button 
+                      class="v2-chip-btn" 
+                      onclick="instagramBotV2View.quickAddSuggestedTarget('${s.handle}', '${s.niche}')" 
+                      style="padding: 0.3rem 0.65rem; font-size: 0.74rem;"
+                      title="Click to instantly monitor @${escapeHtml(s.handle)}"
+                    >
+                      <span style="color: ${currentAccount.color}; font-weight: 900;">+</span>
+                      <span>@${escapeHtml(s.handle)}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          ` : `
+            <!-- Bulk Import Mode -->
+            <div style="display: flex; flex-direction: column; gap: 0.65rem; background: var(--bg-deep); border: 1.5px dashed var(--border-color); border-radius: 12px; padding: 1.1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <span style="font-size: 0.8rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase;">
+                  Batch Paste 10–30 Creator Handles
+                </span>
+                <span style="font-size: 0.74rem; color: var(--text-muted);">
+                  Separate handles by commas, spaces, or newlines
+                </span>
+              </div>
+              <textarea 
+                id="bulk-channels-input" 
+                class="form-input" 
+                style="min-height: 85px; font-family: monospace; font-size: 0.84rem; width: 100%; border-radius: 8px; border: 1.5px solid var(--border-color); background: #FFFFFF; padding: 0.65rem;" 
+                placeholder="@creator1, @creator2, @competitor3, https://instagram.com/creator4..."
+              ></textarea>
+              <div style="display: flex; justify-content: flex-end; gap: 0.65rem; align-items: center; margin-top: 0.25rem;">
+                <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.showBulkImporter = false; instagramBotV2View.renderDashboard();" style="font-weight: 700;">
+                  Cancel
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.bulkAddChannels()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff;">
+                  🚀 Import All to Fleet
                 </button>
               </div>
             </div>
-
-            <!-- Bulk Importer Toggle -->
-            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color);">
-              <button 
-                onclick="instagramBotV2View.showBulkImporter = !instagramBotV2View.showBulkImporter; instagramBotV2View.renderDashboard();" 
-                style="background: transparent; border: none; color: var(--text-secondary); font-size: 0.76rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; padding: 0;"
-              >
-                <span>📂</span>
-                <span>${this.showBulkImporter ? 'Hide Bulk Importer ▲' : 'Paste 10–30 Creator Handles at Once ▸'}</span>
-              </button>
-
-              ${this.showBulkImporter ? `
-                <div style="margin-top: 0.75rem; background: var(--bg-deep); border: 1.5px dashed var(--border-color); border-radius: 10px; padding: 0.85rem;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <span style="font-size: 0.75rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase;">Batch Paste Handles</span>
-                    <span style="font-size: 0.72rem; color: var(--text-muted);">Commas, spaces, or lines</span>
-                  </div>
-                  <textarea 
-                    id="bulk-channels-input" 
-                    class="form-input" 
-                    style="min-height: 65px; font-family: monospace; font-size: 0.82rem; width: 100%; border-radius: 8px;" 
-                    placeholder="@creator1, @creator2, @competitor3..."
-                  ></textarea>
-                  <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
-                    <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.bulkAddChannels()" style="font-weight: 800;">
-                      ➕ Bulk Import All
-                    </button>
-                  </div>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-
-          <!-- Card 2: Instant Niche Suggestions -->
-          <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 14px; border: 1.5px solid var(--border-color); box-shadow: var(--shadow-sm); display: flex; flex-direction: column;">
-            <div style="font-size: 0.92rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
-              <span>💡</span> Instant Suggestions for ${escapeHtml(currentAccount.name)}
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
-              Click any verified creator to add them to your sentinel monitoring fleet:
-            </div>
-
-            <!-- Chips -->
-            <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; flex: 1; align-content: flex-start;">
-              ${defaultSuggestions.map(s => {
-                const isAdded = channels.some(c => (c.username || '').toLowerCase() === s.handle.toLowerCase());
-                if (isAdded) {
-                  return `
-                    <span class="v2-chip-btn" style="opacity: 0.6; cursor: default; background: var(--bg-deep); border-color: var(--border-color); color: var(--text-muted);" title="Already added to monitoring fleet">
-                      ✓ @${escapeHtml(s.handle)}
-                    </span>
-                  `;
-                }
-                return `
-                  <button 
-                    class="v2-chip-btn" 
-                    onclick="instagramBotV2View.quickAddSuggestedTarget('${s.handle}', '${s.niche}')" 
-                    title="Click to add @${escapeHtml(s.handle)} to ${escapeHtml(currentAccount.name)}"
-                  >
-                    <span>➕</span>
-                    <span>@${escapeHtml(s.handle)}</span>
-                  </button>
-                `;
-              }).join('')}
-            </div>
-          </div>
+          `}
 
         </div>
 
