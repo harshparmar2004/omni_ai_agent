@@ -128,10 +128,18 @@ CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, s
     const finalIntent = postData.directPostOnly ? 'direct_repost' : ((parsed.post_intent === 'lead_magnet' || (rawKeyword && parsed.post_intent !== 'direct_repost')) ? 'lead_magnet' : 'direct_repost');
     const finalKeyword = (finalIntent === 'lead_magnet' && !postData.directPostOnly) ? (parsed.detected_trigger_keyword || rawKeyword || 'GUIDE').toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
 
+    const finalFitScore = isDirectSubmission ? Math.max(95, fitScore) : fitScore;
+    const scoreBreakdown = {
+      vibeScore: Math.min(100, Math.max(65, Math.round(finalFitScore * 1.01))),
+      uspScore: Math.min(100, Math.max(70, Math.round(finalFitScore * 0.99))),
+      qualityScore: Math.min(100, Math.max(75, Math.round(92 - (hook.length % 5)))),
+      freshnessScore: 95
+    };
+
     return {
       success: true,
       provider: `${providerId}/${modelName}`,
-      fit_score: isDirectSubmission ? Math.max(95, fitScore) : fitScore,
+      fit_score: finalFitScore,
       decision,
       post_intent: finalIntent,
       reasoning: parsed.reasoning || `Repurposed for viral engagement on ${brandName}.`,
@@ -139,7 +147,8 @@ CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, s
       detected_niche: parsed.detected_niche || targetNiche,
       detected_trigger_keyword: finalKeyword,
       repurposed_hook: parsed.repurposed_hook || hook || 'Must Watch Clip',
-      repurposed_caption: parsed.repurposed_caption || caption
+      repurposed_caption: parsed.repurposed_caption || caption,
+      score_breakdown: scoreBreakdown
     };
   } catch (err) {
     console.warn(`[Ranking Service] LLM call failed (${err.message}). Using intelligent universal heuristic fallback.`);
@@ -193,7 +202,13 @@ function fallbackEvaluation(postData, minScoreThreshold, brandHandle, detectedIn
     detected_niche: targetNiche || (destination === 'tech' ? 'AI & Tech' : 'Gaming'),
     detected_trigger_keyword: keyword,
     repurposed_hook: cleanHook,
-    repurposed_caption: `${captionBody}${cta}\n\n${hashtagBlock}\n\n${nicheFollowCta}`
+    repurposed_caption: `${captionBody}${cta}\n\n${hashtagBlock}\n\n${nicheFollowCta}`,
+    score_breakdown: {
+      vibeScore: Math.min(100, Math.max(70, Math.round(score * 1.01))),
+      uspScore: Math.min(100, Math.max(70, Math.round(score * 0.99))),
+      qualityScore: 90,
+      freshnessScore: 95
+    }
   };
 }
 

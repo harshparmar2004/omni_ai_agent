@@ -736,6 +736,112 @@ router.get('/autonomous/feed', (req, res) => {
 });
 
 /**
+ * GET /api/instagram/pipeline-summary
+ * Returns authoritative stage counts and single contextual primary action
+ */
+router.get('/pipeline-summary', (req, res) => {
+  try {
+    const destination = (req.query.destination || 'tech').toLowerCase();
+    const db = getDb();
+    
+    const sourcesCount = db.prepare('SELECT count(*) as count FROM tracked_instagram_channels WHERE lower(destination_account) = ? AND is_active = 1').get(destination)?.count || 0;
+    const logs = getAutonomousLogs(200, null, destination);
+    
+    let scannedCount = logs.length;
+    let rankedCount = 0;
+    let readyCount = 0;
+    let publishedCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    
+    for (const item of logs) {
+      if (item.stage === 'published' || item.status === 'published' || item.ig_permalink) {
+        publishedCount++;
+      } else if (item.stage === 'skipped' || item.status === 'skipped' || item.status === 'rejected') {
+        skippedCount++;
+      } else if (item.stage === 'failed' || item.status === 'failed') {
+        failedCount++;
+      } else if (item.stage === 'ready' || (item.llm_fit_score >= 80 && item.repurposed_caption)) {
+        readyCount++;
+      }
+      if (item.llm_fit_score > 0) {
+        rankedCount++;
+      }
+    }
+    
+    let primaryAction = {
+      type: 'publish_top',
+      label: '🚀 Publish Top Pick Now',
+      subtitle: `${readyCount} candidate(s) ready to publish`,
+      stage: 'ready'
+    };
+    
+    if (readyCount === 0) {
+      if (scannedCount > 0) {
+        primaryAction = {
+          type: 'rank_now',
+          label: '⚡ Rank & Synthesize Reels',
+          subtitle: `${scannedCount} reel(s) in ingestion stream`,
+          stage: 'scanned'
+        };
+      } else {
+        primaryAction = {
+          type: 'scan_sources',
+          label: '📡 Scan Sources Now',
+          subtitle: `${sourcesCount} active source profile(s)`,
+          stage: 'sources'
+        };
+      }
+    }
+    
+    res.json({
+      success: true,
+      destination,
+      stages: {
+        sources: sourcesCount,
+        scanned: scannedCount,
+        ranked: rankedCount,
+        ready: readyCount,
+        published: publishedCount,
+        skipped: skippedCount,
+        failed: failedCount
+      },
+      primaryAction
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/autonomous/:id/skip
+ */
+router.post('/autonomous/:id/skip', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const db = getDb();
+    db.prepare("UPDATE autonomous_ingestion_log SET status = 'skipped', stage = 'skipped' WHERE id = ?").run(id);
+    res.json({ success: true, message: 'Reel candidate skipped.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/instagram/autonomous/:id/retry
+ */
+router.post('/autonomous/:id/retry', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const db = getDb();
+    db.prepare("UPDATE autonomous_ingestion_log SET status = 'ranked', stage = 'ready', last_error = '' WHERE id = ?").run(id);
+    res.json({ success: true, message: 'Reel reset to ready queue.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/instagram/autonomous/process-url
  * Runs any post URL through the full agentic pipeline:
  * Scrape -> Rank -> Brand Cleanse -> Harvest DM -> Stage

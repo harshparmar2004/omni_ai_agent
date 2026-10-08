@@ -144,7 +144,9 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     repurposed_caption: rankResult.repurposed_caption,
     destination_account: destination,
     post_intent: rankResult.post_intent || (rankResult.detected_trigger_keyword ? 'lead_magnet' : 'direct_repost'),
-    status: 'ranked'
+    status: rankResult.decision === 'REJECTED' ? 'rejected' : 'ranked',
+    stage: rankResult.decision === 'REJECTED' ? 'skipped' : 'ready',
+    score_breakdown: rankResult.score_breakdown || {}
   });
 
   // If rejected by LLM, archive as rejected and stop pipeline
@@ -152,7 +154,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     console.log(`[Autonomous Agent] 🛑 Post rejected (Fit Score: ${rankResult.fit_score}/100) — ${rankResult.reasoning}`);
     return {
       success: false,
-      log: updateAutonomousLog(log.id, { status: 'rejected' }),
+      log,
       message: `Post rejected: ${rankResult.reasoning}`
     };
   }
