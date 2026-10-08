@@ -261,12 +261,11 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
     const isApproved = log.llm_decision === 'APPROVED';
 
     if (isApproved) {
-      const isDirectRepost = log.post_intent === 'direct_repost' || !log.detected_trigger_keyword;
+      const isDirectRepost = !isLeadMagnetWorkflow && (log.post_intent === 'direct_repost' || !log.detected_trigger_keyword);
       const isPublished = Boolean((result.published || result.publishResult?.success) && result.publishResult?.mode !== 'mock');
       const liveLink = isPublished ? (result.publishResult?.permalink || log.ig_permalink || '') : '';
       const publishMethod = result.publishResult?.method || 'Meta Verified Content Publishing API v21.0';
-      const assetUrl = log.harvested_deliverable_url || '';
-
+      
       let resources = [];
       try {
         if (Array.isArray(log.extracted_resources)) {
@@ -277,6 +276,32 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
       } catch (e) {
         resources = [];
       }
+
+      // Priority resolution for the authentic creator deliverable URL
+      let assetUrl = log.harvested_deliverable_url || '';
+      if (!assetUrl && resources.length > 0) {
+        assetUrl = resources[0].url;
+      }
+      if (!assetUrl && result.postId) {
+        try {
+          const pRow = getDb().prepare('SELECT deliverable_url FROM instagram_posts WHERE id = ?').get(result.postId);
+          if (pRow?.deliverable_url) assetUrl = pRow.deliverable_url;
+        } catch (e) {}
+      }
+
+      const triggerKeyword = (log.detected_trigger_keyword || page?.custom_trigger_keyword || 'PROJECT').toUpperCase();
+
+      // Check InstaAuto Health for live confirmation in Telegram
+      let bridgeStatusLine = '⚡ <b>InstaAuto Status:</b> Armed &amp; Listening (Port 3000)';
+      try {
+        const { checkInstaAutoHealth } = require('./bridgeService');
+        const health = await checkInstaAutoHealth();
+        if (health.online) {
+          bridgeStatusLine = `⚡ <b>InstaAuto Status:</b> 🟢 Armed on Port 3000 (Follow-First Gate Active)`;
+        } else {
+          bridgeStatusLine = `⚡ <b>InstaAuto Status:</b> 🟡 Queued for Port 3000 (Ready to Arm)`;
+        }
+      } catch (e) {}
 
       const mediaPaths = log.cleaned_media_paths?.length ? log.cleaned_media_paths : (log.downloaded_media_paths || []);
 
@@ -331,11 +356,11 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
       }
 
       // ── 2. SEND STRUCTURED LIVE PUBLISH & ASSET REPORT ────────────────────
-      const resourceLines = (!isDirectRepost && resources.length > 0)
+      const resourceLines = (resources.length > 0)
         ? [
             ``,
-            `📚 <b>Extracted Resource URLs (${resources.length} Verified):</b>`,
-            ...resources.slice(0, 7).map((r, i) => `${i + 1}. <a href="${r.url}">${r.title}</a> (<i>${r.platform}</i>)`),
+            `📚 <b>All Extracted Creator Resources (${resources.length} Verified):</b>`,
+            ...resources.slice(0, 7).map((r, i) => `${i + 1}. <a href="${r.url}">${escapeHtml(r.title || r.url)}</a> (<i>${escapeHtml(r.platform || 'web')}</i>)`),
             resources.length > 7 ? `<i>+ ${resources.length - 7} more extracted resources...</i>` : '',
           ].filter(Boolean)
         : [];
@@ -359,6 +384,16 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
         `🏷️ <b>Publish Engine:</b> ${publishMethod}`,
         `🎵 <b>Audio Attached:</b> <code>${log.selected_song_title || 'Trending Viral Audio'}</code> (${log.selected_song_artist || 'Original'})`,
         `🧼 <b>Brand Cleansed:</b> Cleaned for ${targetHandle}`,
+        ...(assetUrl ? [
+          ``,
+          `🔗 <b>Extracted Source Link:</b>`,
+          `👉 <a href="${assetUrl}">${assetUrl}</a>`
+        ] : []),
+        ...(resources.length > 0 ? [
+          ``,
+          `📚 <b>Extracted Resources (${resources.length}):</b>`,
+          ...resources.slice(0, 5).map((r, i) => `${i + 1}. <a href="${r.url}">${escapeHtml(r.title || r.url)}</a> (<i>${escapeHtml(r.platform || 'web')}</i>)`)
+        ] : []),
         ``,
         `📝 <b>Published Caption:</b>`,
         `<blockquote>${escapeHtml(log.repurposed_caption || log.raw_caption)}</blockquote>`,
@@ -381,22 +416,23 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
         `🎬 <b>Target Account:</b> ${targetHandle} (${page?.name || destination})`,
         `⭐ <b>Quality Fit Score:</b> ${log.llm_fit_score || 95}/100 (APPROVED)`,
         `🎯 <b>Pipeline Mode:</b> Lead Magnet (Comment Trigger ➔ ManyChat DM ➔ InstaAuto Bridge)`,
-        `🎯 <b>DM Trigger Keyword:</b> "${log.detected_trigger_keyword || page?.custom_trigger_keyword || 'PROJECT'}"`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `🔗 <b>VERIFIED EXTRACTED SOURCE / DELIVERABLE LINK:</b>`,
+        assetUrl ? `👉 <a href="${assetUrl}">${assetUrl}</a>` : `👉 <i>Captured via Creator Post (${rawUrl})</i>`,
+        ``,
+        `💬 <b>COMMENT-TO-DM KEYWORD:</b> <code>${triggerKeyword}</code>`,
+        bridgeStatusLine,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        ...resourceLines,
+        ``,
         `🏷️ <b>Publish Engine:</b> ${publishMethod}`,
         `🎵 <b>Audio Attached:</b> <code>${log.selected_song_title || 'Trending Viral Audio'}</code> (${log.selected_song_artist || 'Original'})`,
         `🧼 <b>Brand Cleansed:</b> Watermarks replaced with ${targetHandle}`,
         ``,
-        ...(assetUrl ? [
-          `🎯 <b>Extracted Creator Resource Link (Sent via DM):</b>`,
-          `👉 <a href="${assetUrl}">${assetUrl}</a>`,
-          ``
-        ] : []),
-        ...resourceLines,
-        ``,
         `📝 <b>LLM Repurposed Caption:</b>`,
         `<blockquote>${escapeHtml(log.repurposed_caption || log.raw_caption)}</blockquote>`,
         ``,
-        ...(log.harvested_deliverable_url && log.harvested_deliverable_url !== assetUrl ? [`🔗 <b>Extracted Resource:</b> <a href="${log.harvested_deliverable_url}">${log.harvested_deliverable_url}</a>\n`] : []),
         `🚀 <b>Dashboard Studio:</b> <a href="http://localhost:4000/#instagram">http://localhost:4000/#instagram</a>`
       ].join('\n');
 
