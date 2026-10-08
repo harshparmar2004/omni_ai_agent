@@ -777,8 +777,8 @@ router.get('/stealth/status', (req, res) => {
  */
 router.post(['/autonomous/poll-now', '/stealth/trigger-cycle'], async (req, res) => {
   try {
-    const { destination } = req.body || {};
-    executeStealthSurveillanceCycle({ destination }).catch(e => console.error('[Stealth Surveillance Poll Error]:', e));
+    const { destination, quick = true } = req.body || {};
+    executeStealthSurveillanceCycle({ destination, quick }).catch(e => console.error('[Stealth Surveillance Poll Error]:', e));
     res.json({
       success: true,
       destination: destination || 'all',
@@ -1207,13 +1207,27 @@ router.post('/mobile-dm/publish', async (req, res) => {
       trigger = getMobileDmTriggerByShortcode(shortcode);
     }
     
-    if (!trigger) {
-      return res.status(404).json({ success: false, error: 'Mobile trigger not found.' });
+    if (!trigger && shortcode) {
+      const autoLog = db.prepare('SELECT * FROM autonomous_ingestion_log WHERE shortcode = ? ORDER BY id DESC LIMIT 1').get(shortcode);
+      if (autoLog) {
+        trigger = {
+          id: autoLog.id,
+          shortcode: autoLog.shortcode,
+          source: 'autonomous_sentinel',
+          destination: autoLog.destination_account
+        };
+      }
     }
 
+    if (!trigger) {
+      return res.status(404).json({ success: false, error: 'Reel or mobile trigger not found for publishing.' });
+    }
+
+    const targetDestination = req.body.destination || trigger.destination || 'gta6';
+
     // Find corresponding post in instagram_posts
-    let post = db.prepare('SELECT * FROM instagram_posts WHERE hook_text LIKE ? OR caption LIKE ? ORDER BY id DESC LIMIT 1')
-      .get(`%${trigger.shortcode}%`, `%${trigger.shortcode}%`);
+    let post = db.prepare('SELECT * FROM instagram_posts WHERE hook_text LIKE ? OR caption LIKE ? OR media_urls LIKE ? ORDER BY id DESC LIMIT 1')
+      .get(`%${trigger.shortcode}%`, `%${trigger.shortcode}%`, `%${trigger.shortcode}%`);
     
     if (!post) {
       // Look for latest post from mobile_bot or studio
@@ -1222,7 +1236,7 @@ router.post('/mobile-dm/publish', async (req, res) => {
     }
 
     if (!post) {
-      return res.status(400).json({ success: false, error: 'No staged post found for this trigger.' });
+      return res.status(400).json({ success: false, error: 'No staged post found for this candidate.' });
     }
 
     const mediaUrls = JSON.parse(post.media_urls || '[]');
@@ -1256,15 +1270,25 @@ router.post('/mobile-dm/publish', async (req, res) => {
       if (post.content_type === 'carousel') {
         pubResult = await publishCarouselToInstagram({
           imageUrls: mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url],
-          caption: post.caption
+          caption: post.caption,
+          destination: targetDestination
         });
       } else {
         pubResult = await publishReelToInstagram({
           videoUrl: mediaUrls[0] || '/generated/reels/test_reel.mp4',
           caption: post.caption,
-          coverUrl: post.thumbnail_url
+          coverUrl: post.thumbnail_url,
+          destination: targetDestination
         });
       }
+    }
+
+    // Update autonomous_ingestion_log status
+    if (trigger.shortcode && pubResult && pubResult.permalink) {
+      try {
+        db.prepare("UPDATE autonomous_ingestion_log SET status = 'published', ig_permalink = ?, ig_media_id = ?, published_at = ? WHERE shortcode = ?")
+          .run(pubResult.permalink, pubResult.ig_media_id || '', new Date().toISOString(), trigger.shortcode);
+      } catch (logErr) {}
     }
 
     // Push to InstaAuto Sister Agent Bridge

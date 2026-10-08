@@ -1,12 +1,11 @@
 /**
- * OmniStudio AI v5.0 — Share-to-DM Bot v2: Autonomous Target Sentinel & Multi-Account Harvester
- * Featuring:
- * 1. 🎯 Monitored Target Profiles (20–30 Creator Pages)
- * 2. 🏆 3-Hour Reel Ranking Arena & Candidate USP Matrix (Replaces static triggers)
- * 3. ⚡ Autonomous Ingestion Feed (Real-time Scrape Stream)
- * 4. 📜 3-Hour Cycle History & Archive (Old posts cleanly archived)
- * 5. 🛡️ Meta Compliance & Anti-Ban Center (5-Layer Shield)
- * 6. ⚙️ Sentinel Automation & Parameter Controls (Vibe Guardian Weights & Shifting Keywords)
+ * OmniStudio AI v5.1 — Share-to-DM Bot v2: Autonomous Multi-Page Sentinel & Ranking Hub
+ * Modernized & Streamlined UI/UX Architecture:
+ * 1. 🏆 Content Arena & Queue (Vibe Guardian Ranking, Extracted USPs, 1-Click Publishing)
+ * 2. 🎯 Monitored Sources (Creator & Competitor Channels, 1-Click Pause/Resume, Bulk Import)
+ * 3. 📜 Published History & Live Posts (Live Instagram Links, Scrape Stream, Cycle Archive)
+ * 4. ⚙️ Page Settings & Autopilot (Per-Page Credentials, Niche Keywords, Vibe Weights, Anti-Ban)
+ * 5. ➕ Dynamic Multi-Tenant Workspace Switcher with Connect New Page Modal
  */
 
 window.escapeHtml = window.escapeHtml || function(str) {
@@ -20,18 +19,31 @@ window.escapeHtml = window.escapeHtml || function(str) {
 };
 
 const instagramBotV2View = {
-  activeTab: 'ranking', // 'ranking', 'profiles', 'feed', 'history', 'compliance', 'engine'
-  activeAccount: 'tech', // 'tech' (Tech News Daily AI) or 'gta6' (GTA 6 Updates 007)
+  activeTab: 'ranking', // 'ranking', 'profiles', 'history', 'engine'
+  activeAccount: 'tech', // dynamically bound to connected_pages slug
+  connectedPages: [],
   trackedChannels: [],
   autonomousFeed: [],
   showParamsModal: false,
   showKeywordsModal: false,
-  historyFilter: 'all', // 'all', 'posted', 'discarded'
+  showConnectModal: false,
+  historyFilter: 'all', // 'all', 'published', 'queue'
 
-  // Multi-Account Workspace Configurations
+  // Dynamic Workspace Palette Configuration
+  palettePresets: [
+    { color: '#7C3AED', gradient: 'linear-gradient(135deg, #7C3AED, #4F46E5)', lightBg: 'rgba(124, 58, 237, 0.08)', borderColor: 'rgba(124, 58, 237, 0.35)', icon: '💻' },
+    { color: '#F59E0B', gradient: 'linear-gradient(135deg, #F59E0B, #EA580C)', lightBg: 'rgba(245, 158, 11, 0.08)', borderColor: 'rgba(245, 158, 11, 0.35)', icon: '🎮' },
+    { color: '#06B6D4', gradient: 'linear-gradient(135deg, #06B6D4, #0284C7)', lightBg: 'rgba(6, 182, 212, 0.08)', borderColor: 'rgba(6, 182, 212, 0.35)', icon: '⚡' },
+    { color: '#10B981', gradient: 'linear-gradient(135deg, #10B981, #059669)', lightBg: 'rgba(16, 185, 129, 0.08)', borderColor: 'rgba(16, 185, 129, 0.35)', icon: '📈' },
+    { color: '#EC4899', gradient: 'linear-gradient(135deg, #EC4899, #DB2777)', lightBg: 'rgba(236, 72, 153, 0.08)', borderColor: 'rgba(236, 72, 153, 0.35)', icon: '🔥' },
+    { color: '#8B5CF6', gradient: 'linear-gradient(135deg, #8B5CF6, #6D28D9)', lightBg: 'rgba(139, 92, 246, 0.08)', borderColor: 'rgba(139, 92, 246, 0.35)', icon: '🚀' }
+  ],
+
+  // Dynamically populated accounts dictionary
   accounts: {
     tech: {
       id: 'tech',
+      dbId: 2,
       name: 'Tech News Daily AI',
       handle: '@technews_daily_ai',
       nicheTitle: 'AI Breakthroughs & Tech News',
@@ -41,12 +53,18 @@ const instagramBotV2View = {
       lightBg: 'rgba(124, 58, 237, 0.08)',
       borderColor: 'rgba(124, 58, 237, 0.35)',
       icon: '💻',
-      placeholder: '@theverge, @techcrunch, @mkbhd, @wired, @engadget, @mashable, @cnet, @digitaltrends, @gizmodo, @arstechnica',
+      placeholder: '@theverge, @techcrunch, @mkbhd, @wired',
       defaultNiche: 'tech',
-      desc: 'Tracks top tech publications, AI labs, and developer tooling creators 24/7.'
+      desc: 'Tracks top tech publications, AI labs, and developer tooling creators 24/7.',
+      pageToken: '',
+      igUserId: '',
+      autopilotEnabled: false,
+      dailyQuota: 3,
+      attributionTemplate: '💡 Reel Source: @{author} | Follow @technews_daily_ai for high-signal AI breakthroughs! #technews #ai'
     },
     gta6: {
       id: 'gta6',
+      dbId: 1,
       name: 'GTA 6 Updates 007',
       handle: '@gta6_updates_007',
       nicheTitle: 'GTA 6 Leaks & Rockstar Games',
@@ -56,11 +74,20 @@ const instagramBotV2View = {
       lightBg: 'rgba(245, 158, 11, 0.08)',
       borderColor: 'rgba(245, 158, 11, 0.35)',
       icon: '🎮',
-      placeholder: '@gtaleaks, @rockstargames, @gta6intel, @gta6countdown, @gta6news, @gta6hub, @rockstarmag, @gta6leaks2025',
+      placeholder: '@gtaleaks, @rockstargames, @gta6countdown',
       defaultNiche: 'gaming',
-      desc: 'Tracks gaming channels, Rockstar announcements, and verified GTA 6 insider leaks.'
+      desc: 'Tracks gaming channels, Rockstar announcements, and verified GTA 6 insider leaks.',
+      pageToken: '',
+      igUserId: '17841428668115319',
+      autopilotEnabled: false,
+      dailyQuota: 3,
+      attributionTemplate: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames'
     }
   },
+
+  // Backward-compatible config aliases
+  get techAccountConfig() { return this.accounts.tech || {}; },
+  get gta6AccountConfig() { return this.accounts.gta6 || {}; },
 
   // Configurable Multi-Factor Ranking Parameters (The Vibe Guardian)
   rankingParams: {
@@ -69,8 +96,8 @@ const instagramBotV2View = {
     qualityWeight: 20,     // 1080p Visual & Audio Polish (%)
     freshnessWeight: 20,   // Breaking News Freshness (%)
     minApprovalScore: 85,  // Threshold out of 100 to auto-post
-    vibeTone: 'authoritative_tech', // 'authoritative_tech', 'developer_deep', 'futuristic_ai', 'balanced_curator'
-    cycleIntervalHours: 3  // 3-hour automated batch cycle
+    vibeTone: 'authoritative_tech',
+    cycleIntervalHours: 3
   },
 
   // Shifted Keyword & Topic Triggers
@@ -82,30 +109,10 @@ const instagramBotV2View = {
     { word: 'apple', category: 'Consumer Tech', weight: 'Medium' },
     { word: 'chatgpt', category: 'Generative AI', weight: 'High' },
     { word: 'agent', category: 'Autonomous Systems', weight: 'High' },
-    { word: 'robotics', category: 'Automation', weight: 'Medium' },
-    { word: 'deepseek', category: 'Open Weights AI', weight: 'High' },
-    { word: 'google', category: 'Tech Giant', weight: 'Medium' }
+    { word: 'gta6', category: 'Gaming', weight: 'High' },
+    { word: 'rockstargames', category: 'Gaming', weight: 'High' },
+    { word: 'deepseek', category: 'Open Weights AI', weight: 'High' }
   ],
-
-  techAccountConfig: {
-    handle: '@technews_daily_ai',
-    pageToken: '',
-    igUserId: '',
-    niche: 'Tech News, AI Breakthroughs & Developer Tools',
-    dailyQuota: 3,
-    autopilotEnabled: false,
-    attributionTemplate: '💡 Reel Source: @{author} | Follow @technews_daily_ai for high-signal AI breakthroughs! #technews #ai'
-  },
-
-  gta6AccountConfig: {
-    handle: '@gta6_updates_007',
-    pageToken: '',
-    igUserId: '17841428668115319',
-    niche: 'GTA 6 Leaks, Rockstar Games & Vice City Rumors',
-    dailyQuota: 3,
-    autopilotEnabled: false,
-    attributionTemplate: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames'
-  },
 
   isLoading: false,
 
@@ -118,7 +125,7 @@ const instagramBotV2View = {
         <div id="bot-v2-main-container">
           <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
             <div style="font-size: 2rem; margin-bottom: 0.5rem;" class="pulse-dot">🤖</div>
-            Loading Share-to-DM Bot v2 (Autonomous Page Sentinel & Ranking Arena)...
+            Loading Share-to-DM Bot v2 (Autonomous Page Sentinel & Multi-Page Hub)...
           </div>
         </div>
       </div>
@@ -131,45 +138,73 @@ const instagramBotV2View = {
   async loadData() {
     this.isLoading = true;
     try {
-      const [channelsRes, feedRes, settingsRes] = await Promise.all([
+      const [channelsRes, feedRes, settingsRes, pagesRes] = await Promise.all([
         fetch('/api/instagram/tracked-channels').catch(() => ({ json: () => ({ channels: [] }) })),
         fetch('/api/instagram/autonomous/feed?limit=100').catch(() => ({ json: () => ({ logs: [] }) })),
-        fetch('/api/settings').catch(() => ({ json: () => ({ settings: {} }) }))
+        fetch('/api/settings').catch(() => ({ json: () => ({ settings: {} }) })),
+        fetch('/api/instagram/pages').catch(() => ({ json: () => ({ pages: [] }) }))
       ]);
 
       const channelsJson = await channelsRes.json();
       const feedJson = await feedRes.json();
       const settingsJson = await settingsRes.json();
+      const pagesJson = await pagesRes.json();
 
       this.trackedChannels = channelsJson.channels || [];
       this.autonomousFeed = feedJson.logs || [];
+      this.connectedPages = pagesJson.pages || [];
 
+      // Dynamically populate accounts from connected_pages
+      if (this.connectedPages.length > 0) {
+        const newAccounts = {};
+        this.connectedPages.forEach((p, idx) => {
+          const pal = this.palettePresets[idx % this.palettePresets.length];
+          const color = p.theme_color || pal.color;
+          const slug = p.slug.toLowerCase().trim();
+
+          newAccounts[slug] = {
+            id: slug,
+            dbId: p.id,
+            name: p.name,
+            handle: p.handle || `@${slug}`,
+            nicheTitle: p.niche === 'tech' 
+              ? 'AI Breakthroughs & Tech News' 
+              : (p.niche === 'gaming' ? 'GTA 6 Leaks & Rockstar Games' : (p.niche || 'Niche Content')),
+            badge: (p.niche || slug).toUpperCase(),
+            color: color,
+            gradient: slug === 'tech' ? this.palettePresets[0].gradient : (slug === 'gta6' ? this.palettePresets[1].gradient : `linear-gradient(135deg, ${color}, #4338CA)`),
+            lightBg: `${color}18`,
+            borderColor: `${color}55`,
+            icon: p.icon || pal.icon,
+            placeholder: slug === 'tech' 
+              ? '@theverge, @techcrunch, @mkbhd, @wired' 
+              : (slug === 'gta6' ? '@gtaleaks, @rockstargames, @gta6countdown' : '@competitor1, @creator2, @niche_channel3'),
+            defaultNiche: p.niche || 'general',
+            desc: p.notes || `Autonomous surveillance, vibe ranking, and scheduled posting for ${p.name}.`,
+            pageToken: p.meta_page_token || '',
+            igUserId: p.meta_ig_user_id || '',
+            autopilotEnabled: p.autopilot_enabled === 1 || p.autopilot_enabled === true,
+            dailyQuota: p.daily_quota || 3,
+            attributionTemplate: p.attribution_template || `Source: @{author} | Follow ${p.handle || slug} for daily updates!`,
+            isActive: p.is_active === 1
+          };
+        });
+        this.accounts = newAccounts;
+      }
+
+      // Check legacy settings synchronization
       if (settingsJson.settings) {
-        if (settingsJson.settings.tech_instagram_handle) {
-          this.techAccountConfig.handle = settingsJson.settings.tech_instagram_handle;
-          this.accounts.tech.handle = settingsJson.settings.tech_instagram_handle;
+        if (this.accounts.tech) {
+          if (settingsJson.settings.tech_instagram_handle) this.accounts.tech.handle = settingsJson.settings.tech_instagram_handle;
+          if (settingsJson.settings.tech_meta_page_token) this.accounts.tech.pageToken = settingsJson.settings.tech_meta_page_token;
+          if (settingsJson.settings.tech_meta_ig_user_id) this.accounts.tech.igUserId = settingsJson.settings.tech_meta_ig_user_id;
+          if (settingsJson.settings.tech_autopilot_enabled) this.accounts.tech.autopilotEnabled = settingsJson.settings.tech_autopilot_enabled === '1';
         }
-        if (settingsJson.settings.instagram_handle) {
-          this.gta6AccountConfig.handle = settingsJson.settings.instagram_handle;
-          this.accounts.gta6.handle = settingsJson.settings.instagram_handle;
-        }
-        if (settingsJson.settings.tech_meta_page_token) {
-          this.techAccountConfig.pageToken = settingsJson.settings.tech_meta_page_token;
-        }
-        if (settingsJson.settings.tech_meta_ig_user_id) {
-          this.techAccountConfig.igUserId = settingsJson.settings.tech_meta_ig_user_id;
-        }
-        if (settingsJson.settings.tech_autopilot_enabled) {
-          this.techAccountConfig.autopilotEnabled = settingsJson.settings.tech_autopilot_enabled === '1';
-        }
-        if (settingsJson.settings.instagram_autopilot_enabled) {
-          this.gta6AccountConfig.autopilotEnabled = settingsJson.settings.instagram_autopilot_enabled === '1';
-        }
-        if (settingsJson.settings.meta_ig_user_id) {
-          this.gta6AccountConfig.igUserId = settingsJson.settings.meta_ig_user_id;
-        }
-        if (settingsJson.settings.meta_page_token) {
-          this.gta6AccountConfig.pageToken = settingsJson.settings.meta_page_token;
+        if (this.accounts.gta6) {
+          if (settingsJson.settings.instagram_handle) this.accounts.gta6.handle = settingsJson.settings.instagram_handle;
+          if (settingsJson.settings.meta_page_token) this.accounts.gta6.pageToken = settingsJson.settings.meta_page_token;
+          if (settingsJson.settings.meta_ig_user_id) this.accounts.gta6.igUserId = settingsJson.settings.meta_ig_user_id;
+          if (settingsJson.settings.instagram_autopilot_enabled) this.accounts.gta6.autopilotEnabled = settingsJson.settings.instagram_autopilot_enabled === '1';
         }
         if (settingsJson.settings.tech_ranking_params) {
           try {
@@ -178,6 +213,13 @@ const instagramBotV2View = {
         }
       }
 
+      // Ensure activeAccount exists in accounts
+      const keys = Object.keys(this.accounts);
+      if (!this.accounts[this.activeAccount] && keys.length > 0) {
+        this.activeAccount = keys[0];
+      }
+
+      // Update navbar source badge
       const navV2Badge = document.getElementById('nav-bot-v2-badge');
       if (navV2Badge) {
         const activeCount = this.trackedChannels.filter(c => c.is_active).length;
@@ -204,38 +246,35 @@ const instagramBotV2View = {
     this.renderDashboard();
   },
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // STRICT MULTI-TENANT ISOLATION HELPERS
-  // ══════════════════════════════════════════════════════════════════════════
+  // Multi-tenant isolation helpers
   getFilteredChannels() {
     return (this.trackedChannels || []).filter(c => {
-      const dest = c.destination_account || 'tech';
-      return dest === this.activeAccount;
+      const dest = (c.destination_account || 'tech').toLowerCase();
+      return dest === this.activeAccount.toLowerCase();
     });
   },
 
   getFilteredFeed() {
     return (this.autonomousFeed || []).filter(f => {
-      const dest = f.destination_account || 'tech';
-      return dest === this.activeAccount;
+      const dest = (f.destination_account || 'tech').toLowerCase();
+      return dest === this.activeAccount.toLowerCase();
     });
   },
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // RANKING CALCULATOR & 3-HOUR BATCH CANDIDATE GENERATOR
-  // ══════════════════════════════════════════════════════════════════════════
+  // 3-Hour Batch Candidate Generator & Ranking Calculator
   getCandidatesForActiveBatch() {
     const feed = this.getFilteredFeed();
     const p = this.rankingParams;
     const isGta = this.activeAccount === 'gta6';
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
 
-    const candidates = feed.slice(0, 12).map((item, idx) => {
+    const candidates = feed.slice(0, 15).map((item, idx) => {
       const baseFit = item.llm_fit_score || (88 - idx * 3);
       
-      const vibeScore = Math.min(100, Math.max(65, Math.round(baseFit * 1.02 - (idx % 2 === 0 ? 0 : 5))));
-      const uspScore = Math.min(100, Math.max(70, Math.round(baseFit * 0.98 + (idx % 3 === 0 ? 6 : 2))));
+      const vibeScore = Math.min(100, Math.max(65, Math.round(baseFit * 1.02 - (idx % 2 === 0 ? 0 : 4))));
+      const uspScore = Math.min(100, Math.max(70, Math.round(baseFit * 0.98 + (idx % 3 === 0 ? 5 : 2))));
       const qualityScore = Math.min(100, Math.max(75, Math.round(92 - (idx * 2))));
-      const freshnessScore = Math.min(100, Math.max(60, Math.round(95 - (idx * 4))));
+      const freshnessScore = Math.min(100, Math.max(60, Math.round(95 - (idx * 3))));
 
       const compositeScore = Math.round(
         (vibeScore * (p.vibeWeight / 100)) +
@@ -244,7 +283,7 @@ const instagramBotV2View = {
         (freshnessScore * (p.freshnessWeight / 100))
       );
 
-      let extractedUsp = item.raw_hook || item.detected_topic || (isGta ? 'Exclusive GTA 6 Gameplay Reveal' : 'Breakthrough AI Engineering Architecture');
+      let extractedUsp = item.raw_hook || item.detected_topic || (isGta ? 'Exclusive GTA 6 Gameplay Reveal' : `${acc.name} Highlight Scoop`);
       if (item.repurposed_hook) extractedUsp = item.repurposed_hook;
 
       return {
@@ -272,156 +311,121 @@ const instagramBotV2View = {
     return candidates;
   },
 
-  getArchivedHistory() {
-    const feed = this.getFilteredFeed();
-    return feed.slice(12).map((item, idx) => ({
-      ...item,
-      cycleBatch: `Batch #${Math.max(1, 40 - Math.floor(idx / 3))}`,
-      cycleDate: item.created_at ? new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit' }) : 'Previous Cycle',
-      disposition: item.status === 'published' ? 'PUBLISHED' : (item.status === 'rejected' ? 'BELOW_THRESHOLD' : 'CYCLE_EXPIRED')
-    }));
-  },
-
   renderDashboard() {
     const container = document.getElementById('bot-v2-main-container');
     if (!container) return;
 
-    const currentAccount = this.accounts[this.activeAccount] || this.accounts.tech;
+    const currentAccount = this.accounts[this.activeAccount] || Object.values(this.accounts)[0] || {
+      id: 'tech',
+      name: 'Tech News Daily AI',
+      handle: '@technews_daily_ai',
+      badge: 'TECH',
+      color: '#7C3AED',
+      gradient: 'linear-gradient(135deg, #7C3AED, #4F46E5)',
+      lightBg: 'rgba(124, 58, 237, 0.08)',
+      borderColor: 'rgba(124, 58, 237, 0.35)',
+      icon: '💻'
+    };
 
-    // Global counts across workspaces for top summary
-    const techChannels = (this.trackedChannels || []).filter(c => (c.destination_account || 'tech') === 'tech');
-    const techFeed = (this.autonomousFeed || []).filter(f => (f.destination_account || 'tech') === 'tech');
-    const techPublished = techFeed.filter(f => f.status === 'published' || f.ig_permalink).length;
-
-    const gtaChannels = (this.trackedChannels || []).filter(c => c.destination_account === 'gta6');
-    const gtaFeed = (this.autonomousFeed || []).filter(f => f.destination_account === 'gta6');
-    const gtaPublished = gtaFeed.filter(f => f.status === 'published' || f.ig_permalink).length;
-
-    // Filtered data for active workspace
     const channels = this.getFilteredChannels();
     const activeChannelsCount = channels.filter(c => c.is_active).length;
     const feed = this.getFilteredFeed();
-    const totalHarvested = feed.length;
-    const autoPublishedCount = feed.filter(f => f.status === 'published' || f.ig_permalink).length;
+    const livePublished = feed.filter(f => f.status === 'published' || f.ig_permalink);
     const candidates = this.getCandidatesForActiveBatch();
     const topCandidate = candidates[0] || null;
+
+    // Build Dynamic Workspace Cards
+    const workspaceCardsHtml = Object.values(this.accounts).map(acc => {
+      const isSelected = this.activeAccount === acc.id;
+      const pChannels = (this.trackedChannels || []).filter(c => (c.destination_account || 'tech').toLowerCase() === acc.id.toLowerCase());
+      const pFeed = (this.autonomousFeed || []).filter(f => (f.destination_account || 'tech').toLowerCase() === acc.id.toLowerCase());
+      const pPub = pFeed.filter(f => f.status === 'published' || f.ig_permalink).length;
+
+      return `
+        <div 
+          class="workspace-card"
+          style="border: 2px solid ${isSelected ? acc.color : 'var(--border-color)'}; background: ${isSelected ? `linear-gradient(145deg, var(--bg-card) 60%, ${acc.lightBg})` : 'var(--bg-card)'}; box-shadow: ${isSelected ? `0 6px 20px ${acc.lightBg}` : 'var(--shadow-card)'}; cursor: pointer;"
+          onclick="instagramBotV2View.switchAccount('${acc.id}')"
+        >
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: ${acc.lightBg}; color: ${acc.color}; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                ${acc.icon || '📱'}
+              </div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <h3 style="font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin: 0;">${escapeHtml(acc.name)}</h3>
+                  <span class="badge" style="background: ${acc.lightBg}; color: ${acc.color}; font-weight: 800; font-size: 0.65rem;">${escapeHtml(acc.badge)}</span>
+                </div>
+                <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px;">
+                  ${escapeHtml(acc.handle)}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              ${isSelected ? `
+                <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800; font-size: 0.7rem; padding: 4px 9px; display: inline-flex; align-items: center; gap: 5px;">
+                  <span class="pulse-dot" style="background: #10B981; width: 6px; height: 6px; border-radius: 50%;"></span>
+                  ACTIVE
+                </span>
+              ` : `
+                <span class="badge" style="background: var(--bg-base); color: var(--text-muted); font-size: 0.7rem; padding: 4px 9px;">
+                  SELECT
+                </span>
+              `}
+            </div>
+          </div>
+
+          <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.75rem;">
+            ${escapeHtml(acc.desc)}
+          </div>
+
+          <div style="display: flex; gap: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 0.65rem; font-size: 0.75rem; flex-wrap: wrap;">
+            <div>
+              <span style="color: var(--text-muted);">Targets:</span>
+              <strong style="color: ${acc.color}; margin-left: 3px;">${pChannels.length}</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted);">Scraped:</span>
+              <strong style="color: var(--text-primary); margin-left: 3px;">${pFeed.length}</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted);">Live:</span>
+              <strong style="color: #10B981; margin-left: 3px;">${pPub}</strong>
+            </div>
+            <div>
+              <span style="color: var(--text-muted);">Autopilot:</span>
+              <strong style="color: ${acc.autopilotEnabled ? '#10B981' : 'var(--text-muted)'}; margin-left: 3px;">${acc.autopilotEnabled ? 'ON' : 'OFF'}</strong>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Connect New Page Card
+    const addPageCardHtml = `
+      <div 
+        class="workspace-card"
+        style="border: 2px dashed var(--border-color); background: rgba(0, 0, 0, 0.02); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; min-height: 135px; transition: all 0.2s ease;"
+        onclick="instagramBotV2View.openConnectPageModal()"
+        title="Connect another Instagram page to run its own sentinel, sources, and queue"
+      >
+        <div style="width: 42px; height: 42px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; margin-bottom: 0.45rem; color: var(--accent-primary);">
+          ➕
+        </div>
+        <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">Connect New Page</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Add third-party or client account</div>
+      </div>
+    `;
 
     container.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
-        <!-- ── 1. DUAL WORKSPACE SWITCHER HERO (USER REQUEST SPECIFICATION) ───── -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1rem;">
-          
-          <!-- WORKSPACE 1: TECH NEWS DAILY AI -->
-          <div 
-            class="workspace-card ${this.activeAccount === 'tech' ? 'active-tech' : ''}"
-            onclick="instagramBotV2View.switchAccount('tech')"
-          >
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
-              <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(124, 58, 237, 0.12); color: #7C3AED; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                  💻
-                </div>
-                <div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <h3 style="font-size: 1.12rem; font-weight: 800; color: var(--text-primary); margin: 0;">Tech News Daily AI</h3>
-                    <span class="badge" style="background: rgba(124, 58, 237, 0.1); color: #7C3AED; font-weight: 800; font-size: 0.68rem;">AI & TECH</span>
-                  </div>
-                  <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px;">
-                    ${escapeHtml(this.techAccountConfig.handle)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                ${this.activeAccount === 'tech' ? `
-                  <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800; font-size: 0.72rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);">
-                    <span class="pulse-dot" style="background: #10B981; width: 7px; height: 7px; border-radius: 50%;"></span>
-                    ACTIVE WORKSPACE
-                  </span>
-                ` : `
-                  <span class="badge" style="background: var(--bg-base); color: var(--text-muted); font-size: 0.72rem; padding: 4px 10px;">
-                    CLICK TO SELECT
-                  </span>
-                `}
-              </div>
-            </div>
-
-            <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.85rem;">
-              Monitors top tech publications, AI labs, and developer tooling creators. Evaluates for breaking scoops and high-signal vibe fit.
-            </div>
-
-            <div style="display: flex; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; font-size: 0.76rem; flex-wrap: wrap;">
-              <div>
-                <span style="color: var(--text-muted);">Monitored Targets:</span>
-                <strong style="color: #7C3AED; margin-left: 3px;">${techChannels.length} Channels</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-muted);">Scraped Feed:</span>
-                <strong style="color: var(--text-primary); margin-left: 3px;">${techFeed.length}</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-muted);">Live Published:</span>
-                <strong style="color: #10B981; margin-left: 3px;">${techPublished}</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- WORKSPACE 2: GTA 6 UPDATES 007 -->
-          <div 
-            class="workspace-card ${this.activeAccount === 'gta6' ? 'active-gta6' : ''}"
-            onclick="instagramBotV2View.switchAccount('gta6')"
-          >
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.85rem;">
-              <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.12); color: #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                  🎮
-                </div>
-                <div>
-                  <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <h3 style="font-size: 1.12rem; font-weight: 800; color: var(--text-primary); margin: 0;">GTA 6 Updates 007</h3>
-                    <span class="badge" style="background: rgba(245, 158, 11, 0.1); color: #D97706; font-weight: 800; font-size: 0.68rem;">GAMING & LEAKS</span>
-                  </div>
-                  <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px;">
-                    ${escapeHtml(this.gta6AccountConfig.handle)}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                ${this.activeAccount === 'gta6' ? `
-                  <span class="badge" style="background: #FEF3C7; color: #92400E; font-weight: 800; font-size: 0.72rem; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.2);">
-                    <span class="pulse-dot" style="background: #F59E0B; width: 7px; height: 7px; border-radius: 50%;"></span>
-                    ACTIVE WORKSPACE
-                  </span>
-                ` : `
-                  <span class="badge" style="background: var(--bg-base); color: var(--text-muted); font-size: 0.72rem; padding: 4px 10px;">
-                    CLICK TO SELECT
-                  </span>
-                `}
-              </div>
-            </div>
-
-            <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.85rem;">
-              Monitors GTA 6 leakers, Rockstar community hubs, and gaming news. Evaluates for viral gameplay hooks and official updates.
-            </div>
-
-            <div style="display: flex; gap: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; font-size: 0.76rem; flex-wrap: wrap;">
-              <div>
-                <span style="color: var(--text-muted);">Monitored Targets:</span>
-                <strong style="color: #F59E0B; margin-left: 3px;">${gtaChannels.length} Channels</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-muted);">Scraped Feed:</span>
-                <strong style="color: var(--text-primary); margin-left: 3px;">${gtaFeed.length}</strong>
-              </div>
-              <div>
-                <span style="color: var(--text-muted);">Live Published:</span>
-                <strong style="color: #10B981; margin-left: 3px;">${gtaPublished}</strong>
-              </div>
-            </div>
-          </div>
-
+        <!-- ── 1. DYNAMIC MULTI-TENANT WORKSPACE SWITCHER ──────────────────── -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem;">
+          ${workspaceCardsHtml}
+          ${addPageCardHtml}
         </div>
 
         <!-- ── 2. EXECUTIVE CONTEXTUAL ACTION BAR ───────────────────────────── -->
@@ -435,7 +439,7 @@ const instagramBotV2View = {
               <div>
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                   <span style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary);">
-                    ${currentAccount.name} Sentinel Dashboard
+                    ${escapeHtml(currentAccount.name)} Sentinel Hub
                   </span>
                   <span class="badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 800; font-size: 0.7rem;">
                     DESTINATION: ${escapeHtml(currentAccount.handle)}
@@ -445,7 +449,7 @@ const instagramBotV2View = {
                   </span>
                 </div>
                 <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
-                  All scans, ranking, and candidate evaluations below are strictly scoped to <strong>${currentAccount.name}</strong>.
+                  All scans, ranking, and candidate evaluations below are strictly scoped to <strong>${escapeHtml(currentAccount.name)}</strong>.
                 </div>
               </div>
             </div>
@@ -453,13 +457,13 @@ const instagramBotV2View = {
             <!-- Primary CTAs for Active Workspace -->
             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
               <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.publishTopTwoNow()" style="font-weight: 800; background: linear-gradient(135deg, #10B981, #059669); border: none; color: #fff; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
-                🚀 Auto-Publish Top 2 to ${currentAccount.badge}
+                🚀 Auto-Publish Top 2 to ${escapeHtml(currentAccount.badge)}
               </button>
               <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.runThreeHourRankingPipeline()" style="font-weight: 800; background: ${currentAccount.lightBg}; color: ${currentAccount.color}; border-color: ${currentAccount.borderColor};">
-                ⚡ Run 3-Hour Cycle Now
+                ⚡ Run Ranking Cycle Now
               </button>
               <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.pollAllSourcesNow()" style="font-weight: 700;">
-                📡 Scan ${currentAccount.name} Profiles
+                📡 Scan ${escapeHtml(currentAccount.name)} Sources
               </button>
               <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.showParamsModal = !instagramBotV2View.showParamsModal; instagramBotV2View.renderDashboard();" style="font-weight: 700;">
                 ⚙️ Vibe Weights
@@ -471,21 +475,21 @@ const instagramBotV2View = {
 
           </div>
 
-          <!-- 4 Fast Metrics Computed Strictly for Current Workspace -->
+          <!-- 4 Clean Metrics Computed Strictly for Current Workspace -->
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.75rem; margin-top: 1.15rem; padding-top: 0.95rem; border-top: 1px solid var(--border-color);">
             <div class="stat-mini-card">
               <div class="stat-mini-icon" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color};">🎯</div>
               <div>
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">${currentAccount.name} Targets</div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">${activeChannelsCount} Active</div>
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Targets</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">${activeChannelsCount} Monitored</div>
               </div>
             </div>
 
             <div class="stat-mini-card">
               <div class="stat-mini-icon" style="background: rgba(245, 158, 11, 0.12); color: #F59E0B;">🏆</div>
               <div>
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Candidates</div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: #F59E0B;">${candidates.length} in Arena</div>
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Candidates in Arena</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #F59E0B;">${candidates.length} Qualified</div>
               </div>
             </div>
 
@@ -500,47 +504,40 @@ const instagramBotV2View = {
             <div class="stat-mini-card">
               <div class="stat-mini-icon" style="background: rgba(59, 130, 246, 0.12); color: #2563EB;">🚀</div>
               <div>
-                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Auto-Published</div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: #2563EB;">${autoPublishedCount} Live</div>
+                <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Live Published</div>
+                <div style="font-size: 1.25rem; font-weight: 800; color: #2563EB;">${livePublished.length} Posts</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- ── 3. MODULAR SUB-NAVIGATION TABS (NO HORIZONTAL OVERFLOW) ──────── -->
+        <!-- ── 3. CLEAN 4 SUB-NAVIGATION TABS (NO HORIZONTAL BLOAT) ─────────── -->
         <div class="bot-subnav-bar">
           <button class="bot-tab-btn ${this.activeTab === 'ranking' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('ranking')">
-            <span>🏆 3-Hour Reel Ranking & USP Arena</span>
-            <span class="bot-tab-badge">${candidates.length} ACTIVE</span>
+            <span>🏆 Content Arena & Queue</span>
+            <span class="bot-tab-badge">${candidates.length} CANDIDATES</span>
           </button>
           <button class="bot-tab-btn ${this.activeTab === 'profiles' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('profiles')">
-            <span>🎯 Monitored Target Profiles</span>
-            <span class="bot-tab-badge">${channels.length} PROFILES</span>
-          </button>
-          <button class="bot-tab-btn ${this.activeTab === 'feed' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('feed')">
-            <span>⚡ Raw Scrape Feed</span>
-            <span class="bot-tab-badge">${totalHarvested}</span>
+            <span>🎯 Monitored Sources</span>
+            <span class="bot-tab-badge">${channels.length} TARGETS</span>
           </button>
           <button class="bot-tab-btn ${this.activeTab === 'history' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('history')">
-            <span>📜 3-Hour Cycle Archive</span>
-            <span class="bot-tab-badge">${this.getArchivedHistory().length}</span>
-          </button>
-          <button class="bot-tab-btn ${this.activeTab === 'compliance' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('compliance')">
-            <span>🛡️ Meta Compliance & Anti-Ban</span>
-          </button>
-          <button class="bot-tab-btn ${this.activeTab === 'harvest_monitor' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('harvest_monitor')">
-            <span>🎯 Resource Harvest Monitor</span>
+            <span>📜 Published History & Live Posts</span>
+            <span class="bot-tab-badge">${livePublished.length} LIVE</span>
           </button>
           <button class="bot-tab-btn ${this.activeTab === 'engine' ? 'active' : ''}" onclick="instagramBotV2View.switchTab('engine')">
-            <span>⚙️ Automation Settings</span>
+            <span>⚙️ Page Settings & Autopilot</span>
           </button>
         </div>
 
-        <!-- Modal 1: Ranking Parameters Drawer / Form -->
+        <!-- Drawer: Ranking Parameters Form -->
         ${this.showParamsModal ? this.renderRankingParamsModal() : ''}
 
-        <!-- Modal 2: Shifted Keywords & Triggers Drawer -->
+        <!-- Drawer: Shifted Keywords & Triggers -->
         ${this.showKeywordsModal ? this.renderKeywordsModal() : ''}
+
+        <!-- Modal: Connect New Page -->
+        ${this.showConnectModal ? this.renderConnectPageModal() : ''}
 
         <!-- ── 4. DYNAMIC TAB CONTENT ──────────────────────────────────────── -->
         ${this.renderActiveTabContent()}
@@ -552,10 +549,7 @@ const instagramBotV2View = {
   renderActiveTabContent() {
     if (this.activeTab === 'ranking') return this.renderRankingArenaTab();
     if (this.activeTab === 'profiles') return this.renderProfilesTab();
-    if (this.activeTab === 'feed') return this.renderFeedTab();
     if (this.activeTab === 'history') return this.renderHistoryArchiveTab();
-    if (this.activeTab === 'compliance') return this.renderComplianceTab();
-    if (this.activeTab === 'harvest_monitor') return this.renderHarvestMonitorTab();
     if (this.activeTab === 'engine') return this.renderEngineTab();
     return this.renderRankingArenaTab();
   },
@@ -572,20 +566,20 @@ const instagramBotV2View = {
       <div style="display: flex; flex-direction: column; gap: 1.25rem;">
 
         <!-- 3-Hour Cycle Overview Card -->
-        <div class="card" style="padding: 1.25rem 1.5rem; background: linear-gradient(135deg, ${currentAccount.lightBg}, rgba(255, 255, 255, 0.02)); border-radius: 14px; border: 1.5px solid ${currentAccount.borderColor};">
+        <div class="card" style="padding: 1.15rem 1.4rem; background: linear-gradient(135deg, ${currentAccount.lightBg}, rgba(255, 255, 255, 0.02)); border-radius: 14px; border: 1.5px solid ${currentAccount.borderColor};">
           <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;">
-                <span style="font-size: 1.25rem;">⏱️</span>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <span style="font-size: 1.2rem;">⏱️</span>
                 <span style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary);">
-                  Active 3-Hour Competitive Ranking Window — ${currentAccount.name}
+                  Active Competitive Ranking Arena — ${escapeHtml(currentAccount.name)}
                 </span>
                 <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800;">
-                  BATCH #42 LIVE
+                  ACTIVE CYCLE
                 </span>
               </div>
               <div style="font-size: 0.82rem; color: var(--text-secondary); max-width: 820px; line-height: 1.45;">
-                Every 3 hours, the Sentinel gathers all newly posted reels from your ${currentAccount.name} monitored creator pages. It evaluates each reel's <strong>Main USP</strong>, verifies your <strong>Page Vibe Fit</strong> (${p.vibeWeight}%), and ranks the best candidates. The <strong>#1 Winner</strong> is prepared for publishing to <strong>${currentAccount.handle}</strong>, and past cycles are cleanly archived.
+                Every 3 hours, the Sentinel gathers newly posted reels from your ${escapeHtml(currentAccount.name)} monitored creator pages. It evaluates each reel's <strong>Main USP</strong>, checks your <strong>Page Vibe Fit</strong> (${p.vibeWeight}%), and prepares the top picks for publishing to <strong>${escapeHtml(currentAccount.handle)}</strong>.
               </div>
             </div>
 
@@ -594,32 +588,32 @@ const instagramBotV2View = {
                 ⚙️ Adjust Vibe Weights
               </button>
               <button class="btn btn-primary btn-sm" onclick="instagramBotV2View.runThreeHourRankingPipeline()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff;">
-                ⚡ Trigger 3-Hour Evaluation
+                ⚡ Trigger Ranking Cycle
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Candidate Reels Grid / Table -->
+        <!-- Candidate Reels Board -->
         <div class="pipeline-flow-container">
           <div style="padding: 1rem 1.25rem; background: var(--bg-base); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
             <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
               <span>🏆</span> Evaluated Candidate Reels Ranked by Vibe & USP Fit (${candidates.length})
             </div>
             <div style="font-size: 0.78rem; color: var(--text-muted);">
-              Cutoff Threshold: <strong style="color: ${currentAccount.color};">${p.minApprovalScore}/100</strong> • Top Pick auto-selected for ${currentAccount.handle}
+              Cutoff Threshold: <strong style="color: ${currentAccount.color};">${p.minApprovalScore}/100</strong> • Top Pick auto-selected for ${escapeHtml(currentAccount.handle)}
             </div>
           </div>
 
           ${candidates.length === 0 ? `
             <div style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted);">
               <div style="font-size: 2rem; margin-bottom: 0.5rem;">📡</div>
-              <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">No Candidate Reels in Active 3-Hour Cycle for ${currentAccount.name}</div>
-              <div style="font-size: 0.85rem; margin-top: 0.25rem;">Click "Trigger 3-Hour Evaluation" or "Scan ${currentAccount.name} Profiles" to ingest fresh creator posts.</div>
+              <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">No Candidate Reels in Active Cycle for ${escapeHtml(currentAccount.name)}</div>
+              <div style="font-size: 0.85rem; margin-top: 0.25rem;">Click "Trigger Ranking Cycle" or "Scan ${escapeHtml(currentAccount.name)} Sources" to ingest fresh creator posts.</div>
             </div>
           ` : `
             <div style="display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem;">
-              ${candidates.map((c, idx) => {
+              ${candidates.map((c) => {
                 const media = c.downloaded_media_paths || c.cleaned_media_paths || [];
                 const thumb = media[0] || '/generated/assets/brand_logo.svg';
                 const isTopWinner = c.rank === 1 && c.compositeScore >= p.minApprovalScore;
@@ -630,7 +624,7 @@ const instagramBotV2View = {
                       
                       <!-- Thumbnail & Rank Badge -->
                       <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
-                        <div class="reel-thumb-box" style="width: 76px; height: 110px; border-radius: 8px;" onclick="app.openVideoModal('${thumb}', '${escapeHtml(c.mainUsp)}', '${currentAccount.badge}', '${escapeHtml(c.repurposed_caption || c.raw_caption || '')}')" title="Click to view 9:16 vertical video">
+                        <div class="reel-thumb-box" style="width: 76px; height: 110px; border-radius: 8px; cursor: pointer;" onclick="app.openVideoModal('${thumb}', '${escapeHtml(c.mainUsp)}', '${escapeHtml(currentAccount.badge)}', '${escapeHtml(c.repurposed_caption || c.raw_caption || '')}')" title="Click to preview 9:16 vertical video">
                           <img src="${thumb}" onerror="this.src='/generated/assets/brand_logo.svg'">
                           <div class="reel-thumb-play-overlay" style="font-size: 1.35rem;">▶</div>
                         </div>
@@ -671,7 +665,7 @@ const instagramBotV2View = {
                         </div>
 
                         <!-- 4 Vibe Score Bars -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; font-size: 0.75rem; margin-bottom: 0.75rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 0.6rem; font-size: 0.75rem; margin-bottom: 0.75rem;">
                           <div style="background: ${currentAccount.lightBg}; padding: 6px 10px; border-radius: 6px;">
                             <div style="color: var(--text-muted); font-size: 0.68rem; font-weight: 700;">PAGE VIBE FIT (${p.vibeWeight}%)</div>
                             <div style="font-weight: 800; color: ${currentAccount.color}; font-size: 0.85rem;">${c.vibeScore}% Match</div>
@@ -701,16 +695,16 @@ const instagramBotV2View = {
                               : 'Qualified candidate held in reserve'}
                           </div>
 
-                          <div style="display: flex; gap: 0.4rem;">
+                          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
                             <button class="table-action-btn" onclick="instagramBotV2View.copyTextToClipboard('${escapeHtml(c.repurposed_caption || c.raw_caption || '')}', 'Caption copied!')">
                               📋 Copy Remixed Caption
                             </button>
                             ${!c.status || c.status !== 'published' ? `
-                              <button class="table-action-btn btn-publish" onclick="instagramBotV2View.publishCandidateNow('${c.shortcode}')" style="background: ${currentAccount.gradient}; color: #fff; font-weight: 800;">
+                              <button class="table-action-btn btn-publish" onclick="instagramBotV2View.publishCandidateNow('${c.shortcode}')" style="background: ${currentAccount.gradient}; color: #fff; font-weight: 800; border: none;">
                                 🚀 Publish Now to ${escapeHtml(currentAccount.handle)}
                               </button>
                             ` : `
-                              <a href="${c.ig_permalink}" target="_blank" class="table-action-btn btn-live" style="text-decoration: none; font-weight: 800;">
+                              <a href="${c.ig_permalink || '#'}" target="_blank" class="table-action-btn btn-live" style="text-decoration: none; font-weight: 800;">
                                 🟢 Live Post ↗
                               </a>
                             `}
@@ -735,7 +729,7 @@ const instagramBotV2View = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // TAB 2: MONITORED TARGET PROFILES (STRICT MULTI-ACCOUNT ISOLATION)
+  // TAB 2: MONITORED TARGET SOURCES (PROFILES)
   // ══════════════════════════════════════════════════════════════════════════
   renderProfilesTab() {
     const channels = this.getFilteredChannels();
@@ -750,26 +744,24 @@ const instagramBotV2View = {
             <div style="font-size: 1.6rem;">${currentAccount.icon}</div>
             <div>
               <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-primary);">
-                Monitored Target Profiles for ${currentAccount.name} (${channels.length} Profiles)
+                Monitored Target Sources for ${escapeHtml(currentAccount.name)} (${channels.length} Profiles)
               </div>
               <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                These creator accounts are monitored exclusively for <strong>${currentAccount.handle}</strong>. They do not cross over to other workspaces.
+                These creator accounts are monitored exclusively for <strong>${escapeHtml(currentAccount.handle)}</strong>.
               </div>
             </div>
           </div>
           <span class="badge" style="background: ${currentAccount.color}; color: #fff; font-weight: 800; padding: 5px 12px; font-size: 0.75rem;">
-            WORKSPACE: ${currentAccount.badge}
+            WORKSPACE: ${escapeHtml(currentAccount.badge)}
           </span>
         </div>
 
         <!-- Add New Source Channel Box -->
         <div class="card" style="padding: 1.25rem 1.5rem; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color);">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
-            <div>
-              <span class="section-label">Add Target Profile to Monitor for ${currentAccount.name}</span>
-              <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
-                Enter any public creator account (e.g. <code>${currentAccount.placeholder.split(',')[0].trim()}</code>). The Sentinel scans them every 3 hours.
-              </div>
+          <div style="margin-bottom: 0.75rem;">
+            <span class="section-label">Add Target Profile to Monitor for ${escapeHtml(currentAccount.name)}</span>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+              Enter any public creator account (e.g. <code>${currentAccount.placeholder.split(',')[0].trim()}</code>). Scanned autonomously every cycle.
             </div>
           </div>
 
@@ -782,21 +774,21 @@ const instagramBotV2View = {
               style="flex: 1; min-width: 280px;"
             >
             <select id="new-channel-niche" class="form-input" style="width: 170px;">
-              <option value="tech" ${this.activeAccount === 'tech' ? 'selected' : ''}>💻 Tech News / AI</option>
-              <option value="coding">👨‍💻 Coding & Python</option>
-              <option value="gaming" ${this.activeAccount === 'gta6' ? 'selected' : ''}>🎮 Gaming / GTA 6</option>
-              <option value="gadgets">📱 Gadgets & Hardware</option>
+              <option value="tech" ${currentAccount.defaultNiche === 'tech' ? 'selected' : ''}>💻 Tech / AI</option>
+              <option value="gaming" ${currentAccount.defaultNiche === 'gaming' ? 'selected' : ''}>🎮 Gaming / GTA 6</option>
+              <option value="coding" ${currentAccount.defaultNiche === 'coding' ? 'selected' : ''}>👨‍💻 Coding & Python</option>
+              <option value="general" ${currentAccount.defaultNiche === 'general' ? 'selected' : ''}>📱 General</option>
             </select>
             <button class="btn btn-primary" onclick="instagramBotV2View.addNewChannel()" style="font-weight: 800; background: ${currentAccount.gradient}; border: none; color: #fff;">
-              ➕ Add to ${currentAccount.badge}
+              ➕ Add to ${escapeHtml(currentAccount.badge)}
             </button>
           </div>
 
-          <!-- Bulk Add 10 Profiles Container -->
+          <!-- Bulk Add Profiles Container -->
           <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-color);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
               <span style="font-size: 0.78rem; font-weight: 800; color: var(--text-primary); text-transform: uppercase;">
-                ⚡ Bulk Import 10 Target Profiles for ${currentAccount.name}
+                ⚡ Bulk Import Creator Profiles for ${escapeHtml(currentAccount.name)}
               </span>
               <span style="font-size: 0.72rem; color: var(--text-muted);">
                 Paste handles separated by commas, spaces, or lines
@@ -805,12 +797,12 @@ const instagramBotV2View = {
             <textarea 
               id="bulk-channels-input" 
               class="form-input" 
-              style="min-height: 65px; font-family: monospace; font-size: 0.8rem; width: 100%;" 
+              style="min-height: 60px; font-family: monospace; font-size: 0.8rem; width: 100%;" 
               placeholder="${currentAccount.placeholder}"
             ></textarea>
             <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
               <button class="btn btn-secondary btn-sm" onclick="instagramBotV2View.bulkAddChannels()" style="font-weight: 800; background: ${currentAccount.lightBg}; color: ${currentAccount.color}; border-color: ${currentAccount.borderColor};">
-                ➕ Bulk Add All 10 Profiles to ${currentAccount.name}
+                ➕ Bulk Add All Profiles to ${escapeHtml(currentAccount.name)}
               </button>
             </div>
           </div>
@@ -820,10 +812,10 @@ const instagramBotV2View = {
         <div class="pipeline-flow-container">
           <div style="padding: 1rem 1.25rem; background: var(--bg-base); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
             <div style="font-weight: 800; font-size: 0.92rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-              <span>📡</span> Target Profiles Monitored for ${currentAccount.name} (${channels.length})
+              <span>📡</span> Target Profiles Monitored for ${escapeHtml(currentAccount.name)} (${channels.length})
             </div>
             <button class="table-action-btn" onclick="instagramBotV2View.pollAllSourcesNow()" style="font-weight: 700;">
-              🔄 Scan ${currentAccount.name} Profiles Now
+              🔄 Scan ${escapeHtml(currentAccount.name)} Profiles Now
             </button>
           </div>
 
@@ -845,8 +837,8 @@ const instagramBotV2View = {
                   <tr>
                     <td colspan="7" style="text-align: center; padding: 2.8rem 1rem; color: var(--text-muted);">
                       <div style="font-size: 1.75rem; margin-bottom: 0.4rem;">🎯</div>
-                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">No target profiles monitored for ${currentAccount.name} yet</div>
-                      <div style="font-size: 0.8rem; margin-top: 0.25rem;">Use the form above to add your 10–30 ${currentAccount.badge} creator pages!</div>
+                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">No target profiles monitored for ${escapeHtml(currentAccount.name)} yet</div>
+                      <div style="font-size: 0.8rem; margin-top: 0.25rem;">Use the form above to add your ${escapeHtml(currentAccount.badge)} competitor or creator pages!</div>
                     </td>
                   </tr>
                 ` : channels.map(c => `
@@ -860,7 +852,7 @@ const instagramBotV2View = {
                       <div style="font-weight: 800; color: var(--text-primary); font-size: 0.88rem;">
                         ${escapeHtml(c.display_name || c.username)}
                       </div>
-                      <a href="${c.profile_url}" target="_blank" style="color: var(--accent-primary); font-size: 0.74rem; font-weight: 700; text-decoration: underline;">
+                      <a href="${c.profile_url || `https://www.instagram.com/${c.username}/`}" target="_blank" style="color: var(--accent-primary); font-size: 0.74rem; font-weight: 700; text-decoration: underline;">
                         @${escapeHtml(c.username)} ↗
                       </a>
                     </td>
@@ -870,7 +862,7 @@ const instagramBotV2View = {
                       </span>
                     </td>
                     <td>
-                      <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">${c.followers_count || 'N/A'}</div>
+                      <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary);">${c.followers_count || 'Active'}</div>
                       <div style="font-size: 0.7rem; color: var(--text-muted);">${c.posts_count || '0'} posts</div>
                     </td>
                     <td>
@@ -882,7 +874,7 @@ const instagramBotV2View = {
                           ${c.last_scraped_at ? new Date(c.last_scraped_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'}
                         </div>
                       ` : `
-                        <span style="font-size: 0.75rem; color: var(--text-muted);">Awaiting next scan</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">Ready to scan</span>
                       `}
                     </td>
                     <td>
@@ -918,50 +910,71 @@ const instagramBotV2View = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // TAB 3: RAW AUTONOMOUS INGESTION FEED
+  // TAB 3: PUBLISHED HISTORY & LIVE POSTS (UNIFIED STREAM)
   // ══════════════════════════════════════════════════════════════════════════
-  renderFeedTab() {
-    const feed = this.getFilteredFeed();
+  renderHistoryArchiveTab() {
+    const rawFeed = this.getFilteredFeed();
     const currentAccount = this.accounts[this.activeAccount] || this.accounts.tech;
+
+    let items = rawFeed;
+    if (this.historyFilter === 'published') {
+      items = rawFeed.filter(f => f.status === 'published' || f.ig_permalink);
+    } else if (this.historyFilter === 'queue') {
+      items = rawFeed.filter(f => f.status !== 'published' && !f.ig_permalink);
+    }
+
+    const liveCount = rawFeed.filter(f => f.status === 'published' || f.ig_permalink).length;
+    const queueCount = rawFeed.length - liveCount;
 
     return `
       <div class="reel-dictionary-container">
-        <div class="dictionary-toolbar">
+        <div class="dictionary-toolbar" style="flex-wrap: wrap; gap: 0.75rem;">
           <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 1.1rem;">⚡</span>
+            <span style="font-size: 1.15rem;">📜</span>
             <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">
-              Raw Auto-Harvested Ingestion Stream for ${currentAccount.name} (${feed.length} Scraped)
+              [${escapeHtml(currentAccount.name)}] Ingestion Feed & Live Posts (${items.length})
             </span>
           </div>
-          <div style="display: flex; gap: 0.5rem;">
+
+          <!-- Filter Pills -->
+          <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <button class="table-action-btn ${this.historyFilter === 'all' ? 'active' : ''}" onclick="instagramBotV2View.historyFilter = 'all'; instagramBotV2View.renderDashboard();" style="${this.historyFilter === 'all' ? 'background: var(--text-primary); color: #fff;' : ''}">
+              All Stream (${rawFeed.length})
+            </button>
+            <button class="table-action-btn ${this.historyFilter === 'published' ? 'active' : ''}" onclick="instagramBotV2View.historyFilter = 'published'; instagramBotV2View.renderDashboard();" style="${this.historyFilter === 'published' ? 'background: #10B981; color: #fff;' : ''}">
+              🟢 Live Published (${liveCount})
+            </button>
+            <button class="table-action-btn ${this.historyFilter === 'queue' ? 'active' : ''}" onclick="instagramBotV2View.historyFilter = 'queue'; instagramBotV2View.renderDashboard();" style="${this.historyFilter === 'queue' ? 'background: #F59E0B; color: #fff;' : ''}">
+              🟡 Qualified Queue (${queueCount})
+            </button>
             <button class="table-action-btn" onclick="instagramBotV2View.loadData().then(() => instagramBotV2View.renderDashboard())">
-              🔄 Refresh Stream
+              🔄 Refresh
             </button>
           </div>
         </div>
 
-        ${feed.length === 0 ? `
+        ${items.length === 0 ? `
           <div style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted);">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📡</div>
-            <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">No Autonomous Posts Ingested for ${currentAccount.name} Yet</div>
-            <div style="font-size: 0.85rem; margin-top: 0.25rem;">Click "Scan ${currentAccount.name} Profiles" or add new target profiles in Tab 2.</div>
+            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+            <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">No records matching filter for ${escapeHtml(currentAccount.name)}</div>
+            <div style="font-size: 0.85rem; margin-top: 0.25rem;">Switch filters or trigger a scan to see newly harvested and published reels.</div>
           </div>
         ` : `
           <div style="overflow-x: auto;">
             <table class="reel-dictionary-table">
               <thead>
                 <tr>
-                  <th style="width: 65px;">Media</th>
-                  <th style="min-width: 170px;">Source & Shortcode</th>
-                  <th style="min-width: 140px;">Detected Topic</th>
-                  <th style="width: 110px;">LLM Score</th>
-                  <th style="min-width: 240px;">Synthesized Caption</th>
-                  <th style="min-width: 140px;">Publish State</th>
-                  <th style="min-width: 140px; text-align: right;">Action</th>
+                  <th style="width: 65px;">Preview</th>
+                  <th style="min-width: 170px;">Creator & Shortcode</th>
+                  <th style="min-width: 140px;">Identified Niche Topic</th>
+                  <th style="width: 100px;">Fit Score</th>
+                  <th style="min-width: 260px;">Synthesized Caption</th>
+                  <th style="min-width: 140px;">Publish Status</th>
+                  <th style="min-width: 130px; text-align: right;">Action</th>
                 </tr>
               </thead>
               <tbody>
-                ${feed.map(item => {
+                ${items.map(item => {
                   const media = item.downloaded_media_paths || item.cleaned_media_paths || [];
                   const thumb = media[0] || '/generated/assets/brand_logo.svg';
                   const isPublished = item.status === 'published' || item.ig_permalink;
@@ -970,7 +983,7 @@ const instagramBotV2View = {
                   return `
                     <tr>
                       <td>
-                        <div class="reel-thumb-box" onclick="app.openVideoModal('${thumb}', '${escapeHtml(item.repurposed_hook || 'Post')}', '${currentAccount.badge}', '${escapeHtml(item.repurposed_caption || '')}')">
+                        <div class="reel-thumb-box" style="cursor: pointer;" onclick="app.openVideoModal('${thumb}', '${escapeHtml(item.repurposed_hook || item.detected_topic || 'Reel')}', '${escapeHtml(currentAccount.badge)}', '${escapeHtml(item.repurposed_caption || '')}')">
                           <img src="${thumb}" onerror="this.src='/generated/assets/brand_logo.svg'">
                           <div class="reel-thumb-play-overlay">▶</div>
                         </div>
@@ -988,17 +1001,11 @@ const instagramBotV2View = {
                         <span class="badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 700; font-size: 0.72rem;">
                           ${escapeHtml(item.detected_topic || currentAccount.nicheTitle)}
                         </span>
-                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">
-                          Mode: [${(item.post_intent || 'direct_repost').toUpperCase()}]
-                        </div>
                       </td>
                       <td>
                         <span class="badge" style="background: ${isRejected ? '#FEE2E2' : '#DEF7EC'}; color: ${isRejected ? '#991B1B' : '#03543F'}; font-weight: 800; font-size: 0.72rem;">
                           ${item.llm_fit_score || 85}/100
                         </span>
-                        <div style="font-size: 0.69rem; color: var(--text-muted); margin-top: 2px;">
-                          ${item.llm_decision || 'APPROVED'}
-                        </div>
                       </td>
                       <td>
                         <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; max-width: 280px;">
@@ -1007,7 +1014,7 @@ const instagramBotV2View = {
                       </td>
                       <td>
                         ${isPublished ? `
-                          <a href="${item.ig_permalink}" target="_blank" class="table-action-btn btn-live" style="text-decoration: none; font-weight: 800;">
+                          <a href="${item.ig_permalink || '#'}" target="_blank" class="table-action-btn btn-live" style="text-decoration: none; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
                             <span>🟢 LIVE POST</span> ↗
                           </a>
                         ` : (isRejected ? `
@@ -1016,14 +1023,21 @@ const instagramBotV2View = {
                           </span>
                         ` : `
                           <span class="badge" style="background: #FEF3C7; color: #92400E; font-weight: 800; font-size: 0.7rem;">
-                            🟡 READY IN QUEUE
+                            🟡 QUALIFIED QUEUE
                           </span>
                         `)}
                       </td>
                       <td style="text-align: right;">
-                        <button class="table-action-btn" onclick="instagramBotV2View.copyTextToClipboard('${escapeHtml(item.repurposed_caption || item.raw_caption || '')}', 'Caption copied!')">
-                          📋 Copy
-                        </button>
+                        <div style="display: flex; gap: 4px; justify-content: flex-end;">
+                          <button class="table-action-btn" onclick="instagramBotV2View.copyTextToClipboard('${escapeHtml(item.repurposed_caption || item.raw_caption || '')}', 'Caption copied!')">
+                            📋 Copy
+                          </button>
+                          ${!isPublished ? `
+                            <button class="table-action-btn" onclick="instagramBotV2View.publishCandidateNow('${item.shortcode}')" style="background: ${currentAccount.color}; color: #fff; border: none; font-weight: 700;">
+                              🚀 Post
+                            </button>
+                          ` : ''}
+                        </div>
                       </td>
                     </tr>
                   `;
@@ -1037,108 +1051,140 @@ const instagramBotV2View = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // TAB 4: 3-HOUR CYCLE HISTORY & ARCHIVE
+  // TAB 4: PAGE CONFIGURATION & AUTOPILOT (STREAMLINED)
   // ══════════════════════════════════════════════════════════════════════════
-  renderHistoryArchiveTab() {
-    const history = this.getArchivedHistory();
-    const currentAccount = this.accounts[this.activeAccount] || this.accounts.tech;
+  renderEngineTab() {
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
 
     return `
-      <div class="reel-dictionary-container">
-        <div class="dictionary-toolbar">
-          <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="font-size: 1.1rem;">📜</span>
-            <span style="font-weight: 800; font-size: 0.95rem; color: var(--text-primary);">
-              [${currentAccount.name}] Previous 3-Hour Cycle Archive (${history.length} Older Reels)
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Active Page Credentials & Autopilot Settings -->
+        <div class="card" style="padding: 1.5rem; background: var(--bg-card); border-radius: 14px; border: 2px solid ${acc.color}; box-shadow: var(--shadow-card);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: ${acc.lightBg}; color: ${acc.color}; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+                ${acc.icon || '📱'}
+              </div>
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-primary);">
+                  ${escapeHtml(acc.name)} Workspace Configuration
+                </h3>
+                <div style="font-size: 0.78rem; color: var(--text-muted); font-family: monospace;">
+                  SLUG: ${escapeHtml(acc.id)} • DESTINATION: ${escapeHtml(acc.handle)}
+                </div>
+              </div>
+            </div>
+            <span class="badge" style="background: ${acc.lightBg}; color: ${acc.color}; font-weight: 800; font-size: 0.72rem;">
+              ${escapeHtml(acc.badge)} WORKSPACE
             </span>
           </div>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">
-            Older reels from past batches are kept here to keep the active ranking arena focused.
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Page Display Name</label>
+              <input type="text" id="page-name-input" class="form-input" value="${escapeHtml(acc.name)}">
+            </div>
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Destination Instagram Handle</label>
+              <input type="text" id="page-handle-input" class="form-input" value="${escapeHtml(acc.handle)}">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Meta Page Access Token (graph.facebook.com)</label>
+              <input type="password" id="page-token-input" class="form-input" placeholder="EAAB..." value="${escapeHtml(acc.pageToken || '')}">
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Sandboxed token for posting exclusively to ${escapeHtml(acc.handle)}.</div>
+            </div>
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Instagram Business User ID</label>
+              <input type="text" id="page-user-id-input" class="form-input" placeholder="17841..." value="${escapeHtml(acc.igUserId || '')}">
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Numeric Instagram Professional Account ID.</div>
+            </div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Attribution & Caption Format Template</label>
+            <textarea class="form-input" id="page-attr-input" style="font-size: 0.8rem; min-height: 70px;">${escapeHtml(acc.attributionTemplate)}</textarea>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Tags: <code>@{author}</code> = original creator handle.</div>
+          </div>
+
+          <!-- Autopilot Toggle Card -->
+          <div style="background: var(--bg-base); padding: 0.85rem 1rem; border-radius: 8px; border: 1.5px solid ${acc.borderColor}; margin-bottom: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.85rem; font-weight: 700;">
+              <input 
+                type="checkbox" 
+                id="page-autopilot-toggle" 
+                ${acc.autopilotEnabled ? 'checked' : ''} 
+                style="width: 17px; height: 17px; accent-color: ${acc.color};"
+              >
+              <span>Instant Autopilot Publishing (Top #1 Winner every cycle)</span>
+            </label>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.7rem;">
+              When active, the top-ranked winner meeting the Vibe Guardian threshold automatically posts to <strong>${escapeHtml(acc.handle)}</strong>.
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Max Reels Per Day (Throttling Quota)</label>
+              <input type="number" id="page-quota-input" class="form-input" min="1" max="10" value="${acc.dailyQuota}">
+            </div>
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Niche Category</label>
+              <input type="text" id="page-niche-input" class="form-input" value="${escapeHtml(acc.defaultNiche)}">
+            </div>
+          </div>
+
+          <button class="btn btn-primary w-full" onclick="instagramBotV2View.saveActivePageSettings()" style="font-weight: 800; background: ${acc.gradient}; border: none; color: #fff; padding: 0.75rem;">
+            💾 Save Settings for ${escapeHtml(acc.name)}
+          </button>
+        </div>
+
+        <!-- Anti-Ban & Gaussian Jitter Architecture Card -->
+        <div class="card" style="padding: 1.25rem 1.4rem; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-color);">
+          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
+            <div style="width: 38px; height: 38px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10B981; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+              🛡️
+            </div>
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0; color: var(--text-primary);">
+                Anti-Ban & Stealth Surveillance Architecture
+              </h3>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">
+                System-level protection active across all connected pages
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem;">
+            <div style="background: var(--bg-base); padding: 0.9rem; border-radius: 10px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.73rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Surveillance Cadence</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #7C3AED; margin-top: 0.2rem;">3 Hours ± 15–35m</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">Gaussian jitter prevents fixed periodic scraping footprints.</div>
+            </div>
+
+            <div style="background: var(--bg-base); padding: 0.9rem; border-radius: 10px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.73rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Inter-Profile Delay</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #10B981; margin-top: 0.2rem;">8 – 22 Seconds</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">Staggers surveillance requests serially to mimic human browsing.</div>
+            </div>
+
+            <div style="background: var(--bg-base); padding: 0.9rem; border-radius: 10px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.73rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Night Mode Cooldown</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #F59E0B; margin-top: 0.2rem;">1 AM – 6:30 AM</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">Stretches scan windows to 5+ hours during low-activity night hours.</div>
+            </div>
+
+            <div style="background: var(--bg-base); padding: 0.9rem; border-radius: 10px; border: 1px solid var(--border-color);">
+              <div style="font-size: 0.73rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Workspace Isolation</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #2563EB; margin-top: 0.2rem;">STRICT / SANDBOXED</div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.2rem;">Every connected page operates with isolated tokens, niche models, and DB logs.</div>
+            </div>
           </div>
         </div>
 
-        ${history.length === 0 ? `
-          <div style="text-align: center; padding: 3.5rem 1rem; color: var(--text-muted);">
-            <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
-            <div style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">No Archived Cycles for ${currentAccount.name}</div>
-            <div style="font-size: 0.85rem; margin-top: 0.25rem;">Reels evaluated in earlier batches will automatically move here once newer cycles run.</div>
-          </div>
-        ` : `
-          <div style="overflow-x: auto;">
-            <table class="reel-dictionary-table">
-              <thead>
-                <tr>
-                  <th style="width: 65px;">Preview</th>
-                  <th style="min-width: 140px;">Cycle Batch</th>
-                  <th style="min-width: 160px;">Creator & Shortcode</th>
-                  <th style="min-width: 240px;">Identified Main USP</th>
-                  <th style="width: 110px;">Fit Score</th>
-                  <th style="min-width: 130px;">Outcome</th>
-                  <th style="min-width: 120px; text-align: right;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${history.map(item => {
-                  const media = item.downloaded_media_paths || item.cleaned_media_paths || [];
-                  const thumb = media[0] || '/generated/assets/brand_logo.svg';
-
-                  return `
-                    <tr>
-                      <td>
-                        <div class="reel-thumb-box" onclick="app.openVideoModal('${thumb}', '${escapeHtml(item.raw_hook || currentAccount.name)}', '${currentAccount.badge}', '${escapeHtml(item.repurposed_caption || '')}')">
-                          <img src="${thumb}" onerror="this.src='/generated/assets/brand_logo.svg'">
-                          <div class="reel-thumb-play-overlay">▶</div>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="badge" style="background: ${currentAccount.lightBg}; color: ${currentAccount.color}; font-weight: 700; font-size: 0.72rem;">
-                          ${item.cycleBatch}
-                        </span>
-                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
-                          ${item.cycleDate}
-                        </div>
-                      </td>
-                      <td>
-                        <div style="font-weight: 800; font-size: 0.85rem; color: var(--text-primary);">
-                          @${escapeHtml(item.channel_username || 'creator')}
-                        </div>
-                        <div style="font-size: 0.74rem; font-family: monospace; color: var(--text-muted);">
-                          #${escapeHtml(item.shortcode)}
-                        </div>
-                      </td>
-                      <td>
-                        <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); line-height: 1.35; max-width: 280px;">
-                          ${escapeHtml((item.repurposed_hook || item.raw_hook || item.detected_topic || 'Reel Candidate').slice(0, 90))}
-                        </div>
-                      </td>
-                      <td>
-                        <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800; font-size: 0.72rem;">
-                          ${item.llm_fit_score || 82}/100
-                        </span>
-                      </td>
-                      <td>
-                        ${item.disposition === 'PUBLISHED' ? `
-                          <span class="badge" style="background: #DEF7EC; color: #03543F; font-weight: 800; font-size: 0.7rem;">
-                            ✓ PUBLISHED LIVE
-                          </span>
-                        ` : `
-                          <span class="badge" style="background: rgba(0, 0, 0, 0.05); color: var(--text-muted); font-size: 0.7rem;">
-                            CYCLE EXPIRED
-                          </span>
-                        `}
-                      </td>
-                      <td style="text-align: right;">
-                        <button class="table-action-btn" onclick="instagramBotV2View.copyTextToClipboard('${escapeHtml(item.repurposed_caption || item.raw_caption || '')}', 'Caption copied!')">
-                          📋 Copy
-                        </button>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
-              </tbody>
-            </table>
-          </div>
-        `}
       </div>
     `;
   },
@@ -1157,7 +1203,7 @@ const instagramBotV2View = {
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <span style="font-size: 1.2rem;">⚙️</span>
               <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                Page Vibe Guardian & Ranking Weights Configurator [${currentAccount.name}]
+                Page Vibe Guardian & Ranking Weights [${escapeHtml(currentAccount.name)}]
               </h3>
             </div>
             <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
@@ -1178,7 +1224,7 @@ const instagramBotV2View = {
               <strong style="color: ${currentAccount.color};" id="lbl-vibe">${p.vibeWeight}%</strong>
             </label>
             <input type="range" class="form-input" min="10" max="60" value="${p.vibeWeight}" oninput="document.getElementById('lbl-vibe').innerText = this.value + '%'; instagramBotV2View.rankingParams.vibeWeight = parseInt(this.value, 10);" style="width: 100%;">
-            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Penalizes cringe memes, clickbait, and irrelevant content.</div>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Penalizes cringe memes, clickbait, and off-brand posts.</div>
           </div>
 
           <!-- Slider 2: Viral USP & Hook -->
@@ -1194,7 +1240,7 @@ const instagramBotV2View = {
           <!-- Slider 3: 1080p Visual & Audio Quality -->
           <div>
             <label style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.35rem;">
-              <span>Visual & Audio Production Polish:</span>
+              <span>Visual & Audio Polish:</span>
               <strong style="color: #10B981;" id="lbl-quality">${p.qualityWeight}%</strong>
             </label>
             <input type="range" class="form-input" min="10" max="40" value="${p.qualityWeight}" oninput="document.getElementById('lbl-quality').innerText = this.value + '%'; instagramBotV2View.rankingParams.qualityWeight = parseInt(this.value, 10);" style="width: 100%;">
@@ -1217,7 +1263,7 @@ const instagramBotV2View = {
           <div style="display: flex; align-items: center; gap: 0.5rem;">
             <label style="font-size: 0.8rem; font-weight: 700;">Approval Cutoff Score:</label>
             <input type="number" class="form-input" min="60" max="95" value="${p.minApprovalScore}" onchange="instagramBotV2View.rankingParams.minApprovalScore = parseInt(this.value, 10);" style="width: 80px; font-weight: 800;">
-            <span style="font-size: 0.75rem; color: var(--text-muted);">/ 100 (Reels below this are moved to archive)</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">/ 100 (Reels below this are held in queue)</span>
           </div>
 
           <div style="display: flex; gap: 0.5rem;">
@@ -1234,7 +1280,7 @@ const instagramBotV2View = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // MODAL / DRAWER: SHIFTED KEYWORDS & TRIGGERS
+  // MODAL / DRAWER: DYNAMIC KEYWORDS & TOPIC TRIGGERS
   // ══════════════════════════════════════════════════════════════════════════
   renderKeywordsModal() {
     return `
@@ -1248,7 +1294,7 @@ const instagramBotV2View = {
               </h3>
             </div>
             <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
-              Replaces static comment triggers with dynamic AI topic extraction.
+              Dynamic AI topic extraction filters incoming creator reels against these high-signal tags.
             </div>
           </div>
           <button class="table-action-btn" onclick="instagramBotV2View.showKeywordsModal = false; instagramBotV2View.renderDashboard();">
@@ -1279,354 +1325,145 @@ const instagramBotV2View = {
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // TAB 5: META COMPLIANCE & ANTI-BAN CENTER
+  // MODAL: CONNECT NEW INSTAGRAM PAGE
   // ══════════════════════════════════════════════════════════════════════════
-  renderComplianceTab() {
-    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
+  openConnectPageModal() {
+    this.showConnectModal = true;
+    this.renderDashboard();
+  },
 
+  closeConnectPageModal() {
+    this.showConnectModal = false;
+    this.renderDashboard();
+  },
+
+  renderConnectPageModal() {
     return `
-      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-        
-        <!-- Alert Banner -->
-        <div class="card" style="padding: 1.5rem; background: ${this.activeAccount === 'gta6' ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(234, 88, 12, 0.08))' : 'linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(16, 185, 129, 0.08))'}; border-radius: 14px; border: 1.5px solid ${acc.color};">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); padding: 1rem;" onclick="if(event.target === this) instagramBotV2View.closeConnectPageModal()">
+        <div class="card" style="width: 100%; max-width: 520px; background: var(--bg-card); border-radius: 16px; border: 1.5px solid var(--border-color); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); overflow: hidden; animation: fadeIn 0.2s ease-out;">
+          
+          <div style="padding: 1.25rem 1.5rem; background: var(--bg-base); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 1.3rem;">➕</span>
+              <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: var(--text-primary);">Connect New Instagram Account</h3>
+            </div>
+            <button onclick="instagramBotV2View.closeConnectPageModal()" style="background: transparent; border: none; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;">✕</button>
+          </div>
+
+          <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; max-height: 75vh; overflow-y: auto;">
             <div>
-              <span class="badge" style="background: ${acc.color}; color: #fff; font-weight: 800; margin-bottom: 0.5rem; display: inline-block;">
-                ACTIVE WORKSPACE: ${acc.name.toUpperCase()} COMPLIANCE BLUEPRINT
-              </span>
-              <h3 style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); margin: 0;">
-                Meta Platform Policy, DMCA Copyright & Ban Probability Guard
-              </h3>
-              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.4rem; max-width: 800px; line-height: 1.5;">
-                Detailed legal, technical, and algorithmic assessment of scraping third-party content and publishing to Instagram via Meta Graph API v21.0.
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Page Display Name *</label>
+              <input type="text" id="modal-new-page-name" class="form-input" placeholder="e.g. Crypto Alpha Daily, Luxury Cars VIP" oninput="if(!document.getElementById('modal-new-page-slug').dataset.edited){ document.getElementById('modal-new-page-slug').value = this.value.toLowerCase().replace(/[^a-z0-9]/g, '_'); }">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div>
+                <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Workspace Slug / ID *</label>
+                <input type="text" id="modal-new-page-slug" class="form-input" placeholder="e.g. crypto_alpha" onchange="this.dataset.edited = '1'">
+              </div>
+              <div>
+                <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Instagram Handle *</label>
+                <input type="text" id="modal-new-page-handle" class="form-input" placeholder="@cryptoalpha_daily">
               </div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Calculated Ban Risk</div>
-              <div style="font-size: 1.75rem; font-weight: 900; color: #10B981;">12% (LOW)</div>
-              <div style="font-size: 0.72rem; color: #10B981; font-weight: 700;">When 5-Layer Shield Active</div>
-            </div>
-          </div>
-        </div>
 
-        <!-- 3 Core Risk Breakdown Cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.25rem;">
-          
-          <div class="card" style="padding: 1.35rem; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color);">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem;">
-              <span style="font-size: 1.35rem;">📜</span>
-              <h4 style="font-size: 0.98rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                1. Meta Terms of Service §3.2.3 (Scraping)
-              </h4>
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 0.75rem;">
+              <div>
+                <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Niche Category</label>
+                <input type="text" id="modal-new-page-niche" class="form-input" placeholder="e.g. crypto, fitness, tech, gaming">
+              </div>
+              <div>
+                <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Icon Emoji</label>
+                <input type="text" id="modal-new-page-icon" class="form-input" value="📱" style="text-align: center; font-size: 1.1rem;">
+              </div>
             </div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
-              <strong>The Rule:</strong> Meta strictly forbids high-frequency scraping without permission.<br>
-              <strong>The Shield:</strong> OmniStudio uses 3-hour batch scan intervals with Gaussian jitter and rotating headers, avoiding continuous endpoint hammering.
-            </div>
-          </div>
 
-          <div class="card" style="padding: 1.35rem; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color);">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem;">
-              <span style="font-size: 1.35rem;">⚖️</span>
-              <h4 style="font-size: 0.98rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                2. DMCA & Copyright (Three-Strike Ban)
-              </h4>
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Meta Page Access Token (Optional)</label>
+              <input type="password" id="modal-new-page-token" class="form-input" placeholder="EAAB... (can be entered later in Settings)">
             </div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
-              <strong>The Rule:</strong> Re-uploading reels untouched triggers copyright takedowns.<br>
-              <strong>The Shield:</strong> Bot v2 enforces <strong>Mandatory Attribution</strong> (<code>Credit: @creator</code>) and transformative headline/watermark remixing.
+
+            <div>
+              <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Instagram Business User ID (Optional)</label>
+              <input type="text" id="modal-new-page-userid" class="form-input" placeholder="17841... (can be entered later in Settings)">
+            </div>
+
+            <div style="background: var(--bg-base); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 700;">
+                <input type="checkbox" id="modal-new-page-autopilot" style="width: 16px; height: 16px;">
+                <span>Enable 3-Hour Autopilot Publishing</span>
+              </label>
             </div>
           </div>
 
-          <div class="card" style="padding: 1.35rem; background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border-color);">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem;">
-              <span style="font-size: 1.35rem;">📉</span>
-              <h4 style="font-size: 0.98rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                3. Instagram Aggregator Demotion
-              </h4>
-            </div>
-            <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5;">
-              <strong>The Rule:</strong> Instagram's algorithm suppresses accounts that spam unedited duplicate video hashes.<br>
-              <strong>The Shield:</strong> Re-transcoding video canvas via FFmpeg with logo watermarking and trending audio strips duplicate fingerprinting.
-            </div>
+          <div style="padding: 1rem 1.5rem; background: var(--bg-base); border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button class="btn btn-secondary" onclick="instagramBotV2View.closeConnectPageModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="instagramBotV2View.handleCreatePage()" style="font-weight: 800; background: linear-gradient(135deg, #7C3AED, #4F46E5); border: none; color: #fff;">
+              ➕ Connect & Activate Page
+            </button>
           </div>
 
         </div>
-
       </div>
     `;
   },
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // TAB: RESOURCE HARVEST MONITOR (V2) — shared with V1 bot
-  // ══════════════════════════════════════════════════════════════════════════
-  renderHarvestMonitorTab() {
-    if (!this._harvestData) {
-      fetch('/api/instagram/mobile-dm/harvest-monitor?limit=50')
-        .then(r => r.json())
-        .then(data => {
-          this._harvestData = data;
-          if (this.activeTab === 'harvest_monitor') {
-            const area = document.getElementById('v2-harvest-monitor-area');
-            if (area) area.innerHTML = (typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable)
-              ? instagramBotView._buildHarvestTable(data)
-              : this._buildHarvestTable(data);
-          }
+  async handleCreatePage() {
+    const name = document.getElementById('modal-new-page-name')?.value?.trim();
+    let slug = (document.getElementById('modal-new-page-slug')?.value?.trim() || name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const handle = document.getElementById('modal-new-page-handle')?.value?.trim();
+    const niche = document.getElementById('modal-new-page-niche')?.value?.trim() || 'general';
+    const icon = document.getElementById('modal-new-page-icon')?.value?.trim() || '📱';
+    const token = document.getElementById('modal-new-page-token')?.value?.trim() || '';
+    const userId = document.getElementById('modal-new-page-userid')?.value?.trim() || '';
+    const autopilot = document.getElementById('modal-new-page-autopilot')?.checked ? 1 : 0;
+
+    if (!name || !slug) {
+      app.showToast('Please enter both a Page Name and Slug', 'warning');
+      return;
+    }
+
+    app.showToast(`Connecting new page "${name}"...`, 'info');
+    try {
+      const res = await fetch('/api/instagram/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slug,
+          name,
+          handle: handle || `@${slug}`,
+          niche,
+          icon,
+          meta_page_token: token,
+          meta_ig_user_id: userId,
+          autopilot_enabled: autopilot,
+          workflow_type: 'direct_repost'
         })
-        .catch(() => {});
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to create page');
+
+      app.showToast(`🎉 Connected new workspace: ${name}!`, 'success');
+      this.showConnectModal = false;
+      this.activeAccount = slug;
+      await this.loadData();
+      this.renderDashboard();
+    } catch (e) {
+      app.showToast(`Error: ${e.message}`, 'error');
     }
-
-    const data = this._harvestData;
-    const stats = data?.stats || {};
-    const tableHtml = data
-      ? ((typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable)
-          ? instagramBotView._buildHarvestTable(data)
-          : this._buildHarvestTable(data))
-      : '<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">⏳ Loading harvest events...</div>';
-
-    return `
-      <div style="display:flex;flex-direction:column;gap:1.5rem;" id="v2-harvest-monitor-area">
-        <div class="card" style="padding:1.5rem;border-left:4px solid var(--accent);background:linear-gradient(135deg,rgba(217,119,87,0.04),rgba(124,58,237,0.04));">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;">
-            <div>
-              <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;color:var(--accent);margin-bottom:4px;">🎯 Resource Harvest Intelligence</div>
-              <h3 style="font-size:1.25rem;font-weight:800;margin:0 0 0.3rem 0;">Comment → DM → Extract Monitor</h3>
-              <p style="font-size:0.85rem;color:var(--text-secondary);margin:0;max-width:600px;">
-                Real-time log of every reel our agent harvested — trigger keyword detected by LLM, comment posted on creator's post, ManyChat DM intercepted, resource link extracted. All clicks open the actual resource or live post.
-              </p>
-            </div>
-            <button class="btn btn-secondary" onclick="instagramBotV2View._harvestData=null;instagramBotV2View.switchTab('harvest_monitor');" style="font-weight:700;">🔄 Refresh</button>
-          </div>
-          ${stats.total !== undefined ? `
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.75rem;margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border-color);">
-            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;">${stats.total}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Total Events</div></div>
-            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#0284C7;">${stats.comments_posted}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">💬 Comments</div></div>
-            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#7C3AED;">${stats.dms_received}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">📨 DMs Received</div></div>
-            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:var(--accent);">${stats.resources_extracted}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">🔗 Resources</div></div>
-            <div style="text-align:center;"><div style="font-size:1.6rem;font-weight:800;color:#10B981;">${stats.published}</div><div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">✅ Published</div></div>
-          </div>` : '<div style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">⏳ Loading...</div>'}
-        </div>
-        ${tableHtml}
-      </div>
-    `;
-  },
-
-  // Fallback table builder for V2 (delegates to V1 if available)
-  _buildHarvestTable(data) {
-    if (typeof instagramBotView !== 'undefined' && instagramBotView._buildHarvestTable) {
-      return instagramBotView._buildHarvestTable(data);
-    }
-    const events = data?.events || [];
-    if (!events.length) return '<div class="card" style="padding:2rem;text-align:center;color:var(--text-muted);">No harvest events found.</div>';
-    return '<div class="card" style="padding:1rem;color:var(--text-muted);font-size:0.85rem;">Open V1 Share-to-DM Bot to see the full harvest monitor table.</div>';
-  },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // TAB 6: SENTINEL AUTOMATION & MULTI-ACCOUNT SETTINGS
-  // ══════════════════════════════════════════════════════════════════════════
-  renderEngineTab() {
-    return `
-      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
-        
-        <!-- Dual Account Credentials Cards Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem;">
-          
-          <!-- Card 1: Tech News Daily AI -->
-          <div class="card" style="padding: 1.5rem; background: var(--bg-card); border-radius: 14px; border: 2px solid ${this.activeAccount === 'tech' ? '#7C3AED' : 'var(--border-color)'}; box-shadow: var(--shadow-card);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
-              <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(124, 58, 237, 0.12); color: #7C3AED; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                  💻
-                </div>
-                <div>
-                  <h3 style="font-size: 1.1rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                    Tech News Daily AI
-                  </h3>
-                  <div style="font-size: 0.76rem; color: var(--text-muted); font-family: monospace;">
-                    ${escapeHtml(this.techAccountConfig.handle)}
-                  </div>
-                </div>
-              </div>
-              <span class="badge" style="background: rgba(124, 58, 237, 0.1); color: #7C3AED; font-weight: 800; font-size: 0.72rem;">
-                TECH WORKSPACE
-              </span>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Destination Instagram Handle</label>
-              <input type="text" id="tech-handle-input" class="form-input" value="${escapeHtml(this.techAccountConfig.handle)}">
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Tech Meta Page Access Token (graph.facebook.com)</label>
-              <input type="password" id="tech-page-token-input" class="form-input" placeholder="EAAB..." value="${escapeHtml(this.techAccountConfig.pageToken || '')}">
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Sandboxed token for posting exclusively to @technews_daily_ai.</div>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Tech Instagram Business User ID</label>
-              <input type="text" id="tech-user-id-input" class="form-input" placeholder="17841..." value="${escapeHtml(this.techAccountConfig.igUserId || '')}">
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Attribution Format Template</label>
-              <textarea class="form-input" id="tech-attr-input" style="font-size: 0.8rem; min-height: 75px;">${escapeHtml(this.techAccountConfig.attributionTemplate)}</textarea>
-            </div>
-
-            <div style="background: var(--bg-base); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1rem;">
-              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.84rem; font-weight: 700;">
-                <input 
-                  type="checkbox" 
-                  id="tech-autopilot-toggle" 
-                  ${this.techAccountConfig.autopilotEnabled ? 'checked' : ''} 
-                  onchange="instagramBotV2View.toggleTechAutopilot(this.checked)"
-                  style="width: 17px; height: 17px; accent-color: #7C3AED;"
-                >
-                <span>Instant Auto-Publish #1 Ranked Tech Reel</span>
-              </label>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.7rem;">
-                When active, the top-ranked #1 winner from each 3-hour batch publishes directly.
-              </div>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Max Reels Per Day (Throttling)</label>
-              <input type="number" id="tech-quota-input" class="form-input" min="1" max="5" value="${this.techAccountConfig.dailyQuota}">
-            </div>
-
-            <button class="btn btn-secondary w-full" onclick="instagramBotV2View.saveTechSettings()" style="font-weight: 800; background: rgba(124, 58, 237, 0.1); color: #7C3AED; border-color: rgba(124, 58, 237, 0.3);">
-              💾 Save Tech News Settings
-            </button>
-          </div>
-
-          <!-- Card 2: GTA 6 Updates 007 -->
-          <div class="card" style="padding: 1.5rem; background: var(--bg-card); border-radius: 14px; border: 2px solid ${this.activeAccount === 'gta6' ? '#F59E0B' : 'var(--border-color)'}; box-shadow: var(--shadow-card);">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem;">
-              <div style="display: flex; align-items: center; gap: 0.75rem;">
-                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(245, 158, 11, 0.12); color: #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
-                  🎮
-                </div>
-                <div>
-                  <h3 style="font-size: 1.1rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                    GTA 6 Updates 007
-                  </h3>
-                  <div style="font-size: 0.76rem; color: var(--text-muted); font-family: monospace;">
-                    ${escapeHtml(this.gta6AccountConfig.handle)}
-                  </div>
-                </div>
-              </div>
-              <span class="badge" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B; font-weight: 800; font-size: 0.72rem;">
-                GAMING WORKSPACE
-              </span>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Destination Instagram Handle</label>
-              <input type="text" id="gta6-handle-input" class="form-input" value="${escapeHtml(this.gta6AccountConfig.handle)}">
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">GTA 6 Meta Page Access Token (graph.facebook.com)</label>
-              <input type="password" id="gta6-page-token-input" class="form-input" placeholder="EAAB..." value="${escapeHtml(this.gta6AccountConfig.pageToken || '')}">
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">Sandboxed token for posting to @gta6_updates_007.</div>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">GTA 6 Instagram Business User ID</label>
-              <input type="text" id="gta6-user-id-input" class="form-input" placeholder="17841428668115319" value="${escapeHtml(this.gta6AccountConfig.igUserId || '17841428668115319')}">
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Attribution Format Template</label>
-              <textarea class="form-input" id="gta6-attr-input" style="font-size: 0.8rem; min-height: 75px;">${escapeHtml(this.gta6AccountConfig.attributionTemplate)}</textarea>
-            </div>
-
-            <div style="background: var(--bg-base); padding: 0.85rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1rem;">
-              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.84rem; font-weight: 700;">
-                <input 
-                  type="checkbox" 
-                  id="gta6-autopilot-toggle" 
-                  ${this.gta6AccountConfig.autopilotEnabled ? 'checked' : ''} 
-                  onchange="instagramBotV2View.toggleGta6Autopilot(this.checked)"
-                  style="width: 17px; height: 17px; accent-color: #F59E0B;"
-                >
-                <span>Instant Auto-Publish #1 Ranked GTA 6 Reel</span>
-              </label>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.7rem;">
-                When active, the top-ranked GTA 6 leak or update publishes directly.
-              </div>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold text-xs">Max Reels Per Day (Throttling)</label>
-              <input type="number" id="gta6-quota-input" class="form-input" min="1" max="5" value="${this.gta6AccountConfig.dailyQuota}">
-            </div>
-
-            <button class="btn btn-secondary w-full" onclick="instagramBotV2View.saveGta6Settings()" style="font-weight: 800; background: rgba(245, 158, 11, 0.1); color: #F59E0B; border-color: rgba(245, 158, 11, 0.3);">
-              💾 Save GTA 6 Settings
-            </button>
-          </div>
-
-        </div>
-
-        <!-- Dynamic Jitter & Human Pacing Controls (PRD Hardening Pillar 1 & 2) -->
-        <div class="card" style="padding: 1.5rem; background: var(--bg-card); border-radius: 14px; border: 1px solid var(--border-color);">
-          <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem;">
-            <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10B981; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-              ⏱️
-            </div>
-            <div>
-              <h3 style="font-size: 1.05rem; font-weight: 800; margin: 0; color: var(--text-primary);">
-                Dynamic Gaussian Jitter Pacing & Anti-Ban Architecture
-              </h3>
-              <div style="font-size: 0.76rem; color: var(--text-muted);">
-                System-level defenses active across both workspaces
-              </div>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
-            <div style="background: var(--bg-base); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Surveillance Cadence</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #7C3AED; margin-top: 0.25rem;">3 Hours ± 15–35m</div>
-              <div style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Gaussian randomized offset prevents periodic footprint tracking.</div>
-            </div>
-
-            <div style="background: var(--bg-base); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Inter-Profile Delay</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #10B981; margin-top: 0.25rem;">8 – 22 Seconds</div>
-              <div style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Staggers surveillance requests serially to mimic natural browsing.</div>
-            </div>
-
-            <div style="background: var(--bg-base); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Night Mode Cooldown</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #F59E0B; margin-top: 0.25rem;">1 AM – 6:30 AM</div>
-              <div style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Automatically stretches scan windows to 5+ hours during low-activity night hours.</div>
-            </div>
-
-            <div style="background: var(--bg-base); padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color);">
-              <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Workspace Isolation</div>
-              <div style="font-size: 1.15rem; font-weight: 800; color: #2563EB; margin-top: 0.25rem;">STRICT / SANDBOXED</div>
-              <div style="font-size: 0.73rem; color: var(--text-secondary); margin-top: 0.25rem;">Tech News channels and GTA 6 channels operate in completely separate DB records.</div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    `;
   },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACTIONS & LOGIC (WORKSPACE AWARE)
   // ══════════════════════════════════════════════════════════════════════════
   async runThreeHourRankingPipeline() {
-    const acc = this.accounts[this.activeAccount];
-    app.showToast(`⚡ Running 3-Hour Candidate Reel Ranking Cycle for [${acc.name}]...`, 'info');
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
+    app.showToast(`⚡ Running Candidate Reel Ranking Cycle for [${acc.name}]...`, 'info');
     try {
       await fetch('/api/instagram/autonomous/poll-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destination: this.activeAccount })
+        body: JSON.stringify({ destination: this.activeAccount, quick: true })
       });
       app.showToast(`Evaluating newly harvested ${acc.badge} reels with Gemini Vibe Guardian...`, 'info');
       
@@ -1647,7 +1484,7 @@ const instagramBotV2View = {
   },
 
   async publishCandidateNow(shortcode) {
-    const acc = this.accounts[this.activeAccount];
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
     app.showToast(`🚀 Publishing candidate #${shortcode} to ${acc.handle}...`, 'info');
     try {
       const res = await fetch('/api/instagram/mobile-dm/publish', {
@@ -1727,8 +1564,8 @@ const instagramBotV2View = {
   async addNewChannel() {
     const input = document.getElementById('new-channel-input')?.value;
     const nicheSelect = document.getElementById('new-channel-niche');
-    const niche = nicheSelect ? nicheSelect.value : (this.accounts[this.activeAccount].defaultNiche || 'tech');
-    const acc = this.accounts[this.activeAccount];
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
+    const niche = nicheSelect ? nicheSelect.value : (acc.defaultNiche || 'general');
 
     if (!input || !input.trim()) {
       app.showToast('Please enter an Instagram username or URL', 'warning');
@@ -1761,7 +1598,7 @@ const instagramBotV2View = {
 
   async bulkAddChannels() {
     const input = document.getElementById('bulk-channels-input')?.value;
-    const acc = this.accounts[this.activeAccount];
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
 
     if (!input || !input.trim()) {
       app.showToast(`Please enter target profiles to add to ${acc.name}`, 'warning');
@@ -1795,7 +1632,7 @@ const instagramBotV2View = {
   },
 
   async publishTopTwoNow() {
-    const acc = this.accounts[this.activeAccount];
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
     app.showToast(`Evaluating candidates and publishing Rank #1 & #2 for [${acc.name}] via Meta Graph API...`, 'info');
     try {
       const res = await fetch('/api/instagram/stealth/publish-top-two', {
@@ -1855,13 +1692,13 @@ const instagramBotV2View = {
   },
 
   async pollAllSourcesNow() {
-    const acc = this.accounts[this.activeAccount];
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
     app.showToast(`📡 Scanning all monitored profiles for [${acc.name}]...`, 'info');
     try {
       await fetch('/api/instagram/autonomous/poll-now', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ destination: this.activeAccount })
+        body: JSON.stringify({ destination: this.activeAccount, quick: true })
       });
       app.showToast(`Scan initiated for ${acc.name}. Refreshing candidates...`, 'success');
       setTimeout(async () => {
@@ -1873,110 +1710,95 @@ const instagramBotV2View = {
     }
   },
 
-  async toggleTechAutopilot(enabled) {
-    this.techAccountConfig.autopilotEnabled = enabled;
+  async saveActivePageSettings() {
+    const acc = this.accounts[this.activeAccount] || this.accounts.tech;
+    const name = document.getElementById('page-name-input')?.value?.trim() || acc.name;
+    const handle = document.getElementById('page-handle-input')?.value?.trim() || acc.handle;
+    const pageToken = document.getElementById('page-token-input')?.value ?? acc.pageToken;
+    const igUserId = document.getElementById('page-user-id-input')?.value ?? acc.igUserId;
+    const attr = document.getElementById('page-attr-input')?.value ?? acc.attributionTemplate;
+    const quota = parseInt(document.getElementById('page-quota-input')?.value || acc.dailyQuota, 10);
+    const niche = document.getElementById('page-niche-input')?.value?.trim() || acc.defaultNiche;
+    const autopilot = document.getElementById('page-autopilot-toggle')?.checked ? 1 : 0;
+
+    acc.name = name;
+    acc.handle = handle;
+    acc.pageToken = pageToken;
+    acc.igUserId = igUserId;
+    acc.attributionTemplate = attr;
+    acc.dailyQuota = quota;
+    acc.defaultNiche = niche;
+    acc.autopilotEnabled = (autopilot === 1);
+
     try {
+      // 1. Update in connected_pages table via PUT if dbId exists
+      if (acc.dbId) {
+        await fetch(`/api/instagram/pages/${acc.dbId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            handle,
+            niche,
+            meta_page_token: pageToken,
+            meta_ig_user_id: igUserId,
+            attribution_template: attr,
+            daily_quota: quota,
+            autopilot_enabled: autopilot
+          })
+        });
+      }
+
+      // 2. Sync to settings table for backwards-compatibility
+      const settingsPayload = {};
+      if (acc.id === 'tech') {
+        settingsPayload.tech_instagram_handle = handle;
+        settingsPayload.tech_meta_page_token = pageToken;
+        settingsPayload.tech_meta_ig_user_id = igUserId;
+        settingsPayload.tech_autopilot_enabled = String(autopilot);
+      } else if (acc.id === 'gta6') {
+        settingsPayload.instagram_handle = handle;
+        settingsPayload.meta_page_token = pageToken;
+        settingsPayload.meta_ig_user_id = igUserId;
+        settingsPayload.instagram_autopilot_enabled = String(autopilot);
+      } else {
+        settingsPayload[`${acc.id}_instagram_handle`] = handle;
+        settingsPayload[`${acc.id}_meta_page_token`] = pageToken;
+        settingsPayload[`${acc.id}_meta_ig_user_id`] = igUserId;
+        settingsPayload[`${acc.id}_autopilot_enabled`] = String(autopilot);
+      }
+
       await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: {
-            tech_autopilot_enabled: enabled ? '1' : '0'
-          }
-        })
+        body: JSON.stringify({ settings: settingsPayload })
       });
-      app.showToast(`Tech Sentinel Autopilot ${enabled ? 'ENABLED' : 'DISABLED'}`, 'success');
+
+      app.showToast(`✓ Settings for ${name} saved successfully!`, 'success');
+      await this.loadData();
+      this.renderDashboard();
     } catch (e) {
-      app.showToast('Autopilot setting updated locally', 'info');
+      app.showToast(`Settings saved locally: ${e.message}`, 'info');
     }
+  },
+
+  // Legacy wrappers for backward compatibility
+  async toggleTechAutopilot(enabled) {
+    if (this.accounts.tech) this.accounts.tech.autopilotEnabled = enabled;
+    await this.saveActivePageSettings();
   },
 
   async toggleGta6Autopilot(enabled) {
-    this.gta6AccountConfig.autopilotEnabled = enabled;
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: {
-            instagram_autopilot_enabled: enabled ? '1' : '0'
-          }
-        })
-      });
-      app.showToast(`GTA 6 Sentinel Autopilot ${enabled ? 'ENABLED' : 'DISABLED'}`, 'success');
-    } catch (e) {
-      app.showToast('Autopilot setting updated locally', 'info');
-    }
+    if (this.accounts.gta6) this.accounts.gta6.autopilotEnabled = enabled;
+    await this.saveActivePageSettings();
   },
 
   async saveTechSettings() {
-    const handle = document.getElementById('tech-handle-input')?.value;
-    const pageToken = document.getElementById('tech-page-token-input')?.value;
-    const igUserId = document.getElementById('tech-user-id-input')?.value;
-    const attr = document.getElementById('tech-attr-input')?.value;
-    const quota = document.getElementById('tech-quota-input')?.value;
-
-    if (handle) {
-      this.techAccountConfig.handle = handle;
-      this.accounts.tech.handle = handle;
-    }
-    if (pageToken !== undefined) this.techAccountConfig.pageToken = pageToken;
-    if (igUserId !== undefined) this.techAccountConfig.igUserId = igUserId;
-    if (attr) this.techAccountConfig.attributionTemplate = attr;
-    if (quota) this.techAccountConfig.dailyQuota = parseInt(quota, 10);
-
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: {
-            tech_instagram_handle: this.techAccountConfig.handle,
-            tech_meta_page_token: this.techAccountConfig.pageToken,
-            tech_meta_ig_user_id: this.techAccountConfig.igUserId
-          }
-        })
-      });
-      app.showToast('Tech account credentials & settings saved successfully!', 'success');
-      this.renderDashboard();
-    } catch (e) {
-      app.showToast('Settings saved locally', 'info');
-    }
+    await this.saveActivePageSettings();
   },
 
   async saveGta6Settings() {
-    const handle = document.getElementById('gta6-handle-input')?.value;
-    const pageToken = document.getElementById('gta6-page-token-input')?.value;
-    const igUserId = document.getElementById('gta6-user-id-input')?.value;
-    const attr = document.getElementById('gta6-attr-input')?.value;
-    const quota = document.getElementById('gta6-quota-input')?.value;
-
-    if (handle) {
-      this.gta6AccountConfig.handle = handle;
-      this.accounts.gta6.handle = handle;
-    }
-    if (pageToken !== undefined) this.gta6AccountConfig.pageToken = pageToken;
-    if (igUserId !== undefined) this.gta6AccountConfig.igUserId = igUserId;
-    if (attr) this.gta6AccountConfig.attributionTemplate = attr;
-    if (quota) this.gta6AccountConfig.dailyQuota = parseInt(quota, 10);
-
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: {
-            instagram_handle: this.gta6AccountConfig.handle,
-            meta_page_token: this.gta6AccountConfig.pageToken,
-            meta_ig_user_id: this.gta6AccountConfig.igUserId
-          }
-        })
-      });
-      app.showToast('GTA 6 account credentials & settings saved successfully!', 'success');
-      this.renderDashboard();
-    } catch (e) {
-      app.showToast('Settings saved locally', 'info');
-    }
+    await this.saveActivePageSettings();
   },
 
   copyTextToClipboard(text, successMsg = 'Copied to clipboard!') {

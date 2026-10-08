@@ -253,15 +253,28 @@ async function processQueuedIngestionWorkerPool() {
 
     console.log(`\n[Async Ingestion Pool] ✓ Worker batch complete: ${processedCount} reels processed (${errors.length} errors).\n`);
 
-    // ── Autopilot check: Rank & publish Top 2 (#1 and #2) ──
-    const isAutopilot = getSetting('tech_autopilot_enabled', '0') === '1' || getSetting('instagram_autopilot_enabled', '0') === '1';
-    let autoPublishResults = null;
-    if (isAutopilot && processedCount > 0) {
-      console.log('[Stealth Sentinel] ⚡ Autopilot active! Ranking candidate reels and publishing Top 2 via Meta Graph API...');
-      try {
-        autoPublishResults = await rankAndPublishTopTwoReels({ destination: 'tech' });
-      } catch (pubErr) {
-        console.error('[Stealth Sentinel Top-2 Publish Error]:', pubErr);
+    // ── Multi-Account Autopilot check: Rank & publish Top 2 for each active workspace ──
+    const distinctDestinations = [...new Set(queuedItems.map(item => item.destination_account || 'tech'))];
+    const autoPublishResults = [];
+
+    if (processedCount > 0) {
+      const { getConnectedPageBySlug } = require('../database');
+      for (const dest of distinctDestinations) {
+        const page = getConnectedPageBySlug(dest);
+        const isAutopilot = (page && page.autopilot_enabled === 1) ||
+                            getSetting(`${dest}_autopilot_enabled`, '0') === '1' ||
+                            (dest === 'gta6' && getSetting('instagram_autopilot_enabled', '0') === '1') ||
+                            (dest === 'tech' && getSetting('tech_autopilot_enabled', '0') === '1');
+
+        if (isAutopilot) {
+          console.log(`[Stealth Sentinel] ⚡ Autopilot active for [${dest.toUpperCase()}]! Ranking candidate reels and publishing Top 2 via Meta Graph API...`);
+          try {
+            const pubRes = await rankAndPublishTopTwoReels({ destination: dest });
+            autoPublishResults.push({ destination: dest, ...pubRes });
+          } catch (pubErr) {
+            console.error(`[Stealth Sentinel Top-2 Publish Error for ${dest}]:`, pubErr);
+          }
+        }
       }
     }
 

@@ -1,6 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
-const { getBrandAssets } = require('../database');
+const { getBrandAssets, getSetting, getConnectedPageBySlug } = require('../database');
 
 /**
  * OmniResearch v4.0 — Brand Cleanser & Visual Tag Replacer Service
@@ -39,9 +39,15 @@ function runBrandCleanserScript(args) {
 /**
  * Cleanse caption text: remove competitor tags and inject our brand handle
  */
-async function cleanseCaption(rawCaption, competitorHandles = []) {
+async function cleanseCaption(rawCaption, competitorHandles = [], destination = 'gta6') {
+  const targetPage = getConnectedPageBySlug(destination);
   const brand = getBrandAssets();
-  const ourHandle = brand.brand_handle || '@harshparmar007__';
+  let ourHandle = (targetPage && targetPage.handle) || '';
+  if (!ourHandle) {
+    ourHandle = destination === 'tech' 
+      ? getSetting('tech_instagram_handle', '@technews_daily_ai') 
+      : (brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007'));
+  }
 
   const res = await runBrandCleanserScript([
     'caption',
@@ -60,9 +66,15 @@ async function cleanseCaption(rawCaption, competitorHandles = []) {
 /**
  * Cleanse and brand images or video
  */
-async function cleanseAndBrandMedia(mediaPaths, contentType = 'carousel', competitorHandles = []) {
+async function cleanseAndBrandMedia(mediaPaths, contentType = 'carousel', competitorHandles = [], destination = 'gta6') {
+  const targetPage = getConnectedPageBySlug(destination);
   const brand = getBrandAssets();
-  const ourHandle = brand.brand_handle || '@harshparmar007__';
+  let ourHandle = (targetPage && targetPage.handle) || '';
+  if (!ourHandle) {
+    ourHandle = destination === 'tech' 
+      ? getSetting('tech_instagram_handle', '@technews_daily_ai') 
+      : (brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007'));
+  }
   const logoRelative = brand.brand_logo_url || '/generated/assets/brand_logo.svg';
   
   // Resolve absolute logo path if available

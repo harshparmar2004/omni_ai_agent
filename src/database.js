@@ -318,6 +318,7 @@ function initSchema(db) {
 
   try {
     db.exec("UPDATE tracked_instagram_channels SET destination_account = 'gta6', niche_tag = 'gaming' WHERE username = 'gtaleaks' OR username LIKE '%gta%'");
+    db.exec("UPDATE tracked_instagram_channels SET is_active = 1 WHERE is_active = 0 OR is_active IS NULL");
   } catch (e) {}
 }
 

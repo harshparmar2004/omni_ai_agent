@@ -1,12 +1,12 @@
 const { routeRequest, getAvailableProviders } = require('./llmRouter');
-const { getSetting, getBrandAssets } = require('../database');
+const { getSetting, getBrandAssets, getConnectedPageBySlug } = require('../database');
 const { detectPostIntent } = require('./instagramDmHarvesterService');
 
 /**
- * OmniResearch v5.0 — Universal Instagram Ranking & Creative Transformation Service
+ * OmniResearch v5.0 — Multi-Page Instagram Ranking & Creative Transformation Service
  * Dynamically evaluates candidate posts across ANY niche (gaming, tech, fitness, comedy,
- * business, lifestyle, education, etc.), extracts authentic topics, generates tailored
- * viral captions and niche hashtags, and branches into Lead Magnet vs Direct Viral Repost.
+ * business, lifestyle, etc.), extracts authentic topics, generates tailored
+ * viral captions, niche hashtags, and tone matched to the target destination page.
  */
 
 async function evaluateAndTransformPost(postData) {
@@ -16,13 +16,39 @@ async function evaluateAndTransformPost(postData) {
     author = '',
     content_type = 'reel',
     slides_count = 1,
-    min_score_threshold = 70
+    min_score_threshold = 70,
+    destination = 'gta6'
   } = postData;
 
+  const targetPage = getConnectedPageBySlug(destination);
   const brand = getBrandAssets();
-  const brandHandle = brand.brand_handle || getSetting('instagram_handle', '@omni_creator');
-  const brandName = brand.brand_name || 'Creator Hub';
-  const customNiche = getSetting('niche_domain', 'Universal Viral Content (Tech, Gaming, Fitness, Business, Lifestyle & Entertainment)');
+
+  // Dynamically resolve brand identity from connected_pages registry or fallback
+  let brandHandle = (targetPage && targetPage.handle) || '';
+  if (!brandHandle) {
+    brandHandle = destination === 'tech'
+      ? getSetting('tech_instagram_handle', '@technews_daily_ai')
+      : (brand.brand_handle || getSetting('instagram_handle', '@gta6_updates_007'));
+  }
+
+  let brandName = (targetPage && targetPage.name) || '';
+  if (!brandName) {
+    brandName = destination === 'tech' ? 'Tech News Daily AI' : 'GTA 6 Updates 007';
+  }
+
+  // Derive specialized niche domain for the target page
+  let targetNiche = targetPage?.niche || '';
+  if (!targetNiche) {
+    targetNiche = destination === 'tech'
+      ? 'Tech News, Artificial Intelligence, Developer Tools & Software Engineering'
+      : 'GTA 6 Leaks, Rockstar Games, Vice City Rumors & Gaming Highlights';
+  }
+
+  const sampleHashtags = destination === 'tech'
+    ? '#TechNews #AI #ArtificialIntelligence #SoftwareEngineering #TechTrends #Coding #MachineLearning #Developer'
+    : (destination === 'gta6'
+      ? '#GTA6 #RockstarGames #GTA6Leaks #GTAViceCity #GamingCommunity #GamingNews #Gamer #GTA6Trailer'
+      : `#${(targetNiche.split(/[\s,]+/)[0] || 'Viral').replace(/[^A-Za-z0-9]/g, '')} #Trending #ExplorePage #InstaDaily`);
 
   // Detect whether post genuinely has a DM trigger keyword or is a direct repost
   const detectedIntentResult = detectPostIntent(caption, hook);
@@ -36,7 +62,8 @@ async function evaluateAndTransformPost(postData) {
   const modelName = activeProvider.models[0];
 
   const systemPrompt = `You are the Lead Content Strategist & Growth Architect for "${brandName}" (${brandHandle}).
-Our mission: Transform viral reels, carousels, and video clips across ANY niche (tech, gaming, fitness, lifestyle, business, entertainment, AI, comedy, educational, etc.) into high-performing, high-engagement Instagram content.
+Channel Niche: ${targetNiche}.
+Our mission: Transform viral reels, carousels, and video clips into high-performing, high-engagement Instagram content tailored specifically for our ${brandName} audience.
 
 Your task is to analyze an incoming Instagram post from creator @${author}, extract its core topic and niche, evaluate its viral potential, and generate an ultra-high-converting repurposed caption.
 
@@ -51,25 +78,26 @@ Return ONLY a valid JSON object with the following schema:
   "post_intent": "<'lead_magnet' or 'direct_repost'>",
   "reasoning": "<1-2 sentences on viral fit and appeal>",
   "detected_topic": "<2-4 words topic matching the actual content, e.g. Core Workout Routine, Python AI Agent, Gameplay Highlights, Business Strategy>",
-  "detected_niche": "<1-2 words niche, e.g. Fitness, Tech, Gaming, Business, Entertainment>",
+  "detected_niche": "<1-2 words niche matching ${targetNiche}>",
   "detected_trigger_keyword": "<1 uppercase keyword IF lead_magnet, or empty string \"\" IF direct_repost>",
   "repurposed_hook": "<compelling, scroll-stopping 1-sentence hook under 85 characters>",
-  "repurposed_caption": "<complete ready-to-post Instagram caption formatted with bullet points, high energy, line breaks, and 6-10 targeted niche hashtags matching the detected topic (e.g., if fitness: #FitnessMotivation #GymLife #WorkoutTips; if tech: #TechNews #AI #Coding; if gaming: #GamingCommunity #GameClips #Gamers). IF lead_magnet: end with 'Comment \"<keyword>\" below to get the resources sent to your DMs!'. IF direct_repost: end with an engaging community question/prompt WITHOUT any DM promise>"
+  "repurposed_caption": "<complete ready-to-post Instagram caption formatted with bullet points, high energy, line breaks, and 6-10 targeted niche hashtags matching ${brandName} and ${targetNiche} (e.g.: ${sampleHashtags}). IF lead_magnet: end with 'Comment \"<keyword>\" below to get the resources sent to your DMs!'. IF direct_repost: end with an engaging community discussion question/prompt WITHOUT any DM promise>"
 }`;
 
   const userPrompt = `Analyze this candidate post:
 - Creator: @${author}
+- Target Account: ${brandName} (${brandHandle})
+- Target Niche: ${targetNiche}
 - Content Type: ${content_type} (${slides_count} slide(s))
 - Original Hook: ${hook}
 - Detected Initial Trigger: ${rawKeyword ? `"${rawKeyword}" (Lead Magnet)` : 'None (Direct Viral Repost)'}
 - Direct Post Only Mode: ${postData.directPostOnly ? 'YES (No DM automation, No PDF)' : 'NO'}
-- Target Channel Domain: ${customNiche}
 - Original Caption:
 """
 ${caption.substring(0, 1500)}
 """
 
-Evaluate viral engagement potential and match the caption specifically to the true subject of the video.
+Evaluate viral engagement potential and write a caption customized specifically for ${brandName} (${brandHandle}) in the ${targetNiche} niche.
 ${(postData.forceApprove || postData.directPostOnly || postData.isDirectSubmission) ? 'NOTE: This was directly shared by the account owner to post. Set decision to "APPROVED" and score >= 95.' : `If score >= ${min_score_threshold}, set decision to "APPROVED", else "REJECTED".`}
 CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, set post_intent to "direct_repost" and detected_trigger_keyword to "". Do NOT invent a fake DM keyword or PDF promise. Instead, write an engaging discussion/save CTA.`;
 
@@ -106,23 +134,23 @@ CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, s
       fit_score: isDirectSubmission ? Math.max(95, fitScore) : fitScore,
       decision,
       post_intent: finalIntent,
-      reasoning: parsed.reasoning || `Repurposed for viral engagement.`,
+      reasoning: parsed.reasoning || `Repurposed for viral engagement on ${brandName}.`,
       detected_topic: parsed.detected_topic || 'Viral Content',
-      detected_niche: parsed.detected_niche || 'Trending',
+      detected_niche: parsed.detected_niche || targetNiche,
       detected_trigger_keyword: finalKeyword,
       repurposed_hook: parsed.repurposed_hook || hook || 'Must Watch Clip',
       repurposed_caption: parsed.repurposed_caption || caption
     };
   } catch (err) {
     console.warn(`[Ranking Service] LLM call failed (${err.message}). Using intelligent universal heuristic fallback.`);
-    return fallbackEvaluation(postData, min_score_threshold, brandHandle, detectedIntent, rawKeyword);
+    return fallbackEvaluation(postData, min_score_threshold, brandHandle, detectedIntent, rawKeyword, destination, brandName, targetNiche);
   }
 }
 
 /**
  * Robust universal heuristic fallback in case LLM is temporarily unreachable
  */
-function fallbackEvaluation(postData, minScoreThreshold, brandHandle, detectedIntent = 'direct_repost', rawKeyword = '') {
+function fallbackEvaluation(postData, minScoreThreshold, brandHandle, detectedIntent = 'direct_repost', rawKeyword = '', destination = 'gta6', brandName = '', targetNiche = '') {
   const isDirect = Boolean(postData.forceApprove || postData.directPostOnly || postData.isDirectSubmission);
   const score = isDirect ? 95 : 85;
   const isLeadMagnet = !postData.directPostOnly && (detectedIntent === 'lead_magnet' || Boolean(rawKeyword));
@@ -131,17 +159,22 @@ function fallbackEvaluation(postData, minScoreThreshold, brandHandle, detectedIn
   const originalCleanCaption = (postData.caption || '').replace(/@\w+/g, '').trim();
   const cleanHook = (postData.hook || originalCleanCaption.slice(0, 75) || 'Must See Viral Clip').slice(0, 85);
 
-  // Extract existing hashtags or dynamically synthesize general viral hashtags
-  const existingHashtags = (postData.caption || '').match(/#[A-Za-z0-9_]+/g) || [];
   let hashtagBlock = '';
-  if (existingHashtags.length >= 4) {
-    hashtagBlock = existingHashtags.slice(0, 10).join(' ');
+  let nicheFollowCta = `Follow ${brandHandle} for daily updates! ✨`;
+
+  if (destination === 'tech') {
+    hashtagBlock = '#TechNews #AI #ArtificialIntelligence #SoftwareEngineering #TechTrends #Coding #MachineLearning';
+    nicheFollowCta = `Follow ${brandHandle} for daily high-signal tech & AI breakthroughs! 💻`;
+  } else if (destination === 'gta6') {
+    hashtagBlock = '#GTA6 #RockstarGames #GTA6Leaks #GTAViceCity #GamingCommunity #GamingNews #Gamer';
+    nicheFollowCta = `Follow ${brandHandle} for daily verified GTA 6 leaks & official news! 🎮`;
   } else {
-    // Dynamically derive keywords from hook/caption
+    const existingHashtags = (postData.caption || '').match(/#[A-Za-z0-9_]+/g) || [];
     const words = cleanHook.replace(/[^A-Za-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3);
     const dynamicTags = words.slice(0, 4).map(w => `#${w.charAt(0).toUpperCase() + w.slice(1)}`);
-    const defaultTags = ['#Trending', '#ViralReels', '#ExplorePage', '#DailyInspo', '#InstaGood'];
+    const defaultTags = ['#Trending', '#ViralReels', '#ExplorePage', '#DailyInspo'];
     hashtagBlock = Array.from(new Set([...existingHashtags, ...dynamicTags, ...defaultTags])).slice(0, 8).join(' ');
+    nicheFollowCta = `Follow ${brandHandle} for more daily content! ✨`;
   }
 
   const captionBody = originalCleanCaption || cleanHook;
@@ -155,12 +188,12 @@ function fallbackEvaluation(postData, minScoreThreshold, brandHandle, detectedIn
     fit_score: score,
     decision: 'APPROVED',
     post_intent: isLeadMagnet ? 'lead_magnet' : 'direct_repost',
-    reasoning: 'Universal submission approved for publishing.',
+    reasoning: `Submission approved for ${brandName || destination}.`,
     detected_topic: cleanHook.slice(0, 30),
-    detected_niche: 'Viral Content',
+    detected_niche: targetNiche || (destination === 'tech' ? 'AI & Tech' : 'Gaming'),
     detected_trigger_keyword: keyword,
     repurposed_hook: cleanHook,
-    repurposed_caption: `${captionBody}${cta}\n\n${hashtagBlock}\n\nFollow ${brandHandle} for more daily content! ✨`
+    repurposed_caption: `${captionBody}${cta}\n\n${hashtagBlock}\n\n${nicheFollowCta}`
   };
 }
 

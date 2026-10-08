@@ -46,19 +46,17 @@ function resolvePublishCredentials(destination = 'gta6') {
     console.warn(`[IG Publisher] Warning looking up connected page for ${destination}: ${err.message}`);
   }
 
-  // Legacy fallback for 'tech'
-  if (destination === 'tech') {
-    const techToken = getSetting('tech_meta_page_token');
-    const techUserId = getSetting('tech_meta_ig_user_id');
-    if (techToken && techToken.length > 20 && techUserId) {
-      return {
-        pageToken: techToken,
-        igUserId: techUserId,
-        handle: getSetting('tech_instagram_handle', '@technews_daily_ai'),
-        destination: 'tech',
-        workflowType: 'lead_magnet'
-      };
-    }
+  // Dynamic setting fallback for any custom destination
+  const customToken = getSetting(`${destination}_meta_page_token`);
+  const customUserId = getSetting(`${destination}_meta_ig_user_id`);
+  if (customToken && customToken.length > 20 && customUserId) {
+    return {
+      pageToken: customToken,
+      igUserId: customUserId,
+      handle: getSetting(`${destination}_instagram_handle`, `@${destination}`),
+      destination,
+      workflowType: destination === 'tech' ? 'lead_magnet' : 'direct_repost'
+    };
   }
 
   // Default GTA 6 fallback (strictly preserves existing flow 100%)

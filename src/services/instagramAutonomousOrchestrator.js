@@ -112,8 +112,11 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   }
 
   // ── Step 2 & 3: Concurrently Run LLM Ranking & Media Cleansing ─────────
-  console.log(`[Autonomous Agent] ⚡ Concurrently evaluating post with LLM ranker & cleansing media assets...`);
-  const brand = getBrandAssets();
+  const channel = channelId ? getTrackedChannelById(channelId) : null;
+  const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
+  const targetPage = getConnectedPageBySlug(destination);
+
+  console.log(`[Autonomous Agent] ⚡ Concurrently evaluating post with LLM ranker & cleansing media assets for [${destination.toUpperCase()}]...`);
   const competitorHandles = [author, channelUsername].filter(Boolean);
 
   const [rankResult, mediaCleanse] = await Promise.all([
@@ -124,10 +127,11 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       content_type: contentType,
       slides_count: mediaPaths.length,
       min_score_threshold: 70,
+      destination,
       directPostOnly: Boolean(options.directPostOnly),
       forceApprove: Boolean(options.forceApprove)
     }),
-    cleanseAndBrandMedia(mediaPaths, contentType, competitorHandles)
+    cleanseAndBrandMedia(mediaPaths, contentType, competitorHandles, destination)
   ]);
 
   log = updateAutonomousLog(log.id, {
@@ -138,6 +142,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     detected_trigger_keyword: rankResult.detected_trigger_keyword,
     repurposed_hook: rankResult.repurposed_hook,
     repurposed_caption: rankResult.repurposed_caption,
+    destination_account: destination,
     post_intent: rankResult.post_intent || (rankResult.detected_trigger_keyword ? 'lead_magnet' : 'direct_repost'),
     status: 'ranked'
   });
@@ -152,10 +157,10 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     };
   }
 
-  console.log(`[Autonomous Agent] ⭐ Post APPROVED (Score: ${rankResult.fit_score}/100) — Mode: [${rankResult.post_intent?.toUpperCase() || 'DIRECT_REPOST'}]`);
+  console.log(`[Autonomous Agent] ⭐ Post APPROVED (Score: ${rankResult.fit_score}/100) for [${destination.toUpperCase()}] — Mode: [${rankResult.post_intent?.toUpperCase() || 'DIRECT_REPOST'}]`);
 
-  // Cleanse Caption (instant string regex replacement)
-  const captionCleanse = await cleanseCaption(rankResult.repurposed_caption, competitorHandles);
+  // Cleanse Caption (instant string regex replacement with destination handle)
+  const captionCleanse = await cleanseCaption(rankResult.repurposed_caption, competitorHandles, destination);
 
   log = updateAutonomousLog(log.id, {
     repurposed_caption: captionCleanse.cleanedCaption,
@@ -165,9 +170,6 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   });
 
   // ── Step 4: Autonomous Lead Magnet vs Direct Repost Branching ────────────
-  const channel = channelId ? getTrackedChannelById(channelId) : null;
-  const destination = options.destination || (channel ? (channel.destination_account || 'tech') : 'gta6');
-  const targetPage = getConnectedPageBySlug(destination);
 
   let isDirectRepost;
   if (options.directPostOnly) {
