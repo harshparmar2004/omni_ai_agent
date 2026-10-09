@@ -260,20 +260,43 @@ async function harvestLeadMagnet(postData) {
     harvestMethod = 'caption_direct';
   }
 
-  // 3. TIER 1: Inbound ManyChat Hunter Dispatch
+  // 3. TIER 1: Dedicated Scout Account Comment & Inbound DM Intercept
   if (!deliverableUrl && source_post_url && triggerKeyword) {
-    const commentRes = await postCommentTrigger(source_post_url, triggerKeyword);
-    commentPosted = commentRes.success;
+    try {
+      const { executeScoutHarvestCycle } = require('./instagramScoutWorker');
+      const scoutHarvest = await executeScoutHarvestCycle({
+        postUrl: source_post_url,
+        triggerKeyword,
+        creatorUsername: channel_username,
+        niche: postData.niche || 'all'
+      });
 
-    if (commentPosted) {
-      // Poll direct messages for ManyChat reply
-      const dmRes = await pollCreatorDmResponse(channel_username, triggerKeyword, 35000);
-      if (dmRes && dmRes.url) {
-        deliverableUrl = dmRes.url;
-        deliverableType = dmRes.type;
+      if (scoutHarvest && scoutHarvest.success && scoutHarvest.url) {
+        deliverableUrl = scoutHarvest.url;
+        deliverableType = scoutHarvest.deliverableType || detectDeliverableType(scoutHarvest.url);
+        commentPosted = true;
         dmReceived = true;
-        harvestMethod = 'manychat_dm';
-        rawDmText = dmRes.rawMessage;
+        harvestMethod = 'scout_dm';
+        rawDmText = scoutHarvest.rawMessage || '';
+      }
+    } catch (scoutErr) {
+      console.warn(`[DM Harvester] Scout cycle notice: ${scoutErr.message}`);
+    }
+
+    // Secondary Tier 1 Fallback: Local microservice (:8001) if scout didn't capture
+    if (!deliverableUrl) {
+      const commentRes = await postCommentTrigger(source_post_url, triggerKeyword);
+      commentPosted = commentRes.success;
+
+      if (commentPosted) {
+        const dmRes = await pollCreatorDmResponse(channel_username, triggerKeyword, 35000);
+        if (dmRes && dmRes.url) {
+          deliverableUrl = dmRes.url;
+          deliverableType = dmRes.type;
+          dmReceived = true;
+          harvestMethod = 'creator_dm';
+          rawDmText = dmRes.rawMessage;
+        }
       }
     }
   }

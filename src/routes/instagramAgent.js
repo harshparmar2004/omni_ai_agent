@@ -2056,4 +2056,108 @@ router.post('/bridge/arm-single', async (req, res) => {
   }
 });
 
+/**
+ * Scout / Hunter Accounts Management Routes (v5.5)
+ */
+
+// GET /api/instagram/scouts - List all configured scouts with usage counters
+router.get('/scouts', (req, res) => {
+  try {
+    const { getScoutAccounts } = require('../database');
+    const scouts = getScoutAccounts();
+    res.json({
+      success: true,
+      scouts: scouts.map(s => ({
+        id: s.id,
+        username: s.username,
+        assigned_niche: s.assigned_niche,
+        status: s.status,
+        hourly_comments_count: s.hourly_comments_count,
+        daily_comments_count: s.daily_comments_count,
+        last_comment_at: s.last_comment_at,
+        last_health_check_at: s.last_health_check_at,
+        health_status: s.health_status,
+        last_error: s.last_error,
+        notes: s.notes,
+        session_configured: Boolean(s.session_id && s.session_id.length > 5),
+        created_at: s.created_at
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/instagram/scouts - Create or update a scout account
+router.post('/scouts', (req, res) => {
+  try {
+    const { id, username, session_id, assigned_niche, notes, status } = req.body || {};
+    const { addScoutAccount, updateScoutAccount, getScoutAccountByUsername } = require('../database');
+
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username is required' });
+    }
+
+    if (id) {
+      const updated = updateScoutAccount(id, {
+        username,
+        session_id,
+        assigned_niche,
+        notes,
+        status
+      });
+      return res.json({ success: true, scout: updated });
+    }
+
+    // Check if username already exists
+    const existing = getScoutAccountByUsername(username);
+    if (existing) {
+      const updated = updateScoutAccount(existing.id, {
+        session_id: session_id || existing.session_id,
+        assigned_niche: assigned_niche || existing.assigned_niche,
+        notes: notes !== undefined ? notes : existing.notes,
+        status: status || existing.status
+      });
+      return res.json({ success: true, scout: updated });
+    }
+
+    if (!session_id) {
+      return res.status(400).json({ success: false, error: 'session_id cookie is required' });
+    }
+
+    const created = addScoutAccount({
+      username,
+      session_id,
+      assigned_niche,
+      notes,
+      status: status || 'active'
+    });
+    res.json({ success: true, scout: created });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/instagram/scouts/:id - Remove a scout account
+router.delete('/scouts/:id', (req, res) => {
+  try {
+    const { deleteScoutAccount } = require('../database');
+    deleteScoutAccount(parseInt(req.params.id, 10));
+    res.json({ success: true, message: 'Scout account deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/instagram/scouts/:id/test - Test scout session live against Instagram
+router.post('/scouts/:id/test', async (req, res) => {
+  try {
+    const { testScoutHealth } = require('../services/instagramScoutWorker');
+    const result = await testScoutHealth(parseInt(req.params.id, 10));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

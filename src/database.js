@@ -272,6 +272,25 @@ function initSchema(db) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_connected_pages_slug ON connected_pages(slug);
+
+    -- 13. Dedicated Scout / Hunter Accounts Registry (v5.5)
+    CREATE TABLE IF NOT EXISTS scout_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      session_id TEXT NOT NULL,
+      assigned_niche TEXT DEFAULT 'all',
+      status TEXT DEFAULT 'active',
+      hourly_comments_count INTEGER DEFAULT 0,
+      daily_comments_count INTEGER DEFAULT 0,
+      last_comment_at TEXT,
+      last_health_check_at TEXT,
+      health_status TEXT DEFAULT 'unknown',
+      last_error TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scout_accounts_status ON scout_accounts(status);
   `);
 
   // ─── v2.0, v3.0, v4.0 & v5.0 Schema Migration ─────────────────────────────
@@ -1338,6 +1357,121 @@ function deleteConnectedPage(id) {
   return db.prepare('DELETE FROM connected_pages WHERE id = ?').run(id);
 }
 
+// ─── Scout Accounts Registry Helpers (v5.5) ──────────────────────
+function getScoutAccounts() {
+  const db = getDb();
+  return db.prepare('SELECT * FROM scout_accounts ORDER BY id DESC').all();
+}
+
+function getScoutAccountById(id) {
+  const db = getDb();
+  return db.prepare('SELECT * FROM scout_accounts WHERE id = ?').get(id);
+}
+
+function getScoutAccountByUsername(username) {
+  if (!username) return null;
+  const clean = String(username).replace(/^@/, '').trim();
+  const db = getDb();
+  return db.prepare('SELECT * FROM scout_accounts WHERE username = ? COLLATE NOCASE').get(clean);
+}
+
+function getActiveScout(niche = 'all') {
+  const db = getDb();
+  let scout = null;
+  if (niche && niche !== 'all') {
+    scout = db.prepare(`
+      SELECT * FROM scout_accounts 
+      WHERE status = 'active' 
+        AND (assigned_niche = ? OR assigned_niche = 'all')
+        AND hourly_comments_count < 5
+        AND daily_comments_count < 20
+      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
+      LIMIT 1
+    `).get(niche);
+  }
+  if (!scout) {
+    scout = db.prepare(`
+      SELECT * FROM scout_accounts 
+      WHERE status = 'active'
+        AND hourly_comments_count < 5
+        AND daily_comments_count < 20
+      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
+      LIMIT 1
+    `).get();
+  }
+  return scout;
+}
+
+function addScoutAccount(data) {
+  const db = getDb();
+  const cleanUsername = String(data.username || '').replace(/^@/, '').trim();
+  const now = new Date().toISOString();
+  const stmt = db.prepare(`
+    INSERT INTO scout_accounts (
+      username, session_id, assigned_niche, status, hourly_comments_count, daily_comments_count,
+      last_comment_at, last_health_check_at, health_status, last_error, notes, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, 'unknown', '', ?, ?, ?)
+  `);
+  const res = stmt.run(
+    cleanUsername,
+    String(data.session_id || '').trim(),
+    data.assigned_niche || 'all',
+    data.status || 'active',
+    data.notes || '',
+    now,
+    now
+  );
+  return getScoutAccountById(res.lastInsertRowid);
+}
+
+function updateScoutAccount(id, data) {
+  const db = getDb();
+  const allowed = [
+    'username', 'session_id', 'assigned_niche', 'status', 'hourly_comments_count',
+    'daily_comments_count', 'last_comment_at', 'last_health_check_at', 'health_status',
+    'last_error', 'notes'
+  ];
+  const fields = [];
+  const values = [];
+  for (const k of allowed) {
+    if (data[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      let val = data[k];
+      if (k === 'username' && typeof val === 'string') val = val.replace(/^@/, '').trim();
+      values.push(val);
+    }
+  }
+  if (fields.length === 0) return getScoutAccountById(id);
+  fields.push('updated_at = ?');
+  values.push(new Date().toISOString());
+  values.push(id);
+  db.prepare(`UPDATE scout_accounts SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return getScoutAccountById(id);
+}
+
+function deleteScoutAccount(id) {
+  const db = getDb();
+  return db.prepare('DELETE FROM scout_accounts WHERE id = ?').run(id);
+}
+
+function incrementScoutUsage(id) {
+  const db = getDb();
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE scout_accounts 
+    SET hourly_comments_count = hourly_comments_count + 1,
+        daily_comments_count = daily_comments_count + 1,
+        last_comment_at = ?,
+        updated_at = ?
+    WHERE id = ?
+  `).run(now, now, id);
+}
+
+function resetScoutHourlyCounters() {
+  const db = getDb();
+  db.prepare(`UPDATE scout_accounts SET hourly_comments_count = 0`).run();
+}
+
 module.exports = {
   getDb,
   getSetting,
@@ -1375,5 +1509,14 @@ module.exports = {
   getConnectedPageById,
   createConnectedPage,
   updateConnectedPage,
-  deleteConnectedPage
+  deleteConnectedPage,
+  getScoutAccounts,
+  getScoutAccountById,
+  getScoutAccountByUsername,
+  getActiveScout,
+  addScoutAccount,
+  updateScoutAccount,
+  deleteScoutAccount,
+  incrementScoutUsage,
+  resetScoutHourlyCounters
 };

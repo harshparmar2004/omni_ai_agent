@@ -214,6 +214,48 @@ const settingsView = {
             </div>
           </div>
 
+          <!-- 5. Dedicated Scout / Hunter Accounts (Zero-Ban Shield) -->
+          <div class="card" style="border: 1.5px solid rgba(124, 58, 237, 0.4); background: linear-gradient(135deg, rgba(124, 58, 237, 0.04), rgba(59, 130, 246, 0.03));">
+            <div class="section-label" style="color: #8B5CF6;">Account Safety &amp; Extraction Shield</div>
+            <h3 style="margin-top: 0.2rem; margin-bottom: 0.4rem;">🛡️ Dedicated Scout Accounts (Competitor DM Harvester)</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+              Scout accounts are secondary personal Instagram accounts used to comment on competitors' reels and intercept their ManyChat DMs. Your primary brand pages (<code>@gta6_updates_007</code> and <code>@technews_daily_ai</code>) are 100% shielded and never penalized!
+            </p>
+
+            <div id="scout-accounts-list" style="margin-bottom: 1rem;">
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Loading scout accounts...</div>
+            </div>
+
+            <!-- Add Scout Form -->
+            <div style="background: var(--bg-surface); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; color: var(--text-primary);">➕ Connect New Scout Account</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
+                <div>
+                  <label class="form-label" style="font-size: 0.76rem;">Scout Username</label>
+                  <input type="text" id="new-scout-username" class="form-input" placeholder="@scout_harsh_007" style="font-size: 0.82rem;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 0.76rem;">Assigned Niche / Page</label>
+                  <select id="new-scout-niche" class="form-input" style="font-size: 0.82rem;">
+                    <option value="all">All Pages (Universal Scout)</option>
+                    <option value="gaming">GTA 6 / Gaming Only</option>
+                    <option value="tech">Tech News AI Only</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" style="margin-bottom: 0.6rem;">
+                <label class="form-label" style="display: flex; justify-content: space-between; font-size: 0.76rem;">
+                  <span>Instagram Session Cookie (<code>sessionid</code>)</span>
+                  <span style="color: var(--text-muted); font-size: 0.72rem;">DevTools ➔ Application ➔ Cookies</span>
+                </label>
+                <input type="password" id="new-scout-session" class="form-input" placeholder="Paste sessionid cookie from browser" style="font-size: 0.82rem;">
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm w-full" onclick="settingsView.addScoutAccount()" style="font-weight: 700; color: #8B5CF6; border-color: rgba(124, 58, 237, 0.4);">
+                ➕ Save &amp; Connect Scout Account
+              </button>
+            </div>
+          </div>
+
           <button class="btn btn-primary w-full" style="font-size: 1rem; font-weight: 700; padding: 0.85rem;" onclick="settingsView.saveAll()">
             💾 Save All Engine & Niche Settings
           </button>
@@ -235,7 +277,7 @@ const settingsView = {
             <div style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6;">
               <p><strong>Dual-Mode Pipeline:</strong></p>
               <p>⚡ <strong>Direct Viral Repost</strong>: Bypasses ManyChat/PDFs; crafts discussion-driven captions, brands your account, attaches trending sound, and posts directly.</p>
-              <p>🎯 <strong>DM Lead Magnet</strong>: Extracts trigger keywords, harvests creator links, generates companion guides, and arms InstaAuto.</p>
+              <p>🎯 <strong>DM Lead Magnet</strong>: Extracts trigger keywords, harvests creator links via Scout Account, and arms InstaAuto.</p>
               <hr style="border-color: var(--border-color); margin: 0.8rem 0;">
               <p><strong>Supported LLM Providers:</strong></p>
               <p>• Google Gemini (Flash / Pro)</p>
@@ -255,6 +297,7 @@ const settingsView = {
 
     this.onProviderChange(s('default_provider', 'gemini'));
     this.loadProviderStatus();
+    this.loadScouts();
   },
 
   onProviderChange(provider) {
@@ -400,6 +443,136 @@ const settingsView = {
       }
     } catch (err) {
       app.showToast(err.message, 'error');
+    }
+  },
+
+  async loadScouts() {
+    const listEl = document.getElementById('scout-accounts-list');
+    if (!listEl) return;
+
+    try {
+      const res = await fetch('/api/instagram/scouts');
+      const data = await res.json();
+      if (!data.success || !data.scouts || data.scouts.length === 0) {
+        listEl.innerHTML = `
+          <div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.75rem; background: var(--bg-surface); border-radius: 6px; border: 1px dashed var(--border-color); text-align: center;">
+            No scout accounts configured yet. Add a secondary disposable account below to automatically harvest links from creator DMs!
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = data.scouts.map(s => {
+        const isHealthy = s.health_status === 'healthy';
+        const badgeColor = isHealthy ? '#10B981' : (s.health_status === 'error' ? '#EF4444' : '#F59E0B');
+        const badgeText = s.health_status ? s.health_status.toUpperCase() : 'UNTESTED';
+        
+        return `
+          <div style="background: var(--bg-surface); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <strong style="color: var(--text-primary); font-size: 0.88rem;">@${s.username.replace('@', '')}</strong>
+                <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: ${badgeColor}22; color: ${badgeColor}; font-weight: 700; border: 1px solid ${badgeColor}55;">
+                  ${badgeText}
+                </span>
+                <span style="font-size: 0.72rem; color: var(--text-muted); background: var(--bg-deep); padding: 2px 6px; border-radius: 4px;">
+                  ${s.assigned_niche === 'all' ? '🌐 Universal' : (s.assigned_niche === 'gaming' ? '🎮 GTA6' : '💻 Tech')}
+                </span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 1rem;">
+                <span>Hourly: <strong>${s.hourly_comments_count || 0}/5</strong></span>
+                <span>Daily: <strong>${s.daily_comments_count || 0}/20</strong></span>
+                ${s.last_comment_at ? `<span>Last Active: ${new Date(s.last_comment_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>` : ''}
+              </div>
+              ${s.last_error ? `<div style="font-size: 0.72rem; color: #EF4444; margin-top: 0.2rem;">⚠️ ${s.last_error}</div>` : ''}
+            </div>
+            <div style="display: flex; gap: 0.4rem; flex-shrink: 0;">
+              <button class="btn btn-secondary btn-sm" onclick="settingsView.testScout(${s.id})" title="Test Instagram connection" style="padding: 4px 8px; font-size: 0.75rem;">
+                🧪 Test
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="settingsView.deleteScout(${s.id})" title="Remove scout" style="padding: 4px 8px; font-size: 0.75rem; color: #EF4444; border-color: rgba(239, 68, 68, 0.3);">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      listEl.innerHTML = `<div style="color: #EF4444; font-size: 0.8rem;">Failed to load scout accounts: ${err.message}</div>`;
+    }
+  },
+
+  async addScoutAccount() {
+    const usernameEl = document.getElementById('new-scout-username');
+    const nicheEl = document.getElementById('new-scout-niche');
+    const sessionEl = document.getElementById('new-scout-session');
+
+    const username = usernameEl ? usernameEl.value.trim() : '';
+    const assigned_niche = nicheEl ? nicheEl.value : 'all';
+    const session_id = sessionEl ? sessionEl.value.trim() : '';
+
+    if (!username) {
+      app.showToast('Please enter a scout Instagram username', 'error');
+      return;
+    }
+    if (!session_id) {
+      app.showToast('Please paste the scout sessionid cookie', 'error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/instagram/scouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, assigned_niche, session_id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`Scout @${username.replace('@', '')} added successfully!`, 'success');
+        if (usernameEl) usernameEl.value = '';
+        if (sessionEl) sessionEl.value = '';
+        this.loadScouts();
+      } else {
+        app.showToast(data.error || 'Failed to add scout', 'error');
+      }
+    } catch (err) {
+      app.showToast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  async testScout(id) {
+    app.showToast('Testing scout connection with Instagram...', 'info');
+    try {
+      const res = await fetch(`/api/instagram/scouts/${id}/test`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success && data.healthy) {
+        app.showToast(`✅ Scout verified healthy! Logged in as ${data.user?.username || 'user'}`, 'success');
+      } else {
+        app.showToast(`❌ Scout check failed: ${data.error || 'Invalid session cookie'}`, 'error');
+      }
+      this.loadScouts();
+    } catch (err) {
+      app.showToast(`Test error: ${err.message}`, 'error');
+    }
+  },
+
+  async deleteScout(id) {
+    if (!confirm('Are you sure you want to remove this scout account?')) return;
+    try {
+      const res = await fetch(`/api/instagram/scouts/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast('Scout account removed', 'success');
+        this.loadScouts();
+      } else {
+        app.showToast(data.error || 'Failed to remove scout', 'error');
+      }
+    } catch (err) {
+      app.showToast(`Error: ${err.message}`, 'error');
     }
   }
 };
