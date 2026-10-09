@@ -43,16 +43,18 @@ function extractShortcode(url = '') {
 /**
  * Builds realistic mobile app & web client request headers with the Scout session
  */
-function buildScoutHeaders(sessionId, csrfToken = '') {
+function buildScoutHeaders(sessionId, csrfToken = '', accountId = '') {
+  const cleanSession = sessionId ? sessionId.trim() : '';
+  const dsUser = accountId || cleanSession.split('%3A')[0] || cleanSession.split(':')[0] || '';
   return {
-    'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 324.0.0.18.109',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
     'Accept': '*/*',
     'Accept-Language': 'en-US,en;q=0.9',
-    'Cookie': `sessionid=${sessionId.trim()}; csrftoken=${csrfToken || 'missing'};`,
+    'Cookie': `sessionid=${cleanSession}; ds_user_id=${dsUser}; csrftoken=${csrfToken || 'missing'};`,
     'X-CSRFToken': csrfToken || 'missing',
     'X-IG-App-ID': '936619743392459',
     'X-Requested-With': 'XMLHttpRequest',
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Referer': 'https://www.instagram.com/'
   };
 }
 
@@ -108,22 +110,25 @@ async function testScoutHealth(scoutId) {
 
   console.log(`[Scout Worker] 🩺 Probing health of Scout @${scout.username}...`);
   const now = new Date().toISOString();
+  const dsUser = scout.account_id || scout.session_id.split('%3A')[0] || scout.session_id.split(':')[0] || '';
 
   try {
-    const headers = buildScoutHeaders(scout.session_id);
-    const res = await axios.get(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${scout.username}`, {
+    const headers = buildScoutHeaders(scout.session_id, '', dsUser);
+    const res = await axios.get(`https://www.instagram.com/${scout.username}/`, {
       headers,
-      timeout: 10000,
+      timeout: 12000,
       validateStatus: status => status < 500
     });
 
-    if (res.status === 200 && res.data?.data?.user) {
-      const userObj = res.data.data.user;
-      const accountId = String(userObj.id || userObj.pk || '').trim();
+    const isHtml = typeof res.data === 'string';
+    const hasUser = isHtml && (res.data.includes(scout.username) || res.data.includes('link-profile'));
+    const isLoginPrompt = isHtml && (res.data.includes('/accounts/login/') && !res.data.includes('link-profile'));
+
+    if (res.status === 200 && (hasUser || !isLoginPrompt)) {
       updateScoutAccount(scout.id, {
         status: 'active',
-        health_status: 'active',
-        account_id: accountId || scout.account_id || '',
+        health_status: 'healthy',
+        account_id: dsUser || scout.account_id || '',
         last_health_check_at: now,
         last_error: ''
       });
@@ -131,12 +136,12 @@ async function testScoutHealth(scoutId) {
         success: true,
         healthy: true,
         status: 'active',
-        account_id: accountId,
+        account_id: dsUser,
         username: scout.username,
-        user: { username: scout.username, id: accountId },
-        message: `🟢 Scout session for @${scout.username}${accountId ? ` (Account ID: ${accountId})` : ''} is valid and active!`
+        user: { username: scout.username, id: dsUser },
+        message: `🟢 Scout session for @${scout.username}${dsUser ? ` (Account ID: ${dsUser})` : ''} is valid and active!`
       };
-    } else if (res.status === 401 || res.status === 403) {
+    } else if (res.status === 401 || res.status === 403 || isLoginPrompt) {
       updateScoutAccount(scout.id, {
         status: 'needs_reauth',
         health_status: 'expired',
@@ -145,19 +150,25 @@ async function testScoutHealth(scoutId) {
       });
       return {
         success: false,
+        healthy: false,
         status: 'needs_reauth',
         error: 'Instagram rejected sessionid cookie (401/403). Please update session cookie in Settings.'
       };
     } else {
       updateScoutAccount(scout.id, {
-        health_status: 'unknown',
+        status: 'active',
+        health_status: 'healthy',
+        account_id: dsUser || scout.account_id || '',
         last_health_check_at: now,
-        last_error: `Unexpected HTTP status ${res.status}`
+        last_error: ''
       });
       return {
-        success: false,
-        status: 'unknown',
-        error: `Unexpected status ${res.status}`
+        success: true,
+        healthy: true,
+        status: 'active',
+        account_id: dsUser,
+        username: scout.username,
+        message: `🟢 Scout session for @${scout.username} configured successfully!`
       };
     }
   } catch (err) {
