@@ -332,38 +332,38 @@ async function listenForScoutDm({ scoutId, creatorUsername, triggerKeyword, time
 
   const cleanCreator = creatorUsername.toLowerCase().replace('@', '').trim();
   const startTime = Date.now();
+  let promptAutoReplied = false;
 
   console.log(`[Scout Worker] 👂 Scout @${scout.username} listening for incoming DM from @${cleanCreator} (timeout: ${timeoutMs / 1000}s)...`);
 
   while (Date.now() - startTime < timeoutMs) {
+    // 1. Primary: Query Mobile Instagrapi Microservice on Port 8001
     try {
-      const headers = buildScoutHeaders(scout.session_id);
-      const res = await axios.get('https://i.instagram.com/api/v1/direct_v2/inbox/?persistentBadging=true&folder=&limit=10', {
-        headers,
-        timeout: 8000
-      });
+      const microRes = await axios.get('http://127.0.0.1:8001/direct/threads?amount=10', { timeout: 8000 });
+      const threads = microRes.data?.threads || [];
 
-      const threads = res.data?.inbox?.threads || [];
       for (const thread of threads) {
-        const users = (thread.users || []).map(u => (u.username || '').toLowerCase());
+        const users = (thread.users || []).map(u => (u || '').toLowerCase());
         const matchCreator = users.includes(cleanCreator) || (thread.thread_title || '').toLowerCase().includes(cleanCreator);
 
         if (matchCreator) {
-          // Inspect newest messages in this thread
-          const items = thread.items || [];
-          for (const item of items.slice(0, 5)) {
-            const text = item.text || (item.link && item.link.text) || '';
-            const links = extractLinks(text);
+          const items = thread.messages || [];
 
-            if (links.length > 0) {
-              const rawUrl = links[0];
+          // Scan all recent messages for delivered links (including ManyChat buttons / generic_xma cards)
+          for (const item of items.slice(0, 6)) {
+            const itemUrls = Array.isArray(item.urls) ? item.urls : [];
+            const textLinks = extractLinks(item.text || '');
+            const allLinks = [...new Set([...itemUrls, ...textLinks])];
+
+            if (allLinks.length > 0) {
+              const rawUrl = allLinks[0];
               const canonicalUrl = await unshortenUrl(rawUrl);
               console.log(`[Scout Worker] 🎯 Intercepted authentic creator link from @${cleanCreator}: ${canonicalUrl}`);
               return {
                 success: true,
                 url: canonicalUrl,
                 rawUrl,
-                rawMessage: text,
+                rawMessage: item.text || rawUrl,
                 deliverableType: detectDeliverableType(canonicalUrl),
                 scoutUsername: scout.username,
                 creator: cleanCreator,
@@ -371,10 +371,69 @@ async function listenForScoutDm({ scoutId, creatorUsername, triggerKeyword, time
               };
             }
           }
+
+          // If creator's bot sent an interactive prompt (e.g. asking which link/opportunity, or did you find link)
+          // and no link was found yet, auto-reply once with the keyword or detected topic to trigger the link delivery!
+          if (!promptAutoReplied && items.length > 0) {
+            const newestMsg = items[0];
+            if (!newestMsg.is_sent_by_viewer && newestMsg.text) {
+              const lowerText = newestMsg.text.toLowerCase();
+              const isPrompt = lowerText.includes('link') || lowerText.includes('find') || lowerText.includes('which') || lowerText.includes('help') || lowerText.includes('story') || lowerText.includes('reply');
+              if (isPrompt) {
+                console.log(`[Scout Worker] 💬 Creator bot sent interactive prompt: "${newestMsg.text.substring(0, 60)}...". Replying with "${triggerKeyword || 'link'}"...`);
+                try {
+                  await axios.post('http://127.0.0.1:8001/direct/send', {
+                    thread_id: thread.thread_id,
+                    text: triggerKeyword || 'link'
+                  }, { timeout: 8000 });
+                  promptAutoReplied = true;
+                } catch (replyErr) {
+                  console.warn(`[Scout Worker] Auto-reply notice: ${replyErr.message}`);
+                }
+              }
+            }
+          }
         }
       }
-    } catch (err) {
-      // Loop continues until timeout
+    } catch (microErr) {
+      // 2. Secondary Fallback: Direct private API inbox request if microservice is offline
+      try {
+        const headers = buildScoutHeaders(scout.session_id);
+        const res = await axios.get('https://i.instagram.com/api/v1/direct_v2/inbox/?persistentBadging=true&folder=&limit=10', {
+          headers,
+          timeout: 8000
+        });
+
+        const threads = res.data?.inbox?.threads || [];
+        for (const thread of threads) {
+          const users = (thread.users || []).map(u => (u.username || '').toLowerCase());
+          const matchCreator = users.includes(cleanCreator) || (thread.thread_title || '').toLowerCase().includes(cleanCreator);
+
+          if (matchCreator) {
+            const items = thread.items || [];
+            for (const item of items.slice(0, 5)) {
+              const text = item.text || (item.link && item.link.text) || '';
+              const links = extractLinks(text);
+
+              if (links.length > 0) {
+                const rawUrl = links[0];
+                const canonicalUrl = await unshortenUrl(rawUrl);
+                console.log(`[Scout Worker] 🎯 Intercepted authentic creator link from @${cleanCreator}: ${canonicalUrl}`);
+                return {
+                  success: true,
+                  url: canonicalUrl,
+                  rawUrl,
+                  rawMessage: text,
+                  deliverableType: detectDeliverableType(canonicalUrl),
+                  scoutUsername: scout.username,
+                  creator: cleanCreator,
+                  harvestMethod: 'scout_dm_intercept'
+                };
+              }
+            }
+          }
+        }
+      } catch (directErr) {}
     }
 
     // Wait 3.0 seconds between polling attempts

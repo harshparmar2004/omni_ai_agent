@@ -180,6 +180,7 @@ async function pollCreatorDmResponse(creatorUsername, triggerKeyword, timeoutMs 
   if (!creatorUsername) return null;
   const cleanUsername = creatorUsername.toLowerCase().replace('@', '');
   const startTime = Date.now();
+  let promptAutoReplied = false;
 
   console.log(`[ManyChat Hunter] 👂 Listening for inbound DM from @${cleanUsername} (timeout: ${timeoutMs / 1000}s)...`);
 
@@ -189,25 +190,47 @@ async function pollCreatorDmResponse(creatorUsername, triggerKeyword, timeoutMs 
       const threads = res.data?.threads || [];
 
       for (const thread of threads) {
-        const matchUser = (thread.users || []).some(u => u.toLowerCase() === cleanUsername);
-        const matchTitle = thread.thread_title?.toLowerCase().includes(cleanUsername);
+        const matchUser = (thread.users || []).some(u => (u || '').toLowerCase() === cleanUsername);
+        const matchTitle = (thread.thread_title || '').toLowerCase().includes(cleanUsername);
 
         if (matchUser || matchTitle) {
+          const items = thread.messages || [];
+
           // Inspect recent messages from this creator
-          for (const msg of (thread.messages || [])) {
-            // Check plain text
-            const links = extractLinksFromText(msg.text);
-            if (links.length > 0) {
-              const rawUrl = links[0];
+          for (const msg of items) {
+            const msgUrls = Array.isArray(msg.urls) ? msg.urls : [];
+            const textLinks = extractLinksFromText(msg.text || '');
+            const allLinks = [...new Set([...msgUrls, ...textLinks])];
+
+            if (allLinks.length > 0) {
+              const rawUrl = allLinks[0];
               const canonical = await unshortenUrl(rawUrl);
               console.log(`[ManyChat Hunter] 🎯 Captured inbound asset link from @${cleanUsername}: ${canonical}`);
               return {
                 url: canonical,
                 rawUrl,
-                rawMessage: msg.text,
+                rawMessage: msg.text || rawUrl,
                 type: detectDeliverableType(canonical),
                 harvestMethod: 'manychat_dm'
               };
+            }
+          }
+
+          // If creator's bot sent an interactive prompt without a link, auto-reply once with the keyword
+          if (!promptAutoReplied && items.length > 0) {
+            const newest = items[0];
+            if (!newest.is_sent_by_viewer && newest.text) {
+              const lower = newest.text.toLowerCase();
+              if (lower.includes('link') || lower.includes('find') || lower.includes('which') || lower.includes('help') || lower.includes('story')) {
+                console.log(`[ManyChat Hunter] 💬 Creator bot prompt: "${newest.text.substring(0, 50)}...". Replying with "${triggerKeyword || 'link'}"...`);
+                try {
+                  await axios.post(`${MICROSERVICE_URL}/direct/send`, {
+                    thread_id: thread.thread_id,
+                    text: triggerKeyword || 'link'
+                  }, { timeout: 8000 });
+                  promptAutoReplied = true;
+                } catch (replyErr) {}
+              }
             }
           }
         }

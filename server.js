@@ -66,6 +66,10 @@ app.listen(PORT, () => {
   const { startMobileDmListener } = require('./src/services/instagramMobileDmListener');
   const { startTelegramListener } = require('./src/services/telegramBotService');
   const { startTunnel } = require('./src/services/tunnelService');
+  const { startMicroserviceDaemon } = require('./src/services/instagramMicroserviceDaemon');
+
+  // Start Python Instagrapi Mobile Microservice on Port 8001 (Pillar for ManyChat Interception)
+  startMicroserviceDaemon().catch(e => console.warn('[Microservice Boot Notice]:', e.message));
 
   // Start Self-Healing Public Tunnel for Meta Graph API uploads
   startTunnel(PORT).catch(e => console.warn('[Tunnel Boot Notice]:', e.message));

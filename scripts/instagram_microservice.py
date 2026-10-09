@@ -29,13 +29,49 @@ ig_client = Client()
 logged_in_user: Optional[str] = None
 
 SESSION_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "ig_session.json"))
-if os.path.exists(SESSION_PATH):
-    try:
-        ig_client.load_settings(SESSION_PATH)
-        logged_in_user = ig_client.username
-        print(f"[Microservice] Loaded persisted Instagram session for @{logged_in_user}")
-    except Exception as e:
-        print(f"[Microservice] Note: Session reload skipped: {e}")
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "omni_research.db"))
+
+def ensure_scout_login():
+    global logged_in_user
+    if logged_in_user:
+        return True
+    # Try saved settings first
+    if os.path.exists(SESSION_PATH):
+        try:
+            ig_client.load_settings(SESSION_PATH)
+            logged_in_user = ig_client.username
+            if logged_in_user:
+                print(f"[Microservice] Loaded persisted Instagram session for @{logged_in_user}")
+                return True
+        except Exception as e:
+            print(f"[Microservice] Note: Session reload skipped: {e}")
+
+    # Fallback: Query active scout from SQLite database
+    if os.path.exists(DB_PATH):
+        try:
+            import sqlite3
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            row = c.execute("SELECT session_id, username FROM scout_accounts WHERE status = 'active' ORDER BY id DESC LIMIT 1").fetchone()
+            conn.close()
+            if row and row[0]:
+                sess_id = row[0].strip()
+                username = row[1]
+                print(f"[Microservice] 🔄 Authenticating Scout @{username} from database...")
+                ig_client.login_by_sessionid(sess_id)
+                logged_in_user = ig_client.username or username
+                try:
+                    ig_client.dump_settings(SESSION_PATH)
+                except Exception:
+                    pass
+                print(f"[Microservice] 🟢 Successfully authenticated Scout @{logged_in_user}!")
+                return True
+        except Exception as e:
+            print(f"[Microservice] ⚠️ Auto scout login error: {e}")
+    return False
+
+# Attempt auto login on boot
+ensure_scout_login()
 
 # Ensure download directory exists
 DOWNLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "public", "generated", "downloads"))
@@ -365,6 +401,24 @@ def post_comment(req: CommentRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def extract_urls_from_xma(raw_xma):
+    urls = []
+    if not raw_xma or not isinstance(raw_xma, dict):
+        return urls
+    try:
+        for gx in raw_xma.get("generic_xma", []):
+            if isinstance(gx, dict):
+                for btn in gx.get("cta_buttons", []):
+                    if isinstance(btn, dict) and btn.get("action_url"):
+                        urls.append(btn["action_url"])
+                for key in ["target_url", "preview_url", "playable_url"]:
+                    val = gx.get(key)
+                    if val and isinstance(val, str) and val.startswith("http"):
+                        urls.append(val)
+    except Exception:
+        pass
+    return urls
+
 @app.get("/direct/threads")
 def get_direct_threads(amount: int = 10):
     """
@@ -372,18 +426,50 @@ def get_direct_threads(amount: int = 10):
     Used by Autonomous DM Harvester to capture deliverable links from competitor bots.
     """
     if not logged_in_user:
+        ensure_scout_login()
+    if not logged_in_user:
         raise HTTPException(status_code=401, detail="Please authenticate via /auth/login before reading DMs.")
     try:
         threads = ig_client.direct_threads(amount=amount)
         parsed = []
         for t in threads:
             messages = []
-            for m in t.messages[:5]:
+            for m in t.messages[:10]:
+                msg_text = m.text or ""
+                xma_urls = []
+                xma_title = ""
+
+                # Extract URLs from raw_xma (ManyChat buttons & cards)
+                if hasattr(m, 'raw_xma') and m.raw_xma:
+                    xma_urls.extend(extract_urls_from_xma(m.raw_xma))
+                    try:
+                        gx_list = m.raw_xma.get('generic_xma', [])
+                        if gx_list and isinstance(gx_list[0], dict):
+                            xma_title = gx_list[0].get('title_text') or ""
+                    except Exception:
+                        pass
+
+                # Extract URLs from link attribute
+                if hasattr(m, 'link') and m.link:
+                    if isinstance(m.link, dict):
+                        l_url = m.link.get('text') or m.link.get('link_context', {}).get('link_url')
+                        if l_url: xma_urls.append(l_url)
+                    elif hasattr(m.link, 'text') and m.link.text:
+                        xma_urls.append(m.link.text)
+
+                # If no text but title or URLs exist, populate text
+                if not msg_text and xma_title:
+                    msg_text = xma_title
+                if xma_urls and not any(u in msg_text for u in xma_urls):
+                    msg_text = f"{msg_text} {' '.join(xma_urls)}".strip()
+
                 messages.append({
                     "id": str(m.id),
                     "user_id": str(m.user_id),
-                    "text": m.text,
+                    "text": msg_text,
                     "item_type": m.item_type,
+                    "is_sent_by_viewer": bool(getattr(m, 'is_sent_by_viewer', False)),
+                    "urls": xma_urls,
                     "timestamp": str(m.timestamp)
                 })
             parsed.append({
