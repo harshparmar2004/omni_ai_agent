@@ -256,38 +256,43 @@ const settingsView = {
               <div style="font-size: 0.8rem; color: var(--text-muted);">Loading scout accounts...</div>
             </div>
 
-            <!-- Add Scout Form -->
-            <div style="background: var(--bg-surface); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; color: var(--text-primary);">➕ Connect New Scout Bot Account</div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
-                <div>
-                  <label class="form-label" style="font-size: 0.76rem;">Scout Username</label>
-                  <input type="text" id="new-scout-username" class="form-input" placeholder="@scout_harsh_007" style="font-size: 0.82rem;">
+            <!-- Add Scout Form (Collapsible) -->
+            <details id="add-scout-details" style="background: var(--bg-surface); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
+              <summary style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: space-between;">
+                <span>➕ Connect Another Scout Worker Account</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">Click to expand</span>
+              </summary>
+              <div style="margin-top: 0.75rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
+                  <div>
+                    <label class="form-label" style="font-size: 0.76rem;">Scout Username</label>
+                    <input type="text" id="new-scout-username" class="form-input" placeholder="@scout_harsh_007" style="font-size: 0.82rem;">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size: 0.76rem;">Assigned Niche / Page</label>
+                    <select id="new-scout-niche" class="form-input" style="font-size: 0.82rem;">
+                      <option value="all">All Pages (Universal Scout)</option>
+                      <option value="gaming">GTA 6 / Gaming Only</option>
+                      <option value="tech">Tech News AI Only</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label class="form-label" style="font-size: 0.76rem;">Assigned Niche / Page</label>
-                  <select id="new-scout-niche" class="form-input" style="font-size: 0.82rem;">
-                    <option value="all">All Pages (Universal Scout)</option>
-                    <option value="gaming">GTA 6 / Gaming Only</option>
-                    <option value="tech">Tech News AI Only</option>
-                  </select>
+                <div class="form-group" style="margin-bottom: 0.6rem;">
+                  <label class="form-label" style="font-size: 0.76rem;">Scout Bot Account ID (Optional / Auto-Detected)</label>
+                  <input type="text" id="new-scout-account-id" class="form-input" placeholder="e.g. 68192837492 (auto-detected when tested)" style="font-size: 0.82rem;">
                 </div>
+                <div class="form-group" style="margin-bottom: 0.6rem;">
+                  <label class="form-label" style="display: flex; justify-content: space-between; font-size: 0.76rem;">
+                    <span>Instagram Session Cookie (<code>sessionid</code>)</span>
+                    <span style="color: var(--text-muted); font-size: 0.72rem;">DevTools ➔ Application ➔ Cookies</span>
+                  </label>
+                  <input type="password" id="new-scout-session" class="form-input" placeholder="Paste sessionid cookie from browser" style="font-size: 0.82rem;">
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm w-full" onclick="settingsView.addScoutAccount()" style="font-weight: 700; color: #8B5CF6; border-color: rgba(124, 58, 237, 0.4);">
+                  ➕ Save &amp; Connect Scout Bot Account
+                </button>
               </div>
-              <div class="form-group" style="margin-bottom: 0.6rem;">
-                <label class="form-label" style="font-size: 0.76rem;">Scout Bot Account ID (Optional / Auto-Detected)</label>
-                <input type="text" id="new-scout-account-id" class="form-input" placeholder="e.g. 68192837492 (auto-detected when tested)" style="font-size: 0.82rem;">
-              </div>
-              <div class="form-group" style="margin-bottom: 0.6rem;">
-                <label class="form-label" style="display: flex; justify-content: space-between; font-size: 0.76rem;">
-                  <span>Instagram Session Cookie (<code>sessionid</code>)</span>
-                  <span style="color: var(--text-muted); font-size: 0.72rem;">DevTools ➔ Application ➔ Cookies</span>
-                </label>
-                <input type="password" id="new-scout-session" class="form-input" placeholder="Paste sessionid cookie from browser" style="font-size: 0.82rem;">
-              </div>
-              <button type="button" class="btn btn-secondary btn-sm w-full" onclick="settingsView.addScoutAccount()" style="font-weight: 700; color: #8B5CF6; border-color: rgba(124, 58, 237, 0.4);">
-                ➕ Save &amp; Connect Scout Bot Account
-              </button>
-            </div>
+            </details>
           </div>
 
           <button class="btn btn-primary w-full" style="font-size: 1rem; font-weight: 700; padding: 0.85rem;" onclick="settingsView.saveAll()">
