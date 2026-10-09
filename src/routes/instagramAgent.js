@@ -2079,6 +2079,7 @@ router.get('/scouts', (req, res) => {
         health_status: s.health_status,
         last_error: s.last_error,
         notes: s.notes,
+        account_id: s.account_id || '',
         session_configured: Boolean(s.session_id && s.session_id.length > 5),
         created_at: s.created_at
       }))
@@ -2091,7 +2092,7 @@ router.get('/scouts', (req, res) => {
 // POST /api/instagram/scouts - Create or update a scout account
 router.post('/scouts', (req, res) => {
   try {
-    const { id, username, session_id, assigned_niche, notes, status } = req.body || {};
+    const { id, username, session_id, assigned_niche, notes, status, account_id } = req.body || {};
     const { addScoutAccount, updateScoutAccount, getScoutAccountByUsername } = require('../database');
 
     if (!username) {
@@ -2104,7 +2105,8 @@ router.post('/scouts', (req, res) => {
         session_id,
         assigned_niche,
         notes,
-        status
+        status,
+        account_id
       });
       return res.json({ success: true, scout: updated });
     }
@@ -2116,7 +2118,8 @@ router.post('/scouts', (req, res) => {
         session_id: session_id || existing.session_id,
         assigned_niche: assigned_niche || existing.assigned_niche,
         notes: notes !== undefined ? notes : existing.notes,
-        status: status || existing.status
+        status: status || existing.status,
+        account_id: account_id || existing.account_id
       });
       return res.json({ success: true, scout: updated });
     }
@@ -2130,6 +2133,7 @@ router.post('/scouts', (req, res) => {
       session_id,
       assigned_niche,
       notes,
+      account_id: account_id || '',
       status: status || 'active'
     });
     res.json({ success: true, scout: created });

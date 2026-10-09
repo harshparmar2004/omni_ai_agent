@@ -118,17 +118,23 @@ async function testScoutHealth(scoutId) {
     });
 
     if (res.status === 200 && res.data?.data?.user) {
+      const userObj = res.data.data.user;
+      const accountId = String(userObj.id || userObj.pk || '').trim();
       updateScoutAccount(scout.id, {
         status: 'active',
         health_status: 'active',
+        account_id: accountId || scout.account_id || '',
         last_health_check_at: now,
         last_error: ''
       });
       return {
         success: true,
+        healthy: true,
         status: 'active',
+        account_id: accountId,
         username: scout.username,
-        message: `🟢 Scout session for @${scout.username} is valid and active!`
+        user: { username: scout.username, id: accountId },
+        message: `🟢 Scout session for @${scout.username}${accountId ? ` (Account ID: ${accountId})` : ''} is valid and active!`
       };
     } else if (res.status === 401 || res.status === 403) {
       updateScoutAccount(scout.id, {

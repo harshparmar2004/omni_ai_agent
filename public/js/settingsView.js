@@ -137,80 +137,110 @@ const settingsView = {
           </div>
 
           <!-- 3. Instagram Publishing & Meta Verified API -->
-          <div class="card">
-            <div class="section-label">Meta & Instagram Studio</div>
-            <h3 style="margin-top: 0.2rem; margin-bottom: 1rem;">Publishing & Brand Credentials</h3>
+          <!-- 3. Connected Instagram Destination Bot Accounts (Multi-Account Publishing) -->
+          <div class="card" style="border: 1.5px solid rgba(59, 130, 246, 0.35); background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(16, 185, 129, 0.03));">
+            <div class="section-label" style="color: #2563EB;">Meta Verified Instagram Studio</div>
+            <h3 style="margin-top: 0.2rem; margin-bottom: 0.4rem;">🤖 Connected Instagram Bot Accounts &amp; Destination Pages</h3>
+            <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+              Connect and manage the official <strong>Bot Account IDs</strong> for your Instagram publishing channels. When reels are ingested via Telegram or Competitor Tracking, Omni Agent publishes to the target account via Meta Graph API v21.0.
+            </p>
 
-            <div class="grid-2">
-              <div class="form-group">
-                <label class="form-label">Instagram App ID</label>
-                <input type="text" id="set-meta-app-id" class="form-input" value="${s('meta_app_id', '1699561267808244')}" placeholder="1699561267808244">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Instagram App Secret</label>
-                <input type="password" id="set-meta-app-secret" class="form-input" value="${s('meta_app_secret', 'f5328133123b2b43dcc44ae3aab9c57b')}" placeholder="App Secret">
-              </div>
+            <!-- Dynamic Connected Pages / Accounts List -->
+            <div id="connected-pages-list" style="margin-bottom: 1.25rem;">
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Loading connected bot accounts...</div>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Brand Watermark Handle (Publishing Destination)</label>
-              <input type="text" id="set-ig-handle" class="form-input" value="${s('instagram_handle', '@harshparmartech')}" placeholder="@harshparmartech">
-            </div>
-
-            <div class="form-group">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                <label class="form-label" style="margin-bottom: 0;">Meta Graph API Page Access Token</label>
+            <!-- Global Meta App & Primary Fallback Credentials -->
+            <div style="background: var(--bg-surface); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.5rem;">
+              <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center;">
+                <span>⚙️ Meta App &amp; Primary Fallback Credentials</span>
                 <button type="button" class="btn btn-secondary btn-xs" id="btn-exchange-token" onclick="settingsView.exchangeAndConnect()" style="font-weight: 700; color: #10B981; border-color: rgba(16, 185, 129, 0.4);">
                   ⚡ Auto-Connect &amp; Exchange
                 </button>
               </div>
-              <input type="password" id="set-meta-token" class="form-input" value="${s('meta_page_token')}" placeholder="Paste token from Graph API Explorer (EAABs...)">
-              <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 0.25rem;">
-                Paste any token and click "⚡ Auto-Connect" to exchange for a permanent token &amp; auto-fetch your Instagram Account ID.
+
+              <div class="grid-2" style="margin-bottom: 0.5rem;">
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                  <label class="form-label" style="font-size: 0.76rem;">Meta App ID</label>
+                  <input type="text" id="set-meta-app-id" class="form-input" value="${s('meta_app_id', '1699561267808244')}" placeholder="1699561267808244" style="font-size: 0.82rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                  <label class="form-label" style="font-size: 0.76rem;">Meta App Secret</label>
+                  <input type="password" id="set-meta-app-secret" class="form-input" value="${s('meta_app_secret', 'f5328133123b2b43dcc44ae3aab9c57b')}" placeholder="App Secret" style="font-size: 0.82rem;">
+                </div>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label class="form-label">Instagram Business Account ID</label>
-              <input type="text" id="set-meta-ig-id" class="form-input" value="${s('meta_ig_user_id')}" placeholder="17841400000000000">
-            </div>
+              <div class="form-group" style="margin-bottom: 0.5rem;">
+                <label class="form-label" style="font-size: 0.76rem;">Global Meta Page Access Token</label>
+                <input type="password" id="set-meta-token" class="form-input" value="${s('meta_page_token')}" placeholder="Paste token from Graph API Explorer (EAABs...)" style="font-size: 0.82rem;">
+              </div>
 
-            <div class="form-group">
-              <label class="form-label">Public Media URL / Ngrok Tunnel</label>
-              <input type="text" id="set-ngrok-url" class="form-input" value="${s('ngrok_url')}" placeholder="https://abc123.ngrok.io (for Meta media containers)">
-            </div>
+              <div class="grid-2">
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                  <label class="form-label" style="font-size: 0.76rem;">Primary Bot Account ID</label>
+                  <input type="text" id="set-meta-ig-id" class="form-input" value="${s('meta_ig_user_id')}" placeholder="17841400000000000" style="font-size: 0.82rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                  <label class="form-label" style="font-size: 0.76rem;">Primary Handle</label>
+                  <input type="text" id="set-ig-handle" class="form-input" value="${s('instagram_handle', '@gta6_updates_007')}" placeholder="@gta6_updates_007" style="font-size: 0.82rem;">
+                </div>
+              </div>
 
-            <div class="form-group">
-              <label class="form-label">InstaAuto Sister Bridge URL</label>
-              <input type="text" id="set-bridge-url" class="form-input" value="${s('instaauto_bridge_url', 'http://localhost:3000/api/agent/bridge')}" placeholder="http://localhost:3000/api/agent/bridge">
+              <div class="grid-2">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" style="font-size: 0.76rem;">Public Tunnel URL (Ngrok / Cloudflare)</label>
+                  <input type="text" id="set-ngrok-url" class="form-input" value="${s('ngrok_url')}" placeholder="https://abc.trycloudflare.com" style="font-size: 0.82rem;">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label class="form-label" style="font-size: 0.76rem;">InstaAuto Sister Bridge URL</label>
+                  <input type="text" id="set-bridge-url" class="form-input" value="${s('instaauto_bridge_url', 'http://localhost:3000/api/agent/bridge')}" placeholder="http://localhost:3000/api/agent/bridge" style="font-size: 0.82rem;">
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- 4. Mobile Inbound Triggers: Telegram Bot -->
+          <!-- 4. Mobile Inbound Triggers: Telegram Bot Hub -->
           <div class="card" style="border: 1.5px solid rgba(16, 185, 129, 0.35); background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(37, 99, 235, 0.03));">
             <div class="section-label" style="color: #10B981;">Mobile Automation</div>
-            <h3 style="margin-top: 0.2rem; margin-bottom: 0.4rem;">📱 Mobile Inbound Triggers (Share-to-Publish)</h3>
+            <h3 style="margin-top: 0.2rem; margin-bottom: 0.4rem;">📱 Mobile Inbound Triggers (Telegram Bot Hub)</h3>
             <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem;">
-              Send any Reel or Carousel link directly from your mobile phone to Telegram. The bot intercepts, downloads uncropped slides, removes competitor watermarks, stamps your logo, and auto-publishes!
+              Share any Reel or Carousel link directly from your mobile Instagram app to Telegram. The bot downloads high-res media, strips competitor tags, brands your media, and automatically delivers reports.
             </p>
 
             <div class="form-group">
               <label class="form-label" style="display: flex; justify-content: space-between;">
-                <span>Telegram Bot Token</span>
-                <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); font-size: 0.78rem; text-decoration: underline;">Get free token from @BotFather ↗</a>
+                <span>Telegram Bot Token (@BotFather)</span>
+                <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); font-size: 0.78rem; text-decoration: underline;">Get token from @BotFather ↗</a>
               </label>
               <input type="password" id="set-telegram-bot-token" class="form-input" value="${s('telegram_bot_token')}" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;">
-                Connected to: <strong>@Harsh_insta_omni_ai_agent_bot</strong>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 700;">Telegram Bot Account ID</label>
+                <input type="text" id="set-telegram-bot-id" class="form-input" value="${s('telegram_bot_id')}" placeholder="e.g. 8887232624 (Auto-detected)" readonly style="background: var(--bg-deep); opacity: 0.9;">
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-size: 0.78rem; font-weight: 700;">Authorized Telegram Chat / User ID</label>
+                <input type="text" id="set-telegram-chat-id" class="form-input" value="${s('telegram_chat_id')}" placeholder="e.g. 1234567890 (send /start to bot)">
               </div>
             </div>
 
-            <div class="form-group" style="margin-bottom: 0;">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
               <label class="form-label">Authorized Instagram Owner Handle</label>
-              <input type="text" id="set-owner-handle" class="form-input" value="${s('instagram_handle', '@harshparmar007__')}" placeholder="@harshparmar007__" readonly style="opacity: 0.85;">
-              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;">
-                Only shares from this authorized handle are processed.
+              <input type="text" id="set-owner-handle" class="form-input" value="${s('instagram_handle', '@harshparmar007__')}" placeholder="@harshparmar007__">
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.25rem;">
+                Only shares from this owner handle are processed. Send <code>/start</code> to your Telegram bot anytime to view your exact Telegram Chat ID.
               </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface); padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color);">
+              <div id="telegram-bot-status-text" style="font-size: 0.78rem; color: var(--text-muted);">
+                Bot status: Checking...
+              </div>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="settingsView.testTelegramBot()" style="font-weight: 700; color: #10B981; border-color: rgba(16, 185, 129, 0.4);">
+                ⚡ Auto-Detect &amp; Test Bot
+              </button>
             </div>
           </div>
 
@@ -219,7 +249,7 @@ const settingsView = {
             <div class="section-label" style="color: #8B5CF6;">Account Safety &amp; Extraction Shield</div>
             <h3 style="margin-top: 0.2rem; margin-bottom: 0.4rem;">🛡️ Dedicated Scout Accounts (Competitor DM Harvester)</h3>
             <p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
-              Scout accounts are secondary personal Instagram accounts used to comment on competitors' reels and intercept their ManyChat DMs. Your primary brand pages (<code>@gta6_updates_007</code> and <code>@technews_daily_ai</code>) are 100% shielded and never penalized!
+              Scout accounts are secondary personal Instagram worker bots used to comment on competitors' reels and intercept their ManyChat DMs. Your primary brand accounts (<code>@gta6_updates_007</code> and <code>@technews_daily_ai</code>) are 100% shielded and never penalized!
             </p>
 
             <div id="scout-accounts-list" style="margin-bottom: 1rem;">
@@ -228,7 +258,7 @@ const settingsView = {
 
             <!-- Add Scout Form -->
             <div style="background: var(--bg-surface); padding: 0.85rem; border-radius: 8px; border: 1px solid var(--border-color);">
-              <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; color: var(--text-primary);">➕ Connect New Scout Account</div>
+              <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.6rem; color: var(--text-primary);">➕ Connect New Scout Bot Account</div>
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
                 <div>
                   <label class="form-label" style="font-size: 0.76rem;">Scout Username</label>
@@ -244,6 +274,10 @@ const settingsView = {
                 </div>
               </div>
               <div class="form-group" style="margin-bottom: 0.6rem;">
+                <label class="form-label" style="font-size: 0.76rem;">Scout Bot Account ID (Optional / Auto-Detected)</label>
+                <input type="text" id="new-scout-account-id" class="form-input" placeholder="e.g. 68192837492 (auto-detected when tested)" style="font-size: 0.82rem;">
+              </div>
+              <div class="form-group" style="margin-bottom: 0.6rem;">
                 <label class="form-label" style="display: flex; justify-content: space-between; font-size: 0.76rem;">
                   <span>Instagram Session Cookie (<code>sessionid</code>)</span>
                   <span style="color: var(--text-muted); font-size: 0.72rem;">DevTools ➔ Application ➔ Cookies</span>
@@ -251,7 +285,7 @@ const settingsView = {
                 <input type="password" id="new-scout-session" class="form-input" placeholder="Paste sessionid cookie from browser" style="font-size: 0.82rem;">
               </div>
               <button type="button" class="btn btn-secondary btn-sm w-full" onclick="settingsView.addScoutAccount()" style="font-weight: 700; color: #8B5CF6; border-color: rgba(124, 58, 237, 0.4);">
-                ➕ Save &amp; Connect Scout Account
+                ➕ Save &amp; Connect Scout Bot Account
               </button>
             </div>
           </div>
@@ -297,7 +331,9 @@ const settingsView = {
 
     this.onProviderChange(s('default_provider', 'gemini'));
     this.loadProviderStatus();
+    this.loadConnectedPages();
     this.loadScouts();
+    this.detectTelegramBotInfo();
   },
 
   onProviderChange(provider) {
@@ -425,7 +461,9 @@ const settingsView = {
       meta_ig_user_id: document.getElementById('set-meta-ig-id').value,
       ngrok_url: document.getElementById('set-ngrok-url').value,
       instagram_handle: document.getElementById('set-ig-handle').value,
-      telegram_bot_token: document.getElementById('set-telegram-bot-token')?.value || ''
+      telegram_bot_token: document.getElementById('set-telegram-bot-token')?.value || '',
+      telegram_chat_id: document.getElementById('set-telegram-chat-id')?.value || '',
+      telegram_bot_id: document.getElementById('set-telegram-bot-id')?.value || ''
     };
 
     try {
@@ -438,11 +476,173 @@ const settingsView = {
       if (data.success) {
         app.showToast('All engine & niche settings saved successfully!', 'success');
         this.loadProviderStatus();
+        this.detectTelegramBotInfo();
       } else {
         throw new Error(data.error || 'Save failed');
       }
     } catch (err) {
       app.showToast(err.message, 'error');
+    }
+  },
+
+  async loadConnectedPages() {
+    const listEl = document.getElementById('connected-pages-list');
+    if (!listEl) return;
+
+    try {
+      const res = await fetch('/api/instagram/pages');
+      const data = await res.json();
+      if (!data.success || !data.pages || data.pages.length === 0) {
+        listEl.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted); padding:0.5rem;">No destination bot accounts registered.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = data.pages.map(p => {
+        const hasId = Boolean(p.meta_ig_user_id && p.meta_ig_user_id.length > 5);
+        const statusBadge = hasId 
+          ? `<span style="font-size:0.72rem; padding:2px 8px; border-radius:4px; background:#10B98122; color:#10B981; font-weight:700; border:1px solid #10B98155;">🟢 Connected (Bot ID: ${p.meta_ig_user_id})</span>`
+          : `<span style="font-size:0.72rem; padding:2px 8px; border-radius:4px; background:#EF444422; color:#EF4444; font-weight:700; border:1px solid #EF444455;">⚠️ Missing Bot Account ID</span>`;
+
+        return `
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.9rem; margin-bottom: 0.75rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem; flex-wrap:wrap; gap:0.4rem;">
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <span style="font-size:1.15rem;">${p.icon || '📱'}</span>
+                <strong style="color:var(--text-primary); font-size:0.92rem;">${p.name}</strong>
+                <code style="font-size:0.8rem; color:var(--accent-primary);">${p.handle}</code>
+                <span style="font-size:0.7rem; color:var(--text-muted); background:var(--bg-deep); padding:2px 6px; border-radius:4px;">
+                  ${p.workflow_type === 'lead_magnet' ? '🎯 Lead Magnet' : '⚡ Direct Repost'}
+                </span>
+              </div>
+              ${statusBadge}
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.6rem; margin-bottom:0.6rem;">
+              <div>
+                <label class="form-label" style="font-size:0.76rem; font-weight:700;">Instagram Bot Account ID</label>
+                <div style="display:flex; gap:0.3rem;">
+                  <input type="text" id="page-bot-id-${p.id}" class="form-input" style="font-size:0.82rem;" value="${p.meta_ig_user_id || ''}" placeholder="e.g. 17841428668115319">
+                  <button type="button" class="btn btn-secondary btn-xs" onclick="settingsView.autoFetchPageBotId(${p.id})" title="Auto-detect account ID via Graph API" style="font-weight:700; color:#10B981; white-space:nowrap; padding:0 8px;">
+                    ⚡ Fetch ID
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:0.76rem; font-weight:700;">Page Access Token</label>
+                <input type="password" id="page-token-${p.id}" class="form-input" style="font-size:0.82rem;" value="${p.meta_page_token || ''}" placeholder="EAABs... (leave empty to use global token)">
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.4rem;">
+              <button type="button" class="btn btn-secondary btn-xs" onclick="settingsView.testPageBot(${p.id})" style="font-size:0.75rem;">
+                🧪 Test Handshake
+              </button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="settingsView.savePageBotId(${p.id})" style="font-size:0.75rem; font-weight:700;">
+                💾 Save Bot Account ID
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      listEl.innerHTML = `<div style="color:#EF4444; font-size:0.8rem;">Failed to load connected bot pages: ${err.message}</div>`;
+    }
+  },
+
+  async savePageBotId(pageId) {
+    const idInput = document.getElementById(`page-bot-id-${pageId}`);
+    const tokenInput = document.getElementById(`page-token-${pageId}`);
+    const meta_ig_user_id = idInput ? idInput.value.trim() : '';
+    const meta_page_token = tokenInput ? tokenInput.value.trim() : '';
+
+    try {
+      const payload = { meta_ig_user_id };
+      if (meta_page_token && !meta_page_token.includes('****')) {
+        payload.meta_page_token = meta_page_token;
+      }
+
+      const res = await fetch(`/api/instagram/pages/${pageId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`✅ Saved Bot Account ID for ${data.page?.name || 'Page'}!`, 'success');
+        this.loadConnectedPages();
+      } else {
+        app.showToast(`Failed to update page: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      app.showToast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  async autoFetchPageBotId(pageId) {
+    const tokenInput = document.getElementById(`page-token-${pageId}`);
+    const token = tokenInput ? tokenInput.value.trim() : '';
+
+    app.showToast('Connecting with Meta Graph API to discover Bot Account ID...', 'info');
+    try {
+      const res = await fetch(`/api/settings/pages/${pageId}/fetch-account-id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meta_page_token: token })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(data.message, 'success');
+        this.loadConnectedPages();
+      } else {
+        app.showToast(`Auto-fetch failed: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      app.showToast(`Error: ${err.message}`, 'error');
+    }
+  },
+
+  async testPageBot(pageId) {
+    app.showToast('Testing page credentials with Meta Graph API...', 'info');
+    try {
+      const res = await fetch(`/api/instagram/pages/${pageId}/test-handshake`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.showToast(`✅ Handshake verified! Connected to @${data.account?.username || 'page'} (ID: ${data.account?.id || 'OK'})`, 'success');
+      } else {
+        app.showToast(`❌ Connection check failed: ${data.error}`, 'error');
+      }
+    } catch (err) {
+      app.showToast(`Test error: ${err.message}`, 'error');
+    }
+  },
+
+  async detectTelegramBotInfo() {
+    const statusEl = document.getElementById('telegram-bot-status-text');
+    const botIdInput = document.getElementById('set-telegram-bot-id');
+    try {
+      const res = await fetch('/api/settings/telegram/info');
+      const data = await res.json();
+      if (data.success && data.online) {
+        if (botIdInput && data.bot?.id) botIdInput.value = data.bot.id;
+        if (statusEl) {
+          statusEl.innerHTML = `🟢 Online: <strong><a href="https://t.me/${data.username}" target="_blank">@${data.username}</a></strong> (Bot ID: <code>${data.bot?.id}</code>)`;
+        }
+      } else if (statusEl) {
+        statusEl.innerHTML = `<span style="color:#F59E0B;">⚠️ Telegram Bot: ${data.error || 'Token not configured'}</span>`;
+      }
+    } catch (e) {
+      if (statusEl) statusEl.textContent = 'Status: Standby';
+    }
+  },
+
+  async testTelegramBot() {
+    app.showToast('Verifying Telegram Bot credentials live...', 'info');
+    await this.detectTelegramBotInfo();
+    const botIdInput = document.getElementById('set-telegram-bot-id');
+    if (botIdInput && botIdInput.value) {
+      app.showToast(`✅ Telegram Bot Verified! Bot Account ID: ${botIdInput.value}`, 'success');
     }
   },
 
@@ -456,21 +656,21 @@ const settingsView = {
       if (!data.success || !data.scouts || data.scouts.length === 0) {
         listEl.innerHTML = `
           <div style="font-size: 0.8rem; color: var(--text-muted); padding: 0.75rem; background: var(--bg-surface); border-radius: 6px; border: 1px dashed var(--border-color); text-align: center;">
-            No scout accounts configured yet. Add a secondary disposable account below to automatically harvest links from creator DMs!
+            No scout worker bots configured yet. Add a secondary disposable account below to automatically harvest links from creator DMs!
           </div>
         `;
         return;
       }
 
       listEl.innerHTML = data.scouts.map(s => {
-        const isHealthy = s.health_status === 'healthy';
-        const badgeColor = isHealthy ? '#10B981' : (s.health_status === 'error' ? '#EF4444' : '#F59E0B');
+        const isHealthy = s.health_status === 'healthy' || s.health_status === 'active';
+        const badgeColor = isHealthy ? '#10B981' : (s.health_status === 'error' || s.health_status === 'expired' ? '#EF4444' : '#F59E0B');
         const badgeText = s.health_status ? s.health_status.toUpperCase() : 'UNTESTED';
         
         return `
           <div style="background: var(--bg-surface); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
             <div style="min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
                 <strong style="color: var(--text-primary); font-size: 0.88rem;">@${s.username.replace('@', '')}</strong>
                 <span style="font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: ${badgeColor}22; color: ${badgeColor}; font-weight: 700; border: 1px solid ${badgeColor}55;">
                   ${badgeText}
@@ -478,6 +678,7 @@ const settingsView = {
                 <span style="font-size: 0.72rem; color: var(--text-muted); background: var(--bg-deep); padding: 2px 6px; border-radius: 4px;">
                   ${s.assigned_niche === 'all' ? '🌐 Universal' : (s.assigned_niche === 'gaming' ? '🎮 GTA6' : '💻 Tech')}
                 </span>
+                ${s.account_id ? `<span style="font-size: 0.72rem; color: #8B5CF6; background: rgba(139, 92, 246, 0.1); padding: 2px 6px; border-radius: 4px; font-weight: 600;">🆔 ID: ${s.account_id}</span>` : ''}
               </div>
               <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 1rem;">
                 <span>Hourly: <strong>${s.hourly_comments_count || 0}/5</strong></span>
@@ -505,10 +706,12 @@ const settingsView = {
   async addScoutAccount() {
     const usernameEl = document.getElementById('new-scout-username');
     const nicheEl = document.getElementById('new-scout-niche');
+    const accountIdEl = document.getElementById('new-scout-account-id');
     const sessionEl = document.getElementById('new-scout-session');
 
     const username = usernameEl ? usernameEl.value.trim() : '';
     const assigned_niche = nicheEl ? nicheEl.value : 'all';
+    const account_id = accountIdEl ? accountIdEl.value.trim() : '';
     const session_id = sessionEl ? sessionEl.value.trim() : '';
 
     if (!username) {
@@ -524,12 +727,13 @@ const settingsView = {
       const res = await fetch('/api/instagram/scouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, assigned_niche, session_id })
+        body: JSON.stringify({ username, assigned_niche, account_id, session_id })
       });
       const data = await res.json();
       if (data.success) {
         app.showToast(`Scout @${username.replace('@', '')} added successfully!`, 'success');
         if (usernameEl) usernameEl.value = '';
+        if (accountIdEl) accountIdEl.value = '';
         if (sessionEl) sessionEl.value = '';
         this.loadScouts();
       } else {
@@ -548,7 +752,7 @@ const settingsView = {
       });
       const data = await res.json();
       if (data.success && data.healthy) {
-        app.showToast(`✅ Scout verified healthy! Logged in as ${data.user?.username || 'user'}`, 'success');
+        app.showToast(`✅ Scout verified healthy! Logged in as ${data.user?.username || 'user'}${data.account_id ? ` (ID: ${data.account_id})` : ''}`, 'success');
       } else {
         app.showToast(`❌ Scout check failed: ${data.error || 'Invalid session cookie'}`, 'error');
       }
@@ -578,4 +782,5 @@ const settingsView = {
 };
 
 window.settingsView = settingsView;
+
 

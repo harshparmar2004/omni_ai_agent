@@ -483,6 +483,8 @@ async function handleTelegramMessage(message) {
       await sendTelegramMessage(
         chatId,
         `🚀 <b>OmniResearch — Universal Multi-Account Instagram Hub</b>\n\n` +
+        `👤 <b>Your Telegram Account / Chat ID:</b> <code>${chatId}</code>\n` +
+        `<i>(Connect this Chat ID in Dashboard Settings ➔ Mobile Inbound to receive private notifications)</i>\n\n` +
         `<b>Connected Instagram Destination Accounts:</b>\n` +
         `${pagesListStr}\n\n` +
         `<b>How to Auto-Post Any Reel from Mobile:</b>\n` +

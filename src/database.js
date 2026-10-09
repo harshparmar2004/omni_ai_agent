@@ -331,7 +331,8 @@ function initSchema(db) {
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN connected_page_id INTEGER",
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN score_breakdown TEXT DEFAULT '{}'",
     "ALTER TABLE autonomous_ingestion_log ADD COLUMN last_error TEXT DEFAULT ''",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN stage TEXT DEFAULT ''"
+    "ALTER TABLE autonomous_ingestion_log ADD COLUMN stage TEXT DEFAULT ''",
+    "ALTER TABLE scout_accounts ADD COLUMN account_id TEXT DEFAULT ''"
   ];
 
   for (const sql of migrations) {
@@ -404,7 +405,9 @@ function seedInitialData(db) {
     // Secondary Tech News Profile Credentials (Bot v2)
     tech_meta_page_token: '',
     tech_meta_ig_user_id: '',
-    tech_instagram_handle: '@technews_daily_ai'
+    tech_instagram_handle: '@technews_daily_ai',
+    telegram_chat_id: '',
+    telegram_bot_id: ''
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
@@ -1409,8 +1412,8 @@ function addScoutAccount(data) {
   const stmt = db.prepare(`
     INSERT INTO scout_accounts (
       username, session_id, assigned_niche, status, hourly_comments_count, daily_comments_count,
-      last_comment_at, last_health_check_at, health_status, last_error, notes, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, 'unknown', '', ?, ?, ?)
+      last_comment_at, last_health_check_at, health_status, last_error, notes, account_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, 'unknown', '', ?, ?, ?, ?)
   `);
   const res = stmt.run(
     cleanUsername,
@@ -1418,6 +1421,7 @@ function addScoutAccount(data) {
     data.assigned_niche || 'all',
     data.status || 'active',
     data.notes || '',
+    data.account_id || '',
     now,
     now
   );
@@ -1429,7 +1433,7 @@ function updateScoutAccount(id, data) {
   const allowed = [
     'username', 'session_id', 'assigned_niche', 'status', 'hourly_comments_count',
     'daily_comments_count', 'last_comment_at', 'last_health_check_at', 'health_status',
-    'last_error', 'notes'
+    'last_error', 'notes', 'account_id'
   ];
   const fields = [];
   const values = [];

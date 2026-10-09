@@ -52,7 +52,12 @@ router.get('/', (req, res) => {
         // Meta App Credentials
         meta_app_id: settings.meta_app_id || '',
         meta_app_secret: settings.meta_app_secret ? maskKey(settings.meta_app_secret) : '',
-        telegram_bot_token: settings.telegram_bot_token ? maskKey(settings.telegram_bot_token) : ''
+        telegram_bot_token: settings.telegram_bot_token ? maskKey(settings.telegram_bot_token) : '',
+        telegram_chat_id: settings.telegram_chat_id || '',
+        telegram_bot_id: settings.telegram_bot_id || '',
+        tech_meta_page_token: settings.tech_meta_page_token ? maskKey(settings.tech_meta_page_token) : '',
+        tech_meta_ig_user_id: settings.tech_meta_ig_user_id || '',
+        tech_instagram_handle: settings.tech_instagram_handle || '@technews_daily_ai'
       }
     });
   } catch (err) {
@@ -79,7 +84,8 @@ router.post('/', (req, res) => {
       'google_docs_enabled', 'google_docs_folder_id',
       'imagen_api_key', 'image_engine', 'instagram_handle',
       'default_content_type', 'public_media_url', 'ngrok_url',
-      'telegram_bot_token'
+      'telegram_bot_token', 'telegram_chat_id', 'telegram_bot_id',
+      'tech_meta_page_token', 'tech_meta_ig_user_id', 'tech_instagram_handle'
     ];
 
     for (const [key, val] of Object.entries(req.body || {})) {
@@ -235,6 +241,115 @@ router.post('/exchange-token', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+  }
+});
+
+/**
+ * GET /api/settings/telegram/info
+ * Retrieves metadata for the configured Telegram Bot (Bot Account ID, handle, live status)
+ */
+router.get('/telegram/info', async (req, res) => {
+  try {
+    const { getTelegramBotInfo } = require('../services/telegramBotService');
+    const info = await getTelegramBotInfo();
+    if (info.online && info.bot?.id) {
+      setSetting('telegram_bot_id', String(info.bot.id));
+    }
+    res.json({ success: true, ...info });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/settings/pages/:id/fetch-account-id
+ * Auto-detects and connects the Instagram Bot Account ID for a connected page via Graph API
+ */
+router.post('/pages/:id/fetch-account-id', async (req, res) => {
+  try {
+    const { getConnectedPageById, updateConnectedPage, getSetting } = require('../database');
+    const pageId = parseInt(req.params.id, 10);
+    const page = getConnectedPageById(pageId);
+    if (!page) return res.status(404).json({ success: false, error: 'Page not found' });
+
+    const token = (page.meta_page_token || req.body?.meta_page_token || getSetting('meta_page_token', '')).trim();
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'No Meta Graph API Page Token configured for this page or globally' });
+    }
+
+    let foundIgId = null;
+    let foundUsername = null;
+
+    // 1. Try Instagram Direct if token is an Instagram direct access token
+    if (token.startsWith('IGAA') || token.startsWith('IGQJ') || token.startsWith('IG')) {
+      try {
+        const meRes = await axios.get('https://graph.instagram.com/me', {
+          params: { fields: 'id,user_id,username', access_token: token },
+          timeout: 12000
+        });
+        if (meRes.data) {
+          foundIgId = meRes.data.user_id || meRes.data.id;
+          foundUsername = meRes.data.username;
+        }
+      } catch (e) {
+        console.warn('[Page Bot Discovery] Direct IG error:', e.response?.data || e.message);
+      }
+    }
+
+    // 2. Try Facebook Graph API me/accounts
+    if (!foundIgId) {
+      try {
+        const accountsRes = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
+          params: {
+            fields: 'name,access_token,instagram_business_account{id,username}',
+            access_token: token
+          },
+          timeout: 12000
+        });
+        const fbPages = accountsRes.data?.data || [];
+        for (const p of fbPages) {
+          if (p.instagram_business_account?.id) {
+            foundIgId = p.instagram_business_account.id;
+            foundUsername = p.instagram_business_account.username;
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn('[Page Bot Discovery] FB Accounts error:', e.response?.data || e.message);
+      }
+    }
+
+    if (!foundIgId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not auto-detect an Instagram Business/Creator account with this token. Please enter your Account ID manually.'
+      });
+    }
+
+    // Save discovered Bot Account ID to database
+    const updatePayload = { meta_ig_user_id: String(foundIgId) };
+    if (foundUsername && (!page.handle || page.handle.startsWith('@'))) {
+      updatePayload.handle = `@${foundUsername}`;
+    }
+    const updated = updateConnectedPage(pageId, updatePayload);
+
+    // If this is page 1 (gta6) or page 2 (tech), also keep global settings synced
+    if (page.slug === 'gta6') {
+      setSetting('meta_ig_user_id', String(foundIgId));
+    } else if (page.slug === 'tech') {
+      setSetting('tech_meta_ig_user_id', String(foundIgId));
+      if (foundUsername) setSetting('tech_instagram_handle', `@${foundUsername}`);
+    }
+
+    res.json({
+      success: true,
+      ig_user_id: foundIgId,
+      username: foundUsername,
+      page: updated,
+      message: `🎉 Successfully connected Bot Account ID: ${foundIgId} for "${updated.name}" (@${foundUsername || updated.handle})!`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.response?.data?.error?.message || err.message });
   }
 });
 
