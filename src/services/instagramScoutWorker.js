@@ -182,6 +182,30 @@ async function testScoutHealth(scoutId) {
 }
 
 /**
+ * Fetches fresh CSRF token from Instagram Web for authenticated session
+ */
+async function fetchCsrfToken(sessionId, accountId = '') {
+  try {
+    const cleanSession = sessionId ? sessionId.trim() : '';
+    const dsUser = accountId || cleanSession.split('%3A')[0] || cleanSession.split(':')[0] || '';
+    const res = await axios.get('https://www.instagram.com/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        'Cookie': `sessionid=${cleanSession}; ds_user_id=${dsUser};`
+      },
+      timeout: 8000,
+      validateStatus: s => s < 500
+    });
+    const cookies = res.headers['set-cookie'] || [];
+    for (const c of cookies) {
+      const m = c.match(/csrftoken=([^;]+)/);
+      if (m) return m[1];
+    }
+  } catch (e) {}
+  return '';
+}
+
+/**
  * Posts a trigger keyword comment on a target creator's reel via the Scout Account
  */
 async function postScoutComment({ postUrl, triggerKeyword, niche = 'all', scoutId = null }) {
@@ -215,34 +239,51 @@ async function postScoutComment({ postUrl, triggerKeyword, niche = 'all', scoutI
   console.log(`[Scout Worker] ⏳ Humanized pause (${(jitterMs / 1000).toFixed(1)}s) before commenting as @${scout.username}...`);
   await new Promise(r => setTimeout(r, jitterMs));
 
-  // 3. Attempt Comment Dispatch
+  // 3. Attempt Comment Dispatch via Verified Instagram Web API
   console.log(`[Scout Worker] 💬 Dispatching comment "${triggerKeyword}" on post ${shortcode} (PK: ${mediaPk}) via Scout @${scout.username}...`);
 
+  const cleanSession = (scout.session_id || '').trim();
+  const dsUser = scout.account_id || cleanSession.split('%3A')[0] || cleanSession.split(':')[0] || '';
+  const csrfToken = await fetchCsrfToken(cleanSession, dsUser);
+
   try {
-    const headers = buildScoutHeaders(scout.session_id);
-    const body = `comment_text=${encodeURIComponent(triggerKeyword.trim())}`;
+    const webHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Cookie': `sessionid=${cleanSession}; ds_user_id=${dsUser}; csrftoken=${csrfToken || 'missing'};`,
+      'X-CSRFToken': csrfToken || '',
+      'X-IG-App-ID': '936619743392459',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Origin': 'https://www.instagram.com',
+      'Referer': `https://www.instagram.com/p/${shortcode}/`
+    };
 
-    const res = await axios.post(`https://i.instagram.com/api/v1/media/${mediaPk}/comment/`, body, {
-      headers,
-      timeout: 15000
-    });
+    const res = await axios.post(
+      `https://www.instagram.com/api/v1/web/comments/${mediaPk}/add/`,
+      `comment_text=${encodeURIComponent(triggerKeyword.trim())}`,
+      { headers: webHeaders, timeout: 15000 }
+    );
 
-    if (res.data?.status === 'ok' || res.data?.comment) {
+    if (res.data?.status === 'ok' || res.data?.id || res.data?.comment) {
       incrementScoutUsage(scout.id);
-      console.log(`[Scout Worker] ✅ Successfully commented "${triggerKeyword}" on ${shortcode}! Comment ID: ${res.data?.comment?.pk || 'ok'}`);
+      const commentId = res.data?.id || res.data?.comment?.pk || 'ok';
+      console.log(`[Scout Worker] ✅ Successfully commented "${triggerKeyword}" on ${shortcode}! Comment ID: ${commentId}`);
       return {
         success: true,
         scoutUsername: scout.username,
         scoutId: scout.id,
-        commentPk: res.data?.comment?.pk || 'ok',
-        triggerKeyword
+        commentPk: commentId,
+        triggerKeyword,
+        method: 'instagram_web_api'
       };
     } else {
       throw new Error(res.data?.message || 'Instagram returned non-OK comment response');
     }
   } catch (err) {
     const errMsg = err.response?.data?.message || err.message;
-    console.warn(`[Scout Worker] Direct API comment notice: ${errMsg}`);
+    console.warn(`[Scout Worker] Web API comment notice: ${errMsg}`);
 
     // Fallback: Check if local Python microservice is active on port 8001
     try {
