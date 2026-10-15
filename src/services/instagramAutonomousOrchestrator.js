@@ -1,3 +1,4 @@
+const axios = require('axios');
 const path = require('path');
 const {
   getDb,
@@ -11,7 +12,8 @@ const {
   getAutonomousLogById,
   getAutonomousLogByShortcode,
   getBrandAssets,
-  getConnectedPageBySlug
+  getConnectedPageBySlug,
+  updateScoutHarvestJob
 } = require('../database');
 
 const { downloadInstagramMedia } = require('./instagramDownloaderService');
@@ -71,9 +73,31 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   const isVideo = Boolean(dlResult.is_video || dlResult.type === 'video' || dlResult.type === 'reel' || (dlResult.relative_url && dlResult.relative_url.endsWith('.mp4')));
   const isCarousel = Boolean(dlResult.is_carousel || dlResult.type === 'carousel' || (dlResult.slides && dlResult.slides.length > 1));
   const contentType = isVideo ? 'reel' : (isCarousel ? 'carousel' : 'photo');
-  const rawCaption = dlResult.caption || dlResult.title || '';
-  const rawHook = dlResult.title || (rawCaption ? rawCaption.split('\n')[0].substring(0, 140) : 'Instagram Post');
-  const author = dlResult.uploader || dlResult.owner || channelUsername || 'instagram';
+  let rawCaption = dlResult.caption || dlResult.title || '';
+  let rawHook = dlResult.title || (rawCaption ? rawCaption.split('\n')[0].substring(0, 140) : 'Instagram Post');
+  let author = dlResult.uploader || dlResult.owner || channelUsername || 'instagram';
+  let creatorPk = null;
+  let topComments = [];
+
+  // Query microservice /media/owner if shortcode is available to get authentic owner & top comments
+  if (shortcode && !shortcode.startsWith('post_')) {
+    try {
+      const ownerRes = await axios.get(`http://127.0.0.1:8001/media/owner?shortcode=${shortcode}`, { timeout: 8000 });
+      if (ownerRes.data && ownerRes.data.success) {
+        if (ownerRes.data.owner_username) author = ownerRes.data.owner_username;
+        if (ownerRes.data.owner_pk) creatorPk = ownerRes.data.owner_pk;
+        if (ownerRes.data.caption) {
+          rawCaption = ownerRes.data.caption;
+          rawHook = rawCaption.split('\n')[0].substring(0, 140);
+        }
+        if (Array.isArray(ownerRes.data.top_comments)) {
+          topComments = ownerRes.data.top_comments;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Autonomous Agent] Could not fetch /media/owner for ${shortcode}: ${err.message}`);
+    }
+  }
 
   // Gather media paths
   let mediaPaths = [];
@@ -130,7 +154,8 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       min_score_threshold: 70,
       destination,
       directPostOnly: Boolean(options.directPostOnly),
-      forceApprove: Boolean(options.forceApprove)
+      forceApprove: Boolean(options.forceApprove),
+      top_comments: topComments
     }),
     cleanseAndBrandMedia(mediaPaths, contentType, competitorHandles, destination)
   ]);
@@ -214,13 +239,16 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     harvestResult = await harvestLeadMagnet({
       source_post_url: postUrl,
       channel_username: author,
+      creator_pk: creatorPk,
       raw_caption: rawCaption,
       raw_hook: rawHook,
       repurposed_hook: rankResult.repurposed_hook,
       detected_topic: rankResult.detected_topic,
       detected_trigger_keyword: rankResult.detected_trigger_keyword,
       brand_handle: targetPage?.handle || brand?.brand_handle || '@harshparmar007__',
-      shortcode
+      shortcode,
+      top_comments: topComments,
+      telegram_chat_id: options.telegramChatId || options.telegram_chat_id || options.chatId || null
     });
 
     log = updateAutonomousLog(log.id, {
@@ -282,12 +310,21 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
   const postId = insertPost.lastInsertRowid;
   updateAutonomousLog(log.id, { staged_post_id: postId, destination_account: destination });
 
+  if (harvestResult && harvestResult.harvest_job_id) {
+    try {
+      updateScoutHarvestJob(harvestResult.harvest_job_id, { post_id: postId });
+    } catch (e) {
+      console.warn(`[Autonomous Agent] Could not link harvest job to post ${postId}: ${e.message}`);
+    }
+  }
+
   // ── Step 7: Check Auto-Pilot / Direct Publish Mode ───────────────────────
   const autoPilotGlobal = getSetting('instagram_autopilot_enabled', '0') === '1' || (targetPage?.autopilot_enabled === 1);
   const autoPilotChannel = channelId ? (getTrackedChannelById(channelId)?.auto_post_enabled === 1) : false;
   const shouldAutoPublish = Boolean(options.autoPublish || autoPilotGlobal || autoPilotChannel);
 
   let publishResult = null;
+  let publishError = null;
   if (shouldAutoPublish) {
     console.log(`[Autonomous Agent] 🚀 Auto-Publish is ACTIVE! Direct publishing post #${postId} via Meta/Microservice API to [${destination.toUpperCase()}]...`);
     try {
@@ -324,6 +361,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
       }
     } catch (pubErr) {
       console.error(`[Autonomous Agent] Auto-publish error: ${pubErr.message}`);
+      publishError = pubErr.message;
       log = updateAutonomousLog(log.id, { status: 'staged' });
     }
   } else {
@@ -337,6 +375,7 @@ async function processSinglePost(postUrlOrOptions, channelUsername = '', channel
     staged: true,
     published: Boolean(publishResult?.success),
     publishResult,
+    publishError,
     message: publishResult?.success
       ? `🎉 Autonomously processed and directly published post #${postId} to Instagram (${publishResult.permalink})!`
       : `🎉 Autonomously processed @${author} post: Fit Score ${rankResult.fit_score}/100, branded with our logo, and staged for publishing!`

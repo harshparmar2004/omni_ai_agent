@@ -255,7 +255,8 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
       destination: destination,
       autoPublish: true,
       directPostOnly: !isLeadMagnetWorkflow,
-      forceApprove: true
+      forceApprove: true,
+      telegramChatId: chatId
     });
     const log = result.log || {};
     const isApproved = log.llm_decision === 'APPROVED';
@@ -368,14 +369,14 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
       const successHtml = isDirectRepost ? [
         isPublished 
           ? `🎉 <b>Reel Successfully Published to ${targetHandle}!</b>`
-          : `🎬 <b>[Direct Viral Repost] Repurposed & Staged in Queue!</b>`,
+          : `🎬 <b>[Direct Viral Repost] Repurposed & Staged in Queue</b>`,
         ``,
         ...(isPublished ? [
           `🌐 <b>Live Instagram Reel:</b>`,
           `👉 <a href="${liveLink}">${liveLink}</a>`,
           ``
         ] : [
-          `⚠️ <b>Publishing Status:</b> Staged for Auto-Publishing (Meta container processing / queued)`,
+          `⚠️ <b>Publishing Status:</b> Staged in Queue (Not live on feed${result.publishError ? `: <i>${escapeHtml(result.publishError)}</i>` : ''})`,
           `🔗 <b>Original Reel Source:</b> <a href="https://www.instagram.com/p/${shortcode}/">https://www.instagram.com/p/${shortcode}/</a>`,
           ``
         ]),
@@ -402,14 +403,14 @@ async function executePostWorkflow({ trigger, page, rawUrl, shortcode, fromUser,
       ].join('\n') : [
         isPublished 
           ? `🚀 <b>Directly Published to Instagram!</b>`
-          : `🎉 <b>Successfully Repurposed & Staged in Queue!</b>`,
+          : `🎬 <b>Successfully Repurposed & Staged in Queue</b>`,
         ``,
         ...(isPublished ? [
           `🌐 <b>Live Instagram Post:</b>`,
           `👉 <a href="${liveLink}">${liveLink}</a>`,
           ``
         ] : [
-          `⚠️ <b>Publishing Status:</b> Staged for Publishing`,
+          `⚠️ <b>Publishing Status:</b> Staged in Queue (Not live on feed${result.publishError ? `: <i>${escapeHtml(result.publishError)}</i>` : ''})`,
           `🔗 <b>Original Post Source:</b> <a href="https://www.instagram.com/p/${shortcode}/">https://www.instagram.com/p/${shortcode}/</a>`,
           ``
         ]),
@@ -474,6 +475,47 @@ async function handleTelegramMessage(message) {
   // Extract Instagram URL (handles reels, p, tv, and mobile share queries)
   const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)[^\s]*/);
   if (!match) {
+    if (text.startsWith('/trace')) {
+      const parts = text.trim().split(/\s+/);
+      const traceShortcode = parts[1];
+      if (!traceShortcode) {
+        await sendTelegramMessage(chatId, 'ℹ️ <b>Usage:</b> <code>/trace &lt;shortcode&gt;</code>\nExample: <code>/trace Dc5kaDjETLZ</code>');
+        return;
+      }
+      const { getHarvestJobTrace } = require('./scoutHarvestJob');
+      const jobTrace = getHarvestJobTrace(traceShortcode);
+      if (!jobTrace) {
+        await sendTelegramMessage(chatId, `⚠️ No Scout harvest job found for shortcode <code>${escapeHtml(traceShortcode)}</code>.`);
+        return;
+      }
+
+      const tracesStr = jobTrace.traces.map(t => {
+        const time = t.time ? t.time.substring(11, 19) : '';
+        const ev = t.event || '';
+        const detailsStr = t.details ? JSON.stringify(t.details) : '';
+        return `• <code>[${time}]</code> <b>${escapeHtml(ev)}</b>${detailsStr ? `: <i>${escapeHtml(detailsStr.substring(0, 100))}</i>` : ''}`;
+      }).join('\n') || '<i>No events recorded.</i>';
+
+      const statusEmoji = jobTrace.status === 'captured' ? '🟢' : (jobTrace.status === 'listening' ? '🟡' : (jobTrace.status === 'no_reply' ? '🟠' : '🔴'));
+
+      const traceReport = [
+        `🕵️ <b>Scout Harvest Trace Report</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `📌 <b>Shortcode:</b> <code>${escapeHtml(jobTrace.shortcode)}</code>`,
+        `👤 <b>Target Creator:</b> @${escapeHtml(jobTrace.creator_username || 'unknown')} (PK: <code>${jobTrace.creator_pk || 'none'}</code>)`,
+        `🔑 <b>Trigger Keyword:</b> <code>${escapeHtml(jobTrace.trigger_keyword || 'none')}</code>`,
+        `📊 <b>Status:</b> ${statusEmoji} <b>${escapeHtml(jobTrace.status.toUpperCase())}</b>`,
+        `⚡ <b>Harvest Method:</b> <code>${escapeHtml(jobTrace.harvest_method || 'pending')}</code>`,
+        `🔗 <b>Captured Source Link:</b> ${jobTrace.harvested_url ? `<a href="${jobTrace.harvested_url}">${escapeHtml(jobTrace.harvested_url)}</a>` : '<i>Pending capture...</i>'}`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `📜 <b>Real-time Activity Log:</b>`,
+        tracesStr
+      ].join('\n');
+
+      await sendTelegramMessage(chatId, traceReport, { disable_web_page_preview: false });
+      return;
+    }
+
     if (text.startsWith('/start') || text.startsWith('/help')) {
       const activePages = getConnectedPages({ isActiveOnly: true });
       const pagesListStr = activePages.length > 0
@@ -493,6 +535,8 @@ async function handleTelegramMessage(message) {
         `3. Tap <b>Share</b> ➔ choose <b>Telegram</b> ➔ send to this bot.\n` +
         `4. <b>Interactive Selection:</b> The bot will ask which account you want to post to.\n` +
         `5. Tap the desired account button and the specialized pipeline runs autonomously!\n\n` +
+        `🔍 <b>Audit Commands:</b>\n` +
+        `• <code>/trace &lt;shortcode&gt;</code> — View real-time Scout comment & DM interception audit logs.\n\n` +
         `<i>Try sharing any Instagram Reel here right now!</i>`
       );
       return;

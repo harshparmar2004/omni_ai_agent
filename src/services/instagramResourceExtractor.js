@@ -14,137 +14,7 @@ const { searchWeb } = require('./webSearchService');
  * 4. Supplies structured extracted resources for InstaAuto / ManyChat comment-to-DM triggers.
  */
 
-// ── 1. High-Precision Curated Knowledge Map (Instant Zero-Latency Match) ───
-const KNOWN_RESOURCE_MAP = [
-  // Google Professional Certificates & Courses
-  {
-    keywords: ['advanced data analytics', 'google data analytics advanced'],
-    title: 'Google Advanced Data Analytics Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-advanced-data-analytics',
-    description: 'Master statistical analysis, regression modeling, Python machine learning, and predictive data science.'
-  },
-  {
-    keywords: ['cybersecurity', 'google cybersecurity'],
-    title: 'Google Cybersecurity Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-cybersecurity',
-    description: 'Network security architecture, Linux, SQL, SIEM tools (Chronicle), Python scripting, and incident response.'
-  },
-  {
-    keywords: ['generative ai leader', 'cloud certified generative ai leader', 'google cloud generative ai leader'],
-    title: 'Google Cloud Certified – Generative AI Leader Path',
-    platform: 'Google Cloud Skills Boost',
-    url: 'https://www.cloudskillsboost.google/paths/183',
-    description: 'Executive & technical roadmap on Generative AI principles, foundation models, Vertex AI, and enterprise safety.'
-  },
-  {
-    keywords: ['crash course on python', 'python crash course', 'google python'],
-    title: 'Google Crash Course on Python',
-    platform: 'Coursera (Google IT Automation)',
-    url: 'https://www.coursera.org/learn/python-crash-course',
-    description: 'Core Python syntax, data structures, object-oriented programming, and practical automation scripts.'
-  },
-  {
-    keywords: ['google generative ai', 'intro to generative ai', 'introduction to generative ai'],
-    title: 'Google Introduction to Generative AI Course',
-    platform: 'Google Cloud Skills Boost',
-    url: 'https://www.cloudskillsboost.google/course_templates/556',
-    description: 'Foundations of Gen AI, Large Language Models (LLMs), attention mechanisms, and Google Cloud AI studio tools.'
-  },
-  {
-    keywords: ['project management', 'google project management'],
-    title: 'Google Project Management Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-project-management',
-    description: 'Agile & Scrum frameworks, sprint planning, project charter development, risk mitigation, and Asana workflows.'
-  },
-  {
-    keywords: ['ai essentials', 'google ai essentials'],
-    title: 'Google AI Essentials Certificate',
-    platform: 'Coursera (Google)',
-    url: 'https://www.coursera.org/learn/google-ai-essentials',
-    description: 'Foundational AI literacy, rapid prompt engineering strategies, workflow automation, and ethical AI integration.'
-  },
-  {
-    keywords: ['google it support', 'it support professional'],
-    title: 'Google IT Support Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-it-support',
-    description: 'Computer networking, system administration, OS fundamentals (Linux/Windows), and cybersecurity basics.'
-  },
-  {
-    keywords: ['google data analytics', 'data analytics certificate'],
-    title: 'Google Data Analytics Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-data-analytics',
-    description: 'Data cleaning, SQL querying, R programming, spreadsheet calculation, and Tableau visual storytelling.'
-  },
-  {
-    keywords: ['digital marketing', 'google digital marketing', 'e-commerce'],
-    title: 'Google Digital Marketing & E-commerce Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-digital-marketing-ecommerce',
-    description: 'Search Engine Optimization (SEO), SEM, Google Analytics 4, email marketing, and Shopify store building.'
-  },
-  {
-    keywords: ['business intelligence', 'google business intelligence'],
-    title: 'Google Business Intelligence Professional Certificate',
-    platform: 'Coursera (Google Career Certificates)',
-    url: 'https://www.coursera.org/professional-certificates/google-business-intelligence',
-    description: 'Data modeling, BigQuery data pipelines, executive KPI dashboards, and business reporting architectures.'
-  },
-  // Global Computer Science & AI Titans
-  {
-    keywords: ['cs50', 'cs50x', 'harvard cs50'],
-    title: 'Harvard CS50: Introduction to Computer Science',
-    platform: 'Harvard University (edX / Harvard Online)',
-    url: 'https://pll.harvard.edu/course/cs50-introduction-computer-science',
-    description: 'World-renowned foundational computer science curriculum covering C, Python, SQL, algorithms, and web dev.'
-  },
-  {
-    keywords: ['cs50 ai', 'cs50ai', 'harvard cs50 ai'],
-    title: "Harvard CS50's Introduction to AI with Python",
-    platform: 'Harvard University (edX / Harvard Online)',
-    url: 'https://pll.harvard.edu/course/cs50s-introduction-artificial-intelligence-python',
-    description: 'Machine learning algorithms, search, optimization, neural networks, NLP, and reinforcement learning in Python.'
-  },
-  {
-    keywords: ['deeplearning.ai', 'ai for everyone', 'andrew ng'],
-    title: 'DeepLearning.AI: AI for Everyone by Andrew Ng',
-    platform: 'Coursera (DeepLearning.AI)',
-    url: 'https://www.coursera.org/learn/ai-for-everyone',
-    description: 'Non-technical and technical roadmap to AI technologies, capabilities, limitations, and organizational impact.'
-  },
-  {
-    keywords: ['prompt engineering for developers', 'chatgpt prompt engineering'],
-    title: 'ChatGPT Prompt Engineering for Developers',
-    platform: 'DeepLearning.AI',
-    url: 'https://www.deeplearning.ai/short-courses/chatgpt-prompt-engineering-for-developers/',
-    description: 'Direct LLM API orchestration, prompting best practices, few-shot conditioning, and chain-of-thought.'
-  },
-  {
-    keywords: ['system design primer', 'system design github'],
-    title: 'System Design Primer (GitHub Master Repo)',
-    platform: 'GitHub (100k+ Stars)',
-    url: 'https://github.com/donnemartin/system-design-primer',
-    description: 'Complete visual blueprint for scaling distributed systems, caching, SQL vs NoSQL, and load balancing.'
-  },
-  {
-    keywords: ['build your own x', 'build your own'],
-    title: 'Build Your Own X (Step-by-Step GitHub Guides)',
-    platform: 'GitHub (250k+ Stars)',
-    url: 'https://github.com/codecrafters-io/build-your-own-x',
-    description: 'Rebuild Git, Docker, Redis, SQLite, operating systems, and neural networks from ground zero.'
-  },
-  {
-    keywords: ['developer roadmap', 'roadmap.sh'],
-    title: 'Developer Roadmaps (roadmap.sh)',
-    platform: 'roadmap.sh Community',
-    url: 'https://roadmap.sh',
-    description: 'Interactive step-by-step career path guides for Backend, Frontend, DevOps, AI, and Software Architecture.'
-  }
-];
+// ── 1. Dynamic Web & Official Resource Resolver (Zero Hardcoded Fallbacks) ───
 
 /**
  * Extracts URLs and shortened links from raw text
@@ -231,38 +101,19 @@ function parseItemsFromCaption(caption = '') {
 }
 
 /**
- * Match an extracted title against the curated knowledge base
+ * Match an extracted title against the curated knowledge base (deprecated, returns null)
  */
 function matchKnownResource(title) {
-  const cleanTitle = title.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
-  for (const entry of KNOWN_RESOURCE_MAP) {
-    for (const kw of entry.keywords) {
-      if (cleanTitle.includes(kw)) {
-        return {
-          title: entry.title,
-          platform: entry.platform,
-          url: entry.url,
-          description: entry.description,
-          confidence: 'high',
-          source: 'curated_database'
-        };
-      }
-    }
-  }
   return null;
 }
 
 /**
- * Discover official URLs for items using web search fallback
+ * Discover official URLs for items using dynamic live web search
  */
 async function resolveResourceUrl(title, contextTopic = '') {
-  // 1. Try curated database
-  const known = matchKnownResource(title);
-  if (known) return known;
-
-  // 2. Fallback to live Web Search (DuckDuckGo / Google News RSS)
+  // Live Web Search for the specific item title
   try {
-    const query = `${title} official course certificate enrollment`;
+    const query = `${title} official direct portal`;
     const searchRes = await searchWeb(query, 3);
     if (searchRes && searchRes.length > 0) {
       const top = searchRes[0];
@@ -287,11 +138,11 @@ async function resolveResourceUrl(title, contextTopic = '') {
     console.warn(`[Resource Extractor] Web search error for "${title}":`, err.message);
   }
 
-  // 3. Fallback to Google Search Direct Query URL
+  // Fallback to Google Search Direct Query URL
   return {
     title,
     platform: 'Official Platform',
-    url: `https://www.google.com/search?q=${encodeURIComponent(title + ' official course enrollment certificate')}`,
+    url: `https://www.google.com/search?q=${encodeURIComponent(title)}`,
     description: `Direct access and verification portal for ${title}.`,
     confidence: 'inferred',
     source: 'google_search_index'
@@ -402,21 +253,6 @@ async function extractAndSynthesizeResources({
     }
   }
 
-  // Step 4: If still no items, provide curated defaults for the detected topic
-  if (resolvedResources.length === 0) {
-    console.log(`[Resource Extractor] ℹ️ No explicit bullet items found in text. Matching curated ${detectedTopic} master pack.`);
-    const fallbackItems = KNOWN_RESOURCE_MAP.slice(0, 5);
-    resolvedResources.push(...fallbackItems.map(item => ({
-      title: item.title,
-      platform: item.platform,
-      url: item.url,
-      description: item.description,
-      confidence: 'curated',
-      source: 'curated_database',
-      is_pdf: checkIsPdf(item.url)
-    })));
-  }
-
   // Determine Primary Resource & PDF URLs
   let primaryUrl = '';
   let extractedPdfUrl = '';
@@ -464,7 +300,6 @@ module.exports = {
   parseItemsFromCaption,
   resolveResourceUrl,
   matchKnownResource,
-  scrapeCreatorBioLink,
-  KNOWN_RESOURCE_MAP
+  scrapeCreatorBioLink
 };
 

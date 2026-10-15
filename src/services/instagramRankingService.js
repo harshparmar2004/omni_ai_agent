@@ -51,7 +51,7 @@ async function evaluateAndTransformPost(postData) {
       : `#${(targetNiche.split(/[\s,]+/)[0] || 'Viral').replace(/[^A-Za-z0-9]/g, '')} #Trending #ExplorePage #InstaDaily`);
 
   // Detect whether post genuinely has a DM trigger keyword or is a direct repost
-  const detectedIntentResult = detectPostIntent(caption, hook);
+  const detectedIntentResult = detectPostIntent(caption, hook, postData.top_comments);
   const detectedIntent = postData.directPostOnly ? 'direct_repost' : (postData.post_intent || detectedIntentResult.intent);
   const rawKeyword = postData.directPostOnly ? '' : (detectedIntentResult.keyword || '');
 
@@ -125,8 +125,8 @@ CRITICAL: If directPostOnly is YES or no comment-to-DM trigger keyword exists, s
     const fitScore = typeof parsed.fit_score === 'number' ? parsed.fit_score : 90;
     const isDirectSubmission = Boolean(postData.forceApprove || postData.directPostOnly || postData.isDirectSubmission);
     const decision = isDirectSubmission ? 'APPROVED' : (parsed.decision || (fitScore >= min_score_threshold ? 'APPROVED' : 'REJECTED'));
-    const finalIntent = postData.directPostOnly ? 'direct_repost' : ((parsed.post_intent === 'lead_magnet' || (rawKeyword && parsed.post_intent !== 'direct_repost')) ? 'lead_magnet' : 'direct_repost');
-    const finalKeyword = (finalIntent === 'lead_magnet' && !postData.directPostOnly) ? (parsed.detected_trigger_keyword || rawKeyword || 'GUIDE').toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+    const finalKeyword = (rawKeyword || parsed.detected_trigger_keyword || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const finalIntent = (postData.directPostOnly || !finalKeyword) ? 'direct_repost' : 'lead_magnet';
 
     const finalFitScore = isDirectSubmission ? Math.max(95, fitScore) : fitScore;
     const scoreBreakdown = {

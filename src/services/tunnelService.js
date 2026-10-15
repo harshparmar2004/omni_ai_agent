@@ -22,8 +22,8 @@ function launchCloudflareTunnel(port = 4000) {
   return new Promise((resolve) => {
     console.log(`[Tunnel Service] ⚡ Starting Cloudflare Edge Tunnel on port ${port}...`);
     
-    // Spawn npx cloudflared tunnel --url http://localhost:<port>
-    const cp = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://localhost:${port}`], {
+    // Spawn npx cloudflared tunnel --url http://127.0.0.1:<port>
+    const cp = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://127.0.0.1:${port}`], {
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });

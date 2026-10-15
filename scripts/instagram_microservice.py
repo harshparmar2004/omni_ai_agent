@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import asyncio
 import uvicorn
@@ -29,7 +30,7 @@ ig_client = Client()
 logged_in_user: Optional[str] = None
 
 SESSION_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "ig_session.json"))
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "omni_research.db"))
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "database.sqlite"))
 
 def ensure_scout_login():
     global logged_in_user
@@ -296,6 +297,50 @@ def instagrapi_info_by_url(url: str = Query(...)):
         # Fallback to public extraction via yt-dlp if session not active
         return get_media_info(url)
 
+@app.get("/media/owner")
+def get_media_owner(url: Optional[str] = Query(None), shortcode: Optional[str] = Query(None)):
+    """
+    Extracts authentic creator metadata (username, numeric PK, caption, top comments)
+    directly via instagrapi media_info and media_comments.
+    """
+    if not logged_in_user:
+        ensure_scout_login()
+    try:
+        if not url and not shortcode:
+            raise HTTPException(status_code=400, detail="Must provide either url or shortcode")
+        if shortcode:
+            try:
+                media_pk = ig_client.media_pk_from_code(shortcode)
+            except Exception:
+                media_pk = ig_client.media_pk_from_url(f"https://www.instagram.com/p/{shortcode}/")
+        else:
+            media_pk = ig_client.media_pk_from_url(url)
+
+        info = ig_client.media_info(media_pk)
+        caption = info.caption_text or ""
+        owner_username = info.user.username
+        owner_pk = str(info.user.pk)
+        owner_full_name = info.user.full_name or ""
+        
+        top_comments = []
+        try:
+            cmts = ig_client.media_comments(media_pk, amount=30)
+            top_comments = [c.text for c in cmts if c and c.text]
+        except Exception as ce:
+            print(f"[Microservice] Note: media_comments error: {ce}")
+            
+        return {
+            "success": True,
+            "media_pk": str(media_pk),
+            "owner_username": owner_username,
+            "owner_pk": owner_pk,
+            "owner_full_name": owner_full_name,
+            "caption": caption,
+            "top_comments": top_comments
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/media/clip/upload")
 def upload_reel(req: ClipUploadRequest):
     """
@@ -381,25 +426,222 @@ class CommentRequest(BaseModel):
     media_url: str
     text: str
 
+class CommentDeleteRequest(BaseModel):
+    media_url: Optional[str] = None
+    media_pk: Optional[str] = None
+    comment_pk: str
+
+class FollowRequest(BaseModel):
+    user_pk: Optional[str] = None
+    username: Optional[str] = None
+
+class ApproveRequest(BaseModel):
+    thread_id: str
+
 @app.post("/media/comment")
 def post_comment(req: CommentRequest):
     """
     Posts a comment (trigger keyword) on an Instagram post.
     Used by the Autonomous DM Harvester to trigger competitor DM automation.
+    Returns structured errors on feedback/action blocks.
     """
     if not logged_in_user:
-        raise HTTPException(status_code=401, detail="Please authenticate via /auth/login before commenting.")
+        ensure_scout_login()
+    if not logged_in_user:
+        raise HTTPException(status_code=401, detail="Please authenticate before commenting.")
     try:
         media_pk = ig_client.media_pk_from_url(req.media_url)
         comment = ig_client.media_comment(media_pk, req.text)
         return {
             "success": True,
             "comment_pk": str(comment.pk),
+            "media_pk": str(media_pk),
             "text": comment.text,
             "message": f"Successfully commented '{req.text}' on media {media_pk}"
         }
     except Exception as e:
+        err_msg = str(e)
+        err_type = type(e).__name__
+        print(f"[Microservice] ⚠️ Comment error ({err_type}): {err_msg}")
+        return {
+            "success": False,
+            "error": err_msg,
+            "error_type": err_type
+        }
+
+@app.delete("/media/comment")
+def delete_comment(req: CommentDeleteRequest):
+    """
+    Deletes the Scout account's comment from target media post.
+    """
+    if not logged_in_user:
+        ensure_scout_login()
+    try:
+        mpk = req.media_pk
+        if not mpk and req.media_url:
+            mpk = str(ig_client.media_pk_from_url(req.media_url))
+        if not mpk:
+            raise HTTPException(status_code=400, detail="media_url or media_pk required")
+        res = ig_client.comment_bulk_delete(mpk, [int(req.comment_pk)])
+        return {"success": bool(res), "message": f"Comment {req.comment_pk} deleted"}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/user/follow")
+def follow_user(req: FollowRequest):
+    """
+    Follows a creator using the Scout account to satisfy 'must follow to receive link' bots.
+    """
+    if not logged_in_user:
+        ensure_scout_login()
+    try:
+        upk = req.user_pk
+        if not upk and req.username:
+            upk = str(ig_client.user_id_from_username(req.username.replace("@", "").strip()))
+        if not upk:
+            raise HTTPException(status_code=400, detail="user_pk or username required")
+        res = ig_client.user_follow(upk)
+        return {"success": bool(res), "user_pk": upk}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/direct/approve_request")
+def approve_pending_thread(req: ApproveRequest):
+    """
+    Approves a message request thread so outbound replies can be sent.
+    """
+    if not logged_in_user:
+        ensure_scout_login()
+    try:
+        res = ig_client.direct_pending_approve(int(req.thread_id))
+        return {"success": bool(res), "thread_id": req.thread_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/direct/creator_messages")
+def get_creator_messages(
+    user_pk: Optional[str] = Query(None),
+    creator_pk: Optional[str] = Query(None),
+    username: Optional[str] = Query(None),
+    creator_username: Optional[str] = Query(None),
+    since_ts: Optional[float] = Query(0.0)
+):
+    """
+    Scans both Primary Inbox and Message Requests (pending inbox) for messages
+    from the target creator. Matches by numeric user PK or username.
+    Extracts text, ManyChat generic_xma CTA buttons, and direct link cards.
+    """
+    if not logged_in_user:
+        ensure_scout_login()
+    if not logged_in_user:
+        raise HTTPException(status_code=401, detail="Please authenticate before reading DMs.")
+
+    clean_uname = (username or creator_username or "").lower().replace("@", "").strip()
+    target_pk = str(user_pk or creator_pk).strip() if (user_pk or creator_pk) else None
+    
+    all_threads_with_folder = []
+    
+    # 1. Fetch Primary Inbox
+    try:
+        inbox_threads = ig_client.direct_threads(amount=15)
+        for t in inbox_threads:
+            all_threads_with_folder.append((t, "inbox"))
+    except Exception as ie:
+        print(f"[Microservice] Note: direct_threads error: {ie}")
+        
+    # 2. Fetch Message Requests (Pending Inbox)
+    try:
+        pending_threads = ig_client.direct_pending_inbox(amount=15)
+        for t in pending_threads:
+            all_threads_with_folder.append((t, "pending"))
+    except Exception as pe:
+        print(f"[Microservice] Note: direct_pending_inbox error: {pe}")
+        
+    for thread, folder in all_threads_with_folder:
+        user_pks = [str(u.pk) for u in thread.users]
+        usernames = [u.username.lower() for u in thread.users]
+        
+        matches = False
+        if target_pk and target_pk in user_pks:
+            matches = True
+        elif clean_uname and (clean_uname in usernames or any(clean_uname in u for u in usernames)):
+            matches = True
+            
+        if matches:
+            creator_uname = usernames[0] if usernames else (clean_uname or "creator")
+            creator_id = user_pks[0] if user_pks else (target_pk or "")
+            
+            parsed_messages = []
+            for m in thread.messages:
+                is_viewer = bool(getattr(m, 'is_sent_by_viewer', False))
+                if is_viewer:
+                    continue
+                    
+                msg_ts = 0.0
+                if hasattr(m, 'timestamp') and m.timestamp:
+                    if hasattr(m.timestamp, 'timestamp'):
+                        msg_ts = m.timestamp.timestamp()
+                    elif isinstance(m.timestamp, (int, float)):
+                        msg_ts = float(m.timestamp)
+                
+                # Filter by since_ts if provided (subtract small jitter margin of 5s)
+                if since_ts and msg_ts > 0 and msg_ts < (since_ts - 5):
+                    continue
+                    
+                msg_text = m.text or ""
+                xma_urls = []
+                xma_title = ""
+                
+                if hasattr(m, 'raw_xma') and m.raw_xma:
+                    xma_urls.extend(extract_urls_from_xma(m.raw_xma))
+                    try:
+                        gx_list = m.raw_xma.get('generic_xma', [])
+                        if gx_list and isinstance(gx_list[0], dict):
+                            xma_title = gx_list[0].get('title_text') or ""
+                    except Exception:
+                        pass
+                        
+                if hasattr(m, 'link') and m.link:
+                    if isinstance(m.link, dict):
+                        l_url = m.link.get('text') or m.link.get('link_context', {}).get('link_url')
+                        if l_url: xma_urls.append(l_url)
+                    elif hasattr(m.link, 'text') and m.link.text:
+                        xma_urls.append(m.link.text)
+                        
+                # Extract regex URLs from msg_text
+                text_urls = re.findall(r'(?:https?://|www\.)[^\s"\'<>\),]+', msg_text)
+                for tu in text_urls:
+                    clean_tu = tu.rstrip(".,;!?)]")
+                    if not clean_tu.startswith("http"): clean_tu = f"https://{clean_tu}"
+                    xma_urls.append(clean_tu)
+                    
+                xma_urls = list(dict.fromkeys(xma_urls))
+                
+                parsed_messages.append({
+                    "id": str(m.id),
+                    "user_id": str(m.user_id),
+                    "text": msg_text,
+                    "xma_title": xma_title,
+                    "item_type": m.item_type,
+                    "urls": xma_urls,
+                    "timestamp": msg_ts
+                })
+                
+            return {
+                "success": True,
+                "found": True,
+                "thread_id": str(thread.id),
+                "folder": folder,
+                "creator_username": creator_uname,
+                "creator_pk": creator_id,
+                "messages": parsed_messages
+            }
+            
+    return {
+        "success": True,
+        "found": False,
+        "messages": []
+    }
 
 def extract_urls_from_xma(raw_xma):
     urls = []

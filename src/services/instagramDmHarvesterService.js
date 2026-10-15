@@ -17,20 +17,54 @@ const { extractAndSynthesizeResources, scrapeCreatorBioLink } = require('./insta
 const MICROSERVICE_URL = 'http://localhost:8001';
 
 /**
- * High-precision regex to extract whatever keyword the creator told users to comment
- * (e.g. Comment "FREE", Comment “PROJECT”, Drop "LINK", Reply with "AI")
+ * Extracts consensus trigger keyword from top comments if multiple users comment the same word
  */
-function extractTriggerKeywordFromCaption(caption = '', hook = '') {
+function extractKeywordFromTopComments(topComments = []) {
+  if (!Array.isArray(topComments) || topComments.length === 0) return null;
+  const stopWords = new Set([
+    'THE', 'AND', 'FOR', 'YOU', 'THIS', 'WITH', 'NICE', 'GOOD', 'WOW', 'YES',
+    'COOL', 'BRO', 'SIR', 'DEAR', 'PLEASE', 'SEND', 'LINK', 'MORE', 'YOUR',
+    'FREE', 'REEL', 'POST', 'HELP', 'WANT', 'LOVE', 'GREAT', 'AWESOME'
+  ]);
+  const counts = {};
+  for (const c of topComments) {
+    if (!c || typeof c !== 'string') continue;
+    const words = c.trim().toUpperCase().split(/\s+/);
+    if (words.length <= 3) {
+      for (const w of words) {
+        const clean = w.replace(/[^A-Z0-9_-]/g, '');
+        if (clean.length >= 2 && clean.length <= 15 && !stopWords.has(clean) && !/^\d+$/.test(clean)) {
+          counts[clean] = (counts[clean] || 0) + 1;
+        }
+      }
+    }
+  }
+  let best = null;
+  let maxCount = 1;
+  for (const [w, cnt] of Object.entries(counts)) {
+    if (cnt > maxCount) {
+      maxCount = cnt;
+      best = w;
+    }
+  }
+  return best;
+}
+
+/**
+ * High-precision regex to extract whatever keyword the creator told users to comment
+ * Supports quotes, brackets, Hinglish (comment karo), colons, and comment consensus
+ */
+function extractTriggerKeywordFromCaption(caption = '', hook = '', topComments = []) {
   const text = `${hook || ''} ${caption || ''}`;
 
   // 1. Quoted / Bracketed keyword after Comment / Drop / Reply / Type / Send / DM / Message
-  // Matches: Comment "FREE", Comment ‘PROJECT’, Drop “LINK”, Type [CODE], DM (GUIDE), Comment the word "AGENT"
-  const quotedRegex = /(?:comment|drop|reply|type|send|dm|message)\s+(?:me\s+)?(?:below\s+with\s+|with\s+|the\s+word\s+)?["“'«\[\(]([A-Za-z0-9_-]{2,20})["”'»\]\)]/i;
+  // Matches: Comment "FREE", Comment ‘PROJECT’, Drop “LINK”, Type [CODE], DM (GUIDE), comment karo "AI"
+  const quotedRegex = /(?:comment|drop|reply|type|send|dm|message)\s*(?:karo|me|kar\s+do|krdo|down|below|here)?\s*[\p{Extended_Pictographic}\uFE0F\s:]*["“'«\[\(]([A-Za-z0-9_-]{2,20})["”'»\]\)]/iu;
   const matchQuoted = text.match(quotedRegex);
   if (matchQuoted) return matchQuoted[1].toUpperCase().trim();
 
   // 2. Colon / dash syntax: Comment: "PROJECT", Drop - CODE, Comment below: LINK
-  const colonRegex = /(?:comment|drop|reply|type|send|dm|message)\s*(?:below|down)?\s*[:\-]\s*["“'«]?([A-Za-z0-9_-]{2,20})["”'»]?/i;
+  const colonRegex = /(?:comment|drop|reply|type|send|dm|message)\s*(?:karo|below|down)?\s*[:\-]\s*["“'«]?([A-Za-z0-9_-]{2,20})["”'»]?/i;
   const matchColon = text.match(colonRegex);
   if (matchColon && !/^(the|a|an|here|link|this|below|down)$/i.test(matchColon[1])) {
     return matchColon[1].toUpperCase().trim();
@@ -62,6 +96,12 @@ function extractTriggerKeywordFromCaption(caption = '', hook = '') {
     if (r.test(text)) return kw;
   }
 
+  // 6. Check top comments consensus (if >=2 commenters posted the exact same keyword)
+  const commentKeyword = extractKeywordFromTopComments(topComments);
+  if (commentKeyword) {
+    return commentKeyword;
+  }
+
   // No DM automation trigger found
   return null;
 }
@@ -69,8 +109,8 @@ function extractTriggerKeywordFromCaption(caption = '', hook = '') {
 /**
  * Detects whether post requires DM automation or is a direct viral repost
  */
-function detectPostIntent(caption = '', hook = '') {
-  const keyword = extractTriggerKeywordFromCaption(caption, hook);
+function detectPostIntent(caption = '', hook = '', topComments = []) {
+  const keyword = extractTriggerKeywordFromCaption(caption, hook, topComments);
   if (keyword) {
     return {
       intent: 'lead_magnet',
@@ -248,151 +288,82 @@ async function pollCreatorDmResponse(creatorUsername, triggerKeyword, timeoutMs 
 }
 
 /**
- * Main execution flow: analyzes post, triggers DM automation, captures asset link,
- * and falls back to bio scraping & AI synthesis
+ * Main execution flow: analyzes post, dispatches asynchronous Scout harvest job,
+ * and returns immediately for responsive pipeline staging
  */
 async function harvestLeadMagnet(postData) {
   const {
     source_post_url = '',
     channel_username = '',
+    creator_pk = '',
+    top_comments = [],
     raw_caption = '',
     raw_hook = '',
-    repurposed_hook = '',
-    detected_topic = 'Software Engineering',
     shortcode = 'lead_magnet',
-    brand_handle = '@harshparmar007__'
+    post_id = null,
+    telegram_chat_id = null
   } = postData;
+
+  const { dispatchScoutHarvestJob } = require('./scoutHarvestJob');
+
+  // 1. Detect the exact CTA trigger keyword (e.g. "FREE", "GOOGLE", "PROJECT", "OOTTO")
+  const triggerKeyword = extractTriggerKeywordFromCaption(
+    raw_caption,
+    raw_hook || postData.detected_trigger_keyword,
+    top_comments
+  );
+
+  // 2. Check if link is already explicitly in caption
+  const captionLinks = extractLinksFromText(raw_caption).filter(l => 
+    !l.includes('instagram.com') && !l.includes('facebook.com') && !l.includes('ig.me')
+  );
 
   let deliverableUrl = '';
   let deliverableType = 'guide';
-  let commentPosted = false;
-  let dmReceived = false;
-  let harvestMethod = 'ai_synthesis';
-  let rawDmText = '';
-  let extractedResources = [];
-  let pdfUrl = '';
+  let harvestMethod = 'none';
 
-  // 1. Detect the exact CTA trigger keyword (e.g. "FREE", "GOOGLE", "PROJECT")
-  const triggerKeyword = extractTriggerKeywordFromCaption(raw_caption, raw_hook || postData.detected_trigger_keyword);
-
-  // 2. Check if link is already explicitly in caption
-  const captionLinks = extractLinksFromText(raw_caption).filter(l => !l.includes('instagram.com') && !l.includes('facebook.com'));
   if (captionLinks.length > 0) {
     deliverableUrl = await unshortenUrl(captionLinks[0]);
     deliverableType = detectDeliverableType(deliverableUrl);
     harvestMethod = 'caption_direct';
   }
 
-  // 3. TIER 1: Dedicated Scout Account Comment & Inbound DM Intercept
+  // 3. TIER 1: Dedicated Scout Background Harvest Job (Inbound ManyChat Intercept)
+  let harvestJob = null;
   if (!deliverableUrl && source_post_url && triggerKeyword) {
-    try {
-      const { executeScoutHarvestCycle } = require('./instagramScoutWorker');
-      const scoutHarvest = await executeScoutHarvestCycle({
-        postUrl: source_post_url,
-        triggerKeyword,
-        creatorUsername: channel_username,
-        niche: postData.niche || 'all'
-      });
-
-      if (scoutHarvest && scoutHarvest.success && scoutHarvest.url) {
-        deliverableUrl = scoutHarvest.url;
-        deliverableType = scoutHarvest.deliverableType || detectDeliverableType(scoutHarvest.url);
-        commentPosted = true;
-        dmReceived = true;
-        harvestMethod = 'scout_dm';
-        rawDmText = scoutHarvest.rawMessage || '';
-      }
-    } catch (scoutErr) {
-      console.warn(`[DM Harvester] Scout cycle notice: ${scoutErr.message}`);
-    }
-
-    // Secondary Tier 1 Fallback: Local microservice (:8001) if scout didn't capture
-    if (!deliverableUrl) {
-      const commentRes = await postCommentTrigger(source_post_url, triggerKeyword);
-      commentPosted = commentRes.success;
-
-      if (commentPosted) {
-        const dmRes = await pollCreatorDmResponse(channel_username, triggerKeyword, 35000);
-        if (dmRes && dmRes.url) {
-          deliverableUrl = dmRes.url;
-          deliverableType = dmRes.type;
-          dmReceived = true;
-          harvestMethod = 'creator_dm';
-          rawDmText = dmRes.rawMessage;
-        }
-      }
-    }
-  }
-
-  // 4. TIER 2: Creator Bio & Linktree Deep Scraper Fallback
-  if (!deliverableUrl && channel_username) {
-    try {
-      const bioUrl = await scrapeCreatorBioLink(channel_username);
-      if (bioUrl) {
-        deliverableUrl = await unshortenUrl(bioUrl);
-        deliverableType = detectDeliverableType(deliverableUrl);
-        harvestMethod = 'creator_bio';
-      }
-    } catch (bioErr) {
-      console.warn(`[DM Harvester] Bio scrape notice: ${bioErr.message}`);
-    }
-  }
-
-  // 5. TIER 3: Autonomous AI Resource Extractor & Link Synthesizer
-  // Ensures all individual course/project links are verified and master guide is ready
-  try {
-    const synRes = await extractAndSynthesizeResources({
-      postUrl: source_post_url,
-      channelUsername: channel_username,
-      rawCaption: raw_caption,
-      rawHook: raw_hook || repurposed_hook || '',
-      detectedTopic: detected_topic,
-      detectedTriggerKeyword: triggerKeyword,
-      brandHandle: brand_handle
+    harvestJob = await dispatchScoutHarvestJob({
+      shortcode,
+      sourcePostUrl: source_post_url,
+      creatorUsername: channel_username,
+      creatorPk: creator_pk || '',
+      triggerKeyword,
+      postId: post_id,
+      telegramChatId: telegram_chat_id
     });
-
-    if (synRes && synRes.success) {
-      extractedResources = synRes.resources || [];
-      pdfUrl = synRes.pdf_url;
-
-      // If ManyChat DM was not captured, use the authentic extracted creator resource link
-      if (!deliverableUrl) {
-        deliverableUrl = synRes.primary_resource_url || synRes.deliverable_url;
-        deliverableType = synRes.is_pdf ? 'pdf' : 'resource_link';
-        harvestMethod = 'creator_resource_extraction';
-      }
-      if (!pdfUrl && synRes.pdf_url) {
-        pdfUrl = synRes.pdf_url;
-      }
-    }
-  } catch (synErr) {
-    console.warn(`[DM Harvester] Link extraction notice: ${synErr.message}`);
+    harvestMethod = 'scout_dm_queued';
   }
 
-  // 6. Ultimate Safety Net: fallback to authentic creator source post URL (never a synthetic PDF)
+  // 4. Default fallback deliverable URL while background harvest runs
   if (!deliverableUrl) {
     deliverableUrl = source_post_url || '';
     deliverableType = 'source_post';
   }
 
-  const isPdfDeliverable = Boolean(pdfUrl || deliverableUrl.toLowerCase().endsWith('.pdf') || deliverableUrl.toLowerCase().includes('.pdf?'));
-
   return {
     success: true,
+    harvest_job_id: harvestJob ? harvestJob.id : null,
     harvested_deliverable_url: deliverableUrl,
-    harvested_deliverable_type: isPdfDeliverable ? 'pdf' : deliverableType,
-    pdf_url: pdfUrl || (isPdfDeliverable ? deliverableUrl : ''),
-    extracted_resources: extractedResources,
+    harvested_deliverable_type: deliverableType,
+    pdf_url: '',
+    extracted_resources: [],
     detected_trigger_keyword: triggerKeyword,
-    dm_comment_posted: commentPosted,
-    dm_response_received: dmReceived,
+    dm_comment_posted: Boolean(triggerKeyword),
+    dm_response_received: false,
     dm_harvest_method: harvestMethod,
-    raw_dm_text: rawDmText,
-    message: dmReceived 
-      ? `🎯 Successfully intercepted ManyChat DM link: ${deliverableUrl}`
-      : (isPdfDeliverable 
-          ? `📄 Armed with extracted creator PDF: ${deliverableUrl}`
-          : `🔗 Armed with authentic creator resource: ${deliverableUrl} (${extractedResources.length} resources)`)
+    raw_dm_text: '',
+    message: triggerKeyword 
+      ? `🔎 Scout @cute.aarohi.007 is hunting the source link in the background for keyword "${triggerKeyword}"...`
+      : `🎬 Direct Viral Repost (No trigger keyword promised).`
   };
 }
 

@@ -291,6 +291,35 @@ function initSchema(db) {
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_scout_accounts_status ON scout_accounts(status);
+
+    -- 14. Autonomous Scout Harvest Jobs (v6.0 Grounded Pipeline)
+    CREATE TABLE IF NOT EXISTS scout_harvest_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shortcode TEXT NOT NULL,
+      source_post_url TEXT NOT NULL,
+      creator_username TEXT NOT NULL,
+      creator_pk TEXT DEFAULT '',
+      trigger_keyword TEXT DEFAULT '',
+      scout_username TEXT DEFAULT '',
+      comment_pk TEXT DEFAULT '',
+      media_pk TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending', -- pending, resolving, keyword_found, commented, listening, captured, no_reply, failed, direct_repost
+      harvest_stage TEXT DEFAULT 'init',
+      harvest_method TEXT DEFAULT '', -- scout_dm, creator_bio, caption_direct, none
+      harvested_url TEXT DEFAULT '',
+      raw_dm_text TEXT DEFAULT '',
+      extracted_links TEXT DEFAULT '[]',
+      attempt_count INTEGER DEFAULT 0,
+      bot_replies_count INTEGER DEFAULT 0,
+      post_id INTEGER,
+      telegram_chat_id TEXT,
+      error_message TEXT DEFAULT '',
+      trace_log TEXT DEFAULT '[]',
+      started_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_harvest_jobs_shortcode ON scout_harvest_jobs(shortcode);
+    CREATE INDEX IF NOT EXISTS idx_harvest_jobs_status ON scout_harvest_jobs(status);
   `);
 
   // ─── v2.0, v3.0, v4.0 & v5.0 Schema Migration ─────────────────────────────
@@ -1380,14 +1409,33 @@ function getScoutAccountByUsername(username) {
 
 function getActiveScout(niche = 'all') {
   const db = getDb();
+
+  // Auto-reset hourly and daily counters if time windows have passed
+  try {
+    const allScouts = db.prepare('SELECT id, last_comment_at, hourly_comments_count, daily_comments_count FROM scout_accounts').all();
+    const now = Date.now();
+    for (const s of allScouts) {
+      if (s.last_comment_at) {
+        const lastTime = new Date(s.last_comment_at).getTime();
+        const hoursPassed = (now - lastTime) / (1000 * 60 * 60);
+        if (hoursPassed >= 1 && s.hourly_comments_count > 0) {
+          db.prepare('UPDATE scout_accounts SET hourly_comments_count = 0 WHERE id = ?').run(s.id);
+        }
+        if (hoursPassed >= 24 && s.daily_comments_count > 0) {
+          db.prepare('UPDATE scout_accounts SET daily_comments_count = 0 WHERE id = ?').run(s.id);
+        }
+      }
+    }
+  } catch (resetErr) {}
+
   let scout = null;
   if (niche && niche !== 'all') {
     scout = db.prepare(`
       SELECT * FROM scout_accounts 
       WHERE status = 'active' 
         AND (assigned_niche = ? OR assigned_niche = 'all')
-        AND hourly_comments_count < 5
-        AND daily_comments_count < 20
+        AND hourly_comments_count < 10
+        AND daily_comments_count < 50
       ORDER BY last_comment_at ASC NULLS FIRST, id ASC
       LIMIT 1
     `).get(niche);
@@ -1396,8 +1444,17 @@ function getActiveScout(niche = 'all') {
     scout = db.prepare(`
       SELECT * FROM scout_accounts 
       WHERE status = 'active'
-        AND hourly_comments_count < 5
-        AND daily_comments_count < 20
+        AND hourly_comments_count < 10
+        AND daily_comments_count < 50
+      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
+      LIMIT 1
+    `).get();
+  }
+  // Fallback to active scout if single scout account configured
+  if (!scout) {
+    scout = db.prepare(`
+      SELECT * FROM scout_accounts 
+      WHERE status = 'active'
       ORDER BY last_comment_at ASC NULLS FIRST, id ASC
       LIMIT 1
     `).get();
@@ -1476,6 +1533,101 @@ function resetScoutHourlyCounters() {
   db.prepare(`UPDATE scout_accounts SET hourly_comments_count = 0`).run();
 }
 
+// ─── 14. Scout Harvest Jobs (v6.0 Grounded Pipeline) ─────────────────────────
+function createScoutHarvestJob(data) {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const res = db.prepare(`
+    INSERT INTO scout_harvest_jobs (
+      shortcode, source_post_url, creator_username, creator_pk,
+      trigger_keyword, scout_username, comment_pk, media_pk,
+      status, harvest_stage, harvest_method, harvested_url,
+      raw_dm_text, extracted_links, attempt_count, bot_replies_count,
+      post_id, telegram_chat_id, error_message, trace_log, started_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    data.shortcode,
+    data.source_post_url,
+    data.creator_username || '',
+    data.creator_pk || '',
+    data.trigger_keyword || '',
+    data.scout_username || '',
+    data.comment_pk || '',
+    data.media_pk || '',
+    data.status || 'pending',
+    data.harvest_stage || 'init',
+    data.harvest_method || '',
+    data.harvested_url || '',
+    data.raw_dm_text || '',
+    JSON.stringify(data.extracted_links || []),
+    data.attempt_count || 0,
+    data.bot_replies_count || 0,
+    data.post_id || null,
+    data.telegram_chat_id ? String(data.telegram_chat_id) : null,
+    data.error_message || '',
+    JSON.stringify(data.trace_log || [{ time: now, event: 'job_created' }]),
+    now
+  );
+  return getScoutHarvestJobById(res.lastInsertRowid);
+}
+
+function getScoutHarvestJobById(id) {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM scout_harvest_jobs WHERE id = ?').get(id);
+  if (!row) return null;
+  try { row.extracted_links = JSON.parse(row.extracted_links || '[]'); } catch (e) { row.extracted_links = []; }
+  try { row.trace_log = JSON.parse(row.trace_log || '[]'); } catch (e) { row.trace_log = []; }
+  return row;
+}
+
+function getScoutHarvestJobByShortcode(shortcode) {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM scout_harvest_jobs WHERE shortcode = ? ORDER BY id DESC LIMIT 1').get(shortcode);
+  if (!row) return null;
+  try { row.extracted_links = JSON.parse(row.extracted_links || '[]'); } catch (e) { row.extracted_links = []; }
+  try { row.trace_log = JSON.parse(row.trace_log || '[]'); } catch (e) { row.trace_log = []; }
+  return row;
+}
+
+function updateScoutHarvestJob(id, updates) {
+  const db = getDb();
+  const allowed = [
+    'creator_username', 'creator_pk', 'trigger_keyword', 'scout_username',
+    'comment_pk', 'media_pk', 'status', 'harvest_stage', 'harvest_method',
+    'harvested_url', 'raw_dm_text', 'extracted_links', 'attempt_count',
+    'bot_replies_count', 'post_id', 'telegram_chat_id', 'error_message',
+    'trace_log', 'completed_at'
+  ];
+  const fields = [];
+  const values = [];
+  for (const k of allowed) {
+    if (updates[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      let val = updates[k];
+      if ((k === 'extracted_links' || k === 'trace_log') && typeof val !== 'string') {
+        val = JSON.stringify(val);
+      }
+      values.push(val);
+    }
+  }
+  if (fields.length === 0) return getScoutHarvestJobById(id);
+  values.push(id);
+  db.prepare(`UPDATE scout_harvest_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return getScoutHarvestJobById(id);
+}
+
+function appendScoutHarvestTrace(id, event, details = {}) {
+  const job = getScoutHarvestJobById(id);
+  if (!job) return;
+  const traces = Array.isArray(job.trace_log) ? job.trace_log : [];
+  traces.push({
+    time: new Date().toISOString(),
+    event,
+    details
+  });
+  updateScoutHarvestJob(id, { trace_log: traces });
+}
+
 module.exports = {
   getDb,
   getSetting,
@@ -1522,5 +1674,10 @@ module.exports = {
   updateScoutAccount,
   deleteScoutAccount,
   incrementScoutUsage,
-  resetScoutHourlyCounters
+  resetScoutHourlyCounters,
+  createScoutHarvestJob,
+  getScoutHarvestJobById,
+  getScoutHarvestJobByShortcode,
+  updateScoutHarvestJob,
+  appendScoutHarvestTrace
 };

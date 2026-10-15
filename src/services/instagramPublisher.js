@@ -1,7 +1,7 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
-const { getSetting, getConnectedPageBySlug } = require('../database');
+const { getSetting, getConnectedPageBySlug, addAutomationEvent } = require('../database');
 const { ensureTunnelOnline, getTunnelUrl } = require('./tunnelService');
 
 /**
@@ -458,9 +458,14 @@ async function executePublishPipeline(postId, publishVia = null) {
   let pubResult = null;
   let publishMethod = 'Meta Graph API v21.0';
 
-  // 1. Check if REST microservice should be targeted or actively used
+  // 1. Resolve destination credentials
+  const destination = post.destination_account || 'gta6';
+  const creds = resolvePublishCredentials(destination);
+  const hasMetaCredentials = Boolean(creds.pageToken && creds.igUserId && creds.pageToken.length > 20);
+
+  // 2. Check if REST microservice should be targeted or actively used
   const microHealth = await checkMicroserviceHealth().catch(() => ({ online: false }));
-  const useMicroservice = publishVia === 'rest_microservice' || (publishVia !== 'meta_api' && microHealth.online && microHealth.loggedInUser);
+  const useMicroservice = publishVia === 'rest_microservice' || (publishVia !== 'meta_api' && !hasMetaCredentials && microHealth.online && microHealth.loggedInUser);
 
   if (useMicroservice) {
     console.log(`[IG Publisher Pipeline] 🚀 Publishing Post #${postId} via FastAPI REST Microservice (instagrapi)...`);
@@ -500,7 +505,6 @@ async function executePublishPipeline(postId, publishVia = null) {
     }
   } else {
     // 2. Publish via official Meta Content Publishing API v21.0
-    const destination = post.destination_account || 'gta6';
     console.log(`[IG Publisher Pipeline] 🚀 Publishing Post #${postId} (${post.content_type}) via Meta Graph API v21.0 [Destination: ${destination.toUpperCase()}]...`);
     if (post.content_type === 'carousel') {
       const candidateUrls = mediaUrls.length > 0 ? mediaUrls : [post.thumbnail_url].filter(Boolean);
@@ -541,7 +545,6 @@ async function executePublishPipeline(postId, publishVia = null) {
   const keyword = (post.trigger_keyword || 'GUIDE').toUpperCase();
   const deliverableUrl = post.deliverable_url || post.pdf_url || '';
 
-  const { getSetting, addAutomationEvent } = require('../database');
   const dmTemplate = getSetting(
     'instaauto_dm_template',
     'Hey {username}! 👋 Thanks for commenting on our reel. Here is the verified resource you requested: {deliverable_url} 🚀 Save this link and let us know if you need anything!'

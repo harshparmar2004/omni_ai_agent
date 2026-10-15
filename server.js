@@ -53,7 +53,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log('\n======================================================');
   console.log('🚀 OMNIRESEARCH AI — Autonomous Content & Deep Research Engine');
   console.log(`🌐 Local Web Dashboard: http://localhost:${PORT}`);
@@ -74,8 +74,9 @@ app.listen(PORT, () => {
   // Start Self-Healing Public Tunnel for Meta Graph API uploads
   startTunnel(PORT).catch(e => console.warn('[Tunnel Boot Notice]:', e.message));
 
-  // Start Mobile Share-to-DM Inbound Listener
-  startMobileDmListener(12000);
+  // Mobile inbound is handled in real-time via Telegram & on-demand Scout Harvester
+  // (startMobileDmListener disabled to protect @cute.aarohi.007 from redundant background polling)
+  // startMobileDmListener(12000);
 
   // Start Telegram Mobile Inbound Listener (if token configured)
   startTelegramListener();
