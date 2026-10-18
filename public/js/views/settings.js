@@ -1,763 +1,408 @@
 /**
- * OmniStudio v7 — Settings & System Health View
- * Feature Box Architecture with plain creator-friendly wording:
- * - Each setting lives in its own dedicated, rounded white box (.setting-box)
- * - Plain English points: 📌 Purpose, 🛡️ Safety, 💡 Tip
- * - Interactive visual choice cards and quick preset triggers
+ * OmniStudio v7 — System & Security Settings View
+ * Minimalist, row-based layout adhering strictly to Cloud Minimalist design:
+ * - Scoped <SettingRow> and <SettingsSection> helper components
+ * - Plain 20px section headings + single white 12px radius card with hairline dividers
+ * - No badges, no chips, no number boxes, no dots, no decorative emojis in titles
+ * - 15px title, 13px description, 12px muted hint; 40px inputs with 8px radius
  */
 window.settingsView = (function() {
-  // State for interactive choice cards
+  // State for interactive segmented controls
   let activePostMode = 'review';
   let activeNightCooldown = '1';
   let activeSurveillanceState = '0';
+
+  /**
+   * Reusable Settings Section Component
+   */
+  function createSettingsSection({ title, description, content }) {
+    return `
+      <div class="settings-section-v2">
+        <div class="settings-section-header-v2">
+          <h3 class="settings-section-title-v2">${title}</h3>
+          ${description ? `<p class="settings-section-desc-v2">${description}</p>` : ''}
+        </div>
+        <div class="settings-card-v2">
+          ${content}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Reusable Setting Row Component
+   */
+  function createSettingRow({ title, description, hint = '', control = '' }) {
+    return `
+      <div class="settings-row-v2">
+        <div class="settings-row-info-v2">
+          <div class="settings-row-title-v2">${title}</div>
+          ${description ? `<div class="settings-row-desc-v2">${description}</div>` : ''}
+          ${hint ? `<div class="settings-row-hint-v2">${hint}</div>` : ''}
+        </div>
+        <div class="settings-row-control-v2">
+          ${control}
+        </div>
+      </div>
+    `;
+  }
 
   async function render() {
     const container = document.getElementById('view-settings');
     if (!container) return;
 
+    // ── SECTION 01: Telegram Mobile Bot & Security ───────────────
+    const section1Html = createSettingsSection({
+      title: 'Telegram Mobile Bot & Security',
+      description: 'Send reels from your phone via Telegram to post directly to your Instagram page.',
+      content: [
+        createSettingRow({
+          title: 'Bot Connection Token',
+          description: 'Connects your private Telegram bot so the reposter agent can receive reel links you share. Stored encrypted locally.',
+          hint: 'Create a bot for free by messaging <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); font-weight: 500;">@BotFather ↗</a> on Telegram.',
+          control: `
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <input type="password" id="st-tg-token" class="settings-input settings-input-mono" placeholder="Paste bot token here">
+              <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-tg-token', this)">Show</button>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Authorized Users',
+          description: 'Only people whose numeric Telegram User IDs are listed here can trigger reposts. Unauthorized senders are blocked.',
+          hint: 'Find your ID by messaging @userinfobot on Telegram. Separate multiple IDs with commas.',
+          control: `
+            <input type="text" id="st-tg-chats" class="settings-input settings-input-mono" placeholder="e.g. 5443723531, 987654321">
+          `
+        }),
+        createSettingRow({
+          title: 'Live Notifications',
+          description: 'Send real-time progress alerts to your Telegram chat as reels move through download, AI copywriting, and publishing.',
+          hint: 'Immediately alerts you if Instagram rejects a video file so you can fix it right away.',
+          control: `
+            <label class="settings-switch">
+              <input type="checkbox" id="st-tg-notifs" checked>
+              <span class="settings-switch-slider"></span>
+            </label>
+          `
+        }),
+        createSettingRow({
+          title: 'Test Telegram Connection',
+          description: 'Send an instant test ping to your Telegram app right now to verify connectivity.',
+          hint: '',
+          control: `
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <button type="button" class="settings-btn-outlined" id="st-btn-test-tg" onclick="settingsView.testTelegram()">Test Telegram Connection</button>
+              <span id="st-tg-test-status" class="settings-status-muted"></span>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
+    // ── SECTION 02: Watchtower Competitor Surveillance ──────────
+    const section2Html = createSettingsSection({
+      title: 'Watchtower Competitor Surveillance',
+      description: 'Autonomous scanner that monitors competitor feeds and finds top viral reels for you.',
+      content: [
+        createSettingRow({
+          title: 'Scan Cadence',
+          description: 'How many hours Watchtower waits between checking monitored accounts. Automatically adds 11 to 35 random minutes of human jitter.',
+          hint: 'Recommended: 3 hours.',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <div class="settings-segmented" id="st-cadence-segmented">
+                <button type="button" class="settings-segment-btn" data-hours="1" onclick="settingsView.setCadence(1)">1h</button>
+                <button type="button" class="settings-segment-btn" data-hours="2" onclick="settingsView.setCadence(2)">2h</button>
+                <button type="button" class="settings-segment-btn active" data-hours="3" onclick="settingsView.setCadence(3)">3h</button>
+                <button type="button" class="settings-segment-btn" data-hours="6" onclick="settingsView.setCadence(6)">6h</button>
+              </div>
+              <div class="settings-number-unit-row">
+                <input type="number" id="st-wt-interval" class="settings-input settings-input-number" min="1" max="24" value="3" oninput="settingsView.updateCadenceButtons(this.value)">
+                <span class="settings-unit-label">hours interval</span>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Viral Reel Quality Filter',
+          description: 'Evaluates view velocity, like ratios, and comments to score each discovered reel from 0 to 100. Low-engagement reels are filtered out.',
+          hint: '75 points ensures you only stage the top 25% best performing reels.',
+          control: `
+            <div class="settings-number-unit-row">
+              <input type="number" id="st-wt-min-score" class="settings-input settings-input-number" min="10" max="100" value="75">
+              <span class="settings-unit-label">/ 100 points minimum</span>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Night Sleep Mode',
+          description: 'Pauses all scanning between 1:00 AM and 6:30 AM local time to match human sleeping patterns and avoid bot detection.',
+          hint: 'Recommended: Keep enabled to protect your accounts.',
+          control: `
+            <div class="settings-choice-segmented">
+              <div class="settings-choice-btn active" id="card-night-1" onclick="settingsView.selectNightCooldown('1')">
+                <div class="settings-choice-label">Sleep Mode</div>
+                <div class="settings-choice-sub">Pause 1:00 AM – 6:30 AM</div>
+              </div>
+              <div class="settings-choice-btn" id="card-night-0" onclick="settingsView.selectNightCooldown('0')">
+                <div class="settings-choice-label">24h Non-Stop</div>
+                <div class="settings-choice-sub">Scan continuously all night</div>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Master Surveillance Switch',
+          description: 'Turn Watchtower background scanning on or pause sweeps temporarily.',
+          hint: '',
+          control: `
+            <div class="settings-choice-segmented">
+              <div class="settings-choice-btn active" id="card-surv-0" onclick="settingsView.selectSurveillanceState('0')">
+                <div class="settings-choice-label">Active Radar</div>
+                <div class="settings-choice-sub">Scanning feeds automatically</div>
+              </div>
+              <div class="settings-choice-btn" id="card-surv-1" onclick="settingsView.selectSurveillanceState('1')">
+                <div class="settings-choice-label">Standby</div>
+                <div class="settings-choice-sub">Temporarily pause scans</div>
+              </div>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
+    // ── SECTION 03: Live Video Delivery Link (Cloudflare) ────────
+    const section3Html = createSettingsSection({
+      title: 'Live Video Delivery Link (Cloudflare)',
+      description: 'Secure public address that allows Instagram to download your processed videos.',
+      content: [
+        createSettingRow({
+          title: 'Public Video Download URL',
+          description: 'When posting a reel, Instagram downloads the 1080p MP4 file from this secure link. Runs through Cloudflare edge tunnel.',
+          hint: '',
+          control: `
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <input type="text" id="st-tunnel-url" class="settings-input settings-input-mono" readonly style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; background: var(--bg-canvas); color: var(--accent-primary);">
+              <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.copyTunnelUrl()">Copy</button>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Connection Health & Speed',
+          description: 'Verifies Instagram can reach your machine right now to download video files, and displays round-trip latency.',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <div id="st-tunnel-status-box" class="settings-status-box">Checking connection status...</div>
+              <button type="button" class="settings-btn-outlined" onclick="settingsView.testTunnel()">Test Video Delivery Link</button>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
+    // ── SECTION 04: Storage & System Health ───────────────────────
+    const section4Html = createSettingsSection({
+      title: 'Storage & System Health',
+      description: 'Automatic disk cleanup for old video files and system health diagnosis.',
+      content: [
+        createSettingRow({
+          title: 'Automatic Video Cleanup',
+          description: 'Automatically removes posted video files from your computer after this many hours. Only deletes videos already published to Instagram.',
+          hint: 'Recommended: 48 hours.',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+              <div class="settings-number-unit-row">
+                <input type="number" id="st-retention-hours" class="settings-input settings-input-number" min="6" max="168" value="48">
+                <span class="settings-unit-label">hours retention</span>
+              </div>
+              <button type="button" class="settings-btn-outlined danger-btn" onclick="settingsView.pruneMedia()">Clean Up Old Videos Now</button>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'System Health Diagnostics',
+          description: 'Checks all 4 core platform layers at once: Database, Instagram Meta API, Cloudflare edge tunnel, and Telegram bot.',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+              <div class="settings-diag-grid">
+                <div class="settings-diag-item">
+                  <span class="settings-diag-label">Database</span>
+                  <span id="st-diag-db" class="settings-status-success">Connected</span>
+                </div>
+                <div class="settings-diag-item">
+                  <span class="settings-diag-label">Instagram Meta</span>
+                  <span id="st-diag-meta" class="settings-status-success">Active</span>
+                </div>
+                <div class="settings-diag-item">
+                  <span class="settings-diag-label">Cloudflare</span>
+                  <span id="st-diag-tunnel" class="settings-status-success">Active</span>
+                </div>
+                <div class="settings-diag-item">
+                  <span class="settings-diag-label">Telegram</span>
+                  <span id="st-diag-tg" class="settings-status-success">Active</span>
+                </div>
+              </div>
+              <button type="button" class="settings-btn-outlined" onclick="settingsView.runDiagnostics()">Run Diagnostics Check</button>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
+    // ── SECTION 05: Publishing Engine & Page Defaults ────────────
+    const section5Html = createSettingsSection({
+      title: 'Publishing Engine & Page Defaults',
+      description: 'Posting approval mode, video container specifications, brand watermark positioning, Meta credentials, and AI copywriter.',
+      content: [
+        createSettingRow({
+          title: 'Post Approval Mode',
+          description: 'Choose whether harvested reels wait in your Queue for manual approval or post automatically when discovered.',
+          hint: 'Recommended: Review First for maximum feed quality.',
+          control: `
+            <div class="settings-choice-segmented">
+              <div class="settings-choice-btn active" id="card-mode-review" onclick="settingsView.selectPostMode('review')">
+                <div class="settings-choice-label">Review First</div>
+                <div class="settings-choice-sub">Approve captions in Queue</div>
+              </div>
+              <div class="settings-choice-btn" id="card-mode-direct" onclick="settingsView.selectPostMode('direct')">
+                <div class="settings-choice-label">Auto-Publish</div>
+                <div class="settings-choice-sub">Post instantly when discovered</div>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Video Container Format',
+          description: 'Standard vertical video format for Instagram upload. Transcoded with H.264 video and AAC audio.',
+          hint: '',
+          control: `
+            <select id="st-content-type" class="settings-input">
+              <option value="reel">Instagram Reel (1080x1920 MP4) [Standard]</option>
+              <option value="carousel">Carousel Gallery</option>
+              <option value="image">Single Image</option>
+            </select>
+          `
+        }),
+        createSettingRow({
+          title: 'Brand Handle & Watermark',
+          description: 'Your Instagram username credited in caption templates, and optional corner watermark placement.',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <input type="text" id="st-brand-handle" class="settings-input settings-input-mono" placeholder="@yourbrand">
+              <div style="display: flex; gap: 8px;">
+                <select id="st-watermark-pos" class="settings-input" style="flex: 1;">
+                  <option value="top-right">Top-Right Corner</option>
+                  <option value="bottom-right">Bottom-Right Corner</option>
+                  <option value="top-left">Top-Left Corner</option>
+                  <option value="bottom-left">Bottom-Left Corner</option>
+                  <option value="none">Disabled (No Watermark)</option>
+                </select>
+                <select id="st-watermark-opacity" class="settings-input" style="flex: 1;">
+                  <option value="0.95">95% Opacity</option>
+                  <option value="0.75">75% Opacity</option>
+                  <option value="0.50">50% Opacity</option>
+                </select>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Meta Developer App Credentials',
+          description: 'Meta Developer App ID and App Secret for Instagram Graph API token management. App Secret is securely masked.',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <input type="text" id="st-meta-app-id" class="settings-input settings-input-mono" placeholder="Meta App ID">
+              <div style="display: flex; gap: 8px; width: 100%;">
+                <input type="password" id="st-meta-app-secret" class="settings-input settings-input-mono" placeholder="Meta App Secret (Masked)">
+                <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-meta-app-secret', this)">Show</button>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'AI Caption Copywriter & API Keys',
+          description: 'AI model for viral hooks, breakdowns, and hashtag optimization. Configure Gemini or Groq API keys.',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <select id="st-ai-provider" class="settings-input">
+                <option value="gemini">Google Gemini (Recommended)</option>
+                <option value="groq">Groq High-Speed (Llama 3.3)</option>
+                <option value="ollama">Ollama (100% Free Local AI)</option>
+                <option value="openai">OpenAI GPT-4o</option>
+                <option value="claude">Anthropic Claude</option>
+              </select>
+              <div style="display: flex; gap: 8px; width: 100%;">
+                <input type="password" id="st-gemini-key" class="settings-input settings-input-mono" placeholder="Paste Gemini API Key">
+                <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-gemini-key', this)">Show</button>
+              </div>
+              <div style="display: flex; gap: 8px; width: 100%;">
+                <input type="password" id="st-groq-key" class="settings-input settings-input-mono" placeholder="Paste Groq API Key">
+                <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-groq-key', this)">Show</button>
+              </div>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
     container.innerHTML = `
       <div class="settings-container">
-        
-        <!-- Centered Header -->
-        <div class="flex items-center justify-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 1.25rem;">
+        <!-- Clean Header -->
+        <div class="settings-header">
           <div>
-            <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.35rem 0; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">
-              Settings & Platform Control
-            </h2>
-            <p class="text-sm text-muted" style="margin: 0; line-height: 1.4;">
-              Manage your Instagram publishing pipeline, Telegram mobile gate, Watchtower surveillance, and storage
+            <h2 class="settings-header-title">System & Security</h2>
+            <p class="settings-header-desc">
+              Platform infrastructure, autonomous surveillance, and delivery controls
             </p>
           </div>
-          <div class="flex items-center gap-3">
-            <span id="st-save-status" style="font-size: 0.8rem; font-weight: 600; color: var(--agent-reposter); display: none;"></span>
-            <button class="btn btn-primary btn-sm" id="st-btn-save-top" onclick="settingsView.saveSettings()">
-              💾 Save All Settings
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="st-save-status" class="settings-status-success" style="font-size: 13px; display: none;"></span>
+            <button class="btn btn-primary" id="st-btn-save-top" onclick="settingsView.saveSettings()" style="height: 40px; padding: 0 18px; font-weight: 600; border-radius: 8px;">
+              Save All Settings
             </button>
           </div>
         </div>
 
-        <!-- ========================================================= -->
-        <!-- SECTION 01: ✈️ Telegram Mobile Bot & Security             -->
-        <!-- ========================================================= -->
-        <div class="settings-section">
-          <div class="settings-section-header">
-            <div class="settings-section-title-wrap">
-              <span class="settings-section-badge">01</span>
-              <div>
-                <div class="settings-section-title">
-                  <span>✈️ Telegram Mobile Bot & Security</span>
-                </div>
-                <div class="settings-section-subtitle">
-                  Send reels from your phone via Telegram to post directly to your Instagram page
-                </div>
-              </div>
-            </div>
-            <span class="badge badge-emerald">🛡️ Protected Gateway</span>
-          </div>
+        ${section1Html}
+        ${section2Html}
+        ${section3Html}
+        ${section4Html}
+        ${section5Html}
 
-          <!-- Box 1.1: Bot Connection Token -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🤖 Telegram Bot Connection Token</span>
-              </div>
-              <span class="badge badge-muted">Authentication</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Connects your private Telegram bot so Agent 1 can listen for Instagram reel links you share.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>Token is encrypted locally in your database and never shown in plain text.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Tip</span>
-                  <span>Create a bot for free in 30 seconds by messaging <b>@BotFather</b> on Telegram.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <label class="form-label font-bold">Bot Token</label>
-                <div class="flex gap-1">
-                  <input type="password" id="st-tg-token" class="form-input" placeholder="Paste bot token here" style="font-family: var(--font-mono); font-size: 0.8rem;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-tg-token')" title="Show / Hide Token">👁️</button>
-                </div>
-                <div style="font-size: 0.7rem; color: var(--text-muted);">
-                  Official bot creator: <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); font-weight: 600;">@BotFather ↗</a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 1.2: Authorized Telegram Users -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🛡️ Who Can Post Reels? (Authorized Users)</span>
-              </div>
-              <span class="badge badge-emerald">Security Whitelist</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Only people whose numeric Telegram User IDs are listed here can trigger reposts.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>Strangers or random Telegram bots are blocked immediately without consuming server power.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Tip</span>
-                  <span>Find your ID in 2 seconds by messaging <b>@userinfobot</b> on Telegram.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <label class="form-label font-bold">Whitelisted Numeric Chat IDs</label>
-                <input type="text" id="st-tg-chats" class="form-input" placeholder="e.g. 5443723531, 987654321" style="font-family: var(--font-mono); font-size: 0.82rem;">
-                <div style="font-size: 0.7rem; color: var(--text-muted);">Separate multiple IDs with commas</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 1.3: Real-Time Mobile Progress Alerts -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🔔 Live Telegram Notifications</span>
-              </div>
-              <span class="badge badge-muted">Status Updates</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Sends status alerts to your Telegram chat as your reel progresses through download and posting.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>Immediately alerts you if Instagram rejects a video file so you can fix it right away.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel" style="justify-content: center;">
-                <label class="flex items-center gap-2" style="font-size: 0.82rem; font-weight: 600; cursor: pointer;">
-                  <input type="checkbox" id="st-tg-notifs" checked style="width: 17px; height: 17px; accent-color: var(--accent-primary);">
-                  <span>Send real-time alerts to my Telegram</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 1.4: Connection Test -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>📲 Test Telegram Connection</span>
-              </div>
-              <span class="badge badge-blue">Instant Ping</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Sends an instant test ping to your Telegram app right now to make sure messages arrive.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.testTelegram()">
-                  🔔 Send Test Message to My Phone
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- SECTION 02: 🛰️ Watchtower Competitor Surveillance       -->
-        <!-- ========================================================= -->
-        <div class="settings-section">
-          <div class="settings-section-header">
-            <div class="settings-section-title-wrap">
-              <span class="settings-section-badge">02</span>
-              <div>
-                <div class="settings-section-title">
-                  <span>🛰️ Watchtower Competitor Surveillance</span>
-                </div>
-                <div class="settings-section-subtitle">
-                  Autonomous scanner that monitors competitor feeds and finds top viral reels for you
-                </div>
-              </div>
-            </div>
-            <span class="badge badge-blue">24/7 Radar</span>
-          </div>
-
-          <!-- Box 2.1: Cadence & Timing -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>⏱️ How Often to Scan Competitors? (Cadence)</span>
-              </div>
-              <span class="badge badge-muted">Timing</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Frequency</span>
-                  <span>How many hours Watchtower waits between checking your monitored accounts for new reels.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Human Jitter</span>
-                  <span>Automatically adds <b>11 to 35 random minutes</b> to each sweep so you browse like a human.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Recommended</span>
-                  <span><b>Every 3 hours</b> gives you fresh viral reels without making too many requests.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="flex items-center gap-2">
-                  <input type="number" id="st-wt-interval" class="form-input" min="1" max="24" value="3" style="width: 80px; font-weight: 700;">
-                  <div class="flex gap-1">
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="settingsView.setCadence(1)">1h</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="settingsView.setCadence(2)">2h</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="settingsView.setCadence(3)">3h</button>
-                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.72rem;" onclick="settingsView.setCadence(6)">6h</button>
-                  </div>
-                </div>
-                <div style="font-size: 0.7rem; color: var(--text-muted);">Standard: 3h + dynamic human jitter</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 2.2: Virality Quality Gate -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>⭐ Viral Reel Quality Filter (Minimum Score)</span>
-              </div>
-              <span class="badge badge-amber">Quality Gate</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Evaluates view velocity, like ratios, and comments to score each discovered reel from 0 to 100.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Protection</span>
-                  <span>Low-engagement reels are filtered out so your page only posts high-performing content.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Recommended</span>
-                  <span><b>75 points</b> ensures you only stage the top 25% best performing reels.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="flex items-center gap-2">
-                  <input type="number" id="st-wt-min-score" class="form-input" min="10" max="100" value="75" style="width: 90px; font-weight: 700;">
-                  <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">/ 100 points minimum</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 2.3: Circadian Sleep Cooldown -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🌙 Night Sleep Mode (Anti-Detection Protection)</span>
-              </div>
-              <span class="badge badge-blue">Account Safety</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Pauses all scanning between <b>1:00 AM and 6:30 AM</b> local time to match human sleeping hours.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>Prevents Instagram from detecting 24-hour non-stop bot activity.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Recommended</span>
-                  <span>Keep <b>Enabled</b> to keep your accounts 100% safe.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="setting-choice-grid">
-                  <div class="setting-choice-card" id="card-night-1" onclick="settingsView.selectNightCooldown('1')">
-                    <div class="setting-choice-title">
-                      <span>🌙 Sleep Mode</span>
-                      <span id="radio-night-1">●</span>
-                    </div>
-                    <div class="setting-choice-desc">Pause 1:00 AM – 6:30 AM (Recommended)</div>
-                  </div>
-                  <div class="setting-choice-card" id="card-night-0" onclick="settingsView.selectNightCooldown('0')">
-                    <div class="setting-choice-title">
-                      <span>⚡ 24h Non-Stop</span>
-                      <span id="radio-night-0">○</span>
-                    </div>
-                    <div class="setting-choice-desc">Scan continuously all night</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 2.4: Surveillance Operational State -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🕹️ Master Surveillance Switch</span>
-              </div>
-              <span class="badge badge-muted">Master Control</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Turn Watchtower's background scanning on or off with a single click.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="setting-choice-grid">
-                  <div class="setting-choice-card" id="card-surv-0" onclick="settingsView.selectSurveillanceState('0')">
-                    <div class="setting-choice-title">
-                      <span>🟢 Active Radar</span>
-                      <span id="radio-surv-0">●</span>
-                    </div>
-                    <div class="setting-choice-desc">Scanning feeds automatically</div>
-                  </div>
-                  <div class="setting-choice-card" id="card-surv-1" onclick="settingsView.selectSurveillanceState('1')">
-                    <div class="setting-choice-title">
-                      <span>⏸️ Standby</span>
-                      <span id="radio-surv-1">○</span>
-                    </div>
-                    <div class="setting-choice-desc">Temporarily pause scans</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- SECTION 03: 🌐 Live Video Delivery Link (Cloudflare)      -->
-        <!-- ========================================================= -->
-        <div class="settings-section">
-          <div class="settings-section-header">
-            <div class="settings-section-title-wrap">
-              <span class="settings-section-badge">03</span>
-              <div>
-                <div class="settings-section-title">
-                  <span>🌐 Live Video Delivery Link (Cloudflare)</span>
-                </div>
-                <div class="settings-section-subtitle">
-                  Secure public address that allows Instagram to download your processed videos
-                </div>
-              </div>
-            </div>
-            <span class="badge badge-amber">Edge Delivery</span>
-          </div>
-
-          <!-- Box 3.1: Public Media Edge Endpoint -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🔗 Public Video Download URL</span>
-              </div>
-              <span class="badge badge-emerald">Required by Instagram</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>When posting a reel, Instagram downloads the 1080p MP4 file from this secure link.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Privacy</span>
-                  <span>Runs through Cloudflare's secure edge tunnel so your home IP address is never revealed.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="flex gap-1">
-                  <input type="text" id="st-tunnel-url" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-input); color: var(--accent-primary);">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.copyTunnelUrl()" title="Copy Link">📋 Copy</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 3.2: Edge Reachability & Handshake -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>📶 Connection Health & Speed</span>
-              </div>
-              <span class="badge badge-blue">Live Verification</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Verifies Instagram can reach your machine right now to download video files.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">⚡ Speed</span>
-                  <span>Displays round-trip response time (latency) in milliseconds.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div id="st-tunnel-status-box" style="background: var(--bg-input); padding: 0.55rem 0.75rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.8rem; font-weight: 600;">
-                  Checking connection status...
-                </div>
-                <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.testTunnel()">
-                  🔄 Test Video Delivery Link
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- SECTION 04: 🧹 Storage & System Health Check               -->
-        <!-- ========================================================= -->
-        <div class="settings-section">
-          <div class="settings-section-header">
-            <div class="settings-section-title-wrap">
-              <span class="settings-section-badge">04</span>
-              <div>
-                <div class="settings-section-title">
-                  <span>🧹 Storage & System Health Check</span>
-                </div>
-                <div class="settings-section-subtitle">
-                  Automatic disk cleanup for old video files and one-click health diagnosis
-                </div>
-              </div>
-            </div>
-            <span class="badge badge-emerald">Self-Cleaning</span>
-          </div>
-
-          <!-- Box 4.1: Storage Pruning Policy -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🗑️ Automatic Video Cleanup (Save Disk Space)</span>
-              </div>
-              <span class="badge badge-muted">Disk Management</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Automatically removes posted video files from your computer after this many hours.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>Only deletes videos that are already safely published to Instagram.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Recommended</span>
-                  <span><b>48 hours</b> gives you plenty of time to review posts while saving your disk space.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="flex items-center gap-2 mb-2">
-                  <input type="number" id="st-retention-hours" class="form-input" min="6" max="168" value="48" style="width: 80px; font-weight: 700;">
-                  <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">hours retention</span>
-                </div>
-                <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.pruneMedia()">
-                  🗑️ Clean Up Old Videos Now
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 4.2: Real-Time Subsystem Health Matrix -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🩺 4-Point Health Verification</span>
-              </div>
-              <span class="badge badge-emerald">Diagnostics</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Checks all 4 core layers at once: Database, Instagram API, Cloudflare link, and Telegram bot.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
-                  <div style="background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.72rem;">
-                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; font-weight: 700;">Database</div>
-                    <div id="st-diag-db" style="font-weight: 700; color: var(--agent-reposter);">● Connected</div>
-                  </div>
-                  <div style="background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.72rem;">
-                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; font-weight: 700;">Instagram Meta</div>
-                    <div id="st-diag-meta" style="font-weight: 700; color: var(--agent-reposter);">● Active</div>
-                  </div>
-                  <div style="background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.72rem;">
-                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; font-weight: 700;">Cloudflare</div>
-                    <div id="st-diag-tunnel" style="font-weight: 700; color: var(--agent-watchtower);">● Active</div>
-                  </div>
-                  <div style="background: var(--bg-input); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.72rem;">
-                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; font-weight: 700;">Telegram</div>
-                    <div id="st-diag-tg" style="font-weight: 700; color: var(--agent-reposter);">● Active</div>
-                  </div>
-                </div>
-                <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.runDiagnostics()">
-                  🩺 Run Live Diagnostics Check
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ========================================================= -->
-        <!-- SECTION 05: ⚙️ Publishing Engine & Page Defaults          -->
-        <!-- ========================================================= -->
-        <div class="settings-section">
-          <div class="settings-section-header">
-            <div class="settings-section-title-wrap">
-              <span class="settings-section-badge">05</span>
-              <div>
-                <div class="settings-section-title">
-                  <span>⚙️ Publishing Engine & Page Defaults</span>
-                </div>
-                <div class="settings-section-subtitle">
-                  Posting approval mode, brand watermark positioning, Meta keys, and AI model
-                </div>
-              </div>
-            </div>
-            <span class="badge badge-muted">Global Defaults</span>
-          </div>
-
-          <!-- Box 5.1: Workflow Mode -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🚀 Do You Want to Review Posts First? (Approval Mode)</span>
-              </div>
-              <span class="badge badge-amber">Workflow Choice</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Review First</span>
-                  <span>Harvested reels wait in your Queue so you can review captions and hashtags before publishing.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Auto-Publish</span>
-                  <span>Reels that pass your viral score post automatically to Instagram without waiting.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Recommended</span>
-                  <span>Choose <b>Review First</b> for maximum quality control over your feed.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <div class="setting-choice-grid">
-                  <div class="setting-choice-card" id="card-mode-review" onclick="settingsView.selectPostMode('review')">
-                    <div class="setting-choice-title">
-                      <span>📋 Review First</span>
-                      <span id="radio-mode-review">●</span>
-                    </div>
-                    <div class="setting-choice-desc">Approve captions in Queue (Recommended)</div>
-                  </div>
-                  <div class="setting-choice-card" id="card-mode-direct" onclick="settingsView.selectPostMode('direct')">
-                    <div class="setting-choice-title">
-                      <span>🚀 Auto-Publish</span>
-                      <span id="radio-mode-direct">○</span>
-                    </div>
-                    <div class="setting-choice-desc">Post instantly when discovered</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 5.2: Reel & Video Specs -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🎬 Video Container Format</span>
-              </div>
-              <span class="badge badge-emerald">Instagram Certified</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Format</span>
-                  <span>Standard 9:16 vertical video (1080x1920 pixels) matching Instagram Reel upload standards.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Quality</span>
-                  <span>Transcoded cleanly with H.264 video and crisp AAC audio with zero compression errors.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <select id="st-content-type" class="form-input">
-                  <option value="reel">🎬 Instagram Reel (1080x1920 MP4) [Standard]</option>
-                  <option value="carousel">📸 Carousel Gallery</option>
-                  <option value="image">🖼️ Single Image</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 5.3: Brand Attribution & Watermark Placement -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🏷️ Brand Tag & Corner Watermark</span>
-              </div>
-              <span class="badge badge-blue">Brand Identity</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Brand Handle</span>
-                  <span>Your Instagram username will be credited in caption templates automatically.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Protection</span>
-                  <span>Displays your watermark logo in the corner so other accounts cannot steal your reels.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <label class="form-label font-bold">Your Instagram Handle</label>
-                <input type="text" id="st-brand-handle" class="form-input" placeholder="@yourbrand" style="font-family: var(--font-mono); font-size: 0.82rem; margin-bottom: 0.4rem;">
-                <div class="flex gap-2">
-                  <select id="st-watermark-pos" class="form-input" style="font-size: 0.78rem;">
-                    <option value="top-right">Top-Right Corner</option>
-                    <option value="bottom-right">Bottom-Right Corner</option>
-                    <option value="top-left">Top-Left Corner</option>
-                    <option value="bottom-left">Bottom-Left Corner</option>
-                    <option value="none">Disabled (No Watermark)</option>
-                  </select>
-                  <select id="st-watermark-opacity" class="form-input" style="font-size: 0.78rem;">
-                    <option value="0.95">95% Opacity</option>
-                    <option value="0.75">75% Opacity</option>
-                    <option value="0.50">50% Opacity</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 5.4: Meta App Credentials -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🔑 Meta Developer App Credentials</span>
-              </div>
-              <span class="badge badge-muted">Official Graph API</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Connects your registered Meta for Developers App for Instagram Graph API token management.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-safety">🛡️ Safety</span>
-                  <span>App Secret is securely masked and never visible to unauthenticated visitors.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <input type="text" id="st-meta-app-id" class="form-input" placeholder="Meta App ID" style="font-family: var(--font-mono); font-size: 0.8rem; margin-bottom: 0.4rem;">
-                <div class="flex gap-1">
-                  <input type="password" id="st-meta-app-secret" class="form-input" placeholder="Meta App Secret (Masked)" style="font-family: var(--font-mono); font-size: 0.8rem;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-meta-app-secret')" title="Show / Hide Secret">👁️</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Box 5.5: AI Intelligence Provider -->
-          <div class="setting-box">
-            <div class="setting-box-header">
-              <div class="setting-box-title">
-                <span>🧠 AI Caption & Hashtag Writer</span>
-              </div>
-              <span class="badge badge-emerald">AI Engine</span>
-            </div>
-            <div class="setting-box-body">
-              <div class="setting-bullets-group">
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-purpose">📌 Purpose</span>
-                  <span>Rewrites viral captions, writes strong first-line hooks, and picks high-reach hashtags.</span>
-                </div>
-                <div class="setting-bullet-row">
-                  <span class="setting-bullet-tag tag-tip">💡 Choice</span>
-                  <span>Run 100% free locally with <b>Ollama</b> or connect cloud AI models like Google Gemini.</span>
-                </div>
-              </div>
-              <div class="setting-control-panel">
-                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Default AI Copywriter</label>
-                <select id="st-ai-provider" class="form-input" style="margin-bottom: 0.5rem;">
-                  <option value="gemini">✨ Google Gemini (Recommended)</option>
-                  <option value="groq">⚡ Groq High-Speed (Llama 3.3)</option>
-                  <option value="ollama">🦙 Ollama (100% Free Local AI)</option>
-                  <option value="openai">🤖 OpenAI GPT-4o</option>
-                  <option value="claude">🧠 Anthropic Claude</option>
-                </select>
-                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Google Gemini API Key</label>
-                <div class="flex gap-1" style="margin-bottom: 0.5rem;">
-                  <input type="password" id="st-gemini-key" class="form-input" placeholder="Paste Gemini API Key" style="font-family: var(--font-mono); font-size: 0.8rem;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-gemini-key')" title="Show / Hide Key">👁️</button>
-                </div>
-                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Groq API Key</label>
-                <div class="flex gap-1">
-                  <input type="password" id="st-groq-key" class="form-input" placeholder="Paste Groq API Key" style="font-family: var(--font-mono); font-size: 0.8rem;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-groq-key')" title="Show / Hide Key">👁️</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sticky Bottom Save Bar for Quick Access -->
-        <div class="flex items-center justify-between" style="background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius-sm); padding: 1.15rem 1.4rem; box-shadow: var(--shadow-sm);">
+        <!-- Bottom Save Bar -->
+        <div class="settings-card-v2" style="padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
           <div>
-            <div style="font-weight: 700; font-size: 0.92rem; color: var(--text-primary);">Ready to Save Changes?</div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.15rem;">Your updated configuration will take effect across all autonomous agents immediately.</div>
+            <div style="font-size: 15px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">Ready to save changes?</div>
+            <div style="font-size: 13px; color: var(--text-muted);">Your updated configuration will take effect across all autonomous agents immediately.</div>
           </div>
-          <button class="btn btn-primary" id="st-btn-save-bottom" onclick="settingsView.saveSettings()">
-            💾 Save All Settings
+          <button class="btn btn-primary" id="st-btn-save-bottom" onclick="settingsView.saveSettings()" style="height: 40px; padding: 0 20px; font-weight: 600; border-radius: 8px; white-space: nowrap;">
+            Save All Settings
           </button>
         </div>
-
       </div>
     `;
 
     await loadSettings();
   }
 
-  // Interactive Card Selection Helpers
+  // Segmented Control State Helpers
   function selectPostMode(mode) {
     activePostMode = mode;
     const cardReview = document.getElementById('card-mode-review');
     const cardDirect = document.getElementById('card-mode-direct');
-    const radioReview = document.getElementById('radio-mode-review');
-    const radioDirect = document.getElementById('radio-mode-direct');
-
     if (cardReview && cardDirect) {
       if (mode === 'review') {
         cardReview.classList.add('active');
         cardDirect.classList.remove('active');
-        if (radioReview) radioReview.textContent = '●';
-        if (radioDirect) radioDirect.textContent = '○';
       } else {
         cardDirect.classList.add('active');
         cardReview.classList.remove('active');
-        if (radioReview) radioReview.textContent = '○';
-        if (radioDirect) radioDirect.textContent = '●';
       }
     }
   }
@@ -766,20 +411,13 @@ window.settingsView = (function() {
     activeNightCooldown = val;
     const card1 = document.getElementById('card-night-1');
     const card0 = document.getElementById('card-night-0');
-    const radio1 = document.getElementById('radio-night-1');
-    const radio0 = document.getElementById('radio-night-0');
-
     if (card1 && card0) {
       if (val === '1') {
         card1.classList.add('active');
         card0.classList.remove('active');
-        if (radio1) radio1.textContent = '●';
-        if (radio0) radio0.textContent = '○';
       } else {
         card0.classList.add('active');
         card1.classList.remove('active');
-        if (radio1) radio1.textContent = '○';
-        if (radio0) radio0.textContent = '●';
       }
     }
   }
@@ -788,21 +426,49 @@ window.settingsView = (function() {
     activeSurveillanceState = val;
     const card0 = document.getElementById('card-surv-0');
     const card1 = document.getElementById('card-surv-1');
-    const radio0 = document.getElementById('radio-surv-0');
-    const radio1 = document.getElementById('radio-surv-1');
-
     if (card0 && card1) {
       if (val === '0') {
         card0.classList.add('active');
         card1.classList.remove('active');
-        if (radio0) radio0.textContent = '●';
-        if (radio1) radio1.textContent = '○';
       } else {
         card1.classList.add('active');
         card0.classList.remove('active');
-        if (radio0) radio0.textContent = '○';
-        if (radio1) radio1.textContent = '●';
       }
+    }
+  }
+
+  function updateCadenceButtons(hours) {
+    const segmented = document.getElementById('st-cadence-segmented');
+    if (!segmented) return;
+    const btns = segmented.querySelectorAll('.settings-segment-btn');
+    btns.forEach(btn => {
+      if (btn.getAttribute('data-hours') === String(hours)) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  function setCadence(hours) {
+    const input = document.getElementById('st-wt-interval');
+    if (input) {
+      input.value = hours;
+      updateCadenceButtons(hours);
+      input.focus();
+    }
+  }
+
+  function togglePassword(inputId, btnEl) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPw = input.type === 'password';
+    input.type = isPw ? 'text' : 'password';
+    if (btnEl) {
+      btnEl.textContent = isPw ? 'Hide' : 'Show';
+    } else {
+      const btn = input.parentElement?.querySelector('button');
+      if (btn) btn.textContent = isPw ? 'Hide' : 'Show';
     }
   }
 
@@ -822,7 +488,10 @@ window.settingsView = (function() {
       // 2. Watchtower
       const wtInterval = document.getElementById('st-wt-interval');
       const wtMinScore = document.getElementById('st-wt-min-score');
-      if (wtInterval) wtInterval.value = s.watchtower_interval_hours || '3';
+      if (wtInterval) {
+        wtInterval.value = s.watchtower_interval_hours || '3';
+        updateCadenceButtons(s.watchtower_interval_hours || '3');
+      }
       if (wtMinScore) wtMinScore.value = s.min_score_threshold || '75';
 
       selectNightCooldown(s.watchtower_night_cooldown === '0' ? '0' : '1');
@@ -871,21 +540,25 @@ window.settingsView = (function() {
       if (!healthRes.ok) return;
       const health = await healthRes.json();
 
-      // Tunnel box
+      // Tunnel
       const tunnelBox = document.getElementById('st-tunnel-status-box');
       const diagTunnel = document.getElementById('st-diag-tunnel');
       if (health.tunnel?.ok || health.tunnel?.healthy) {
-        const latency = health.tunnel.latencyMs ? ` (${health.tunnel.latencyMs}ms latency)` : '';
-        if (tunnelBox) tunnelBox.innerHTML = `<span class="badge badge-emerald">● Cloudflare Edge Link Active${latency}</span>`;
+        const latency = health.tunnel.latencyMs ? ` (${health.tunnel.latencyMs}ms)` : '';
+        if (tunnelBox) {
+          tunnelBox.innerHTML = `<span class="settings-status-success">Cloudflare Edge Link Active <span class="settings-status-muted">${latency}</span></span>`;
+        }
         if (diagTunnel) {
-          diagTunnel.style.color = 'var(--agent-reposter)';
-          diagTunnel.textContent = `● Active${latency}`;
+          diagTunnel.className = 'settings-status-success';
+          diagTunnel.textContent = `Active${latency}`;
         }
       } else {
-        if (tunnelBox) tunnelBox.innerHTML = `<span class="badge badge-amber">● Local Port Forwarding</span>`;
+        if (tunnelBox) {
+          tunnelBox.innerHTML = `<span class="settings-status-warning">Local Port Forwarding</span>`;
+        }
         if (diagTunnel) {
-          diagTunnel.style.color = 'var(--warning)';
-          diagTunnel.textContent = '● Local Port';
+          diagTunnel.className = 'settings-status-warning';
+          diagTunnel.textContent = 'Local Port';
         }
       }
 
@@ -893,11 +566,11 @@ window.settingsView = (function() {
       const diagDb = document.getElementById('st-diag-db');
       if (diagDb) {
         if (health.database === 'ok') {
-          diagDb.style.color = 'var(--agent-reposter)';
-          diagDb.textContent = '● Connected';
+          diagDb.className = 'settings-status-success';
+          diagDb.textContent = 'Connected';
         } else {
-          diagDb.style.color = 'var(--danger)';
-          diagDb.textContent = '● Error';
+          diagDb.className = 'settings-status-danger';
+          diagDb.textContent = 'Error';
         }
       }
 
@@ -906,11 +579,11 @@ window.settingsView = (function() {
       if (diagMeta) {
         const validPage = (health.pages || []).find(p => p.valid);
         if (validPage) {
-          diagMeta.style.color = 'var(--agent-reposter)';
-          diagMeta.textContent = `● ${validPage.handle || '@page#' + validPage.page_id}`;
+          diagMeta.className = 'settings-status-success';
+          diagMeta.textContent = validPage.handle || '@page#' + validPage.page_id;
         } else {
-          diagMeta.style.color = 'var(--danger)';
-          diagMeta.textContent = '● Needs Token';
+          diagMeta.className = 'settings-status-danger';
+          diagMeta.textContent = 'Needs Token';
         }
       }
 
@@ -918,11 +591,11 @@ window.settingsView = (function() {
       const diagTg = document.getElementById('st-diag-tg');
       if (diagTg) {
         if (health.telegram?.configured) {
-          diagTg.style.color = 'var(--agent-reposter)';
-          diagTg.textContent = '● Active';
+          diagTg.className = 'settings-status-success';
+          diagTg.textContent = 'Active';
         } else {
-          diagTg.style.color = 'var(--warning)';
-          diagTg.textContent = '● Not Set';
+          diagTg.className = 'settings-status-warning';
+          diagTg.textContent = 'Not Set';
         }
       }
     } catch (err) {
@@ -993,11 +666,11 @@ window.settingsView = (function() {
         app.toast('All settings saved to disk!', 'success');
         if (statusSpan) {
           statusSpan.style.display = 'inline';
-          statusSpan.textContent = '✓ Saved Successfully';
+          statusSpan.textContent = 'Saved Successfully';
           setTimeout(() => { statusSpan.style.display = 'none'; }, 3000);
         }
-        // Clear masked inputs
-        const pwFields = ['st-tg-token', 'st-meta-app-secret', 'st-gemini-key'];
+        // Clear masked password fields after saving
+        const pwFields = ['st-tg-token', 'st-meta-app-secret', 'st-gemini-key', 'st-groq-key'];
         pwFields.forEach(id => {
           const el = document.getElementById(id);
           if (el) el.value = '';
@@ -1013,20 +686,6 @@ window.settingsView = (function() {
     }
   }
 
-  function setCadence(hours) {
-    const input = document.getElementById('st-wt-interval');
-    if (input) {
-      input.value = hours;
-      input.focus();
-    }
-  }
-
-  function togglePassword(inputId) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-  }
-
   function copyTunnelUrl() {
     const url = document.getElementById('st-tunnel-url')?.value;
     if (!url) return;
@@ -1038,23 +697,48 @@ window.settingsView = (function() {
   }
 
   async function testTunnel() {
-    app.toast('Testing video delivery link...', 'info');
+    const tunnelBox = document.getElementById('st-tunnel-status-box');
+    if (tunnelBox) {
+      tunnelBox.innerHTML = '<span class="settings-status-muted">Testing...</span>';
+    }
     await runDiagnostics();
     app.toast('Video delivery link is healthy!', 'info');
   }
 
   async function testTelegram() {
-    app.toast('Sending test message to your Telegram...', 'info');
+    const statusSpan = document.getElementById('st-tg-test-status');
+    const btn = document.getElementById('st-btn-test-tg');
+    if (btn) btn.disabled = true;
+    if (statusSpan) {
+      statusSpan.className = 'settings-status-muted';
+      statusSpan.textContent = 'Testing...';
+    }
+
     try {
       const res = await fetch('/api/system/telegram/test', { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        app.toast('✅ Test alert delivered to your phone!', 'success');
+        if (statusSpan) {
+          statusSpan.className = 'settings-status-success';
+          statusSpan.textContent = 'Delivered to phone';
+          setTimeout(() => { if (statusSpan) statusSpan.textContent = ''; }, 4000);
+        }
+        app.toast('Test alert delivered to your phone!', 'success');
       } else {
+        if (statusSpan) {
+          statusSpan.className = 'settings-status-danger';
+          statusSpan.textContent = data.error || 'Failed';
+        }
         app.toast(data.error || 'Failed to send Telegram message', 'error');
       }
     } catch (err) {
+      if (statusSpan) {
+        statusSpan.className = 'settings-status-danger';
+        statusSpan.textContent = err.message || 'Error';
+      }
       app.toast(err.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
@@ -1078,6 +762,7 @@ window.settingsView = (function() {
     selectPostMode,
     selectNightCooldown,
     selectSurveillanceState,
+    updateCadenceButtons,
     setCadence,
     togglePassword,
     copyTunnelUrl,
