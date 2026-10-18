@@ -374,10 +374,11 @@ a:hover {
 }
 
 .content-body {
-  padding: 1.5rem 1.75rem 3rem;
+  padding: 1.5rem 2rem 3.5rem;
   flex: 1;
-  max-width: 1400px;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* ==========================================================================
@@ -1065,6 +1066,100 @@ table.data-table tr:hover td {
   color: var(--accent-primary);
   border-bottom-color: var(--accent-primary);
 }
+
+/* ==========================================================================
+   Full-Width Page Workspaces & Multi-Account Surveillance Layout
+   ========================================================================== */
+.pages-hub-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.workspace-hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-top: 4px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  padding: 1.5rem 1.75rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.25rem;
+}
+
+.workspace-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.workspace-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 1.15rem 1.35rem;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all var(--transition-fast);
+}
+
+.workspace-metric-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.workspace-metric-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workspace-metric-val {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-bottom: 0.35rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.workspace-metric-sub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.workspace-metric-progress-bar {
+  background: var(--bg-elevated);
+  height: 7px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.workspace-metric-progress-fill {
+  background: linear-gradient(90deg, var(--agent-reposter), var(--accent-primary));
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.competitor-row {
+  transition: background var(--transition-fast);
+}
+
+.competitor-row:hover {
+  background: var(--bg-card-hover);
+}
+
 
 
 

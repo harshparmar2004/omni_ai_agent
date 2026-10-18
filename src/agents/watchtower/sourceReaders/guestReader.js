@@ -10,7 +10,7 @@ const path = require('path');
 function readSourcePosts(username, limit = 6) {
   return new Promise((resolve) => {
     const cleanUser = username.replace(/^@/, '').trim();
-    const scriptPath = path.join(__dirname, '..', '..', '..', 'scripts', 'instagram_scraper.py');
+    const scriptPath = path.resolve(__dirname, '../../../../scripts/instagram_scraper.py');
     const profileUrl = `https://www.instagram.com/${cleanUser}/`;
     const command = `python "${scriptPath}" "${profileUrl}"`;
 

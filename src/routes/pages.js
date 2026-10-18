@@ -11,9 +11,11 @@ const {
   createSourceAccount,
   deleteSourceAccount,
   listDiscoveredPosts,
-  listPublishJobs
+  listPublishJobs,
+  listAgentRuns
 } = require('../database');
 const { validatePageToken, maskToken } = require('../core/tokenManager');
+const scheduler = require('../agents/watchtower/scheduler');
 
 /**
  * GET /api/pages
@@ -120,10 +122,36 @@ router.get('/:id/workspace', (req, res) => {
     const page = getPageById(id);
     if (!page) return res.status(404).json({ error: 'Page not found' });
 
-    const sources = getSourceAccounts({ pageId: id });
-    const stockReels = listDiscoveredPosts({ pageId: id, limit: 30 });
-    const publishedPosts = listPublishJobs({ pageId: id, status: 'published', limit: 15 });
+    const rawSources = getSourceAccounts({ pageId: id });
+    const stockReels = listDiscoveredPosts({ pageId: id, limit: 40 });
+    const publishedPosts = listPublishJobs({ pageId: id, status: 'published', limit: 20 });
     const todayCount = getPublishedCountToday(id);
+    const quotaMax = page.daily_quota || 3;
+
+    // Enrich each source with discovered posts count and latest post preview
+    const sources = rawSources.map(s => {
+      const sourcePosts = listDiscoveredPosts({ sourceAccountId: s.id, limit: 1 });
+      const latestPost = sourcePosts.length > 0 ? sourcePosts[0] : null;
+      return {
+        ...s,
+        discovered_count: s.synced_posts_count || 0,
+        latest_post: latestPost ? {
+          shortcode: latestPost.shortcode,
+          url: latestPost.url,
+          score: latestPost.score,
+          likes: latestPost.like_count,
+          comments: latestPost.comment_count,
+          posted_at: latestPost.posted_at
+        } : null
+      };
+    });
+
+    const cadence = scheduler.getStatus();
+    const recentRuns = listAgentRuns(5);
+
+    const avgScore = stockReels.length > 0
+      ? Math.round(stockReels.reduce((acc, r) => acc + (r.score || 70), 0) / stockReels.length)
+      : 80;
 
     res.json({
       page: {
@@ -135,14 +163,39 @@ router.get('/:id/workspace', (req, res) => {
       sources,
       stockReels,
       publishedPosts,
+      recentRuns,
+      cadence,
       stats: {
         sourcesCount: sources.length,
         stockCount: stockReels.length,
         publishedCount: publishedPosts.length,
         todayCount,
-        quotaMax: page.daily_quota || 5
+        quotaMax,
+        remainingQuota: Math.max(0, quotaMax - todayCount),
+        quotaPct: Math.min(100, Math.round((todayCount / quotaMax) * 100)),
+        avgScore
       }
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/pages/:id/scan
+ * Trigger an immediate on-demand surveillance scan for this page's competitors
+ */
+router.post('/:id/scan', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getPageById(id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    setImmediate(() => {
+      scheduler.executeCycle({ quick: true, force: true }).catch(e => console.error('[Page Scan Cycle Error]:', e));
+    });
+
+    res.json({ success: true, message: `Surveillance cycle triggered for ${page.name}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
