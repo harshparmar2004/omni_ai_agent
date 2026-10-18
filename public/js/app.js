@@ -16,8 +16,8 @@ window.app = (function() {
     'watchtower': 'Agent 2: Watchtower',
     'queue': 'Review & Queue',
     'published': 'Published Feed',
-    'pages': 'My Pages',
-    'settings': 'Settings & Health'
+    'pages': 'Channel Command Hub',
+    'settings': 'System & Security'
   };
 
   /**
