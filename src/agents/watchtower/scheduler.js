@@ -199,13 +199,19 @@ class WatchtowerScheduler {
 
   getStatus() {
     const isPaused = getSetting('watchtower_paused', '0') === '1';
+    const nextRunAt = getSetting('watchtower_next_run_at');
+    let nextRunInMs = 0;
+    if (nextRunAt) {
+      nextRunInMs = Math.max(0, new Date(nextRunAt).getTime() - Date.now());
+    }
     return {
       isRunning: this.isRunning,
       isScanning: this.isScanning,
       isPaused,
       paused: isPaused,
       lastRunAt: getSetting('watchtower_last_run_at'),
-      nextRunAt: getSetting('watchtower_next_run_at'),
+      nextRunAt,
+      nextRunInMs,
       intervalHours: parseInt(getSetting('watchtower_interval_hours', '3'), 10)
     };
   }

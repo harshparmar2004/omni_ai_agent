@@ -135,10 +135,10 @@ window.pagesView = (function() {
               <div class="mb-4">
                 <div class="flex items-center justify-between text-xs mb-1">
                   <span style="color: var(--text-secondary);">Today's Quota</span>
-                  <span style="font-weight: 700; color: #60A5FA;">${quotaUsed} / ${quotaMax} reels</span>
+                  <span style="font-weight: 700; color: var(--accent-primary);">${quotaUsed} / ${quotaMax} reels</span>
                 </div>
                 <div style="background: var(--bg-elevated); height: 7px; border-radius: var(--radius-full); overflow: hidden;">
-                  <div style="background: linear-gradient(90deg, #10B981, #3B82F6); height: 100%; width: ${quotaPct}%;"></div>
+                  <div style="background: linear-gradient(90deg, var(--agent-reposter), var(--accent-primary)); height: 100%; width: ${quotaPct}%;"></div>
                 </div>
               </div>
             </div>

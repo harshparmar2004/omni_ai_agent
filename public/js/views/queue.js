@@ -116,8 +116,8 @@ window.queueView = (function() {
               <div class="flex items-center justify-between mb-1">
                 <label class="form-label font-bold" style="font-size: 0.78rem; margin: 0;">Review & Edit Caption Before Publishing</label>
                 <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
-                  Hashtags: <span id="q-tags-${j.id}" style="color: #60A5FA;">${initialTags}</span>/30 • 
-                  Chars: <span id="q-len-${j.id}" style="color: #60A5FA;">${initialLen}</span>/2200
+                  Hashtags: <span id="q-tags-${j.id}" style="color: var(--accent-primary);">${initialTags}</span>/30 • 
+                  Chars: <span id="q-len-${j.id}" style="color: var(--accent-primary);">${initialLen}</span>/2200
                 </div>
               </div>
               <textarea id="q-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45;" oninput="queueView.onCaptionInput(${j.id})">${initialCaption}</textarea>
@@ -178,7 +178,7 @@ window.queueView = (function() {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : `@page#${j.page_id}`;
         return `
           <tr>
-            <td style="font-weight: 700; color: #60A5FA; font-family: var(--font-mono);">#${j.id}</td>
+            <td style="font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">#${j.id}</td>
             <td style="font-weight: 600;">${pageSlug}</td>
             <td>
               <a href="${j.source_url}" target="_blank">
@@ -259,7 +259,7 @@ window.queueView = (function() {
               </a>
             </div>
 
-            <div style="background: var(--bg-input); border: 1px solid var(--border-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); font-family: var(--font-mono); font-size: 0.78rem; color: #F87171; margin-bottom: 0.75rem; word-break: break-word;">
+            <div style="background: var(--bg-input); border: 1px solid var(--border-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); font-family: var(--font-mono); font-size: 0.78rem; color: var(--danger); margin-bottom: 0.75rem; word-break: break-word;">
               ${j.error || 'Unknown pipeline failure occurred'}
             </div>
 

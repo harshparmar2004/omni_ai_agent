@@ -38,12 +38,12 @@ window.watchtowerView = (function() {
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
         <div class="card card-agent-watchtower" style="padding: 1rem;">
           <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Surveillance Cadence</div>
-          <div id="wt-stat-cadence" style="font-size: 1.35rem; font-weight: 800; color: #60A5FA;">Every 3h</div>
+          <div id="wt-stat-cadence" style="font-size: 1.35rem; font-weight: 800; color: var(--agent-watchtower);">Every 3h</div>
           <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.15rem;">+ 11-35m human jitter</div>
         </div>
         <div class="card" style="padding: 1rem;">
           <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Next Cycle In</div>
-          <div id="wt-stat-countdown" style="font-size: 1.35rem; font-weight: 800; color: #F59E0B;">--</div>
+          <div id="wt-stat-countdown" style="font-size: 1.35rem; font-weight: 800; color: var(--accent-primary);">--</div>
           <div id="wt-stat-night-cooldown" style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem;">Night cooldown: 01:00-06:30</div>
         </div>
         <div class="card" style="padding: 1rem;">
@@ -125,9 +125,17 @@ window.watchtowerView = (function() {
         badge.className = 'badge badge-blue';
         toggleBtn.innerHTML = '⏸️ Pause';
         if (countdown) {
-          const minutesLeft = Math.max(0, Math.round(status.nextRunInMs / 60000));
+          let minutesLeft = 0;
+          if (status.nextRunInMs !== undefined && !isNaN(status.nextRunInMs)) {
+            minutesLeft = Math.max(0, Math.round(status.nextRunInMs / 60000));
+          } else if (status.nextRunAt) {
+            const diffMs = Math.max(0, new Date(status.nextRunAt).getTime() - Date.now());
+            minutesLeft = Math.round(diffMs / 60000);
+          } else {
+            minutesLeft = (status.intervalHours || 3) * 60;
+          }
           countdown.textContent = minutesLeft > 60 ? `${Math.floor(minutesLeft / 60)}h ${minutesLeft % 60}m` : `${minutesLeft} min`;
-          countdown.style.color = '#F59E0B';
+          countdown.style.color = 'var(--warning)';
         }
       }
     }
@@ -432,13 +440,13 @@ window.watchtowerView = (function() {
 
         return `
           <tr>
-            <td style="font-weight: 700; color: #60A5FA; font-family: var(--font-mono);">#${r.id}</td>
+            <td style="font-weight: 700; color: var(--accent-primary); font-family: var(--font-mono);">#${r.id}</td>
             <td style="color: var(--text-secondary); font-size: 0.78rem;">${time}</td>
             <td>
               <span class="badge badge-muted">${r.trigger_type || 'scheduled'}</span>
             </td>
             <td>${r.sources_checked || 0}</td>
-            <td style="color: #60A5FA; font-weight: 600;">${r.posts_discovered || 0}</td>
+            <td style="color: var(--agent-watchtower); font-weight: 600;">${r.posts_discovered || 0}</td>
             <td style="color: var(--agent-reposter); font-weight: 600;">${r.posts_selected || 0}</td>
             <td style="color: var(--text-muted); font-size: 0.75rem;">${duration}</td>
             <td>${statusBadge}</td>

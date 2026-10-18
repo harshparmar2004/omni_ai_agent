@@ -37,7 +37,7 @@ window.commandCenterView = (function() {
           </div>
 
           <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1rem;">
-            Listens on Telegram bot (<code style="color: #60a5fa;">@omnistudio_bot</code>) and Web Dashboard. Downloads 1080p, generates attribution, publishes live via Meta Graph API v21.0.
+            Listens on Telegram bot (<code>@omnistudio_bot</code>) and Web Dashboard. Downloads 1080p, generates attribution, publishes live via Meta Graph API v21.0.
           </p>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: var(--bg-input); padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); margin-bottom: 1.15rem;">
@@ -85,7 +85,7 @@ window.commandCenterView = (function() {
             </div>
             <div>
               <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Next Cycle In</div>
-              <div id="cc-watchtower-next" style="font-size: 1.15rem; font-weight: 800; color: #F59E0B; line-height: 1.4;">--</div>
+              <div id="cc-watchtower-next" style="font-size: 1.15rem; font-weight: 800; color: var(--accent-primary); line-height: 1.4;">--</div>
             </div>
           </div>
 
@@ -196,7 +196,15 @@ window.commandCenterView = (function() {
             wtNext.textContent = 'Scanning Now';
             wtNext.style.color = 'var(--agent-watchtower)';
           } else {
-            const minutesLeft = Math.max(0, Math.round(wt.nextRunInMs / 60000));
+            let minutesLeft = 0;
+            if (wt.nextRunInMs !== undefined && !isNaN(wt.nextRunInMs)) {
+              minutesLeft = Math.max(0, Math.round(wt.nextRunInMs / 60000));
+            } else if (wt.nextRunAt) {
+              const diffMs = Math.max(0, new Date(wt.nextRunAt).getTime() - Date.now());
+              minutesLeft = Math.round(diffMs / 60000);
+            } else {
+              minutesLeft = (wt.intervalHours || 3) * 60;
+            }
             wtNext.textContent = minutesLeft > 60 ? `${Math.floor(minutesLeft / 60)}h ${minutesLeft % 60}m` : `${minutesLeft} min`;
           }
         }
@@ -250,7 +258,7 @@ window.commandCenterView = (function() {
 
       return `
         <tr>
-          <td style="font-weight: 700; color: #60A5FA; font-family: var(--font-mono);">#${j.id}</td>
+          <td style="font-weight: 700; color: var(--accent-primary); font-family: var(--font-mono);">#${j.id}</td>
           <td>
             <div style="font-weight: 600;">${pageSlug}</div>
             <div style="font-size: 0.72rem; color: var(--text-muted);">${j.agent === 'watchtower' ? '🛰️ Watchtower' : '📲 Reposter'}</div>
@@ -321,9 +329,9 @@ window.commandCenterView = (function() {
     if (!stream) return;
 
     const rows = activityLogs.map(item => `
-      <div style="background: var(--bg-input); border-left: 3px solid var(--agent-watchtower); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.15rem; border: 1px solid var(--border-subtle); border-left-width: 3px;">
+      <div style="background: var(--bg-input); border-left: 3px solid var(--accent-primary); padding: 0.45rem 0.65rem; border-radius: var(--radius-xs); font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.15rem; border: 1px solid var(--border-subtle); border-left-width: 3px;">
         <div style="display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text-muted);">
-          <span style="font-weight: 700; color: #60A5FA;">${item.type}</span>
+          <span style="font-weight: 700; color: var(--accent-primary);">${item.type}</span>
           <span style="font-family: var(--font-mono);">${item.time}</span>
         </div>
         <div style="color: var(--text-primary); word-break: break-word; font-family: var(--font-mono); font-size: 0.75rem;">${item.text}</div>

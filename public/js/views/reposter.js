@@ -24,7 +24,7 @@ window.reposterView = (function() {
               <span class="badge badge-emerald">● READY</span>
             </div>
             <p class="text-sm text-muted" style="margin-top: 0.15rem;">
-              Direct single-reel ingestion via Telegram Bot (<code style="color: #60A5FA;">@omnistudio_bot</code>) or Web Dashboard
+              Direct single-reel ingestion via Telegram Bot (<code>@omnistudio_bot</code>) or Web Dashboard
             </p>
           </div>
         </div>
@@ -109,7 +109,7 @@ window.reposterView = (function() {
 
           <div style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); font-size: 0.75rem;">
             <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Authorized Telegram Chat IDs:</div>
-            <code style="color: #60A5FA; font-weight: 700;" id="rp-telegram-allowed">5443723531</code>
+            <code style="font-weight: 700;" id="rp-telegram-allowed">5443723531</code>
           </div>
         </div>
       </div>
@@ -172,7 +172,7 @@ window.reposterView = (function() {
 
       return `
         <tr>
-          <td style="font-weight: 700; color: #60A5FA; font-family: var(--font-mono);">#${j.id}</td>
+          <td style="font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">#${j.id}</td>
           <td style="font-weight: 600;">${pageSlug}</td>
           <td>
             <a href="${j.source_url}" target="_blank">

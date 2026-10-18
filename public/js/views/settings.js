@@ -80,7 +80,7 @@ window.settingsView = (function() {
 
           <div class="form-group mb-3">
             <label class="form-label">Current Public Media URL</label>
-            <input type="text" id="st-tunnel-url" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-input); color: #60A5FA;">
+            <input type="text" id="st-tunnel-url" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-input); color: var(--accent-primary);">
             <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Meta Graph API servers download 1080p MP4 files from this edge address.</div>
           </div>
 
