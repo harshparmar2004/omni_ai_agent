@@ -179,7 +179,12 @@ window.watchtowerView = (function() {
         <div class="card">
           <div class="flex items-center justify-between mb-3">
             <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0;">Monitored Instagram Accounts</h3>
-            <span style="font-size: 0.72rem; color: var(--text-muted);">Scraped in guest mode (no bot login needed)</span>
+            <div class="flex items-center gap-2">
+              <select id="wt-sources-page-filter" class="form-input" style="font-size: 0.76rem; padding: 3px 8px; width: auto;" onchange="watchtowerView.loadSourcesData()">
+                <option value="">All Connected Pages</option>
+                ${(window.app?.pages || []).map(p => `<option value="${p.id}">${p.name} (@${p.slug})</option>`).join('')}
+              </select>
+            </div>
           </div>
           <div id="wt-sources-table" class="table-container">
             <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2rem; text-align: center;">Loading sources...</div>
@@ -223,7 +228,9 @@ window.watchtowerView = (function() {
 
   async function loadSourcesData() {
     try {
-      const res = await fetch('/api/sources');
+      const pageFilter = document.getElementById('wt-sources-page-filter')?.value;
+      const url = pageFilter ? `/api/sources?pageId=${pageFilter}` : '/api/sources';
+      const res = await fetch(url);
       if (!res.ok) return;
       const sources = await res.json();
 
@@ -295,7 +302,11 @@ window.watchtowerView = (function() {
         <div class="flex items-center justify-between mb-3">
           <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0;">Discovered Reels Feed</h3>
           <div class="flex gap-2">
-            <select id="wt-disc-filter" class="form-input" style="width: 170px; font-size: 0.8rem; padding: 4px 8px;" onchange="watchtowerView.loadDiscoveriesData()">
+            <select id="wt-disc-page-filter" class="form-input" style="font-size: 0.78rem; padding: 4px 8px; width: auto;" onchange="watchtowerView.loadDiscoveriesData()">
+              <option value="">All Target Pages</option>
+              ${(window.app?.pages || []).map(p => `<option value="${p.id}">${p.name} (@${p.slug})</option>`).join('')}
+            </select>
+            <select id="wt-disc-filter" class="form-input" style="width: 150px; font-size: 0.8rem; padding: 4px 8px;" onchange="watchtowerView.loadDiscoveriesData()">
               <option value="">All Statuses</option>
               <option value="discovered" selected>Discovered (Fresh)</option>
               <option value="selected">Selected / Queued</option>
@@ -318,7 +329,10 @@ window.watchtowerView = (function() {
     if (!container) return;
 
     const filterVal = document.getElementById('wt-disc-filter')?.value || '';
-    const query = filterVal ? `?status=${filterVal}&limit=30` : '?limit=30';
+    const pageFilter = document.getElementById('wt-disc-page-filter')?.value || '';
+    let query = '?limit=30';
+    if (filterVal) query += `&status=${filterVal}`;
+    if (pageFilter) query += `&pageId=${pageFilter}`;
 
     try {
       const res = await fetch(`/api/discoveries${query}`);

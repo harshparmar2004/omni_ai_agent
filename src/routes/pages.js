@@ -6,7 +6,12 @@ const {
   createPage,
   updatePage,
   deletePage,
-  getPublishedCountToday
+  getPublishedCountToday,
+  getSourceAccounts,
+  createSourceAccount,
+  deleteSourceAccount,
+  listDiscoveredPosts,
+  listPublishJobs
 } = require('../database');
 const { validatePageToken, maskToken } = require('../core/tokenManager');
 
@@ -96,6 +101,88 @@ router.post('/:id/test', async (req, res) => {
 
     const status = await validatePageToken(page);
     res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/pages/:id/workspace
+ * Complete workspace payload for a specific page:
+ * - Page details & token validity
+ * - Competitor sources monitored for this page
+ * - Stock / discovered candidate reels
+ * - Triggered published reels
+ */
+router.get('/:id/workspace', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const page = getPageById(id);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    const sources = getSourceAccounts({ pageId: id });
+    const stockReels = listDiscoveredPosts({ pageId: id, limit: 30 });
+    const publishedPosts = listPublishJobs({ pageId: id, status: 'published', limit: 15 });
+    const todayCount = getPublishedCountToday(id);
+
+    res.json({
+      page: {
+        ...page,
+        access_token_masked: maskToken(page.access_token),
+        has_valid_token: Boolean(page.access_token && page.access_token.length > 20),
+        today_published_count: todayCount
+      },
+      sources,
+      stockReels,
+      publishedPosts,
+      stats: {
+        sourcesCount: sources.length,
+        stockCount: stockReels.length,
+        publishedCount: publishedPosts.length,
+        todayCount,
+        quotaMax: page.daily_quota || 5
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/pages/:id/sources
+ * Quick-add a competitor source account directly to this page
+ */
+router.post('/:id/sources', (req, res) => {
+  try {
+    const pageId = parseInt(req.params.id, 10);
+    const page = getPageById(pageId);
+    if (!page) return res.status(404).json({ error: 'Page not found' });
+
+    const { username } = req.body;
+    if (!username) return res.status(400).json({ error: 'Competitor username is required' });
+
+    const cleanUser = username.replace(/^@/, '').replace(/https?:\/\/(?:www\.)?instagram\.com\//, '').replace(/\/.*$/, '').trim();
+    if (!cleanUser) return res.status(400).json({ error: 'Invalid username' });
+
+    const source = createSourceAccount({
+      username: cleanUser,
+      page_id: pageId
+    });
+    res.json({ success: true, source });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * DELETE /api/pages/:id/sources/:sourceId
+ * Unlink/delete a competitor source account from this page
+ */
+router.delete('/:id/sources/:sourceId', (req, res) => {
+  try {
+    const sourceId = parseInt(req.params.sourceId, 10);
+    deleteSourceAccount(sourceId);
+    res.json({ success: true, sourceId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
