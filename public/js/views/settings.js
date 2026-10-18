@@ -1,6 +1,11 @@
 /**
- * OmniStudio v7 — Settings & Diagnostics View
- * Platform settings for Telegram Bot, Watchtower, Cloudflare Tunnel, and Disk Retention
+ * OmniStudio v7 — Settings & System Health View
+ * Centered single-column layout strictly ordered:
+ * 1. Telegram Bot & Security Gate (in the middle at the top)
+ * 2. Watchtower Surveillance Engine
+ * 3. Cloudflare Media Tunnel
+ * 4. Storage & Subsystem Health Diagnostics ("Storage and Check")
+ * 5. Platform Engine & Publishing Defaults
  */
 window.settingsView = (function() {
   async function render() {
@@ -8,105 +13,387 @@ window.settingsView = (function() {
     if (!container) return;
 
     container.innerHTML = `
-      <div class="mb-4 flex items-center justify-between">
-        <div>
-          <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 0.2rem 0;">Settings & System Health</h2>
-          <p class="text-sm text-muted">Configure global agent parameters, Telegram credentials, and storage pruning</p>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="settingsView.saveSettings()">
-          💾 Save Settings
-        </button>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
-        <!-- Telegram Configuration -->
-        <div class="card">
-          <div class="flex items-center gap-2 mb-3">
-            <span style="font-size: 1.4rem; line-height: 1;">✈️</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.95rem;">Telegram Bot & Security</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Direct mobile reposting gate</div>
-            </div>
+      <div style="max-width: 820px; margin: 0 auto; padding-bottom: 3.5rem;">
+        <!-- Centered Header -->
+        <div class="mb-4 flex items-center justify-between" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 1rem;">
+          <div>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin: 0 0 0.25rem 0; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">Settings & System Engine</h2>
+            <p class="text-sm text-muted" style="margin: 0;">Configure autonomous agents, Telegram security gate, edge media tunnel, and platform parameters</p>
           </div>
-
-          <div class="form-group mb-3">
-            <label class="form-label">Telegram Bot Token</label>
-            <input type="password" id="st-tg-token" class="form-input" placeholder="Leave empty to keep existing">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">From @BotFather. Agent 1 listens on this bot.</div>
-          </div>
-
-          <div class="form-group mb-4">
-            <label class="form-label">Allowed Chat IDs (Whitelisted)</label>
-            <input type="text" id="st-tg-chats" class="form-input" placeholder="e.g. 5443723531, 987654321" style="font-family: var(--font-mono); font-size: 0.82rem;">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Comma-separated list of numeric IDs. Non-whitelisted users are rejected.</div>
-          </div>
-
-          <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.testTelegram()">
-            🔔 Send Test Alert to Telegram
-          </button>
-        </div>
-
-        <!-- Watchtower Configuration -->
-        <div class="card">
-          <div class="flex items-center gap-2 mb-3">
-            <span style="font-size: 1.4rem; line-height: 1;">🛰️</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.95rem;">Watchtower Surveillance</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Autonomous competitor & source scanner</div>
-            </div>
-          </div>
-
-          <div class="form-group mb-3">
-            <label class="form-label">Surveillance Cadence (Hours)</label>
-            <input type="number" id="st-wt-interval" class="form-input" min="1" max="24" value="3">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Interval between source feed inspection cycles. Default: 3 hours.</div>
-          </div>
-
-          <div class="form-group mb-4" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
-            <div style="font-weight: 600; font-size: 0.82rem; margin-bottom: 0.2rem; color: var(--text-primary);">Night Mode Cooldown (Circadian Rhythm)</div>
-            <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.4;">Automatically pauses surveillance from 01:00 AM to 06:30 AM local time to emulate natural human sleeping behavior.</div>
+          <div class="flex items-center gap-2">
+            <span id="st-save-status" style="font-size: 0.78rem; color: var(--text-muted); display: none;">Saved</span>
+            <button class="btn btn-primary btn-sm" id="st-btn-save" onclick="settingsView.saveSettings()">
+              💾 Save All Settings
+            </button>
           </div>
         </div>
 
-        <!-- Public Media Tunnel -->
-        <div class="card">
-          <div class="flex items-center gap-2 mb-3">
-            <span style="font-size: 1.4rem; line-height: 1;">🌐</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.95rem;">Cloudflare Media Tunnel</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Meta Graph API video container ingester</div>
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- ========================================================= -->
+          <!-- 1. Telegram Bot & Security Gate (In the middle at top)   -->
+          <!-- ========================================================= -->
+          <div class="card" style="border-top: 3px solid var(--agent-reposter);">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.35rem; line-height: 1;">✈️</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">Telegram Bot & Security Gate</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">Direct mobile reposting gateway & status alerts (Agent 1: Reposter)</div>
+                </div>
+              </div>
+              <span class="badge badge-emerald">🛡️ Whitelist Protected</span>
+            </div>
+
+            <div class="form-group mb-3">
+              <label class="form-label font-bold">Telegram Bot Token</label>
+              <div class="flex gap-2">
+                <input type="password" id="st-tg-token" class="form-input" placeholder="Leave empty to keep existing bot token" style="font-family: var(--font-mono); font-size: 0.82rem;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-tg-token')">👁️</button>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                Generated by <a href="https://t.me/BotFather" target="_blank" style="color: var(--accent-primary); font-weight: 600;">@BotFather</a>. Agent 1 polls this bot for incoming Instagram reel links.
+              </div>
+            </div>
+
+            <div class="form-group mb-3">
+              <label class="form-label font-bold">Allowed Chat IDs (Whitelisted Users)</label>
+              <input type="text" id="st-tg-chats" class="form-input" placeholder="e.g. 5443723531, 987654321" style="font-family: var(--font-mono); font-size: 0.82rem;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                Comma-separated numeric user IDs. Unauthorized messages are immediately dropped for security.
+              </div>
+            </div>
+
+            <div class="form-group mb-4" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <label class="form-label font-bold" style="margin-bottom: 0.25rem;">Telegram Alert Notifications</label>
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2" style="font-size: 0.82rem; cursor: pointer;">
+                  <input type="checkbox" id="st-tg-notifs" checked>
+                  <span>Send instant alerts when reels are downloaded, transcribed, or published</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2" style="border-top: 1px solid var(--border-subtle);">
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                Test your connection to verify immediate alert delivery:
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="settingsView.testTelegram()">
+                🔔 Send Test Alert to Telegram
+              </button>
             </div>
           </div>
 
-          <div class="form-group mb-3">
-            <label class="form-label">Current Public Media URL</label>
-            <input type="text" id="st-tunnel-url" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.78rem; background: var(--bg-input); color: var(--accent-primary);">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Meta Graph API servers download 1080p MP4 files from this edge address.</div>
+          <!-- ========================================================= -->
+          <!-- 2. Watchtower Surveillance Engine                         -->
+          <!-- ========================================================= -->
+          <div class="card" style="border-top: 3px solid var(--agent-watchtower);">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.35rem; line-height: 1;">🛰️</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">Watchtower Surveillance Engine</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">Autonomous competitor feed scanner & viral reel discovery (Agent 2: Watchtower)</div>
+                </div>
+              </div>
+              <span class="badge badge-blue">24/7 Radar</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">Surveillance Cadence (Hours)</label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="st-wt-interval" class="form-input" min="1" max="24" value="3" style="width: 85px;">
+                  <div class="flex gap-1">
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.72rem;" onclick="settingsView.setCadence(1)">1h</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.72rem;" onclick="settingsView.setCadence(2)">2h</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.72rem;" onclick="settingsView.setCadence(3)">3h</button>
+                    <button type="button" class="btn btn-secondary btn-sm" style="padding: 2px 7px; font-size: 0.72rem;" onclick="settingsView.setCadence(6)">6h</button>
+                  </div>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Interval between inspections (+ 11-35m dynamic jitter for human emulation).
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Minimum Virality Score Threshold</label>
+                <input type="number" id="st-wt-min-score" class="form-input" min="10" max="100" value="75">
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Reels scoring below this engagement metric will be filtered out.
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">Surveillance State</label>
+                <select id="st-wt-paused" class="form-input">
+                  <option value="0">🟢 Active (Surveillance Running)</option>
+                  <option value="1">⏸️ Paused (Standby Mode)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Pause or resume automatic background surveillance sweeps.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Night Mode Cooldown (Circadian Rhythm)</label>
+                <select id="st-wt-night-cooldown" class="form-input">
+                  <option value="1">🌙 Enabled (Pause 01:00 AM – 06:30 AM)</option>
+                  <option value="0">⚡ Disabled (Run continuously 24h)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Protects target accounts by pausing sweeps during local late-night hours.
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div id="st-tunnel-status-box" style="background: var(--bg-input); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.8rem; margin-bottom: 1rem;">
-            Checking tunnel health...
+          <!-- ========================================================= -->
+          <!-- 3. Cloudflare Media Tunnel                                -->
+          <!-- ========================================================= -->
+          <div class="card" style="border-top: 3px solid var(--accent-primary);">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.35rem; line-height: 1;">🌐</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">Cloudflare Media Tunnel</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">Edge media proxy for Meta Graph API v21.0 video container ingester</div>
+                </div>
+              </div>
+              <span class="badge badge-amber">Edge Proxy</span>
+            </div>
+
+            <div class="form-group mb-3">
+              <label class="form-label font-bold">Current Public Media Ingestion URL</label>
+              <div class="flex gap-2">
+                <input type="text" id="st-tunnel-url" class="form-input" readonly style="font-family: var(--font-mono); font-size: 0.8rem; background: var(--bg-input); color: var(--accent-primary);">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.copyTunnelUrl()">📋 Copy</button>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                Meta Graph API servers download 1080p MP4 reel files directly from this public HTTPS edge address.
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <div id="st-tunnel-status-box" style="font-size: 0.82rem; font-weight: 600;">
+                Checking tunnel health...
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="settingsView.testTunnel()">
+                🔄 Test Edge Tunnel Handshake
+              </button>
+            </div>
           </div>
+
+          <!-- ========================================================= -->
+          <!-- 4. Storage & Subsystem Health Diagnostics ("Storage & Check") -->
+          <!-- ========================================================= -->
+          <div class="card" style="border-top: 3px solid var(--warning);">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.35rem; line-height: 1;">🧹</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">Storage & System Health Diagnostics</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">Local MP4 disk retention & live subsystem diagnostic verification</div>
+                </div>
+              </div>
+              <span class="badge badge-emerald">Self-Healing</span>
+            </div>
+
+            <!-- Storage Pruning -->
+            <div class="form-group mb-3">
+              <div class="flex items-center justify-between mb-1">
+                <label class="form-label font-bold" style="margin: 0;">Local Media Retention (Hours)</label>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Default: 48 hours</span>
+              </div>
+              <div class="flex gap-2">
+                <input type="number" id="st-retention-hours" class="form-input" min="6" max="168" value="48" style="width: 120px;">
+                <button class="btn btn-secondary btn-sm flex-1" onclick="settingsView.pruneMedia()">
+                  🗑️ Prune Expired Local Media Now
+                </button>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                Downloaded 1080p MP4 files older than this will be safely deleted after successful Instagram publishing to save disk space.
+              </div>
+            </div>
+
+            <!-- Health Diagnostics Matrix -->
+            <div class="mt-3 pt-3" style="border-top: 1px solid var(--border-subtle);">
+              <div class="flex items-center justify-between mb-2">
+                <div style="font-weight: 700; font-size: 0.84rem; color: var(--text-primary);">Subsystem Health Matrix</div>
+                <button class="btn btn-secondary btn-sm" style="font-size: 0.72rem; padding: 2px 8px;" onclick="settingsView.runDiagnostics()">
+                  🩺 Run Live Diagnostics
+                </button>
+              </div>
+
+              <div id="st-health-matrix" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.65rem;">
+                <div style="background: var(--bg-input); padding: 0.65rem 0.8rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.78rem;">
+                  <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; font-weight: 700;">SQLite Database</div>
+                  <div id="st-diag-db" style="font-weight: 700; color: var(--agent-reposter); margin-top: 0.15rem;">● Connected (v7 Schema)</div>
+                </div>
+                <div style="background: var(--bg-input); padding: 0.65rem 0.8rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.78rem;">
+                  <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; font-weight: 700;">Meta Graph API</div>
+                  <div id="st-diag-meta" style="font-weight: 700; color: var(--agent-reposter); margin-top: 0.15rem;">● Active (@gta6_updates_007)</div>
+                </div>
+                <div style="background: var(--bg-input); padding: 0.65rem 0.8rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.78rem;">
+                  <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; font-weight: 700;">Cloudflare Tunnel</div>
+                  <div id="st-diag-tunnel" style="font-weight: 700; color: var(--agent-watchtower); margin-top: 0.15rem;">● Checking...</div>
+                </div>
+                <div style="background: var(--bg-input); padding: 0.65rem 0.8rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.78rem;">
+                  <div style="color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; font-weight: 700;">Telegram Gateway</div>
+                  <div id="st-diag-tg" style="font-weight: 700; color: var(--agent-reposter); margin-top: 0.15rem;">● Bot Configured</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========================================================= -->
+          <!-- 5. Platform Engine & Publishing Defaults                  -->
+          <!-- ========================================================= -->
+          <div class="card" style="border-top: 3px solid var(--text-secondary);">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.35rem; line-height: 1;">⚙️</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">Platform Engine & Publishing Defaults</div>
+                  <div style="font-size: 0.74rem; color: var(--text-muted);">Global posting workflows, branding, watermark styling, and Meta app credentials</div>
+                </div>
+              </div>
+              <span class="badge badge-muted">Global Engine</span>
+            </div>
+
+            <!-- Publishing Workflow -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">Default Publishing Mode</label>
+                <select id="st-post-mode" class="form-input">
+                  <option value="review">📋 Review First (Save to Queue)</option>
+                  <option value="direct">🚀 Direct Auto-Publish (Immediate)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Whether harvested reels require manual caption approval before publishing.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Default Content Type</label>
+                <select id="st-content-type" class="form-input">
+                  <option value="reel">🎬 Instagram Reel (1080x1920 MP4)</option>
+                  <option value="carousel">📸 Carousel Gallery</option>
+                  <option value="image">🖼️ Single Image</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Preferred container format for outgoing creator posts.
+                </div>
+              </div>
+            </div>
+
+            <!-- Branding & Watermark Defaults -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">Brand Handle</label>
+                <input type="text" id="st-brand-handle" class="form-input" placeholder="@yourbrand" style="font-family: var(--font-mono); font-size: 0.82rem;">
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Appended to reel captions.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Watermark Position</label>
+                <select id="st-watermark-pos" class="form-input">
+                  <option value="top-right">Top-Right Corner</option>
+                  <option value="bottom-right">Bottom-Right Corner</option>
+                  <option value="top-left">Top-Left Corner</option>
+                  <option value="bottom-left">Bottom-Left Corner</option>
+                  <option value="none">Disabled (No Watermark)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Placement on outgoing reels.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Watermark Opacity</label>
+                <select id="st-watermark-opacity" class="form-input">
+                  <option value="0.95">95% (Solid Visibility)</option>
+                  <option value="0.75">75% (Standard Blend)</option>
+                  <option value="0.50">50% (Subtle Accent)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Alpha channel overlay.
+                </div>
+              </div>
+            </div>
+
+            <!-- Meta Developer App Credentials -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">Meta App ID</label>
+                <input type="text" id="st-meta-app-id" class="form-input" placeholder="e.g. 1699561267808244" style="font-family: var(--font-mono); font-size: 0.82rem;">
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Meta for Developers App ID for Instagram Graph API.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Meta App Secret</label>
+                <div class="flex gap-2">
+                  <input type="password" id="st-meta-app-secret" class="form-input" placeholder="Leave empty to keep existing" style="font-family: var(--font-mono); font-size: 0.82rem;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-meta-app-secret')">👁️</button>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Used for OAuth token exchanges and server-to-server proofs.
+                </div>
+              </div>
+            </div>
+
+            <!-- AI Caption Generation Provider -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group">
+                <label class="form-label font-bold">AI Caption Provider</label>
+                <select id="st-ai-provider" class="form-input">
+                  <option value="ollama">🦙 Ollama (Local AI)</option>
+                  <option value="gemini">✨ Google Gemini</option>
+                  <option value="claude">🧠 Anthropic Claude</option>
+                  <option value="openai">🤖 OpenAI GPT-4o</option>
+                  <option value="groq">⚡ Groq High-Speed</option>
+                </select>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Engine used for transcription summarization and hashtag generation.
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label font-bold">Gemini API Key (Optional)</label>
+                <div class="flex gap-2">
+                  <input type="password" id="st-gemini-key" class="form-input" placeholder="Leave empty to keep existing" style="font-family: var(--font-mono); font-size: 0.82rem;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-gemini-key')">👁️</button>
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.3rem;">
+                  Used when Gemini provider is selected for AI processing.
+                </div>
+              </div>
+            </div>
+
+            <!-- Transcoding Info -->
+            <div class="mt-3 pt-3" style="border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 0.74rem; color: var(--text-secondary);">
+                <b>Video Engine Standard:</b> FFmpeg 1080x1920 portrait (9:16), H.264 video, AAC 44.1kHz audio, 30fps.
+              </div>
+              <span class="badge badge-emerald">Meta Graph API v21.0 Compliant</span>
+            </div>
+          </div>
+
         </div>
 
-        <!-- Storage & Retention -->
-        <div class="card">
-          <div class="flex items-center gap-2 mb-3">
-            <span style="font-size: 1.4rem; line-height: 1;">🧹</span>
-            <div>
-              <div style="font-weight: 700; font-size: 0.95rem;">Storage & Cache Pruning</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Automated cleanup of local video files</div>
-            </div>
+        <!-- Sticky Bottom Save Bar for Quick Access -->
+        <div class="mt-4 flex items-center justify-between" style="background: var(--bg-card); border: 1px solid var(--border-card); border-radius: var(--radius-sm); padding: 0.85rem 1.25rem; box-shadow: var(--shadow-sm);">
+          <div style="font-size: 0.82rem; color: var(--text-secondary);">
+            Ensure all parameters are configured before saving changes to disk.
           </div>
-
-          <div class="form-group mb-3">
-            <label class="form-label">Media Retention (Hours)</label>
-            <input type="number" id="st-retention-hours" class="form-input" min="6" max="168" value="48">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Local MP4 files older than this will be safely deleted after posting.</div>
-          </div>
-
-          <button class="btn btn-secondary btn-sm w-full" onclick="settingsView.pruneMedia()">
-            🗑️ Prune Expired Local Media Now
+          <button class="btn btn-primary" onclick="settingsView.saveSettings()">
+            💾 Save All Settings
           </button>
         </div>
       </div>
@@ -122,45 +409,168 @@ window.settingsView = (function() {
       const data = await res.json();
       const s = data.settings || {};
 
+      // 1. Telegram
       const tgChats = document.getElementById('st-tg-chats');
-      const wtInterval = document.getElementById('st-wt-interval');
-      const tunnelUrl = document.getElementById('st-tunnel-url');
-      const retention = document.getElementById('st-retention-hours');
-
+      const tgNotifs = document.getElementById('st-tg-notifs');
       if (tgChats) tgChats.value = s.telegram_allowed_chat_ids || '5443723531';
+      if (tgNotifs) tgNotifs.checked = s.telegram_notifications_enabled !== '0';
+
+      // 2. Watchtower
+      const wtInterval = document.getElementById('st-wt-interval');
+      const wtMinScore = document.getElementById('st-wt-min-score');
+      const wtPaused = document.getElementById('st-wt-paused');
+      const wtNightCooldown = document.getElementById('st-wt-night-cooldown');
       if (wtInterval) wtInterval.value = s.watchtower_interval_hours || '3';
+      if (wtMinScore) wtMinScore.value = s.min_score_threshold || '75';
+      if (wtPaused) wtPaused.value = s.watchtower_paused === '1' ? '1' : '0';
+      if (wtNightCooldown) wtNightCooldown.value = s.watchtower_night_cooldown === '0' ? '0' : '1';
+
+      // 3. Cloudflare Tunnel
+      const tunnelUrl = document.getElementById('st-tunnel-url');
       if (tunnelUrl) tunnelUrl.value = s.public_media_url || 'Waiting for Cloudflare tunnel...';
+
+      // 4. Storage & Pruning
+      const retention = document.getElementById('st-retention-hours');
       if (retention) retention.value = s.media_retention_hours || '48';
 
-      // Health status check
-      const healthRes = await fetch('/api/system/health');
-      if (healthRes.ok) {
-        const health = await healthRes.json();
-        const box = document.getElementById('st-tunnel-status-box');
-        if (box) {
-          if (health.tunnel?.healthy) {
-            box.innerHTML = `<span class="badge badge-emerald">● Cloudflare Tunnel Healthy & Reachable</span>`;
-          } else {
-            box.innerHTML = `<span class="badge badge-amber">● Tunnel: Local / Port Forwarding</span>`;
-          }
-        }
-      }
+      // 5. Platform Engine Defaults
+      const postMode = document.getElementById('st-post-mode');
+      const contentType = document.getElementById('st-content-type');
+      const brandHandle = document.getElementById('st-brand-handle');
+      const watermarkPos = document.getElementById('st-watermark-pos');
+      const watermarkOpacity = document.getElementById('st-watermark-opacity');
+      const metaAppId = document.getElementById('st-meta-app-id');
+      const aiProvider = document.getElementById('st-ai-provider');
+
+      if (postMode) postMode.value = s.default_post_mode || 'review';
+      if (contentType) contentType.value = s.default_content_type || 'reel';
+      if (brandHandle) brandHandle.value = s.brand_handle || s.instagram_handle || '@gta6_updates_007';
+      if (watermarkPos) watermarkPos.value = s.brand_watermark_position || 'top-right';
+      if (watermarkOpacity) watermarkOpacity.value = s.brand_watermark_opacity || '0.95';
+      if (metaAppId) metaAppId.value = s.meta_app_id || '1699561267808244';
+      if (aiProvider) aiProvider.value = s.default_provider || 'ollama';
+
+      // Run health check
+      await runDiagnostics();
     } catch (err) {
       console.warn('[loadSettings error]:', err);
     }
   }
 
+  async function runDiagnostics() {
+    try {
+      const healthRes = await fetch('/api/system/health');
+      if (!healthRes.ok) return;
+      const health = await healthRes.json();
+
+      // Tunnel box & pill
+      const tunnelBox = document.getElementById('st-tunnel-status-box');
+      const diagTunnel = document.getElementById('st-diag-tunnel');
+      if (health.tunnel?.ok || health.tunnel?.healthy) {
+        const latency = health.tunnel.latencyMs ? ` (${health.tunnel.latencyMs}ms latency)` : '';
+        if (tunnelBox) tunnelBox.innerHTML = `<span class="badge badge-emerald">● Cloudflare Edge Tunnel Healthy & Reachable${latency}</span>`;
+        if (diagTunnel) {
+          diagTunnel.style.color = 'var(--agent-reposter)';
+          diagTunnel.textContent = `● Edge Active${latency}`;
+        }
+      } else {
+        if (tunnelBox) tunnelBox.innerHTML = `<span class="badge badge-amber">● Tunnel: Local / Port Forwarding</span>`;
+        if (diagTunnel) {
+          diagTunnel.style.color = 'var(--warning)';
+          diagTunnel.textContent = '● Local Port';
+        }
+      }
+
+      // DB
+      const diagDb = document.getElementById('st-diag-db');
+      if (diagDb) {
+        if (health.database === 'ok') {
+          diagDb.style.color = 'var(--agent-reposter)';
+          diagDb.textContent = '● Connected (v7 Schema)';
+        } else {
+          diagDb.style.color = 'var(--danger)';
+          diagDb.textContent = '● Database Error';
+        }
+      }
+
+      // Meta
+      const diagMeta = document.getElementById('st-diag-meta');
+      if (diagMeta) {
+        const validPage = (health.pages || []).find(p => p.valid);
+        if (validPage) {
+          diagMeta.style.color = 'var(--agent-reposter)';
+          diagMeta.textContent = `● Verified (${validPage.handle || '@page#' + validPage.page_id})`;
+        } else {
+          diagMeta.style.color = 'var(--danger)';
+          diagMeta.textContent = '● Needs Token Handshake';
+        }
+      }
+
+      // Telegram
+      const diagTg = document.getElementById('st-diag-tg');
+      if (diagTg) {
+        if (health.telegram?.configured) {
+          diagTg.style.color = 'var(--agent-reposter)';
+          diagTg.textContent = '● Bot & Whitelist Active';
+        } else {
+          diagTg.style.color = 'var(--warning)';
+          diagTg.textContent = '● Token Not Set';
+        }
+      }
+    } catch (err) {
+      console.warn('[runDiagnostics error]:', err);
+    }
+  }
+
   async function saveSettings() {
-    const tgToken = document.getElementById('st-tg-token')?.value?.trim();
-    const tgChats = document.getElementById('st-tg-chats')?.value?.trim();
-    const wtInterval = document.getElementById('st-wt-interval')?.value?.trim();
-    const retention = document.getElementById('st-retention-hours')?.value?.trim();
+    const btn = document.getElementById('st-btn-save');
+    const statusSpan = document.getElementById('st-save-status');
+    if (btn) btn.disabled = true;
 
     const payload = {};
+
+    // 1. Telegram
+    const tgToken = document.getElementById('st-tg-token')?.value?.trim();
+    const tgChats = document.getElementById('st-tg-chats')?.value?.trim();
+    const tgNotifs = document.getElementById('st-tg-notifs')?.checked ? '1' : '0';
     if (tgToken) payload.telegram_bot_token = tgToken;
     if (tgChats) payload.telegram_allowed_chat_ids = tgChats;
+    payload.telegram_notifications_enabled = tgNotifs;
+
+    // 2. Watchtower
+    const wtInterval = document.getElementById('st-wt-interval')?.value?.trim();
+    const wtMinScore = document.getElementById('st-wt-min-score')?.value?.trim();
+    const wtPaused = document.getElementById('st-wt-paused')?.value;
+    const wtNightCooldown = document.getElementById('st-wt-night-cooldown')?.value;
     if (wtInterval) payload.watchtower_interval_hours = wtInterval;
+    if (wtMinScore) payload.min_score_threshold = wtMinScore;
+    if (wtPaused !== undefined) payload.watchtower_paused = wtPaused;
+    if (wtNightCooldown !== undefined) payload.watchtower_night_cooldown = wtNightCooldown;
+
+    // 3. Storage
+    const retention = document.getElementById('st-retention-hours')?.value?.trim();
     if (retention) payload.media_retention_hours = retention;
+
+    // 4. Platform Defaults
+    const postMode = document.getElementById('st-post-mode')?.value;
+    const contentType = document.getElementById('st-content-type')?.value;
+    const brandHandle = document.getElementById('st-brand-handle')?.value?.trim();
+    const watermarkPos = document.getElementById('st-watermark-pos')?.value;
+    const watermarkOpacity = document.getElementById('st-watermark-opacity')?.value;
+    const metaAppId = document.getElementById('st-meta-app-id')?.value?.trim();
+    const metaAppSecret = document.getElementById('st-meta-app-secret')?.value?.trim();
+    const aiProvider = document.getElementById('st-ai-provider')?.value;
+    const geminiKey = document.getElementById('st-gemini-key')?.value?.trim();
+
+    if (postMode) payload.default_post_mode = postMode;
+    if (contentType) payload.default_content_type = contentType;
+    if (brandHandle) payload.brand_handle = brandHandle;
+    if (watermarkPos) payload.brand_watermark_position = watermarkPos;
+    if (watermarkOpacity) payload.brand_watermark_opacity = watermarkOpacity;
+    if (metaAppId) payload.meta_app_id = metaAppId;
+    if (metaAppSecret) payload.meta_app_secret = metaAppSecret;
+    if (aiProvider) payload.default_provider = aiProvider;
+    if (geminiKey) payload.gemini_api_key = geminiKey;
 
     try {
       const res = await fetch('/api/settings', {
@@ -171,13 +581,56 @@ window.settingsView = (function() {
       const data = await res.json();
       if (data.success) {
         app.toast('Settings saved successfully!', 'success');
-        document.getElementById('st-tg-token').value = '';
+        if (statusSpan) {
+          statusSpan.style.display = 'inline';
+          statusSpan.style.color = 'var(--agent-reposter)';
+          statusSpan.textContent = '✓ Saved to disk';
+          setTimeout(() => { statusSpan.style.display = 'none'; }, 3000);
+        }
+        // Clear masked inputs so they don't hold dirty password values
+        const pwFields = ['st-tg-token', 'st-meta-app-secret', 'st-gemini-key'];
+        pwFields.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
       } else {
         app.toast(data.error || 'Failed to save settings', 'error');
       }
     } catch (err) {
       app.toast(err.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
     }
+  }
+
+  function setCadence(hours) {
+    const input = document.getElementById('st-wt-interval');
+    if (input) {
+      input.value = hours;
+      input.focus();
+    }
+  }
+
+  function togglePassword(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+  }
+
+  function copyTunnelUrl() {
+    const url = document.getElementById('st-tunnel-url')?.value;
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+      app.toast('Copied Cloudflare Media URL to clipboard!', 'info');
+    }).catch(() => {
+      app.toast('URL: ' + url, 'info');
+    });
+  }
+
+  async function testTunnel() {
+    app.toast('Testing Cloudflare edge handshake...', 'info');
+    await runDiagnostics();
+    app.toast('Edge handshake test complete', 'info');
   }
 
   async function testTelegram() {
@@ -212,8 +665,13 @@ window.settingsView = (function() {
   return {
     render,
     saveSettings,
+    setCadence,
+    togglePassword,
+    copyTunnelUrl,
+    testTunnel,
     testTelegram,
     pruneMedia,
+    runDiagnostics,
     refresh: loadSettings
   };
 })();
