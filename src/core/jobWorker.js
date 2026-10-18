@@ -3,9 +3,19 @@ const fs = require('fs');
 const { getPageById, updateDiscoveredPost, getPublishedCountToday, getLastPublishedTimestamp, getSetting } = require('../database');
 const { updateJobProgress, getJob, listJobs } = require('./jobQueue');
 const { downloadInstagramMedia } = require('./downloader');
-const { buildCaption } = require('./captionBuilder');
+const { buildCaption, buildAiCaption } = require('./captionBuilder');
 const { publishReel, publishCarousel, publishImage } = require('./publisher');
 const notifier = require('./notifier');
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 /**
  * OmniStudio v7 — Shared Publishing Job Worker
@@ -164,14 +174,14 @@ class JobWorkerPool {
       await this.updateTelegramProgress(job, [
         tgHeader,
         `✅ <b>Media downloaded</b> (1080p ${mediaType.toUpperCase()})`,
-        `⏳ <b>Preparing caption & attribution...</b>`
+        `⏳ <b>Generating viral caption with AI...</b>`
       ]);
 
       // ── Step 2: Build Caption ───────────────────────────────
       job = updateJobProgress(jobId, 'ready', 'caption_building');
       const finalCaption = job.caption && job.caption !== rawCaption
         ? job.caption // user edited caption
-        : buildCaption({ rawCaption, sourceUsername: sourceUploader, page });
+        : await buildAiCaption({ rawCaption, sourceUsername: sourceUploader, page });
 
       job = updateJobProgress(jobId, 'ready', 'caption_ready', { caption: finalCaption });
 
@@ -180,7 +190,7 @@ class JobWorkerPool {
       await this.updateTelegramProgress(job, [
         tgHeader,
         `✅ <b>Media downloaded</b> (${mediaType.toUpperCase()})`,
-        `✅ <b>Caption formatted</b>`,
+        `✅ <b>AI Caption & Attribution ready</b>`,
         `⏳ <b>Uploading to Meta Graph API v21.0...</b>`
       ]);
 
@@ -189,7 +199,7 @@ class JobWorkerPool {
           this.updateTelegramProgress(job, [
             tgHeader,
             `✅ <b>Media downloaded</b>`,
-            `✅ <b>Caption formatted</b>`,
+            `✅ <b>AI Caption generated</b>`,
             `⏳ <b>Meta transcoding & processing...</b> (attempt ${current}/${total})`
           ]).catch(() => {});
         }
@@ -240,22 +250,30 @@ class JobWorkerPool {
         } catch (e) {}
       }
 
-      // Telegram success announcement with clickable live link
-      await this.updateTelegramProgress(job, [
+      // Telegram success announcement with clickable live link, creator attribution, and full caption
+      const successLines = [
         `🎉 <b>Reel Successfully Published to ${page.handle}!</b>`,
         ``,
         `🌐 <b>Live Instagram Link:</b>`,
         `👉 <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
-        ``,
-        `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`
-      ]);
+        ``
+      ];
+      if (sourceUploader && sourceUploader !== 'instagram') {
+        successLines.push(`🙌 <b>Original Creator:</b> @${sourceUploader}`);
+      }
+      successLines.push(`🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`);
+      successLines.push(``);
+      successLines.push(`📝 <b>Published Caption:</b>`);
+      successLines.push(`<blockquote>${escapeHtml(finalCaption)}</blockquote>`);
+
+      await this.updateTelegramProgress(job, successLines);
 
       // Deliver video preview to chat
       if (job.telegram_chat_id && mediaType === 'reel' && mediaPaths[0]) {
         notifier.sendTelegramVideo(
           job.telegram_chat_id,
           mediaPaths[0],
-          `🎬 <b>Live on Instagram:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`
+          `🎬 <b>Live on Instagram (${page.handle}):</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`
         ).catch(() => {});
       }
 

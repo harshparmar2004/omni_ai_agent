@@ -699,16 +699,23 @@ window.settingsView = (function() {
                 </div>
               </div>
               <div class="setting-control-panel">
-                <select id="st-ai-provider" class="form-input" style="margin-bottom: 0.4rem;">
+                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Default AI Copywriter</label>
+                <select id="st-ai-provider" class="form-input" style="margin-bottom: 0.5rem;">
+                  <option value="gemini">✨ Google Gemini (Recommended)</option>
+                  <option value="groq">⚡ Groq High-Speed (Llama 3.3)</option>
                   <option value="ollama">🦙 Ollama (100% Free Local AI)</option>
-                  <option value="gemini">✨ Google Gemini</option>
-                  <option value="claude">🧠 Anthropic Claude</option>
                   <option value="openai">🤖 OpenAI GPT-4o</option>
-                  <option value="groq">⚡ Groq High-Speed</option>
+                  <option value="claude">🧠 Anthropic Claude</option>
                 </select>
-                <div class="flex gap-1">
-                  <input type="password" id="st-gemini-key" class="form-input" placeholder="Gemini API Key (Optional)" style="font-family: var(--font-mono); font-size: 0.8rem;">
+                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Google Gemini API Key</label>
+                <div class="flex gap-1" style="margin-bottom: 0.5rem;">
+                  <input type="password" id="st-gemini-key" class="form-input" placeholder="Paste Gemini API Key" style="font-family: var(--font-mono); font-size: 0.8rem;">
                   <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-gemini-key')" title="Show / Hide Key">👁️</button>
+                </div>
+                <label class="form-label font-bold" style="font-size: 0.72rem; margin-bottom: 0.2rem;">Groq API Key</label>
+                <div class="flex gap-1">
+                  <input type="password" id="st-groq-key" class="form-input" placeholder="Paste Groq API Key" style="font-family: var(--font-mono); font-size: 0.8rem;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="settingsView.togglePassword('st-groq-key')" title="Show / Hide Key">👁️</button>
                 </div>
               </div>
             </div>
@@ -844,7 +851,12 @@ window.settingsView = (function() {
       if (watermarkPos) watermarkPos.value = s.brand_watermark_position || 'top-right';
       if (watermarkOpacity) watermarkOpacity.value = s.brand_watermark_opacity || '0.95';
       if (metaAppId) metaAppId.value = s.meta_app_id || '1699561267808244';
-      if (aiProvider) aiProvider.value = s.default_provider || 'ollama';
+      if (aiProvider) aiProvider.value = s.default_provider || 'gemini';
+
+      const geminiKey = document.getElementById('st-gemini-key');
+      const groqKey = document.getElementById('st-groq-key');
+      if (geminiKey && s.gemini_api_key) geminiKey.value = s.gemini_api_key;
+      if (groqKey && s.groq_api_key) groqKey.value = s.groq_api_key;
 
       // Run health check
       await runDiagnostics();
@@ -958,6 +970,7 @@ window.settingsView = (function() {
     const metaAppSecret = document.getElementById('st-meta-app-secret')?.value?.trim();
     const aiProvider = document.getElementById('st-ai-provider')?.value;
     const geminiKey = document.getElementById('st-gemini-key')?.value?.trim();
+    const groqKey = document.getElementById('st-groq-key')?.value?.trim();
 
     if (contentType) payload.default_content_type = contentType;
     if (brandHandle) payload.brand_handle = brandHandle;
@@ -967,6 +980,7 @@ window.settingsView = (function() {
     if (metaAppSecret) payload.meta_app_secret = metaAppSecret;
     if (aiProvider) payload.default_provider = aiProvider;
     if (geminiKey) payload.gemini_api_key = geminiKey;
+    if (groqKey) payload.groq_api_key = groqKey;
 
     try {
       const res = await fetch('/api/settings', {

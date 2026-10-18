@@ -34,7 +34,8 @@ router.get('/', (req, res) => {
       default_provider: raw.default_provider || 'ollama',
       meta_app_id: raw.meta_app_id || '1699561267808244',
       meta_app_secret: raw.meta_app_secret ? maskSecret(raw.meta_app_secret) : '',
-      gemini_api_key: raw.gemini_api_key ? maskSecret(raw.gemini_api_key) : ''
+      gemini_api_key: raw.gemini_api_key ? maskSecret(raw.gemini_api_key) : '',
+      groq_api_key: raw.groq_api_key ? maskSecret(raw.groq_api_key) : ''
     };
     res.json({ success: true, settings: safeSettings });
   } catch (err) {

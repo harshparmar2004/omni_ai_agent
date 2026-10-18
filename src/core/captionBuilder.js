@@ -62,11 +62,12 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const bodyWithoutHashtags = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
-  // Attribution
+  // Attribution & Hourly Follow CTA
   let attribution = '';
   if (page.attribution_enabled && sourceUsername && sourceUsername !== 'instagram') {
     const handle = page.handle || `@${page.slug || 'our_page'}`;
-    attribution = `💡 Source: @${sourceUsername} | Follow ${handle} for daily updates!`;
+    const pageName = page.name || 'GTA 6';
+    attribution = `🙌 Shout-out & thanks to @${sourceUsername} for this resource!\n\n🔔 Follow ${handle} for the latest ${pageName} updates every hour!`;
   }
 
   // Collect and deduplicate hashtags
@@ -120,9 +121,25 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   return finalCaption;
 }
 
+/**
+ * Builds AI-buffed viral caption via configured LLM provider
+ * Falls back to deterministic buildCaption if LLM is unavailable
+ */
+async function buildAiCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
+  try {
+    const { generateAiCaption } = require('./llmService');
+    const result = await generateAiCaption({ rawCaption, sourceUsername, page });
+    return result.caption || buildCaption({ rawCaption, sourceUsername, page });
+  } catch (err) {
+    console.warn(`[Caption Builder] AI generation fallback: ${err.message}`);
+    return buildCaption({ rawCaption, sourceUsername, page });
+  }
+}
+
 module.exports = {
   cleanRawCaption,
   extractHashtags,
   stripHashtagsFromText,
-  buildCaption
+  buildCaption,
+  buildAiCaption
 };
