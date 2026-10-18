@@ -15,1669 +15,666 @@ function getDb() {
   const dbPath = path.join(dataDir, 'database.sqlite');
   db = new Database(dbPath);
 
-  // Enable Write-Ahead Logging (WAL) for high concurrency
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
-  initSchema(db);
-  seedInitialData(db);
+  initV7Schema(db);
 
   return db;
 }
 
-function initSchema(db) {
+function initV7Schema(db) {
   db.exec(`
-    -- 1. Research Campaigns
-    CREATE TABLE IF NOT EXISTS research_campaigns (
+    -- 1. Destination Instagram Pages
+    CREATE TABLE IF NOT EXISTS pages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      topic TEXT NOT NULL,
-      niche TEXT,
-      summary TEXT,
-      key_insights TEXT, -- JSON array
-      code_snippets TEXT, -- JSON array
-      mermaid_diagram TEXT,
-      status TEXT DEFAULT 'completed',
-      created_at TEXT NOT NULL
-    );
-
-    -- 2. Deliverable Documents
-    CREATE TABLE IF NOT EXISTS deliverables (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      campaign_id INTEGER,
       slug TEXT UNIQUE NOT NULL,
-      title TEXT NOT NULL,
-      markdown_content TEXT NOT NULL,
-      public_url TEXT NOT NULL,
-      views_count INTEGER DEFAULT 0,
+      name TEXT NOT NULL,
+      handle TEXT NOT NULL,
+      ig_user_id TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      token_expires_at TEXT,
+      caption_template TEXT DEFAULT '{caption}\n\n{attribution}\n\n{hashtags}',
+      default_hashtags TEXT DEFAULT '',
+      attribution_enabled INTEGER DEFAULT 1,
+      watermark_enabled INTEGER DEFAULT 0,
+      post_mode TEXT DEFAULT 'review', -- 'auto' | 'review'
+      posts_per_cycle INTEGER DEFAULT 1,
+      daily_quota INTEGER DEFAULT 3,
+      min_spacing_minutes INTEGER DEFAULT 60,
+      is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL,
-      FOREIGN KEY(campaign_id) REFERENCES research_campaigns(id) ON DELETE SET NULL
+      updated_at TEXT NOT NULL
     );
 
-    -- 3. Media Assets & Reel Content
-    CREATE TABLE IF NOT EXISTS media_assets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      deliverable_id INTEGER,
-      hook_text TEXT NOT NULL,
-      script_text TEXT NOT NULL,
-      trigger_keyword TEXT NOT NULL,
-      caption TEXT NOT NULL,
-      image_url TEXT,
-      video_url TEXT,
-      thumbnail_url TEXT,
-      aspect_ratio TEXT DEFAULT '9:16',
-      generation_engine TEXT DEFAULT 'nano_banana',
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(deliverable_id) REFERENCES deliverables(id) ON DELETE SET NULL
-    );
+    CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug);
 
-    -- 4. Internal Matrix & Bridge Audit Log ("Virtual Sheet")
-    CREATE TABLE IF NOT EXISTS deliverables_matrix (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      media_asset_id INTEGER,
-      deliverable_id INTEGER,
-      topic TEXT NOT NULL,
-      lead_magnet_title TEXT NOT NULL,
-      trigger_keyword TEXT NOT NULL,
-      deliverable_url TEXT NOT NULL,
-      ig_media_id TEXT,
-      ig_permalink TEXT,
-      caption TEXT NOT NULL,
-      status TEXT DEFAULT 'draft', -- draft, generating, published, armed
-      instaauto_rule_id INTEGER,
-      instaauto_response TEXT,
-      created_at TEXT NOT NULL,
-      armed_at TEXT,
-      FOREIGN KEY(media_asset_id) REFERENCES media_assets(id) ON DELETE SET NULL,
-      FOREIGN KEY(deliverable_id) REFERENCES deliverables(id) ON DELETE SET NULL
-    );
-
-    -- 5. Global Settings & API Keys
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT
-    );
-
-    -- 6. Instagram Posts Queue & History (v3.0)
-    CREATE TABLE IF NOT EXISTS instagram_posts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      campaign_id INTEGER,
-      deliverable_id INTEGER,
-      content_type TEXT NOT NULL DEFAULT 'carousel',
-      status TEXT NOT NULL DEFAULT 'ready_to_post',
-      hook_text TEXT NOT NULL,
-      caption TEXT NOT NULL,
-      trigger_keyword TEXT NOT NULL,
-      trending_song_title TEXT,
-      trending_song_artist TEXT,
-      trending_song_audio_url TEXT,
-      audio_vibe TEXT,
-      media_urls TEXT NOT NULL,
-      thumbnail_url TEXT,
-      deliverable_url TEXT NOT NULL,
-      pdf_url TEXT NOT NULL,
-      ig_media_id TEXT,
-      ig_permalink TEXT,
-      scheduled_at TEXT,
-      published_at TEXT,
-      instaauto_rule_id INTEGER,
-      instaauto_status TEXT DEFAULT 'pending',
-      dms_delivered_count INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(campaign_id) REFERENCES research_campaigns(id) ON DELETE SET NULL,
-      FOREIGN KEY(deliverable_id) REFERENCES deliverables(id) ON DELETE SET NULL
-    );
-
-    -- 7. Tracked Instagram Channels (Channel Tracker & Ingestion Engine)
-    CREATE TABLE IF NOT EXISTS tracked_instagram_channels (
+    -- 2. Source Accounts to Monitor (Watchtower)
+    CREATE TABLE IF NOT EXISTS source_accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
-      profile_url TEXT NOT NULL,
-      display_name TEXT,
-      bio TEXT,
-      followers_count TEXT DEFAULT '0',
-      following_count TEXT DEFAULT '0',
-      posts_count TEXT DEFAULT '0',
-      avatar_url TEXT DEFAULT '',
+      page_id INTEGER REFERENCES pages(id) ON DELETE CASCADE,
       is_active INTEGER DEFAULT 1,
-      last_scraped_at TEXT,
-      last_post_shortcode TEXT,
+      health TEXT DEFAULT 'ok', -- 'ok' | 'failing' | 'paused'
+      consecutive_failures INTEGER DEFAULT 0,
+      last_error TEXT DEFAULT '',
+      last_checked_at TEXT,
+      last_new_post_at TEXT,
       synced_posts_count INTEGER DEFAULT 0,
       created_at TEXT NOT NULL
     );
 
-    -- 8. Autonomous Ingestion, Ranking & Auto-Publish Log (v4.0)
-    CREATE TABLE IF NOT EXISTS autonomous_ingestion_log (
+    CREATE INDEX IF NOT EXISTS idx_sources_username ON source_accounts(username);
+    CREATE INDEX IF NOT EXISTS idx_sources_page ON source_accounts(page_id);
+
+    -- 3. Discovered Posts (Watchtower)
+    CREATE TABLE IF NOT EXISTS discovered_posts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id INTEGER,
-      channel_username TEXT NOT NULL,
-      source_post_url TEXT NOT NULL,
-      shortcode TEXT NOT NULL UNIQUE,
-      content_type TEXT NOT NULL, -- reel, carousel, photo
-      downloaded_media_paths TEXT NOT NULL, -- JSON array of local file paths
-      raw_caption TEXT,
-      raw_hook TEXT,
-      
-      -- AI Evaluation & Ranking
-      llm_fit_score INTEGER DEFAULT 0,
-      llm_decision TEXT DEFAULT 'PENDING', -- APPROVED, REJECTED, NEEDS_REVIEW
-      llm_reasoning TEXT,
-      detected_topic TEXT,
-      detected_trigger_keyword TEXT,
+      source_account_id INTEGER REFERENCES source_accounts(id) ON DELETE CASCADE,
+      run_id INTEGER,
+      shortcode TEXT UNIQUE NOT NULL,
+      url TEXT NOT NULL,
+      media_type TEXT NOT NULL DEFAULT 'reel', -- reel, carousel, image
+      caption TEXT DEFAULT '',
+      like_count INTEGER DEFAULT 0,
+      comment_count INTEGER DEFAULT 0,
+      view_count INTEGER DEFAULT 0,
+      posted_at TEXT,
+      score REAL DEFAULT 0.0,
+      status TEXT DEFAULT 'new', -- new, pending_review, selected, skipped, published
+      created_at TEXT NOT NULL
+    );
 
-      -- Brand Cleansing Audit
-      discarded_tags TEXT, -- JSON array of removed competitor handles (e.g. ["@the.natasha.ai"])
-      cleaned_media_paths TEXT, -- JSON array of re-branded media files with our logo
+    CREATE INDEX IF NOT EXISTS idx_discovered_shortcode ON discovered_posts(shortcode);
+    CREATE INDEX IF NOT EXISTS idx_discovered_status ON discovered_posts(status);
 
-      -- Lead Magnet & DM Harvester
-      harvested_deliverable_url TEXT,
-      harvested_deliverable_type TEXT,
-      dm_comment_posted INTEGER DEFAULT 0,
-      dm_response_received INTEGER DEFAULT 0,
-      
-      -- Transformed Content
-      repurposed_hook TEXT,
-      repurposed_caption TEXT,
-      selected_song_title TEXT,
-      selected_song_artist TEXT,
-      selected_song_audio_url TEXT,
-      
-      -- Publishing Status
-      status TEXT DEFAULT 'ingested', -- ingested, ranked, cleansed, harvesting, staged, publishing, published, rejected
-      ig_media_id TEXT,
-      ig_permalink TEXT,
+    -- 4. Publish Jobs (Shared Core Queue & History)
+    CREATE TABLE IF NOT EXISTS publish_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent TEXT NOT NULL, -- 'reposter' | 'watchtower'
+      page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      discovered_post_id INTEGER REFERENCES discovered_posts(id) ON DELETE SET NULL,
+      shortcode TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      media_type TEXT NOT NULL DEFAULT 'reel', -- reel, carousel, image
+      media_paths TEXT DEFAULT '[]',
+      caption TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued', -- queued, downloading, ready, publishing, published, failed
+      current_step TEXT DEFAULT 'init',
+      attempts INTEGER DEFAULT 0,
+      error TEXT DEFAULT '',
+      ig_media_id TEXT DEFAULT '',
+      permalink TEXT DEFAULT '',
+      telegram_chat_id TEXT DEFAULT '',
+      telegram_message_id TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
       published_at TEXT,
-      created_at TEXT NOT NULL,
-      
-      FOREIGN KEY(channel_id) REFERENCES tracked_instagram_channels(id) ON DELETE CASCADE
+      UNIQUE(page_id, shortcode)
     );
 
-    -- 9. Mobile-First Share-to-DM Triggers Table (v4.0)
-    CREATE TABLE IF NOT EXISTS mobile_dm_triggers (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      sender_handle TEXT NOT NULL,
-      source_post_url TEXT NOT NULL,
-      shortcode TEXT NOT NULL,
-      thread_id TEXT,
-      message_id TEXT,
-      processing_status TEXT DEFAULT 'received', -- received, processing, published, rejected, error
-      live_post_permalink TEXT,
-      error_message TEXT,
-      created_at TEXT NOT NULL,
-      completed_at TEXT
-    );
+    CREATE INDEX IF NOT EXISTS idx_jobs_status ON publish_jobs(status);
+    CREATE INDEX IF NOT EXISTS idx_jobs_page ON publish_jobs(page_id);
+    CREATE INDEX IF NOT EXISTS idx_jobs_shortcode ON publish_jobs(shortcode);
 
-    -- 10. Instagram Proxy / Relay Jobs Table (Hypothesis 2)
-    CREATE TABLE IF NOT EXISTS instagram_relay_jobs (
+    -- 5. Agent Runs (Watchtower Cycle Audit)
+    CREATE TABLE IF NOT EXISTS agent_runs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      relay_id TEXT UNIQUE NOT NULL,
-      requester_ig_id TEXT NOT NULL,
-      requester_username TEXT,
-      target_shortcode TEXT NOT NULL,
-      target_media_id TEXT,
-      target_creator_id TEXT,
-      target_creator_handle TEXT,
-      detected_keyword TEXT NOT NULL,
-      comment_posted_at TEXT,
-      dm_received_at TEXT,
-      extracted_links TEXT DEFAULT '[]',
-      status TEXT DEFAULT 'pending_comment', -- pending_comment, commented, harvested, relayed, fallback
-      retry_count INTEGER DEFAULT 0,
-      relayed_at TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_relay_creator ON instagram_relay_jobs(target_creator_id, status);
-    CREATE INDEX IF NOT EXISTS idx_relay_shortcode ON instagram_relay_jobs(target_shortcode, status);
-
-    -- 11. Instagram Automation Lifecycle Events Log
-    CREATE TABLE IF NOT EXISTS instagram_automation_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      post_id INTEGER,
-      event_type TEXT NOT NULL,
-      ig_media_id TEXT,
-      ig_permalink TEXT,
-      trigger_keyword TEXT,
-      resource_url TEXT,
-      dm_message TEXT,
-      rule_id INTEGER,
-      status TEXT DEFAULT 'success',
-      details TEXT DEFAULT '{}',
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_auto_event_post ON instagram_automation_events(post_id);
-    CREATE INDEX IF NOT EXISTS idx_auto_event_type ON instagram_automation_events(event_type);
-
-    -- 12. Connected Instagram Pages & Multi-Tenant Registry (v5.0)
-    CREATE TABLE IF NOT EXISTS connected_pages (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT UNIQUE NOT NULL,             -- e.g. 'tech', 'gta6', 'politics', 'fitness'
-      name TEXT NOT NULL,                    -- e.g. 'Tech News Daily AI', 'GTA 6 Updates 007'
-      handle TEXT NOT NULL,                  -- e.g. '@technews_daily_ai'
-      meta_page_token TEXT NOT NULL,         -- Meta Graph API System User / Page Access Token
-      meta_ig_user_id TEXT NOT NULL,         -- Instagram Business Account ID
-      niche TEXT NOT NULL DEFAULT 'tech',    -- 'tech', 'gaming', 'politics', 'finance', 'gadgets'
-      workflow_type TEXT NOT NULL DEFAULT 'lead_magnet', -- 'lead_magnet', 'direct_repost', 'editorial'
-      icon TEXT DEFAULT '📱',                -- Emoji for UI & Telegram buttons
-      theme_color TEXT DEFAULT '#7C3AED',    -- Hex color for UI branding
-      has_dm_automation INTEGER DEFAULT 1,   -- 1 = ManyChat Comment-to-DM Harvester, 0 = No DM harvesting
-      custom_trigger_keyword TEXT DEFAULT 'PROJECT', -- Keyword users comment on OUR post
-      lead_magnet_instructions TEXT,         -- Custom system prompt for caption generation
-      instaauto_enabled INTEGER DEFAULT 1,
-      instaauto_rule_template TEXT DEFAULT '{"follow_required": true, "reply_message": "Hey! Here is your requested link: {deliverable_url}"}',
-      attribution_template TEXT DEFAULT '💡 Reel Source: @{author} | Follow @{my_handle} for daily updates!',
-      autopilot_enabled INTEGER DEFAULT 0,
-      daily_quota INTEGER DEFAULT 3,
-      is_active INTEGER DEFAULT 1,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_connected_pages_slug ON connected_pages(slug);
-
-    -- 13. Dedicated Scout / Hunter Accounts Registry (v5.5)
-    CREATE TABLE IF NOT EXISTS scout_accounts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      session_id TEXT NOT NULL,
-      assigned_niche TEXT DEFAULT 'all',
-      status TEXT DEFAULT 'active',
-      hourly_comments_count INTEGER DEFAULT 0,
-      daily_comments_count INTEGER DEFAULT 0,
-      last_comment_at TEXT,
-      last_health_check_at TEXT,
-      health_status TEXT DEFAULT 'unknown',
-      last_error TEXT DEFAULT '',
-      notes TEXT DEFAULT '',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_scout_accounts_status ON scout_accounts(status);
-
-    -- 14. Autonomous Scout Harvest Jobs (v6.0 Grounded Pipeline)
-    CREATE TABLE IF NOT EXISTS scout_harvest_jobs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      shortcode TEXT NOT NULL,
-      source_post_url TEXT NOT NULL,
-      creator_username TEXT NOT NULL,
-      creator_pk TEXT DEFAULT '',
-      trigger_keyword TEXT DEFAULT '',
-      scout_username TEXT DEFAULT '',
-      comment_pk TEXT DEFAULT '',
-      media_pk TEXT DEFAULT '',
-      status TEXT DEFAULT 'pending', -- pending, resolving, keyword_found, commented, listening, captured, no_reply, failed, direct_repost
-      harvest_stage TEXT DEFAULT 'init',
-      harvest_method TEXT DEFAULT '', -- scout_dm, creator_bio, caption_direct, none
-      harvested_url TEXT DEFAULT '',
-      raw_dm_text TEXT DEFAULT '',
-      extracted_links TEXT DEFAULT '[]',
-      attempt_count INTEGER DEFAULT 0,
-      bot_replies_count INTEGER DEFAULT 0,
-      post_id INTEGER,
-      telegram_chat_id TEXT,
-      error_message TEXT DEFAULT '',
-      trace_log TEXT DEFAULT '[]',
+      agent TEXT NOT NULL DEFAULT 'watchtower',
       started_at TEXT NOT NULL,
-      completed_at TEXT
+      finished_at TEXT,
+      sources_checked INTEGER DEFAULT 0,
+      new_posts INTEGER DEFAULT 0,
+      published INTEGER DEFAULT 0,
+      errors TEXT DEFAULT '[]'
     );
-    CREATE INDEX IF NOT EXISTS idx_harvest_jobs_shortcode ON scout_harvest_jobs(shortcode);
-    CREATE INDEX IF NOT EXISTS idx_harvest_jobs_status ON scout_harvest_jobs(status);
+
+    -- 6. Key-Value Settings
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
-
-  // ─── v2.0, v3.0, v4.0 & v5.0 Schema Migration ─────────────────────────────
-  const migrations = [
-    "ALTER TABLE research_campaigns ADD COLUMN provider TEXT DEFAULT 'synthetic'",
-    "ALTER TABLE research_campaigns ADD COLUMN model TEXT DEFAULT ''",
-    "ALTER TABLE research_campaigns ADD COLUMN iterations INTEGER DEFAULT 1",
-    "ALTER TABLE research_campaigns ADD COLUMN confidence_score REAL DEFAULT 0.85",
-    "ALTER TABLE research_campaigns ADD COLUMN sources TEXT DEFAULT '[]'",
-    "ALTER TABLE research_campaigns ADD COLUMN token_usage TEXT DEFAULT '{}'",
-    "ALTER TABLE deliverables ADD COLUMN google_doc_id TEXT DEFAULT ''",
-    "ALTER TABLE deliverables ADD COLUMN google_doc_url TEXT DEFAULT ''",
-    "ALTER TABLE deliverables ADD COLUMN pdf_url TEXT DEFAULT ''",
-    "ALTER TABLE deliverables_matrix ADD COLUMN content_type TEXT DEFAULT 'reel'",
-    "ALTER TABLE deliverables_matrix ADD COLUMN thumbnail_url TEXT DEFAULT ''",
-    "ALTER TABLE deliverables_matrix ADD COLUMN google_doc_url TEXT DEFAULT ''",
-    "ALTER TABLE deliverables_matrix ADD COLUMN pdf_url TEXT DEFAULT ''",
-    "ALTER TABLE deliverables_matrix ADD COLUMN provider TEXT DEFAULT ''",
-    "ALTER TABLE deliverables_matrix ADD COLUMN confidence_score REAL DEFAULT 0.0",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN niche_tag TEXT DEFAULT 'tech'",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN auto_post_enabled INTEGER DEFAULT 0",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN min_score_threshold INTEGER DEFAULT 75",
-    "ALTER TABLE instagram_posts ADD COLUMN origin_source TEXT DEFAULT 'studio'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN extracted_resources TEXT DEFAULT '[]'",
-    "ALTER TABLE instagram_posts ADD COLUMN extracted_resources TEXT DEFAULT '[]'",
-    "ALTER TABLE instagram_posts ADD COLUMN post_intent TEXT DEFAULT 'lead_magnet'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN post_intent TEXT DEFAULT 'lead_magnet'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN staged_post_id INTEGER",
-    "ALTER TABLE instagram_posts ADD COLUMN destination_account TEXT DEFAULT 'gta6'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN destination_account TEXT DEFAULT 'tech'",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN destination_account TEXT DEFAULT 'tech'",
-    "ALTER TABLE mobile_dm_triggers ADD COLUMN destination_account TEXT DEFAULT NULL",
-    "ALTER TABLE mobile_dm_triggers ADD COLUMN connected_page_id INTEGER",
-    "ALTER TABLE mobile_dm_triggers ADD COLUMN selected_workflow TEXT DEFAULT NULL",
-    "ALTER TABLE mobile_dm_triggers ADD COLUMN telegram_message_id TEXT",
-    "ALTER TABLE instagram_posts ADD COLUMN connected_page_id INTEGER",
-    "ALTER TABLE tracked_instagram_channels ADD COLUMN connected_page_id INTEGER",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN connected_page_id INTEGER",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN score_breakdown TEXT DEFAULT '{}'",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN last_error TEXT DEFAULT ''",
-    "ALTER TABLE autonomous_ingestion_log ADD COLUMN stage TEXT DEFAULT ''",
-    "ALTER TABLE scout_accounts ADD COLUMN account_id TEXT DEFAULT ''"
-  ];
-
-  for (const sql of migrations) {
-    try { db.exec(sql); } catch (e) { /* Column already exists — safe to skip */ }
-  }
-
-  try {
-    db.exec("UPDATE tracked_instagram_channels SET destination_account = 'gta6', niche_tag = 'gaming' WHERE username = 'gtaleaks' OR username LIKE '%gta%'");
-    db.exec("UPDATE tracked_instagram_channels SET is_active = 1 WHERE is_active = 0 OR is_active IS NULL");
-  } catch (e) {}
 }
 
-function getSetting(key, defaultValue = '') {
+// ─────────────────────────────────────────────────────────────
+// Settings Operations
+// ─────────────────────────────────────────────────────────────
+
+function getSetting(key, defaultValue = null) {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key);
-  return row ? row.value : defaultValue;
+  if (!row || row.value === undefined || row.value === null) return defaultValue;
+  return row.value;
 }
 
 function setSetting(key, value) {
+  const val = typeof value === 'object' ? JSON.stringify(value) : String(value);
   getDb().prepare(`
-    INSERT INTO settings (key, value)
-    VALUES (?, ?)
+    INSERT INTO settings (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
-  `).run(key, String(value));
+  `).run(key, val);
+  return val;
 }
 
-function seedInitialData(db) {
-  // Check if settings are set
-  const defaults = {
-    mode: 'mock', // 'mock' or 'live'
-    instaauto_bridge_url: 'http://localhost:3000/api/agent/bridge',
-    nano_banana_api_key: '',
-    gemini_api_key: '',
-    openai_api_key: '',
-    elevenlabs_api_key: '',
-    meta_page_token: '',
-    meta_ig_user_id: '17841400000000000',
-    public_base_url: 'http://localhost:4000',
-    // v2.0 & v4.0 — Multi-LLM Providers & Niche Intelligence
-    claude_api_key: '',
-    groq_api_key: '',
-    ollama_endpoint: 'http://localhost:11434',
-    default_provider: 'gemini',
-    default_model: 'gemini-2.5-flash',
-    niche_domain: 'AI Engineering & Hackathons',
-    min_score_threshold: '70',
-    failover_chain: 'gemini,claude,openai,groq,ollama',
-    // v2.0 — Google Docs Integration
-    google_client_id: '',
-    google_client_secret: '',
-    google_refresh_token: '',
-    google_docs_enabled: 'false',
-    google_docs_folder_id: '',
-    // v2.0 — Image Generation
-    imagen_api_key: '',
-    image_engine: 'canvas',
-    instagram_handle: '@harshparmar007__',
-    // v2.0 — Content Types
-    default_content_type: 'reel',
-    public_media_url: 'http://localhost:4000',
-    ngrok_url: '',
-    // v3.5 — Brand & Creative Asset Studio
-    brand_name: 'Omni Engineering & AI',
-    brand_handle: '@harshparmar007__',
-    brand_tagline: 'Handwritten Engineering Guides & Autonomous Notes',
-    brand_logo_url: '/generated/assets/brand_logo.svg',
-    brand_watermark_position: 'top-right',
-    brand_watermark_opacity: '0.9',
-    brand_primary_color: '#D97757',
-    brand_accent_color: '#1A73E8',
-    // Secondary Tech News Profile Credentials (Bot v2)
-    tech_meta_page_token: '',
-    tech_meta_ig_user_id: '',
-    tech_instagram_handle: '@technews_daily_ai',
-    telegram_chat_id: '',
-    telegram_bot_id: ''
-  };
-
-  const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-  for (const [k, v] of Object.entries(defaults)) {
-    insertSetting.run(k, v);
+function getAllSettings() {
+  const rows = getDb().prepare('SELECT key, value FROM settings').all();
+  const result = {};
+  for (const r of rows) {
+    result[r.key] = r.value;
   }
-
-  // Seed tracked channels if empty
-  const channelCount = db.prepare('SELECT count(*) as count FROM tracked_instagram_channels').get().count;
-  if (channelCount === 0) {
-    const insertChannel = db.prepare(`
-      INSERT OR IGNORE INTO tracked_instagram_channels 
-      (username, profile_url, display_name, bio, followers_count, following_count, posts_count, avatar_url, is_active, last_scraped_at, last_post_shortcode, synced_posts_count, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const seedTime = new Date().toISOString();
-    insertChannel.run(
-      'github',
-      'https://www.instagram.com/github/',
-      'GitHub',
-      'The home for all developers. Sharing engineering workflows, open source, and AI coding tools.',
-      '902K',
-      '13',
-      '1,336',
-      'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
-      1,
-      seedTime,
-      'DdpgyGIgcQC',
-      1,
-      seedTime
-    );
-    insertChannel.run(
-      'python.learning',
-      'https://www.instagram.com/python.learning/',
-      'Python Learning',
-      'Daily Python tips, algorithms, machine learning cheatsheets, and backend engineering architectures.',
-      '1.2M',
-      '42',
-      '890',
-      '/generated/assets/brand_logo.svg',
-      1,
-      seedTime,
-      '',
-      0,
-      seedTime
-    );
-  }
-
-  // Seed connected_pages registry (v5.0 Multi-Account Hub)
-  seedConnectedPages(db);
-
-  // Check if deliverables_matrix has data
-  const count = db.prepare('SELECT count(*) as count FROM deliverables_matrix').get().count;
-  if (count > 0) return;
-
-  const now = new Date();
-  const formatTimestamp = (d) => {
-    return d.toLocaleString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
-  };
-
-  const seed1Date = new Date(now.getTime() - 24 * 3600 * 1000);
-  const seed2Date = new Date(now.getTime() - 12 * 3600 * 1000);
-  const seed3Date = new Date(now.getTime() - 2 * 3600 * 1000);
-
-  // Seed 1: Autonomous Multi-Agent Systems
-  const camp1 = db.prepare(`
-    INSERT INTO research_campaigns (topic, niche, summary, key_insights, code_snippets, mermaid_diagram, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    'Autonomous Multi-Agent Architecture with LangGraph',
-    'AI Engineering',
-    'Modern AI engineering is shifting from single-turn zero-shot prompts to autonomous multi-agent state machines. Using LangGraph and hierarchical supervisory loops, teams achieve resilient tool use and error self-correction.',
-    JSON.stringify([
-      'Decentralized specialized agents out-perform monolithic prompt pipelines by 4x.',
-      'State checkpointing with SQLite/Postgres guarantees durable human-in-the-loop approvals.',
-      'Dynamic routing allows cost containment: Flash models for triage, Pro models for code synthesis.'
-    ]),
-    JSON.stringify([
-      {
-        language: 'python',
-        title: 'Supervisory Agent State Graph',
-        code: `from langgraph.graph import StateGraph, END\nfrom typing import TypedDict, Annotated\n\nclass AgentState(TypedDict):\n    messages: list\n    next_worker: str\n\nworkflow = StateGraph(AgentState)\nworkflow.add_node("supervisor", supervisor_node)\nworkflow.add_node("researcher", researcher_node)\nworkflow.add_node("coder", coder_node)\nworkflow.add_edge("researcher", "supervisor")\nworkflow.add_edge("coder", "supervisor")\napp = workflow.compile()`
-      }
-    ]),
-    `graph TD
-    User([User Goal]) --> Supervisor{Supervisor Agent}
-    Supervisor -->|Subtask: Research| Researcher[Web Search Agent]
-    Supervisor -->|Subtask: Code| Coder[Code Synthesis Agent]
-    Researcher --> Supervisor
-    Coder --> Supervisor
-    Supervisor -->|Review & Passed| Final[Verified Output]`,
-    'completed',
-    seed1Date.toISOString()
-  );
-
-  const deliv1 = db.prepare(`
-    INSERT INTO deliverables (campaign_id, slug, title, markdown_content, public_url, views_count, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    camp1.lastInsertRowid,
-    'autonomous-multi-agent-systems-2026',
-    'Autonomous Multi-Agent Systems in 2026: The Production Architecture Guide',
-    `# Autonomous Multi-Agent Systems in 2026: The Production Architecture Guide\n\n> Verified Companion Blueprint compiled by OmniResearch AI\n\n## Executive Summary\nBuilding scalable agentic workflows requires moving beyond basic chain-of-thought prompts. This blueprint covers state checkpointing, resilient error boundary handling, and supervisor-worker topologies.\n\n## System Architecture\n\`\`\`mermaid\ngraph TD\n    User([User Goal]) --> Supervisor{Supervisor Agent}\n    Supervisor -->|Subtask: Research| Researcher[Web Search Agent]\n    Supervisor -->|Subtask: Code| Coder[Code Synthesis Agent]\n    Researcher --> Supervisor\n    Coder --> Supervisor\n    Supervisor -->|Review & Passed| Final[Verified Output]\n\`\`\`\n\n## Key Architectural Pillars\n1. **Deterministic State Graphs**: Never rely on free-form LLM loops. Enforce hard schema states.\n2. **Tool Sandboxing**: Run external code execution in gVisor or isolated Docker containers.\n3. **Human-in-the-loop**: Checkpoint states before high-impact API or database writes.\n\n## Production Code Template\n\`\`\`python\nfrom langgraph.graph import StateGraph, END\n\n# Production Supervisor Loop\ndef supervisor_node(state):\n    task = state.get("task")\n    return {"next_worker": "coder" if "code" in task else "researcher"}\n\`\`\``,
-    'http://localhost:4000/docs/autonomous-multi-agent-systems-2026',
-    142,
-    seed1Date.toISOString()
-  );
-
-  const media1 = db.prepare(`
-    INSERT INTO media_assets (deliverable_id, hook_text, script_text, trigger_keyword, caption, image_url, video_url, thumbnail_url, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    deliv1.lastInsertRowid,
-    'Stop building basic chatbots in 2026!',
-    'Stop building basic chatbots in 2026! The top AI engineers are now deploying autonomous multi-agent state machines that self-correct and code themselves. Comment AGENT below and I will instantly DM you the full production architecture guide and starter templates!',
-    'AGENT',
-    'Stop building basic chatbots in 2026! 🤖\n\nHere is the exact architecture behind autonomous multi-agent systems with self-correcting state machines.\n\nComment "AGENT" below and I will DM you the complete companion blueprint + code repo! 🚀\n\n#aiagents #langgraph #python #softwareengineering #genai',
-    '/generated/images/multi_agent_cover.png',
-    '/generated/reels/multi_agent_reel.mp4',
-    '/generated/images/multi_agent_cover.png',
-    seed1Date.toISOString()
-  );
-
-  db.prepare(`
-    INSERT INTO deliverables_matrix (media_asset_id, deliverable_id, topic, lead_magnet_title, trigger_keyword, deliverable_url, ig_media_id, ig_permalink, caption, status, instaauto_rule_id, instaauto_response, created_at, armed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    media1.lastInsertRowid,
-    deliv1.lastInsertRowid,
-    'Autonomous Multi-Agent Architecture with LangGraph',
-    'Autonomous Multi-Agent Systems in 2026: The Production Architecture Guide',
-    'AGENT',
-    'http://localhost:4000/docs/autonomous-multi-agent-systems-2026',
-    '18049102948201941',
-    'https://www.instagram.com/reel/C1k8mNxPq1/',
-    'Stop building basic chatbots in 2026! 🤖\n\nComment "AGENT" below for the blueprint!',
-    'armed',
-    1,
-    JSON.stringify({ success: true, message: 'Post 18049102948201941 armed with keyword "AGENT"!' }),
-    formatTimestamp(seed1Date),
-    formatTimestamp(seed1Date)
-  );
-
-  // Seed 2: Production Hybrid RAG
-  const camp2 = db.prepare(`
-    INSERT INTO research_campaigns (topic, niche, summary, key_insights, code_snippets, mermaid_diagram, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    'Enterprise Hybrid RAG (Dense Embeddings + BM25 + Cohere Rerank)',
-    'Information Retrieval',
-    'Vector similarity alone fails on product IDs, exact serial numbers, and domain acronyms. Hybrid RAG couples BM25 lexical search with dense embeddings, followed by cross-encoder neural reranking.',
-    JSON.stringify([
-      'Reciprocal Rank Fusion (RRF) yields 38% better precision over pure cosine search.',
-      'Cohere Rerank v3 filters out hallucination vectors before feeding LLM context window.',
-      'Chunk size optimization: 512 tokens with 10% overlap is the empirical sweet spot.'
-    ]),
-    JSON.stringify([
-      {
-        language: 'python',
-        title: 'Reciprocal Rank Fusion Pipeline',
-        code: `def rrf(dense_ranks, sparse_ranks, k=60):\n    scores = {}\n    for doc_id, rank in dense_ranks.items():\n        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank)\n    for doc_id, rank in sparse_ranks.items():\n        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank)\n    return sorted(scores.items(), key=lambda x: x[1], reverse=True)`
-      }
-    ]),
-    `graph LR
-    Query[User Query] --> Dense[Dense Vector Search]
-    Query --> Sparse[BM25 Keyword Search]
-    Dense --> RRF[Reciprocal Rank Fusion]
-    Sparse --> RRF
-    RRF --> Rerank[Cross-Encoder Reranker]
-    Rerank --> Context[Top 5 Relevant Chunks]`,
-    'completed',
-    seed2Date.toISOString()
-  );
-
-  const deliv2 = db.prepare(`
-    INSERT INTO deliverables (campaign_id, slug, title, markdown_content, public_url, views_count, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    camp2.lastInsertRowid,
-    'enterprise-hybrid-rag-blueprint',
-    'Enterprise Hybrid RAG Blueprint: BM25, Dense Vectors & Cross-Encoders',
-    `# Enterprise Hybrid RAG Blueprint: BM25, Dense Vectors & Cross-Encoders\n\n> Production companion guide for high-accuracy enterprise search.\n\n## Why Pure Vector Search Fails\nCosine similarity struggles with exact codes, domain acronyms, and numeric queries. Hybrid RAG solves this with dual-index retrieval.\n\n## Retrieval Pipeline\n\`\`\`mermaid\ngraph LR\n    Query[User Query] --> Dense[Dense Vector Search]\n    Query --> Sparse[BM25 Keyword Search]\n    Dense --> RRF[Reciprocal Rank Fusion]\n    Sparse --> RRF\n    RRF --> Rerank[Cross-Encoder Reranker]\n    Rerank --> Context[Top 5 Relevant Chunks]\n\`\`\`\n\n## Key Metrics\n- **Precision@5**: Up 38%\n- **Latency**: Under 180ms with pipeline batching\n- **Token Savings**: 65% reduction in irrelevant context tokens`,
-    'http://localhost:4000/docs/enterprise-hybrid-rag-blueprint',
-    219,
-    seed2Date.toISOString()
-  );
-
-  const media2 = db.prepare(`
-    INSERT INTO media_assets (deliverable_id, hook_text, script_text, trigger_keyword, caption, image_url, video_url, thumbnail_url, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    deliv2.lastInsertRowid,
-    'Why 90% of RAG systems hallucinate in production',
-    'Why 90% of RAG systems hallucinate in production! If you only use vector embeddings, you are losing exact keyword matches. Here is the hybrid architecture used by Fortune 500 teams. Comment RAG below and I will send you the full engineering paper and code repository!',
-    'RAG',
-    'Why 90% of RAG systems fail in production! 🚨\n\nStop relying only on vector similarity. Here is how to implement Hybrid Search + Cross-Encoder Reranking.\n\nComment "RAG" below and I will DM you the complete architecture whitepaper! 📄\n\n#rag #llmops #vectorsearch #ai #machinelearning',
-    '/generated/images/hybrid_rag_cover.png',
-    '/generated/reels/hybrid_rag_reel.mp4',
-    '/generated/images/hybrid_rag_cover.png',
-    seed2Date.toISOString()
-  );
-
-  db.prepare(`
-    INSERT INTO deliverables_matrix (media_asset_id, deliverable_id, topic, lead_magnet_title, trigger_keyword, deliverable_url, ig_media_id, ig_permalink, caption, status, instaauto_rule_id, instaauto_response, created_at, armed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    media2.lastInsertRowid,
-    deliv2.lastInsertRowid,
-    'Enterprise Hybrid RAG (Dense Embeddings + BM25 + Cohere Rerank)',
-    'Enterprise Hybrid RAG Blueprint: BM25, Dense Vectors & Cross-Encoders',
-    'RAG',
-    'http://localhost:4000/docs/enterprise-hybrid-rag-blueprint',
-    '18049102948201942',
-    'https://www.instagram.com/reel/C1m9pZxPq2/',
-    'Why 90% of RAG systems fail in production! Comment "RAG" for the blueprint.',
-    'armed',
-    2,
-    JSON.stringify({ success: true, message: 'Post 18049102948201942 armed with keyword "RAG"!' }),
-    formatTimestamp(seed2Date),
-    formatTimestamp(seed2Date)
-  );
-
-  // Seed 3: DeepSeek Reasoning Models
-  const camp3 = db.prepare(`
-    INSERT INTO research_campaigns (topic, niche, summary, key_insights, code_snippets, mermaid_diagram, status, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    'DeepSeek-R1 Distillation & Local Reasoning Inference',
-    'Model Optimization',
-    'DeepSeek-R1 demonstrated that reinforcement learning on reasoning trajectories enables frontier-level problem solving at a fraction of training costs. Distilling R1 into 7B and 14B models allows enterprise local deployment.',
-    JSON.stringify([
-      'Pure RL discovery of chain-of-thought without supervised fine-tuning.',
-      'Quantization with AWQ allows 14B reasoning models to run smoothly on 16GB GPUs.',
-      'vLLM integration delivers 45 tokens/second per concurrent streaming user.'
-    ]),
-    JSON.stringify([
-      {
-        language: 'bash',
-        title: 'vLLM Local Reasoning Server',
-        code: `vllm serve deepseek-ai/DeepSeek-R1-Distill-Qwen-14B \\\n  --quantization awq \\\n  --tensor-parallel-size 1 \\\n  --gpu-memory-utilization 0.90 \\\n  --port 8000`
-      }
-    ]),
-    `graph TD
-    Prompt[Complex Logic Prompt] --> Model[DeepSeek-R1 Distill 14B]
-    Model --> CoT[<think> Dynamic Chain of Thought </think>]
-    CoT --> SelfCorrect{Internal Verifier}
-    SelfCorrect -->|Verify Logic| CoT
-    SelfCorrect -->|Verified| Result[Definitive Answer]`,
-    'completed',
-    seed3Date.toISOString()
-  );
-
-  const deliv3 = db.prepare(`
-    INSERT INTO deliverables (campaign_id, slug, title, markdown_content, public_url, views_count, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    camp3.lastInsertRowid,
-    'deepseek-r1-local-reasoning-guide',
-    'DeepSeek-R1: Local Reasoning Models & Enterprise Inference Guide',
-    `# DeepSeek-R1: Local Reasoning Models & Enterprise Inference Guide\n\n> Comprehensive architectural breakdown of DeepSeek-R1 distillation for local enterprise inference.\n\n## Reasoning Mechanism\n\`\`\`mermaid\ngraph TD\n    Prompt[Complex Logic Prompt] --> Model[DeepSeek-R1 Distill 14B]\n    Model --> CoT[<think> Dynamic Chain of Thought </think>]\n    CoT --> SelfCorrect{Internal Verifier}\n    SelfCorrect -->|Verify Logic| CoT\n    SelfCorrect -->|Verified| Result[Definitive Answer]\n\`\`\`\n\n## Hardware Sizing Guide\n- **1.5B**: Any modern laptop (M1/M2/M3, 8GB RAM)\n- **7B**: Single RTX 3060 (12GB VRAM)\n- **14B**: Single RTX 4080 (16GB VRAM) or Apple Silicon 32GB\n- **32B**: 2x RTX 3090 or RTX 4090`,
-    'http://localhost:4000/docs/deepseek-r1-local-reasoning-guide',
-    345,
-    seed3Date.toISOString()
-  );
-
-  const media3 = db.prepare(`
-    INSERT INTO media_assets (deliverable_id, hook_text, script_text, trigger_keyword, caption, image_url, video_url, thumbnail_url, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    deliv3.lastInsertRowid,
-    'Run frontier reasoning models on your local laptop for free!',
-    'Run frontier reasoning models on your local laptop for free! DeepSeek-R1 changed the game forever. Here is the exact setup to run distilled reasoning models on private hardware. Comment DEEP below and I will DM you the setup guide and hardware sizing matrix!',
-    'DEEP',
-    'Run frontier reasoning models completely locally! 🧠⚡\n\nNo cloud API bills, 100% private data privacy.\n\nComment "DEEP" below and I will send you the hardware sizing matrix and vLLM launch scripts! 🚀\n\n#deepseek #ai #opensource #localllm #deeplearning',
-    '/generated/images/deepseek_cover.png',
-    '/generated/reels/deepseek_reel.mp4',
-    '/generated/images/deepseek_cover.png',
-    seed3Date.toISOString()
-  );
-
-  db.prepare(`
-    INSERT INTO deliverables_matrix (media_asset_id, deliverable_id, topic, lead_magnet_title, trigger_keyword, deliverable_url, ig_media_id, ig_permalink, caption, status, instaauto_rule_id, instaauto_response, created_at, armed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    media3.lastInsertRowid,
-    deliv3.lastInsertRowid,
-    'DeepSeek-R1 Distillation & Local Reasoning Inference',
-    'DeepSeek-R1: Local Reasoning Models & Enterprise Inference Guide',
-    'DEEP',
-    'http://localhost:4000/docs/deepseek-r1-local-reasoning-guide',
-    '18049102948201943',
-    'https://www.instagram.com/reel/C1r2wKxPq3/',
-    'Run frontier reasoning models completely locally! Comment "DEEP" for the guide.',
-    'armed',
-    3,
-    JSON.stringify({ success: true, message: 'Post 18049102948201943 armed with keyword "DEEP"!' }),
-    formatTimestamp(seed3Date),
-    formatTimestamp(seed3Date)
-  );
-
-  console.log('[OmniResearch Database] Initial schema initialized and pre-seeded with 3 realistic enterprise deliverables.');
+  return result;
 }
 
-function seedConnectedPages(db) {
-  try {
-    const pageCount = db.prepare('SELECT count(*) as count FROM connected_pages').get().count;
-    if (pageCount === 0) {
-      const now = new Date().toISOString();
-      const insertPage = db.prepare(`
-        INSERT INTO connected_pages (
-          slug, name, handle, meta_page_token, meta_ig_user_id, niche, workflow_type,
-          icon, theme_color, has_dm_automation, custom_trigger_keyword, instaauto_enabled,
-          attribution_template, autopilot_enabled, daily_quota, is_active, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+// ─────────────────────────────────────────────────────────────
+// Pages Operations (Connected Destination Accounts)
+// ─────────────────────────────────────────────────────────────
 
-      // Seed GTA 6 Updates 007
-      const gtaToken = getSetting('meta_page_token', '');
-      const gtaUserId = getSetting('meta_ig_user_id', '17841428668115319');
-      const gtaHandle = getSetting('instagram_handle', '@gta6_updates_007');
-
-      insertPage.run(
-        'gta6',
-        'GTA 6 Updates 007',
-        gtaHandle,
-        gtaToken,
-        gtaUserId,
-        'gaming',
-        'direct_repost',
-        '🎮',
-        '#F59E0B',
-        0,
-        'GTA6',
-        0,
-        '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
-        0,
-        3,
-        1,
-        now,
-        now
-      );
-
-      // Seed Tech News Daily AI
-      const techToken = getSetting('tech_meta_page_token', '');
-      const techUserId = getSetting('tech_meta_ig_user_id', '');
-      const techHandle = getSetting('tech_instagram_handle', '@technews_daily_ai');
-
-      insertPage.run(
-        'tech',
-        'Tech News Daily AI',
-        techHandle,
-        techToken,
-        techUserId,
-        'tech',
-        'lead_magnet',
-        '💻',
-        '#7C3AED',
-        1,
-        'PROJECT',
-        1,
-        '💡 Reel Source: @{author} | Follow @technews_daily_ai for high-signal AI breakthroughs! #technews #ai',
-        0,
-        3,
-        1,
-        now,
-        now
-      );
-      console.log('[OmniResearch Database] Pre-seeded connected_pages registry with [gta6] and [tech] workspaces.');
-    }
-  } catch (err) {
-    console.warn('[Database Seed Notice]:', err.message);
-  }
-}
-
-// ─── Tracked Channels Helpers ─────────────────────────────────────
-function getTrackedChannels(destination = null) {
-  if (destination) {
-    return getDb().prepare('SELECT * FROM tracked_instagram_channels WHERE destination_account = ? ORDER BY is_active DESC, id DESC').all(destination);
-  }
-  return getDb().prepare('SELECT * FROM tracked_instagram_channels ORDER BY is_active DESC, id DESC').all();
-}
-
-function getTrackedChannelById(id) {
-  return getDb().prepare('SELECT * FROM tracked_instagram_channels WHERE id = ?').get(id);
-}
-
-function getTrackedChannelByUsername(username) {
-  const clean = username.replace(/^@/, '').trim().toLowerCase();
-  return getDb().prepare('SELECT * FROM tracked_instagram_channels WHERE lower(username) = ?').get(clean);
-}
-
-function addTrackedChannel(data) {
-  const cleanUsername = data.username.replace(/^@/, '').trim();
-  const profileUrl = data.profile_url || `https://www.instagram.com/${cleanUsername}/`;
-  const destinationAccount = data.destination_account || (data.niche_tag === 'gaming' ? 'gta6' : 'tech');
-  const nicheTag = data.niche_tag || (destinationAccount === 'gta6' ? 'gaming' : 'tech');
-  const info = getDb().prepare(`
-    INSERT INTO tracked_instagram_channels (
-      username, profile_url, display_name, bio, followers_count, following_count,
-      posts_count, avatar_url, is_active, last_scraped_at, last_post_shortcode, synced_posts_count,
-      niche_tag, destination_account, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    cleanUsername,
-    profileUrl,
-    data.display_name || cleanUsername,
-    data.bio || '',
-    data.followers_count || 'N/A',
-    data.following_count || 'N/A',
-    data.posts_count || 'N/A',
-    data.avatar_url || '',
-    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
-    data.last_scraped_at || new Date().toISOString(),
-    data.last_post_shortcode || '',
-    data.synced_posts_count || 0,
-    nicheTag,
-    destinationAccount,
-    new Date().toISOString()
-  );
-  return getTrackedChannelById(info.lastInsertRowid);
-}
-
-function updateTrackedChannel(id, updates) {
-  const fields = [];
-  const values = [];
-  for (const [k, v] of Object.entries(updates)) {
-    fields.push(`${k} = ?`);
-    values.push(v);
-  }
-  if (fields.length === 0) return getTrackedChannelById(id);
-  values.push(id);
-  getDb().prepare(`UPDATE tracked_instagram_channels SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getTrackedChannelById(id);
-}
-
-function deleteTrackedChannel(id) {
-  return getDb().prepare('DELETE FROM tracked_instagram_channels WHERE id = ?').run(id);
-}
-
-// ─── Brand Assets Helpers ─────────────────────────────────────────
-function getBrandAssets() {
-  return {
-    brand_name: getSetting('brand_name', 'Omni Engineering & AI'),
-    brand_handle: getSetting('brand_handle', '@harshparmar007__'),
-    brand_tagline: getSetting('brand_tagline', 'Handwritten Engineering Guides & Autonomous Notes'),
-    brand_logo_url: getSetting('brand_logo_url', '/generated/assets/brand_logo.svg'),
-    brand_watermark_position: getSetting('brand_watermark_position', 'top-right'),
-    brand_watermark_opacity: parseFloat(getSetting('brand_watermark_opacity', '0.9')) || 0.9,
-    brand_primary_color: getSetting('brand_primary_color', '#D97757'),
-    brand_accent_color: getSetting('brand_accent_color', '#1A73E8')
-  };
-}
-
-function setBrandAssets(settings) {
-  for (const [k, v] of Object.entries(settings)) {
-    if (v !== undefined) {
-      setSetting(k, v);
-    }
-  }
-  return getBrandAssets();
-}
-
-// ─── Autonomous Ingestion Log Helpers (v4.0) ──────────────────────
-function addAutonomousLog(data) {
-  const info = getDb().prepare(`
-    INSERT INTO autonomous_ingestion_log (
-      channel_id, channel_username, source_post_url, shortcode, content_type,
-      downloaded_media_paths, raw_caption, raw_hook,
-      llm_fit_score, llm_decision, llm_reasoning, detected_topic, detected_trigger_keyword,
-      discarded_tags, cleaned_media_paths,
-      harvested_deliverable_url, harvested_deliverable_type, dm_comment_posted, dm_response_received,
-      repurposed_hook, repurposed_caption, selected_song_title, selected_song_artist, selected_song_audio_url,
-      status, ig_media_id, ig_permalink, published_at, destination_account, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    data.channel_id || null,
-    data.channel_username || '',
-    data.source_post_url || '',
-    data.shortcode,
-    data.content_type || 'carousel',
-    typeof data.downloaded_media_paths === 'string' ? data.downloaded_media_paths : JSON.stringify(data.downloaded_media_paths || []),
-    data.raw_caption || '',
-    data.raw_hook || '',
-    data.llm_fit_score || 0,
-    data.llm_decision || 'PENDING',
-    data.llm_reasoning || '',
-    data.detected_topic || '',
-    data.detected_trigger_keyword || '',
-    typeof data.discarded_tags === 'string' ? data.discarded_tags : JSON.stringify(data.discarded_tags || []),
-    typeof data.cleaned_media_paths === 'string' ? data.cleaned_media_paths : JSON.stringify(data.cleaned_media_paths || []),
-    data.harvested_deliverable_url || '',
-    data.harvested_deliverable_type || '',
-    data.dm_comment_posted ? 1 : 0,
-    data.dm_response_received ? 1 : 0,
-    data.repurposed_hook || '',
-    data.repurposed_caption || '',
-    data.selected_song_title || '',
-    data.selected_song_artist || '',
-    data.selected_song_audio_url || '',
-    data.status || 'ingested',
-    data.ig_media_id || '',
-    data.ig_permalink || '',
-    data.published_at || null,
-    data.destination_account || 'tech',
-    data.created_at || new Date().toISOString()
-  );
-  return getAutonomousLogById(info.lastInsertRowid);
-}
-
-function parseAutonomousRow(row) {
-  if (!row) return null;
-  let resources = [];
-  try {
-    if (typeof row.extracted_resources === 'string') {
-      resources = JSON.parse(row.extracted_resources || '[]');
-    } else if (Array.isArray(row.extracted_resources)) {
-      resources = row.extracted_resources;
-    }
-  } catch (e) {
-    resources = [];
-  }
-
-  let scoreBreakdown = {};
-  try {
-    if (typeof row.score_breakdown === 'string' && row.score_breakdown) {
-      scoreBreakdown = JSON.parse(row.score_breakdown);
-    } else if (typeof row.score_breakdown === 'object' && row.score_breakdown) {
-      scoreBreakdown = row.score_breakdown;
-    }
-  } catch (e) {
-    scoreBreakdown = {};
-  }
-
-  // Derive realistic breakdown if missing
-  const fit = row.llm_fit_score || 85;
-  if (!scoreBreakdown.vibeScore) {
-    scoreBreakdown = {
-      vibeScore: Math.min(100, Math.max(65, Math.round(fit * 1.01))),
-      uspScore: Math.min(100, Math.max(70, Math.round(fit * 0.99))),
-      qualityScore: Math.min(100, Math.max(75, Math.round(92 - (row.id % 4)))),
-      freshnessScore: Math.min(100, Math.max(65, Math.round(95 - (row.id % 5))))
-    };
-  }
-
-  // Derived canonical pipeline stage
-  let stage = row.stage || '';
-  if (!stage) {
-    if (row.status === 'published' || row.ig_permalink) {
-      stage = 'published';
-    } else if (row.status === 'skipped' || row.status === 'rejected' || row.llm_decision === 'REJECTED') {
-      stage = 'skipped';
-    } else if (row.status === 'failed' || row.last_error) {
-      stage = 'failed';
-    } else if (row.status === 'staged' || row.status === 'cleansed' || (fit >= 80 && row.repurposed_caption)) {
-      stage = 'ready';
-    } else if (fit > 0) {
-      stage = 'ranked';
-    } else {
-      stage = 'scanned';
-    }
-  }
-
-  return {
-    ...row,
-    stage,
-    score_breakdown: scoreBreakdown,
-    last_error: row.last_error || '',
-    downloaded_media_paths: JSON.parse(row.downloaded_media_paths || '[]'),
-    discarded_tags: JSON.parse(row.discarded_tags || '[]'),
-    cleaned_media_paths: JSON.parse(row.cleaned_media_paths || '[]'),
-    extracted_resources: resources
-  };
-}
-
-function getAutonomousLogById(id) {
-  const row = getDb().prepare('SELECT * FROM autonomous_ingestion_log WHERE id = ?').get(id);
-  return parseAutonomousRow(row);
-}
-
-function getAutonomousLogByShortcode(shortcode) {
-  const row = getDb().prepare('SELECT * FROM autonomous_ingestion_log WHERE shortcode = ?').get(shortcode);
-  return parseAutonomousRow(row);
-}
-
-function getAutonomousLogs(limit = 50, status = null, destination = null) {
-  let query = 'SELECT * FROM autonomous_ingestion_log';
-  const conditions = [];
+function getPages(options = {}) {
+  let sql = 'SELECT * FROM pages';
   const params = [];
-  if (status) {
-    conditions.push('status = ?');
-    params.push(status);
-  }
-  if (destination) {
-    conditions.push('destination_account = ?');
-    params.push(destination);
-  }
-  if (conditions.length > 0) {
-    query += ' WHERE ' + conditions.join(' AND ');
-  }
-  query += ' ORDER BY id DESC LIMIT ?';
-  params.push(limit);
-
-  const rows = getDb().prepare(query).all(...params);
-  return rows.map(r => parseAutonomousRow(r));
-}
-
-function updateAutonomousLog(id, updates) {
-  const fields = [];
-  const values = [];
-  for (const [k, v] of Object.entries(updates)) {
-    fields.push(`${k} = ?`);
-    if (typeof v === 'object' && v !== null && !(v instanceof Date)) {
-      values.push(JSON.stringify(v));
-    } else {
-      values.push(v);
-    }
-  }
-  if (fields.length === 0) return getAutonomousLogById(id);
-  values.push(id);
-  getDb().prepare(`UPDATE autonomous_ingestion_log SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getAutonomousLogById(id);
-}
-
-function deleteAutonomousLog(id) {
-  return getDb().prepare('DELETE FROM autonomous_ingestion_log WHERE id = ?').run(id);
-}
-
-// ─── Mobile DM Trigger Helpers (v4.0) ──────────────────────────────
-function addMobileDmTrigger(data) {
-  const info = getDb().prepare(`
-    INSERT INTO mobile_dm_triggers (
-      sender_handle, source_post_url, shortcode, thread_id, message_id,
-      processing_status, live_post_permalink, error_message, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    data.sender_handle || '',
-    data.source_post_url || '',
-    data.shortcode || '',
-    data.thread_id || '',
-    data.message_id || '',
-    data.processing_status || 'received',
-    data.live_post_permalink || '',
-    data.error_message || '',
-    data.created_at || new Date().toISOString()
-  );
-  return getMobileDmTriggerById(info.lastInsertRowid);
-}
-
-function getMobileDmTriggerById(id) {
-  return getDb().prepare('SELECT * FROM mobile_dm_triggers WHERE id = ?').get(id);
-}
-
-function getMobileDmTriggerByShortcode(shortcode) {
-  return getDb().prepare('SELECT * FROM mobile_dm_triggers WHERE shortcode = ?').get(shortcode);
-}
-
-function getMobileDmTriggers(limit = 30) {
-  const rows = getDb().prepare('SELECT * FROM mobile_dm_triggers ORDER BY id DESC LIMIT ?').all(limit);
-  const logStmt = getDb().prepare('SELECT * FROM autonomous_ingestion_log WHERE shortcode = ?');
-  const postStmt = getDb().prepare('SELECT * FROM instagram_posts WHERE hook_text LIKE ? OR caption LIKE ? ORDER BY id DESC LIMIT 1');
-
-  return rows.map(r => {
-    let log = logStmt.get(r.shortcode);
-    let post = null;
-    if (log) {
-      log = {
-        ...log,
-        downloaded_media_paths: JSON.parse(log.downloaded_media_paths || '[]'),
-        discarded_tags: JSON.parse(log.discarded_tags || '[]'),
-        cleaned_media_paths: JSON.parse(log.cleaned_media_paths || '[]'),
-        extracted_resources: JSON.parse(log.extracted_resources || '[]')
-      };
-      if (log.repurposed_hook) {
-        try {
-          post = postStmt.get(`%${log.repurposed_hook.slice(0, 30)}%`, `%${log.repurposed_hook.slice(0, 30)}%`);
-        } catch (e) {}
-      }
-    }
-
-    const webhookUrl = log?.harvested_deliverable_url || post?.deliverable_url || 'http://localhost:3000/api/agent/bridge';
-    const mediaPaths = log?.cleaned_media_paths?.length ? log.cleaned_media_paths : (log?.downloaded_media_paths || []);
-    const extractedResources = log?.extracted_resources || (post?.extracted_resources ? JSON.parse(post.extracted_resources) : []);
-
-    return {
-      ...r,
-      log,
-      post,
-      webhook_url: webhookUrl,
-      trigger_keyword: log?.detected_trigger_keyword || post?.trigger_keyword || 'PROJECT',
-      media_paths: mediaPaths,
-      content_type: log?.content_type || 'reel',
-      llm_fit_score: log?.llm_fit_score || 0,
-      llm_decision: log?.llm_decision || 'PENDING',
-      llm_reasoning: log?.llm_reasoning || '',
-      repurposed_hook: log?.repurposed_hook || '',
-      repurposed_caption: log?.repurposed_caption || '',
-      selected_song_title: log?.selected_song_title || '',
-      extracted_resources: extractedResources
-    };
-  });
-}
-
-function updateMobileDmTrigger(id, updates) {
-  const fields = [];
-  const values = [];
-  for (const [k, v] of Object.entries(updates)) {
-    fields.push(`${k} = ?`);
-    values.push(v);
-  }
-  if (fields.length === 0) return getMobileDmTriggerById(id);
-  values.push(id);
-  getDb().prepare(`UPDATE mobile_dm_triggers SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getMobileDmTriggerById(id);
-}
-
-// ─── 10. Instagram Proxy / Relay Jobs Helpers (Hypothesis 2) ───────────────────
-function parseRelayJob(row) {
-  if (!row) return null;
-  let links = [];
-  try {
-    links = typeof row.extracted_links === 'string' ? JSON.parse(row.extracted_links || '[]') : (row.extracted_links || []);
-  } catch (e) {
-    links = [];
-  }
-  return {
-    ...row,
-    extracted_links: links
-  };
-}
-
-function createRelayJob(job) {
-  const relayId = job.relay_id || `relay_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-  const info = getDb().prepare(`
-    INSERT INTO instagram_relay_jobs (
-      relay_id, requester_ig_id, requester_username, target_shortcode,
-      target_media_id, target_creator_id, target_creator_handle,
-      detected_keyword, comment_posted_at, dm_received_at, extracted_links,
-      status, retry_count, relayed_at, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    relayId,
-    job.requester_ig_id || '',
-    job.requester_username || '',
-    job.target_shortcode || '',
-    job.target_media_id || '',
-    job.target_creator_id || '',
-    job.target_creator_handle || '',
-    job.detected_keyword || 'FREE',
-    job.comment_posted_at || null,
-    job.dm_received_at || null,
-    JSON.stringify(job.extracted_links || []),
-    job.status || 'pending_comment',
-    job.retry_count || 0,
-    job.relayed_at || null,
-    job.created_at || new Date().toISOString()
-  );
-  return getRelayJobById(info.lastInsertRowid);
-}
-
-function getRelayJobById(id) {
-  const row = getDb().prepare('SELECT * FROM instagram_relay_jobs WHERE id = ?').get(id);
-  return parseRelayJob(row);
-}
-
-function getRelayJobByRelayId(relayId) {
-  const row = getDb().prepare('SELECT * FROM instagram_relay_jobs WHERE relay_id = ?').get(relayId);
-  return parseRelayJob(row);
-}
-
-function getPendingRelayByCreator(creatorId, creatorHandle) {
-  let query = 'SELECT * FROM instagram_relay_jobs WHERE status IN (\'commented\', \'pending_comment\')';
-  const params = [];
-  if (creatorId && creatorHandle) {
-    query += ' AND (target_creator_id = ? OR target_creator_handle = ?)';
-    params.push(String(creatorId), String(creatorHandle));
-  } else if (creatorId) {
-    query += ' AND target_creator_id = ?';
-    params.push(String(creatorId));
-  } else if (creatorHandle) {
-    query += ' AND target_creator_handle = ?';
-    params.push(String(creatorHandle));
-  }
-  query += ' ORDER BY id DESC LIMIT 1';
-  const row = getDb().prepare(query).get(...params);
-  return parseRelayJob(row);
-}
-
-function getPendingRelayByShortcode(shortcode) {
-  const row = getDb().prepare("SELECT * FROM instagram_relay_jobs WHERE target_shortcode = ? AND status IN ('commented', 'pending_comment') ORDER BY id DESC LIMIT 1").get(shortcode);
-  return parseRelayJob(row);
-}
-
-function getActiveRelayJobs(limit = 50) {
-  const rows = getDb().prepare('SELECT * FROM instagram_relay_jobs ORDER BY id DESC LIMIT ?').all(limit);
-  return rows.map(parseRelayJob);
-}
-
-function updateRelayJob(id, updates) {
-  const fields = [];
-  const values = [];
-  for (const [k, v] of Object.entries(updates)) {
-    fields.push(`${k} = ?`);
-    if (typeof v === 'object' && v !== null && !(v instanceof Date)) {
-      values.push(JSON.stringify(v));
-    } else {
-      values.push(v);
-    }
-  }
-  if (fields.length === 0) return getRelayJobById(id);
-  values.push(id);
-  getDb().prepare(`UPDATE instagram_relay_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getRelayJobById(id);
-}
-
-function addAutomationEvent(event) {
-  const db = getDb();
-  const res = db.prepare(`
-    INSERT INTO instagram_automation_events (
-      post_id, event_type, ig_media_id, ig_permalink, trigger_keyword,
-      resource_url, dm_message, rule_id, status, details, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    event.post_id || null,
-    event.event_type || 'POST_AND_ARMED',
-    event.ig_media_id || '',
-    event.ig_permalink || '',
-    event.trigger_keyword || '',
-    event.resource_url || '',
-    event.dm_message || '',
-    event.rule_id || null,
-    event.status || 'success',
-    typeof event.details === 'object' ? JSON.stringify(event.details) : (event.details || '{}'),
-    new Date().toISOString()
-  );
-  return res.lastInsertRowid;
-}
-
-function getAutomationEvents(limit = 25) {
-  const db = getDb();
-  return db.prepare(`
-    SELECT * FROM instagram_automation_events ORDER BY id DESC LIMIT ?
-  `).all(limit);
-}
-
-// ─── Connected Instagram Pages Multi-Tenant Registry (v5.0) ─────────
-function getConnectedPages(options = {}) {
-  const db = getDb();
   if (options.isActiveOnly) {
-    return db.prepare('SELECT * FROM connected_pages WHERE is_active = 1 ORDER BY id ASC').all();
+    sql += ' WHERE is_active = 1';
   }
-  return db.prepare('SELECT * FROM connected_pages ORDER BY id ASC').all();
+  sql += ' ORDER BY id ASC';
+  return getDb().prepare(sql).all(...params);
 }
 
-function getConnectedPageBySlug(slug) {
-  if (!slug) return null;
-  return getDb().prepare('SELECT * FROM connected_pages WHERE lower(slug) = ?').get(String(slug).toLowerCase().trim());
+function getPageById(id) {
+  return getDb().prepare('SELECT * FROM pages WHERE id = ?').get(id);
 }
 
-function getConnectedPageById(id) {
-  return getDb().prepare('SELECT * FROM connected_pages WHERE id = ?').get(id);
+function getPageBySlug(slug) {
+  return getDb().prepare('SELECT * FROM pages WHERE slug = ?').get(slug);
 }
 
-function createConnectedPage(data) {
-  const db = getDb();
+function createPage(data) {
   const now = new Date().toISOString();
-  const rawSlug = data.slug || data.name || 'page';
-  const slug = rawSlug.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || `page_${Date.now()}`;
-  
-  const stmt = db.prepare(`
-    INSERT INTO connected_pages (
-      slug, name, handle, meta_page_token, meta_ig_user_id, niche, workflow_type,
-      icon, theme_color, has_dm_automation, custom_trigger_keyword, lead_magnet_instructions,
-      instaauto_enabled, instaauto_rule_template, attribution_template, autopilot_enabled,
-      daily_quota, is_active, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  const stmt = getDb().prepare(`
+    INSERT INTO pages (
+      slug, name, handle, ig_user_id, access_token, token_expires_at,
+      caption_template, default_hashtags, attribution_enabled, watermark_enabled,
+      post_mode, posts_per_cycle, daily_quota, min_spacing_minutes, is_active,
+      created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-
   const info = stmt.run(
-    slug,
-    data.name || 'New Instagram Page',
-    data.handle || '@new_account',
-    data.meta_page_token || '',
-    data.meta_ig_user_id || '',
-    data.niche || 'tech',
-    data.workflow_type || 'lead_magnet',
-    data.icon || '📱',
-    data.theme_color || '#7C3AED',
-    data.has_dm_automation !== undefined ? (data.has_dm_automation ? 1 : 0) : 1,
-    data.custom_trigger_keyword || 'PROJECT',
-    data.lead_magnet_instructions || '',
-    data.instaauto_enabled !== undefined ? (data.instaauto_enabled ? 1 : 0) : 1,
-    data.instaauto_rule_template || '{"follow_required": true}',
-    data.attribution_template || '💡 Source: @{author} | Follow @{my_handle} for daily updates!',
-    data.autopilot_enabled ? 1 : 0,
-    parseInt(data.daily_quota || '3', 10),
+    data.slug.toLowerCase().trim(),
+    data.name.trim(),
+    data.handle.trim(),
+    data.ig_user_id.trim(),
+    data.access_token.trim(),
+    data.token_expires_at || null,
+    data.caption_template || '{caption}\n\n{attribution}\n\n{hashtags}',
+    data.default_hashtags || '',
+    data.attribution_enabled !== undefined ? (data.attribution_enabled ? 1 : 0) : 1,
+    data.watermark_enabled !== undefined ? (data.watermark_enabled ? 1 : 0) : 0,
+    data.post_mode || 'review',
+    data.posts_per_cycle || 1,
+    data.daily_quota || 3,
+    data.min_spacing_minutes || 60,
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
     now,
     now
   );
-
-  return getConnectedPageById(info.lastInsertRowid);
+  return getPageById(info.lastInsertRowid);
 }
 
-function updateConnectedPage(id, data) {
-  const db = getDb();
-  const page = getConnectedPageById(id);
-  if (!page) return null;
+function updatePage(id, data) {
+  const page = getPageById(id);
+  if (!page) throw new Error(`Page #${id} not found`);
 
-  const now = new Date().toISOString();
   const fields = [];
-  const values = [];
+  const params = [];
 
   const allowed = [
-    'name', 'handle', 'meta_page_token', 'meta_ig_user_id', 'niche', 'workflow_type',
-    'icon', 'theme_color', 'has_dm_automation', 'custom_trigger_keyword', 'lead_magnet_instructions',
-    'instaauto_enabled', 'instaauto_rule_template', 'attribution_template', 'autopilot_enabled',
-    'daily_quota', 'is_active'
+    'slug', 'name', 'handle', 'ig_user_id', 'access_token', 'token_expires_at',
+    'caption_template', 'default_hashtags', 'attribution_enabled', 'watermark_enabled',
+    'post_mode', 'posts_per_cycle', 'daily_quota', 'min_spacing_minutes', 'is_active'
   ];
 
   for (const key of allowed) {
     if (data[key] !== undefined) {
       fields.push(`${key} = ?`);
-      let val = data[key];
-      if (typeof val === 'boolean') val = val ? 1 : 0;
-      values.push(val);
-    }
-  }
-
-  if (fields.length === 0) return page;
-
-  fields.push('updated_at = ?');
-  values.push(now);
-  values.push(id);
-
-  db.prepare(`UPDATE connected_pages SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getConnectedPageById(id);
-}
-
-function deleteConnectedPage(id) {
-  const db = getDb();
-  return db.prepare('DELETE FROM connected_pages WHERE id = ?').run(id);
-}
-
-// ─── Scout Accounts Registry Helpers (v5.5) ──────────────────────
-function getScoutAccounts() {
-  const db = getDb();
-  return db.prepare('SELECT * FROM scout_accounts ORDER BY id DESC').all();
-}
-
-function getScoutAccountById(id) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM scout_accounts WHERE id = ?').get(id);
-}
-
-function getScoutAccountByUsername(username) {
-  if (!username) return null;
-  const clean = String(username).replace(/^@/, '').trim();
-  const db = getDb();
-  return db.prepare('SELECT * FROM scout_accounts WHERE username = ? COLLATE NOCASE').get(clean);
-}
-
-function getActiveScout(niche = 'all') {
-  const db = getDb();
-
-  // Auto-reset hourly and daily counters if time windows have passed
-  try {
-    const allScouts = db.prepare('SELECT id, last_comment_at, hourly_comments_count, daily_comments_count FROM scout_accounts').all();
-    const now = Date.now();
-    for (const s of allScouts) {
-      if (s.last_comment_at) {
-        const lastTime = new Date(s.last_comment_at).getTime();
-        const hoursPassed = (now - lastTime) / (1000 * 60 * 60);
-        if (hoursPassed >= 1 && s.hourly_comments_count > 0) {
-          db.prepare('UPDATE scout_accounts SET hourly_comments_count = 0 WHERE id = ?').run(s.id);
-        }
-        if (hoursPassed >= 24 && s.daily_comments_count > 0) {
-          db.prepare('UPDATE scout_accounts SET daily_comments_count = 0 WHERE id = ?').run(s.id);
-        }
+      if (typeof data[key] === 'boolean') {
+        params.push(data[key] ? 1 : 0);
+      } else {
+        params.push(data[key]);
       }
     }
-  } catch (resetErr) {}
+  }
 
-  let scout = null;
-  if (niche && niche !== 'all') {
-    scout = db.prepare(`
-      SELECT * FROM scout_accounts 
-      WHERE status = 'active' 
-        AND (assigned_niche = ? OR assigned_niche = 'all')
-        AND hourly_comments_count < 10
-        AND daily_comments_count < 50
-      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
-      LIMIT 1
-    `).get(niche);
-  }
-  if (!scout) {
-    scout = db.prepare(`
-      SELECT * FROM scout_accounts 
-      WHERE status = 'active'
-        AND hourly_comments_count < 10
-        AND daily_comments_count < 50
-      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
-      LIMIT 1
-    `).get();
-  }
-  // Fallback to active scout if single scout account configured
-  if (!scout) {
-    scout = db.prepare(`
-      SELECT * FROM scout_accounts 
-      WHERE status = 'active'
-      ORDER BY last_comment_at ASC NULLS FIRST, id ASC
-      LIMIT 1
-    `).get();
-  }
-  return scout;
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  getDb().prepare(`UPDATE pages SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getPageById(id);
 }
 
-function addScoutAccount(data) {
-  const db = getDb();
-  const cleanUsername = String(data.username || '').replace(/^@/, '').trim();
-  const now = new Date().toISOString();
-  const stmt = db.prepare(`
-    INSERT INTO scout_accounts (
-      username, session_id, assigned_niche, status, hourly_comments_count, daily_comments_count,
-      last_comment_at, last_health_check_at, health_status, last_error, notes, account_id, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 0, 0, NULL, NULL, 'unknown', '', ?, ?, ?, ?)
+function deletePage(id) {
+  return getDb().prepare('DELETE FROM pages WHERE id = ?').run(id);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Source Accounts Operations (Watchtower)
+// ─────────────────────────────────────────────────────────────
+
+function getSourceAccounts(options = {}) {
+  let sql = `
+    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    FROM source_accounts s
+    LEFT JOIN pages p ON s.page_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (options.pageId) {
+    sql += ' AND s.page_id = ?';
+    params.push(options.pageId);
+  }
+  if (options.isActiveOnly) {
+    sql += ' AND s.is_active = 1';
+  }
+  sql += ' ORDER BY s.id ASC';
+  return getDb().prepare(sql).all(...params);
+}
+
+function getSourceAccountById(id) {
+  return getDb().prepare(`
+    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    FROM source_accounts s
+    LEFT JOIN pages p ON s.page_id = p.id
+    WHERE s.id = ?
+  `).get(id);
+}
+
+function getSourceAccountByUsername(username) {
+  const clean = username.replace(/^@/, '').toLowerCase().trim();
+  return getDb().prepare('SELECT * FROM source_accounts WHERE username = ?').get(clean);
+}
+
+function createSourceAccount(data) {
+  const username = data.username.replace(/^@/, '').toLowerCase().trim();
+  const stmt = getDb().prepare(`
+    INSERT INTO source_accounts (
+      username, page_id, is_active, health, consecutive_failures,
+      last_error, last_checked_at, last_new_post_at, synced_posts_count, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const res = stmt.run(
-    cleanUsername,
-    String(data.session_id || '').trim(),
-    data.assigned_niche || 'all',
-    data.status || 'active',
-    data.notes || '',
-    data.account_id || '',
-    now,
-    now
+  const info = stmt.run(
+    username,
+    data.page_id,
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    data.health || 'ok',
+    0,
+    '',
+    null,
+    null,
+    0,
+    new Date().toISOString()
   );
-  return getScoutAccountById(res.lastInsertRowid);
+  return getSourceAccountById(info.lastInsertRowid);
 }
 
-function updateScoutAccount(id, data) {
-  const db = getDb();
-  const allowed = [
-    'username', 'session_id', 'assigned_niche', 'status', 'hourly_comments_count',
-    'daily_comments_count', 'last_comment_at', 'last_health_check_at', 'health_status',
-    'last_error', 'notes', 'account_id'
-  ];
+function updateSourceAccount(id, data) {
   const fields = [];
-  const values = [];
+  const params = [];
+
+  const allowed = [
+    'username', 'page_id', 'is_active', 'health', 'consecutive_failures',
+    'last_error', 'last_checked_at', 'last_new_post_at', 'synced_posts_count'
+  ];
+
+  for (const key of allowed) {
+    if (data[key] !== undefined) {
+      fields.push(`${key} = ?`);
+      if (typeof data[key] === 'boolean') {
+        params.push(data[key] ? 1 : 0);
+      } else {
+        params.push(data[key]);
+      }
+    }
+  }
+
+  if (fields.length === 0) return getSourceAccountById(id);
+
+  params.push(id);
+  getDb().prepare(`UPDATE source_accounts SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getSourceAccountById(id);
+}
+
+function deleteSourceAccount(id) {
+  return getDb().prepare('DELETE FROM source_accounts WHERE id = ?').run(id);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Discovered Posts Operations (Watchtower)
+// ─────────────────────────────────────────────────────────────
+
+function getDiscoveredPostByShortcode(shortcode) {
+  return getDb().prepare('SELECT * FROM discovered_posts WHERE shortcode = ?').get(shortcode);
+}
+
+function getDiscoveredPostById(id) {
+  return getDb().prepare(`
+    SELECT d.*, s.username as source_username, s.page_id
+    FROM discovered_posts d
+    LEFT JOIN source_accounts s ON d.source_account_id = s.id
+    WHERE d.id = ?
+  `).get(id);
+}
+
+function createDiscoveredPost(data) {
+  const stmt = getDb().prepare(`
+    INSERT INTO discovered_posts (
+      source_account_id, run_id, shortcode, url, media_type,
+      caption, like_count, comment_count, view_count, posted_at,
+      score, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.source_account_id || null,
+    data.run_id || null,
+    data.shortcode,
+    data.url,
+    data.media_type || 'reel',
+    data.caption || '',
+    data.like_count || 0,
+    data.comment_count || 0,
+    data.view_count || 0,
+    data.posted_at || null,
+    data.score || 0.0,
+    data.status || 'new',
+    new Date().toISOString()
+  );
+  return getDiscoveredPostById(info.lastInsertRowid);
+}
+
+function updateDiscoveredPost(id, data) {
+  const fields = [];
+  const params = [];
+  const allowed = ['score', 'status', 'run_id', 'like_count', 'comment_count', 'view_count', 'caption'];
   for (const k of allowed) {
     if (data[k] !== undefined) {
       fields.push(`${k} = ?`);
-      let val = data[k];
-      if (k === 'username' && typeof val === 'string') val = val.replace(/^@/, '').trim();
-      values.push(val);
+      params.push(data[k]);
     }
   }
-  if (fields.length === 0) return getScoutAccountById(id);
-  fields.push('updated_at = ?');
-  values.push(new Date().toISOString());
-  values.push(id);
-  db.prepare(`UPDATE scout_accounts SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getScoutAccountById(id);
+  if (fields.length === 0) return getDiscoveredPostById(id);
+  params.push(id);
+  getDb().prepare(`UPDATE discovered_posts SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getDiscoveredPostById(id);
 }
 
-function deleteScoutAccount(id) {
-  const db = getDb();
-  return db.prepare('DELETE FROM scout_accounts WHERE id = ?').run(id);
+function listDiscoveredPosts(options = {}) {
+  let sql = `
+    SELECT d.*, s.username as source_username, p.slug as page_slug, p.name as page_name
+    FROM discovered_posts d
+    LEFT JOIN source_accounts s ON d.source_account_id = s.id
+    LEFT JOIN pages p ON s.page_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (options.status) {
+    sql += ' AND d.status = ?';
+    params.push(options.status);
+  }
+  if (options.pageId) {
+    sql += ' AND s.page_id = ?';
+    params.push(options.pageId);
+  }
+  if (options.sourceAccountId) {
+    sql += ' AND d.source_account_id = ?';
+    params.push(options.sourceAccountId);
+  }
+
+  sql += ' ORDER BY d.id DESC';
+  if (options.limit) {
+    sql += ' LIMIT ?';
+    params.push(options.limit);
+  }
+
+  return getDb().prepare(sql).all(...params);
 }
 
-function incrementScoutUsage(id) {
-  const db = getDb();
-  const now = new Date().toISOString();
-  db.prepare(`
-    UPDATE scout_accounts 
-    SET hourly_comments_count = hourly_comments_count + 1,
-        daily_comments_count = daily_comments_count + 1,
-        last_comment_at = ?,
-        updated_at = ?
-    WHERE id = ?
-  `).run(now, now, id);
+// ─────────────────────────────────────────────────────────────
+// Publish Jobs Operations (Shared Core Queue & History)
+// ─────────────────────────────────────────────────────────────
+
+function getPublishJobById(id) {
+  return getDb().prepare(`
+    SELECT j.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    FROM publish_jobs j
+    LEFT JOIN pages p ON j.page_id = p.id
+    WHERE j.id = ?
+  `).get(id);
 }
 
-function resetScoutHourlyCounters() {
-  const db = getDb();
-  db.prepare(`UPDATE scout_accounts SET hourly_comments_count = 0`).run();
+function getPublishJob(pageId, shortcode) {
+  return getDb().prepare(`
+    SELECT * FROM publish_jobs WHERE page_id = ? AND shortcode = ?
+  `).get(pageId, shortcode);
 }
 
-// ─── 14. Scout Harvest Jobs (v6.0 Grounded Pipeline) ─────────────────────────
-function createScoutHarvestJob(data) {
-  const db = getDb();
-  const now = new Date().toISOString();
-  const res = db.prepare(`
-    INSERT INTO scout_harvest_jobs (
-      shortcode, source_post_url, creator_username, creator_pk,
-      trigger_keyword, scout_username, comment_pk, media_pk,
-      status, harvest_stage, harvest_method, harvested_url,
-      raw_dm_text, extracted_links, attempt_count, bot_replies_count,
-      post_id, telegram_chat_id, error_message, trace_log, started_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+function createPublishJob(data) {
+  const stmt = getDb().prepare(`
+    INSERT INTO publish_jobs (
+      agent, page_id, discovered_post_id, shortcode, source_url,
+      media_type, media_paths, caption, status, current_step,
+      attempts, error, ig_media_id, permalink, telegram_chat_id,
+      telegram_message_id, created_at, published_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.agent || 'reposter',
+    data.page_id,
+    data.discovered_post_id || null,
     data.shortcode,
-    data.source_post_url,
-    data.creator_username || '',
-    data.creator_pk || '',
-    data.trigger_keyword || '',
-    data.scout_username || '',
-    data.comment_pk || '',
-    data.media_pk || '',
-    data.status || 'pending',
-    data.harvest_stage || 'init',
-    data.harvest_method || '',
-    data.harvested_url || '',
-    data.raw_dm_text || '',
-    JSON.stringify(data.extracted_links || []),
-    data.attempt_count || 0,
-    data.bot_replies_count || 0,
-    data.post_id || null,
-    data.telegram_chat_id ? String(data.telegram_chat_id) : null,
-    data.error_message || '',
-    JSON.stringify(data.trace_log || [{ time: now, event: 'job_created' }]),
-    now
+    data.source_url,
+    data.media_type || 'reel',
+    typeof data.media_paths === 'string' ? data.media_paths : JSON.stringify(data.media_paths || []),
+    data.caption || '',
+    data.status || 'queued',
+    data.current_step || 'init',
+    data.attempts || 0,
+    data.error || '',
+    data.ig_media_id || '',
+    data.permalink || '',
+    data.telegram_chat_id || '',
+    data.telegram_message_id || '',
+    new Date().toISOString(),
+    null
   );
-  return getScoutHarvestJobById(res.lastInsertRowid);
+  return getPublishJobById(info.lastInsertRowid);
 }
 
-function getScoutHarvestJobById(id) {
-  const db = getDb();
-  const row = db.prepare('SELECT * FROM scout_harvest_jobs WHERE id = ?').get(id);
-  if (!row) return null;
-  try { row.extracted_links = JSON.parse(row.extracted_links || '[]'); } catch (e) { row.extracted_links = []; }
-  try { row.trace_log = JSON.parse(row.trace_log || '[]'); } catch (e) { row.trace_log = []; }
-  return row;
-}
-
-function getScoutHarvestJobByShortcode(shortcode) {
-  const db = getDb();
-  const row = db.prepare('SELECT * FROM scout_harvest_jobs WHERE shortcode = ? ORDER BY id DESC LIMIT 1').get(shortcode);
-  if (!row) return null;
-  try { row.extracted_links = JSON.parse(row.extracted_links || '[]'); } catch (e) { row.extracted_links = []; }
-  try { row.trace_log = JSON.parse(row.trace_log || '[]'); } catch (e) { row.trace_log = []; }
-  return row;
-}
-
-function updateScoutHarvestJob(id, updates) {
-  const db = getDb();
-  const allowed = [
-    'creator_username', 'creator_pk', 'trigger_keyword', 'scout_username',
-    'comment_pk', 'media_pk', 'status', 'harvest_stage', 'harvest_method',
-    'harvested_url', 'raw_dm_text', 'extracted_links', 'attempt_count',
-    'bot_replies_count', 'post_id', 'telegram_chat_id', 'error_message',
-    'trace_log', 'completed_at'
-  ];
+function updatePublishJob(id, data) {
   const fields = [];
-  const values = [];
+  const params = [];
+
+  const allowed = [
+    'status', 'current_step', 'attempts', 'error', 'media_paths',
+    'caption', 'ig_media_id', 'permalink', 'telegram_chat_id',
+    'telegram_message_id', 'published_at'
+  ];
+
   for (const k of allowed) {
-    if (updates[k] !== undefined) {
+    if (data[k] !== undefined) {
       fields.push(`${k} = ?`);
-      let val = updates[k];
-      if ((k === 'extracted_links' || k === 'trace_log') && typeof val !== 'string') {
-        val = JSON.stringify(val);
+      if (k === 'media_paths' && typeof data[k] !== 'string') {
+        params.push(JSON.stringify(data[k]));
+      } else {
+        params.push(data[k]);
       }
-      values.push(val);
     }
   }
-  if (fields.length === 0) return getScoutHarvestJobById(id);
-  values.push(id);
-  db.prepare(`UPDATE scout_harvest_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...values);
-  return getScoutHarvestJobById(id);
+
+  if (fields.length === 0) return getPublishJobById(id);
+  params.push(id);
+  getDb().prepare(`UPDATE publish_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getPublishJobById(id);
 }
 
-function appendScoutHarvestTrace(id, event, details = {}) {
-  const job = getScoutHarvestJobById(id);
-  if (!job) return;
-  const traces = Array.isArray(job.trace_log) ? job.trace_log : [];
-  traces.push({
-    time: new Date().toISOString(),
-    event,
-    details
-  });
-  updateScoutHarvestJob(id, { trace_log: traces });
+function listPublishJobs(options = {}) {
+  let sql = `
+    SELECT j.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    FROM publish_jobs j
+    LEFT JOIN pages p ON j.page_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (options.status) {
+    if (Array.isArray(options.status)) {
+      sql += ` AND j.status IN (${options.status.map(() => '?').join(',')})`;
+      params.push(...options.status);
+    } else {
+      sql += ' AND j.status = ?';
+      params.push(options.status);
+    }
+  }
+  if (options.pageId) {
+    sql += ' AND j.page_id = ?';
+    params.push(options.pageId);
+  }
+  if (options.agent) {
+    sql += ' AND j.agent = ?';
+    params.push(options.agent);
+  }
+
+  sql += ' ORDER BY j.id DESC';
+  if (options.limit) {
+    sql += ' LIMIT ?';
+    params.push(options.limit);
+  }
+
+  return getDb().prepare(sql).all(...params);
+}
+
+// Count jobs published for a page today
+function getPublishedCountToday(pageId) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const row = getDb().prepare(`
+    SELECT count(*) as count FROM publish_jobs
+    WHERE page_id = ? AND status = 'published' AND published_at >= ?
+  `).get(pageId, todayStart.toISOString());
+  return row ? row.count : 0;
+}
+
+// Get timestamp of latest published job for a page
+function getLastPublishedTimestamp(pageId) {
+  const row = getDb().prepare(`
+    SELECT published_at FROM publish_jobs
+    WHERE page_id = ? AND status = 'published' AND published_at IS NOT NULL
+    ORDER BY id DESC LIMIT 1
+  `).get(pageId);
+  return row ? row.published_at : null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Agent Runs Operations (Watchtower Auditing)
+// ─────────────────────────────────────────────────────────────
+
+function createAgentRun(data = {}) {
+  const stmt = getDb().prepare(`
+    INSERT INTO agent_runs (agent, started_at, finished_at, sources_checked, new_posts, published, errors)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.agent || 'watchtower',
+    new Date().toISOString(),
+    null,
+    0,
+    0,
+    0,
+    '[]'
+  );
+  return getDb().prepare('SELECT * FROM agent_runs WHERE id = ?').get(info.lastInsertRowid);
+}
+
+function updateAgentRun(id, data) {
+  const fields = [];
+  const params = [];
+  const allowed = ['finished_at', 'sources_checked', 'new_posts', 'published', 'errors'];
+  for (const k of allowed) {
+    if (data[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      if (k === 'errors' && typeof data[k] !== 'string') {
+        params.push(JSON.stringify(data[k]));
+      } else {
+        params.push(data[k]);
+      }
+    }
+  }
+  if (fields.length === 0) return getDb().prepare('SELECT * FROM agent_runs WHERE id = ?').get(id);
+  params.push(id);
+  getDb().prepare(`UPDATE agent_runs SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getDb().prepare('SELECT * FROM agent_runs WHERE id = ?').get(id);
+}
+
+function listAgentRuns(limit = 20) {
+  return getDb().prepare('SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?').all(limit);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Backwards Compatibility Bridge
+// (Allows any existing services to query pages/channels safely during migration)
+// ─────────────────────────────────────────────────────────────
+
+function getConnectedPages(options = {}) {
+  return getPages(options);
+}
+function getConnectedPageBySlug(slug) {
+  return getPageBySlug(slug);
+}
+function getTrackedChannels() {
+  return getSourceAccounts();
+}
+function getBrandAssets() {
+  return { brand_handle: getSetting('instagram_handle', '@gta6_updates_007') };
 }
 
 module.exports = {
   getDb,
+  // Settings
   getSetting,
   setSetting,
-  getTrackedChannels,
-  getTrackedChannelById,
-  getTrackedChannelByUsername,
-  addTrackedChannel,
-  updateTrackedChannel,
-  deleteTrackedChannel,
-  getBrandAssets,
-  setBrandAssets,
-  addAutonomousLog,
-  getAutonomousLogById,
-  getAutonomousLogByShortcode,
-  getAutonomousLogs,
-  updateAutonomousLog,
-  deleteAutonomousLog,
-  addMobileDmTrigger,
-  getMobileDmTriggerById,
-  getMobileDmTriggerByShortcode,
-  getMobileDmTriggers,
-  updateMobileDmTrigger,
-  createRelayJob,
-  getRelayJobById,
-  getRelayJobByRelayId,
-  getPendingRelayByCreator,
-  getPendingRelayByShortcode,
-  getActiveRelayJobs,
-  updateRelayJob,
-  addAutomationEvent,
-  getAutomationEvents,
+  getAllSettings,
+  // Pages
+  getPages,
+  getPageById,
+  getPageBySlug,
+  createPage,
+  updatePage,
+  deletePage,
+  // Source Accounts
+  getSourceAccounts,
+  getSourceAccountById,
+  getSourceAccountByUsername,
+  createSourceAccount,
+  updateSourceAccount,
+  deleteSourceAccount,
+  // Discovered Posts
+  getDiscoveredPostByShortcode,
+  getDiscoveredPostById,
+  createDiscoveredPost,
+  updateDiscoveredPost,
+  listDiscoveredPosts,
+  // Publish Jobs
+  getPublishJobById,
+  getPublishJob,
+  createPublishJob,
+  updatePublishJob,
+  listPublishJobs,
+  getPublishedCountToday,
+  getLastPublishedTimestamp,
+  // Agent Runs
+  createAgentRun,
+  updateAgentRun,
+  listAgentRuns,
+  // Backwards compatibility
   getConnectedPages,
   getConnectedPageBySlug,
-  getConnectedPageById,
-  createConnectedPage,
-  updateConnectedPage,
-  deleteConnectedPage,
-  getScoutAccounts,
-  getScoutAccountById,
-  getScoutAccountByUsername,
-  getActiveScout,
-  addScoutAccount,
-  updateScoutAccount,
-  deleteScoutAccount,
-  incrementScoutUsage,
-  resetScoutHourlyCounters,
-  createScoutHarvestJob,
-  getScoutHarvestJobById,
-  getScoutHarvestJobByShortcode,
-  updateScoutHarvestJob,
-  appendScoutHarvestTrace
+  getTrackedChannels,
+  getBrandAssets
 };

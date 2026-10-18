@@ -1,11 +1,12 @@
 {
-  "name": "omni-research-agent",
-  "version": "1.0.0",
-  "description": "OmniResearch AI — Autonomous Content & Deep Research Engine (Interconnected Sister Platform to InstaAuto AI Agent)",
+  "name": "omnistudio-ai",
+  "version": "7.0.0",
+  "description": "OmniStudio v7 — Autonomous Two-Agent Instagram Platform (Reposter & Watchtower)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test test/v7_subsystems.test.js"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",

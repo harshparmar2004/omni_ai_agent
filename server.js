@@ -7,7 +7,7 @@ const { getDb } = require('./src/database');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Initialize SQLite database
+// Initialize SQLite v7 database
 getDb();
 
 // Middlewares
@@ -19,78 +19,67 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/generated', express.static(path.join(__dirname, 'public', 'generated')));
 
-// API Routes
-app.use('/api/research', require('./src/routes/research'));
-app.use('/api/media', require('./src/routes/media'));
-app.use('/api/publish', require('./src/routes/publish'));
-app.use('/api/pipeline', require('./src/routes/publish'));
-app.use('/api/matrix', require('./src/routes/matrix'));
+// ─────────────────────────────────────────────────────────────
+// OmniStudio v7 API Routes
+// ─────────────────────────────────────────────────────────────
+app.use('/api/reposter', require('./src/routes/reposter'));
+app.use('/api/jobs', require('./src/routes/jobs'));
+app.use('/api/watchtower', require('./src/routes/watchtower'));
+app.use('/api/sources', require('./src/routes/sources'));
+app.use('/api/discoveries', require('./src/routes/discoveries'));
+app.use('/api/pages', require('./src/routes/pages'));
+app.use('/api/system', require('./src/routes/system'));
 app.use('/api/settings', require('./src/routes/settings'));
-app.use('/api/overview', require('./src/routes/settings'));
 
-// v2.0 & v3.0 Routes
-app.use('/api/llm', require('./src/routes/llm'));
-app.use('/api/oauth', require('./src/routes/oauth'));
-app.use('/api/docs', require('./src/routes/docs'));
-app.use('/api/instagram/webhook', require('./src/routes/instagramWebhook'));
-app.use('/api/instagram', require('./src/routes/instagramAgent'));
-app.use('/api/nanobanana', require('./src/routes/nanoBanana'));
-
-// Public Companion Guides (/docs/:slug)
-app.use('/docs', require('./src/routes/docs'));
-
-// Fallback for SPA
+// Fallback for Single Page Application (SPA)
 app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api') || req.path.startsWith('/docs') || req.path.startsWith('/generated')) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/generated')) {
     return next();
   }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Error handling
+// Global error handling
 app.use((err, req, res, next) => {
-  console.error('[OmniResearch Server Error]:', err);
+  console.error('[OmniStudio Server Error]:', err);
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('\n======================================================');
-  console.log('🚀 OMNIRESEARCH AI — Autonomous Content & Deep Research Engine');
-  console.log(`🌐 Local Web Dashboard: http://localhost:${PORT}`);
-  console.log(`📄 Public Deliverables Host: http://localhost:${PORT}/docs/:slug`);
-  console.log(`📡 Linked InstaAuto Sentinel: http://localhost:3000/api/agent/bridge`);
-  console.log('======================================================\n');
+// Start Express server bound explicitly to 0.0.0.0
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log('\n======================================================');
+    console.log('🚀 OMNISTUDIO v7 — Autonomous Two-Agent Instagram Platform');
+    console.log(`🌐 Local Web Dashboard: http://localhost:${PORT}`);
+    console.log('🤖 Agent 1: Reposter (Telegram & Dashboard Inbound ➔ Instagram Live)');
+    console.log('🛰️ Agent 2: Watchtower (24/7 Monitored Sources ➔ Instagram Auto-Post)');
+    console.log('======================================================\n');
 
-  // ── 24/7 Autonomous Channel Poller & Stealth Sentinel Daemon ─────────
-  const { startStealthSentinelScheduler } = require('./src/services/stealthSentinelScheduler');
-  const { startMobileDmListener } = require('./src/services/instagramMobileDmListener');
-  const { startTelegramListener } = require('./src/services/telegramBotService');
-  const { startTunnel } = require('./src/services/tunnelService');
-  const { startMicroserviceDaemon } = require('./src/services/instagramMicroserviceDaemon');
+    const { startTunnel } = require('./src/core/mediaHost');
+    const jobWorkerPool = require('./src/core/jobWorker');
+    const { startTelegramBot } = require('./src/agents/reposter/telegramBot');
+    const watchtowerScheduler = require('./src/agents/watchtower/scheduler');
+    const { pruneExpiredMediaCache } = require('./src/core/mediaCleaner');
 
-  // Start Python Instagrapi Mobile Microservice on Port 8001 (Pillar for ManyChat Interception)
-  startMicroserviceDaemon().catch(e => console.warn('[Microservice Boot Notice]:', e.message));
+    // 1. Start self-healing Cloudflare public tunnel for Meta Graph API uploads
+    startTunnel(PORT).catch(e => console.warn('[Tunnel Boot Notice]:', e.message));
 
-  // Start Self-Healing Public Tunnel for Meta Graph API uploads
-  startTunnel(PORT).catch(e => console.warn('[Tunnel Boot Notice]:', e.message));
+    // 2. Start shared publishing core job worker pool
+    jobWorkerPool.start(3000);
 
-  // Mobile inbound is handled in real-time via Telegram & on-demand Scout Harvester
-  // (startMobileDmListener disabled to protect @cute.aarohi.007 from redundant background polling)
-  // startMobileDmListener(12000);
+    // 3. Start Agent 1: Reposter Telegram bot listener
+    startTelegramBot().catch(e => console.warn('[Telegram Bot Boot Notice]:', e.message));
 
-  // Start Telegram Mobile Inbound Listener (if token configured)
-  startTelegramListener();
+    // 4. Start Agent 2: Watchtower 24/7 surveillance scheduler
+    watchtowerScheduler.start();
 
-  // Start Untrackable Stealth Sentinel Scheduler (5 Anti-Tracking Strategies Active)
-  startStealthSentinelScheduler();
-
-  // Prune expired temporary media cache on boot (Pillar 4)
-  const { pruneExpiredMediaCache } = require('./src/services/mediaCleanerService');
-  try {
-    pruneExpiredMediaCache(48);
-  } catch (e) {
-    console.warn('[Media Cleaner Boot Notice]:', e.message);
-  }
-});
+    // 5. Initial cleanup of expired temporary media
+    try {
+      pruneExpiredMediaCache();
+    } catch (e) {
+      console.warn('[Media Cleaner Boot Notice]:', e.message);
+    }
+  });
+}
 
 module.exports = app;
