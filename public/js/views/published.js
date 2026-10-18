@@ -12,16 +12,16 @@ window.publishedView = (function() {
     container.innerHTML = `
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h2 style="font-size: 1.5rem; font-weight: 800; margin: 0 0 0.25rem 0;">Published Feed</h2>
-          <p style="color: var(--text-secondary); margin: 0; font-size: 0.88rem;">Live reels published to connected Instagram pages via Meta Graph API v21.0</p>
+          <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 0.2rem 0;">Published Feed</h2>
+          <p class="text-sm text-muted">Live reels published to connected Instagram pages via Meta Graph API v21.0</p>
         </div>
         <div class="flex items-center gap-2">
-          <select id="pub-page-filter" class="form-input" style="width: 180px; font-size: 0.8rem; padding: 4px 8px;" onchange="publishedView.filterByPage()">
+          <select id="pub-page-filter" class="form-input" style="width: 190px; font-size: 0.8rem; padding: 5px 9px;" onchange="publishedView.filterByPage()">
             <option value="">All Connected Pages</option>
             ${(window.app?.pages || []).map(p => `<option value="${p.id}">${p.name} (@${p.slug})</option>`).join('')}
           </select>
           <button class="btn btn-secondary btn-sm" onclick="publishedView.refresh()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
             Refresh
           </button>
         </div>
@@ -69,10 +69,10 @@ window.publishedView = (function() {
 
     if (!jobs || jobs.length === 0) {
       container.innerHTML = `
-        <div class="card" style="padding: 3rem; text-align: center;">
+        <div class="card" style="padding: 3.5rem; text-align: center;">
           <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📸</div>
-          <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
-          <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">Submit a reel link using Agent 1 (Reposter) or let Agent 2 (Watchtower) discover and publish content!</p>
+          <div style="font-weight: 800; font-size: 1.15rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Submit a reel link via Agent 1 (Reposter) or let Agent 2 (Watchtower) discover and publish content!</p>
         </div>
       `;
       return;
@@ -87,11 +87,11 @@ window.publishedView = (function() {
       const videoWebUrl = hasMedia ? `/generated/videos/${j.local_media_path.split(/[/\\]/).pop()}` : null;
 
       return `
-        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 1rem;">
+        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; padding: 1.15rem; background: var(--bg-card);">
           <div>
             <!-- Header -->
             <div class="flex items-center justify-between mb-2">
-              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10B981; font-weight: 700; font-size: 0.75rem;">
+              <span class="badge badge-emerald">
                 ${pageSlug}
               </span>
               <span style="font-size: 0.72rem; color: var(--text-muted);">
@@ -99,19 +99,19 @@ window.publishedView = (function() {
               </span>
             </div>
 
-            <!-- Published Instagram Media ID -->
+            <!-- Published Meta Media ID -->
             <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 0.65rem;">
-              Media ID: ${j.published_media_id || 'Meta Graph v21.0'}
+              ID: ${j.published_media_id || 'Meta v21.0'}
             </div>
 
             <!-- Caption -->
-            <div style="background: var(--bg-deep); padding: 0.65rem 0.85rem; border-radius: 6px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 0.75rem; max-height: 90px; overflow-y: auto;">
+            <div style="background: var(--bg-input); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); border: 1px solid var(--border-subtle); font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 0.75rem; max-height: 85px; overflow-y: auto;">
               ${j.caption || 'No caption text'}
             </div>
 
-            <div class="flex items-center justify-between" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-              <span>🕒 Published ${timeAgo}</span>
-              <a href="${j.source_url}" target="_blank" style="color: #60a5fa; text-decoration: none;">Original Source ↗</a>
+            <div class="flex items-center justify-between" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem;">
+              <span>🕒 ${timeAgo}</span>
+              <a href="${j.source_url}" target="_blank">Original Source ↗</a>
             </div>
           </div>
 
@@ -122,8 +122,8 @@ window.publishedView = (function() {
                 ▶ Preview Reel
               </button>
             ` : ''}
-            <a href="${directUrl}" target="_blank" class="btn btn-primary btn-sm w-full" style="text-align: center; font-size: 0.75rem; text-decoration: none;">
-              Open on Instagram ↗
+            <a href="${directUrl}" target="_blank" class="btn btn-primary btn-sm w-full" style="text-align: center; font-size: 0.75rem;">
+              View on IG ↗
             </a>
           </div>
         </div>
@@ -131,7 +131,7 @@ window.publishedView = (function() {
     }).join('');
 
     container.innerHTML = `
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.15rem;">
         ${cards}
       </div>
     `;

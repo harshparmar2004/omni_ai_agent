@@ -12,31 +12,31 @@ window.queueView = (function() {
     container.innerHTML = `
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h2 style="font-size: 1.5rem; font-weight: 800; margin: 0 0 0.25rem 0;">Review & Content Pipeline</h2>
-          <p style="color: var(--text-secondary); margin: 0; font-size: 0.88rem;">Manage caption reviews, live worker queues, and failed attempts</p>
+          <h2 style="font-size: 1.4rem; font-weight: 800; margin: 0 0 0.2rem 0;">Review & Content Pipeline</h2>
+          <p class="text-sm text-muted">Manage caption reviews, live worker queues, and failed attempts</p>
         </div>
         <button class="btn btn-secondary btn-sm" onclick="queueView.refresh()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
           Refresh
         </button>
       </div>
 
       <!-- Navigation Tabs -->
-      <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1.25rem; padding-bottom: 0.25rem;">
-        <button id="q-tab-btn-review" class="btn btn-secondary btn-sm ${activeTab === 'review' ? 'active' : ''}" onclick="queueView.switchTab('review')" style="${activeTab === 'review' ? 'background: var(--accent-primary); color: #fff;' : ''}">
+      <div style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1.25rem; padding-bottom: 0.4rem;">
+        <button id="q-tab-btn-review" class="btn btn-sm ${activeTab === 'review' ? 'btn-primary' : 'btn-secondary'}" onclick="queueView.switchTab('review')">
           ✍️ Needs Review (<span id="q-badge-review">0</span>)
         </button>
-        <button id="q-tab-btn-active" class="btn btn-secondary btn-sm ${activeTab === 'active' ? 'active' : ''}" onclick="queueView.switchTab('active')" style="${activeTab === 'active' ? 'background: var(--accent-primary); color: #fff;' : ''}">
+        <button id="q-tab-btn-active" class="btn btn-sm ${activeTab === 'active' ? 'btn-primary' : 'btn-secondary'}" onclick="queueView.switchTab('active')">
           ⚙️ Active Pipeline (<span id="q-badge-active">0</span>)
         </button>
-        <button id="q-tab-btn-failed" class="btn btn-secondary btn-sm ${activeTab === 'failed' ? 'active' : ''}" onclick="queueView.switchTab('failed')" style="${activeTab === 'failed' ? 'background: var(--accent-primary); color: #fff;' : ''}">
+        <button id="q-tab-btn-failed" class="btn btn-sm ${activeTab === 'failed' ? 'btn-primary' : 'btn-secondary'}" onclick="queueView.switchTab('failed')">
           ⚠️ Failed / Deadletter (<span id="q-badge-failed">0</span>)
         </button>
       </div>
 
       <!-- Tab Content Area -->
       <div id="q-tab-content">
-        <div style="color: var(--text-muted); padding: 2rem; text-align: center;">Loading pipeline data...</div>
+        <div style="color: var(--text-muted); padding: 3rem; text-align: center;">Loading pipeline data...</div>
       </div>
     `;
 
@@ -49,11 +49,9 @@ window.queueView = (function() {
       const btn = document.getElementById(`q-tab-btn-${t}`);
       if (btn) {
         if (t === tab) {
-          btn.style.background = 'var(--accent-primary)';
-          btn.style.color = '#fff';
+          btn.className = 'btn btn-sm btn-primary';
         } else {
-          btn.style.background = 'transparent';
-          btn.style.color = 'var(--text-secondary)';
+          btn.className = 'btn btn-sm btn-secondary';
         }
       }
     });
@@ -86,10 +84,10 @@ window.queueView = (function() {
 
       if (jobs.length === 0) {
         container.innerHTML = `
-          <div class="card" style="padding: 3rem; text-align: center;">
+          <div class="card" style="padding: 3.5rem; text-align: center;">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
-            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">Review Queue Empty</div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No content pending review. All submissions are automatically processed or published.</p>
+            <div style="font-weight: 800; font-size: 1.15rem; margin-bottom: 0.25rem;">Review Queue Empty</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No content pending review. Submissions are automatically processed or published.</p>
           </div>
         `;
         return;
@@ -97,26 +95,36 @@ window.queueView = (function() {
 
       const cards = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : `@page#${j.page_id}`;
+        const initialCaption = j.caption || '';
+        const initialLen = initialCaption.length;
+        const initialTags = (initialCaption.match(/#[a-zA-Z0-9_]+/g) || []).length;
+
         return `
-          <div class="card mb-3" style="background: var(--bg-deep); border-left: 4px solid #F59E0B;">
+          <div class="card mb-3" style="border-left: 4px solid var(--warning); background: var(--bg-card);">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
-                <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #F59E0B; font-weight: 700;">#${j.id}</span>
-                <span style="font-weight: 700;">Target: ${pageSlug}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">• ${j.agent === 'watchtower' ? '🛰️ Watchtower' : '📲 Reposter'}</span>
+                <span class="badge badge-amber">#${j.id}</span>
+                <span style="font-weight: 700; font-size: 0.95rem;">Target: ${pageSlug}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">• ${j.agent === 'watchtower' ? '🛰️ Watchtower' : '📲 Reposter'}</span>
               </div>
-              <a href="${j.source_url}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 0.82rem;">
+              <a href="${j.source_url}" target="_blank" style="font-size: 0.8rem; text-decoration: none;">
                 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
               </a>
             </div>
 
-            <div class="form-group mb-3">
-              <label class="form-label font-bold" style="font-size: 0.8rem;">Review & Edit Caption Before Publishing</label>
-              <textarea id="q-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.4;">${j.caption || ''}</textarea>
+            <div class="form-group mb-2">
+              <div class="flex items-center justify-between mb-1">
+                <label class="form-label font-bold" style="font-size: 0.78rem; margin: 0;">Review & Edit Caption Before Publishing</label>
+                <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                  Hashtags: <span id="q-tags-${j.id}" style="color: #60A5FA;">${initialTags}</span>/30 • 
+                  Chars: <span id="q-len-${j.id}" style="color: #60A5FA;">${initialLen}</span>/2200
+                </div>
+              </div>
+              <textarea id="q-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.45;" oninput="queueView.onCaptionInput(${j.id})">${initialCaption}</textarea>
             </div>
 
-            <div class="flex items-center justify-between">
-              <button class="btn btn-secondary btn-sm" onclick="queueView.deleteJob(${j.id})" style="color: #EF4444;">
+            <div class="flex items-center justify-between mt-3">
+              <button class="btn btn-danger btn-sm" onclick="queueView.deleteJob(${j.id})">
                 🗑️ Discard
               </button>
               <button class="btn btn-primary btn-sm" onclick="queueView.approveJob(${j.id})">
@@ -133,6 +141,17 @@ window.queueView = (function() {
     }
   }
 
+  function onCaptionInput(id) {
+    const val = document.getElementById(`q-caption-${id}`)?.value || '';
+    const lenEl = document.getElementById(`q-len-${id}`);
+    const tagEl = document.getElementById(`q-tags-${id}`);
+    if (lenEl) lenEl.textContent = val.length;
+    if (tagEl) {
+      const tags = (val.match(/#[a-zA-Z0-9_]+/g) || []).length;
+      tagEl.textContent = tags;
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
   // 2. Active Pipeline Tab
   // ─────────────────────────────────────────────────────────────
@@ -146,10 +165,10 @@ window.queueView = (function() {
 
       if (jobs.length === 0) {
         container.innerHTML = `
-          <div class="card" style="padding: 3rem; text-align: center;">
+          <div class="card" style="padding: 3.5rem; text-align: center;">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💤</div>
-            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">Pipeline Idle</div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">No active downloading or publishing jobs in progress.</p>
+            <div style="font-weight: 800; font-size: 1.15rem; margin-bottom: 0.25rem;">Pipeline Idle</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">No downloading or publishing jobs currently in progress.</p>
           </div>
         `;
         return;
@@ -158,24 +177,22 @@ window.queueView = (function() {
       const rows = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : `@page#${j.page_id}`;
         return `
-          <tr style="border-bottom: 1px solid var(--border-color); font-size: 0.82rem;">
-            <td style="padding: 0.65rem 0.5rem; font-weight: 700; color: var(--accent-primary);">#${j.id}</td>
-            <td style="padding: 0.65rem 0.5rem; font-weight: 600;">${pageSlug}</td>
-            <td style="padding: 0.65rem 0.5rem;">
-              <a href="${j.source_url}" target="_blank" style="color: #60a5fa; text-decoration: none;">
-                ${j.shortcode || 'Link'}
+          <tr>
+            <td style="font-weight: 700; color: #60A5FA; font-family: var(--font-mono);">#${j.id}</td>
+            <td style="font-weight: 600;">${pageSlug}</td>
+            <td>
+              <a href="${j.source_url}" target="_blank">
+                ${j.shortcode || 'Link'} ↗
               </a>
             </td>
-            <td style="padding: 0.65rem 0.5rem;">
-              <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #3B82F6; font-weight: 700;">
-                ⚙️ ${j.status}
-              </span>
+            <td>
+              <span class="badge badge-blue">⚙️ ${j.status}</span>
             </td>
-            <td style="padding: 0.65rem 0.5rem; color: var(--text-secondary); font-size: 0.75rem;">
+            <td style="color: var(--text-secondary); font-size: 0.75rem;">
               ${j.progress_step || 'In progress'}
             </td>
-            <td style="padding: 0.65rem 0.5rem; text-align: right;">
-              <button class="btn btn-secondary btn-sm" onclick="queueView.deleteJob(${j.id})" style="font-size: 0.72rem; padding: 2px 7px; color: #EF4444;">
+            <td style="text-align: right;">
+              <button class="btn btn-danger btn-sm" onclick="queueView.deleteJob(${j.id})" style="font-size: 0.72rem; padding: 2px 7px;">
                 Cancel
               </button>
             </td>
@@ -184,16 +201,16 @@ window.queueView = (function() {
       }).join('');
 
       container.innerHTML = `
-        <div class="card">
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+        <div class="card table-container">
+          <table class="data-table">
             <thead>
-              <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase;">
-                <th style="padding: 0.5rem;">ID</th>
-                <th style="padding: 0.5rem;">Destination</th>
-                <th style="padding: 0.5rem;">Source</th>
-                <th style="padding: 0.5rem;">Status</th>
-                <th style="padding: 0.5rem;">Current Step</th>
-                <th style="padding: 0.5rem; text-align: right;">Actions</th>
+              <tr>
+                <th>ID</th>
+                <th>Destination</th>
+                <th>Source</th>
+                <th>Status</th>
+                <th>Current Step</th>
+                <th style="text-align: right;">Actions</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -218,10 +235,10 @@ window.queueView = (function() {
 
       if (jobs.length === 0) {
         container.innerHTML = `
-          <div class="card" style="padding: 3rem; text-align: center;">
+          <div class="card" style="padding: 3.5rem; text-align: center;">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✨</div>
-            <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">Zero Failed Jobs</div>
-            <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0;">The publishing pipeline is operating with 100% health!</p>
+            <div style="font-weight: 800; font-size: 1.15rem; margin-bottom: 0.25rem;">Zero Failed Jobs</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">The publishing pipeline is operating with 100% health!</p>
           </div>
         `;
         return;
@@ -230,24 +247,24 @@ window.queueView = (function() {
       const cards = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : `@page#${j.page_id}`;
         return `
-          <div class="card mb-3" style="background: var(--bg-deep); border-left: 4px solid #EF4444;">
+          <div class="card mb-3" style="border-left: 4px solid var(--danger); background: var(--bg-card);">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
-                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #EF4444; font-weight: 700;">#${j.id} Failed</span>
+                <span class="badge badge-red">#${j.id} Failed</span>
                 <span style="font-weight: 700;">${pageSlug}</span>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">• Attempts: ${j.attempts || 1}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">• Attempts: ${j.attempts || 1}</span>
               </div>
-              <a href="${j.source_url}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 0.82rem;">
+              <a href="${j.source_url}" target="_blank" style="font-size: 0.8rem; text-decoration: none;">
                 ${j.shortcode || 'Source'} ↗
               </a>
             </div>
 
-            <div style="background: var(--bg-base); border: 1px solid var(--border-color); padding: 0.65rem 0.85rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.78rem; color: #f87171; margin-bottom: 0.75rem; word-break: break-word;">
-              ${j.error || 'Unknown error occurred'}
+            <div style="background: var(--bg-input); border: 1px solid var(--border-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius-xs); font-family: var(--font-mono); font-size: 0.78rem; color: #F87171; margin-bottom: 0.75rem; word-break: break-word;">
+              ${j.error || 'Unknown pipeline failure occurred'}
             </div>
 
             <div class="flex items-center justify-between">
-              <button class="btn btn-secondary btn-sm" onclick="queueView.deleteJob(${j.id})" style="color: #EF4444;">
+              <button class="btn btn-danger btn-sm" onclick="queueView.deleteJob(${j.id})">
                 🗑️ Delete Job
               </button>
               <button class="btn btn-primary btn-sm" onclick="queueView.retryJob(${j.id})">
@@ -323,6 +340,7 @@ window.queueView = (function() {
     approveJob,
     retryJob,
     deleteJob,
+    onCaptionInput,
     refresh: renderActiveTab
   };
 })();
