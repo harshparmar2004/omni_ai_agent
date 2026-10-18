@@ -1160,6 +1160,33 @@ table.data-table tr:hover td {
   background: var(--bg-card-hover);
 }
 
+.instruction-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1.25rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1.15rem;
+}
+
+.metrics-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.15rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .metrics-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+
 
 
 

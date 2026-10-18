@@ -293,6 +293,16 @@ function getSourceAccountByUsername(username) {
 
 function createSourceAccount(data) {
   const username = data.username.replace(/^@/, '').toLowerCase().trim();
+  const existing = getSourceAccountByUsername(username);
+  if (existing) {
+    updateSourceAccount(existing.id, {
+      page_id: data.page_id,
+      is_active: 1,
+      health: 'ok'
+    });
+    return getSourceAccountById(existing.id);
+  }
+
   const stmt = getDb().prepare(`
     INSERT INTO source_accounts (
       username, page_id, is_active, health, consecutive_failures,
