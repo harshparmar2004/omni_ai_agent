@@ -158,66 +158,66 @@ window.publishedView = (function() {
 
     container.innerHTML = `
       <!-- Box 1: Combined Published -->
-      <div class="pub-kpi-card" style="border-top: 3px solid var(--accent-primary);">
+      <div class="pub-kpi-card" style="border-top: 2px solid var(--accent-primary);">
         <div>
           <div class="pub-kpi-card-header">
             <span class="pub-kpi-label">Combined Published</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2.4"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           </div>
           <div class="pub-kpi-value" style="color: var(--accent-primary);">
             ${combinedPub.toLocaleString()}
           </div>
         </div>
         <div class="pub-kpi-sub">
-          <b>${reposterPub}</b> via Reposter · <b>${watchtowerPub}</b> via Watchtower
+          <b>${reposterPub}</b> Reposter · <b>${watchtowerPub}</b> Watchtower
         </div>
       </div>
 
       <!-- Box 2: Total Scraped -->
-      <div class="pub-kpi-card" style="border-top: 3px solid #0284C7;">
+      <div class="pub-kpi-card" style="border-top: 2px solid #0284C7;">
         <div>
           <div class="pub-kpi-card-header">
             <span class="pub-kpi-label">Total Scraped</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
           </div>
           <div class="pub-kpi-value" style="color: #0284C7;">
             ${scrapedTotal.toLocaleString()}
           </div>
         </div>
         <div class="pub-kpi-sub">
-          Competitor surveillance candidate reels harvested
+          Harvested from surveillance feeds
         </div>
       </div>
 
       <!-- Box 3: Live on Instagram -->
-      <div class="pub-kpi-card" style="border-top: 3px solid #16A34A;">
+      <div class="pub-kpi-card" style="border-top: 2px solid #16A34A;">
         <div>
           <div class="pub-kpi-card-header">
             <span class="pub-kpi-label">Live on Instagram</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.4"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
           </div>
           <div class="pub-kpi-value" style="color: #16A34A;">
             ${liveIg.toLocaleString()}
           </div>
         </div>
         <div class="pub-kpi-sub">
-          Active reels verified via Meta Graph API v21.0
+          Active reels on connected pages
         </div>
       </div>
 
       <!-- Box 4: Total Reels in System -->
-      <div class="pub-kpi-card" style="border-top: 3px solid #7C3AED;">
+      <div class="pub-kpi-card" style="border-top: 2px solid #7C3AED;">
         <div>
           <div class="pub-kpi-card-header">
             <span class="pub-kpi-label">Total Pipeline Reels</span>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2.2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2.4"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           </div>
           <div class="pub-kpi-value" style="color: #7C3AED;">
             ${totalPipeline.toLocaleString()}
           </div>
         </div>
         <div class="pub-kpi-sub">
-          Permanent history ledger across all jobs
+          Permanent history across all jobs
         </div>
       </div>
     `;
