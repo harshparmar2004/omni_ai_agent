@@ -129,12 +129,12 @@ window.watchtowerView = (function() {
       </div>
 
       <div class="pipeline-stepper">
-        <!-- Stage 1: Sources -->
-        <div class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Monitored Competitor Creators">
+        <!-- Stage 1: Tracking Accounts -->
+        <div class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Tracked Competitor Accounts">
           <span class="pipeline-step-num">1.</span>
           <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Sources</span>
-            <span class="pipeline-step-count" id="ps-count-sources">${s.sources} Profiles</span>
+            <span class="pipeline-step-label">Tracking Accounts</span>
+            <span class="pipeline-step-count" id="ps-count-sources">${s.sources} Accounts</span>
           </div>
         </div>
         <div class="pipeline-step-arrow">→</div>
@@ -269,7 +269,7 @@ window.watchtowerView = (function() {
     const cPub = document.getElementById('ps-count-published');
     const cFailed = document.getElementById('ps-count-failed');
 
-    if (cSources) cSources.textContent = `${s.sources} Profiles`;
+    if (cSources) cSources.textContent = `${s.sources} Accounts`;
     if (cDisc) cDisc.textContent = `${s.discovered} Ingested`;
     if (cRanked) cRanked.textContent = `${s.ranked} Scored`;
     if (cDl) cDl.textContent = `${s.downloaded || 0} Ready Files`;
@@ -345,7 +345,7 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 1: Monitored Competitor Sources Deck
+  // STAGE 1: Tracking Accounts Deck (Full-Width End-to-End)
   // ─────────────────────────────────────────────────────────────
   async function renderSourcesStage(container) {
     try {
@@ -360,11 +360,11 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>Stage 1: Monitored Competitors</span>
-              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${sources.length} channels</span>
+              <span>Stage 1: Tracking Accounts</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${sources.length} accounts</span>
             </div>
             <div class="text-sm text-muted">
-              Creators inspected every 3 hours for viral reels targeting <b>${selectedPage ? selectedPage.name : 'all connected pages'}</b>
+              Competitor accounts inspected every 3 hours for viral reels targeting <b>${selectedPage ? selectedPage.name : 'all connected pages'}</b>
             </div>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()">
@@ -372,100 +372,118 @@ window.watchtowerView = (function() {
           </button>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start;">
-          <!-- Sources Table -->
-          <div class="card" style="padding: 0; overflow: hidden; border-radius: 10px; box-shadow: none;">
-            ${sources.length === 0 ? `
-              <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
-                <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">No Competitor Sources Monitored</div>
-                <p style="font-size: 0.82rem; margin: 0;">Add creator profiles using the form on the right to start automated discovery.</p>
-              </div>
-            ` : `
-              <table class="data-table" style="width: 100%;">
-                <thead>
-                  <tr>
-                    <th>Creator Profile</th>
-                    <th>Target Destination</th>
-                    <th>Synced Reels</th>
-                    <th>Last Checked</th>
-                    <th>Health</th>
-                    <th style="text-align: right;">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${sources.map(s => {
-                    const pageSlug = s.page_slug ? `@${s.page_slug}` : (s.page_id ? `@page#${s.page_id}` : 'General');
-                    const lastChecked = s.last_checked_at ? formatTimeAgo(s.last_checked_at) : 'Pending';
-                    const isHealthy = s.health === 'ok';
-
-                    return `
-                      <tr>
-                        <td style="font-weight: 600; font-family: var(--font-mono);">
-                          <a href="https://instagram.com/${s.username}" target="_blank" style="text-decoration: none; color: var(--text-primary);">
-                            @${s.username} <span style="font-size: 0.72rem; color: var(--accent-primary);">↗</span>
-                          </a>
-                        </td>
-                        <td style="color: var(--text-secondary); font-size: 0.82rem; font-family: var(--font-mono);">
-                          ${pageSlug}
-                        </td>
-                        <td style="font-size: 0.82rem; color: var(--text-secondary);">
-                          ${s.synced_posts_count || 0} reels
-                        </td>
-                        <td style="font-size: 0.78rem; color: var(--text-muted);">
-                          ${lastChecked}
-                        </td>
-                        <td>
-                          <span class="status-text ${isHealthy ? 'status-text-success' : 'status-text-warning'}">
-                            ${isHealthy ? 'Operational' : 'Attention'}
-                          </span>
-                        </td>
-                        <td style="text-align: right;">
-                          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.checkSource(${s.id})" style="font-size: 0.72rem; padding: 2px 7px;">
-                            Inspect
-                          </button>
-                          <button onclick="watchtowerView.deleteSource(${s.id})" style="background: none; border: none; padding: 0; color: var(--danger); font-size: 0.78rem; cursor: pointer; text-decoration: underline; margin-left: 8px;">
-                            Remove
-                          </button>
-                        </td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            `}
+        <!-- 1. Add Creator to Track Card (Full-Width End-to-End) -->
+        <div class="card mb-3" style="padding: 1.25rem 1.5rem; border-radius: 10px; border: 1px solid var(--border-card); box-shadow: none; width: 100%;">
+          <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 2px;">+ Add Creator to Track</div>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">Watchtower will scrape, rank, and download high-performing reels from this creator profile.</div>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="watchtowerView.toggleBulkImport()" style="font-size: 0.76rem;">
+              <span id="wt-bulk-toggle-label">Bulk Import Mode</span>
+            </button>
           </div>
 
-          <!-- Add Source Form -->
-          <div class="card" style="padding: 1.25rem; border-radius: 10px; box-shadow: none;">
-            <div style="font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem;">+ Add Creator to Track</div>
-            <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">
-              Watchtower will scrape and rank reels from this creator profile.
-            </p>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold" style="font-size: 0.78rem;">Instagram Username (@handle)</label>
-              <input type="text" id="wt-add-user" class="form-input" placeholder="e.g. rockstargames or gtanewz">
+          <!-- Single Creator Inline Form Row -->
+          <div id="wt-single-add-form" style="display: flex; gap: 0.85rem; align-items: flex-end; flex-wrap: wrap; width: 100%;">
+            <div style="flex: 2; min-width: 220px;">
+              <label class="form-label font-bold" style="font-size: 0.76rem; margin-bottom: 4px; display: block;">Instagram Username (@handle or URL)</label>
+              <input type="text" id="wt-add-user" class="form-input" placeholder="e.g. rockstargames or gtanewz" style="height: 38px; font-family: var(--font-mono); font-size: 0.82rem;">
             </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold" style="font-size: 0.78rem;">Target Page</label>
-              <select id="wt-add-page" class="form-input">
-                ${pages.map(p => `<option value="${p.id}" ${selectedPageId === p.id ? 'selected' : ''}>${p.name} (@${p.slug})</option>`).join('')}
+            <div style="flex: 1.5; min-width: 200px;">
+              <label class="form-label font-bold" style="font-size: 0.76rem; margin-bottom: 4px; display: block;">Target Destination Page</label>
+              <select id="wt-add-page" class="form-input" style="height: 38px; font-size: 0.82rem;">
+                ${pages.map(p => `<option value="${p.id}" ${selectedPageId === p.id ? 'selected' : ''}>${escapeHtml(p.name)} (@${p.slug})</option>`).join('')}
               </select>
             </div>
-
-            <button class="btn btn-primary btn-sm w-full mb-3" onclick="watchtowerView.addSource()">
-              Add Single Creator
-            </button>
-
-            <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 1rem 0;">
-
-            <div style="font-weight: 600; font-size: 0.82rem; margin-bottom: 0.35rem;">Bulk Import Creators</div>
-            <textarea id="wt-bulk-add" class="form-input mb-2" rows="3" placeholder="rockstargames&#10;gtanewz&#10;gamingbible" style="font-family: var(--font-mono); font-size: 0.78rem;"></textarea>
-            <button class="btn btn-secondary btn-sm w-full" onclick="watchtowerView.bulkAddSources()">
-              Bulk Import Creators
-            </button>
+            <div style="min-width: 160px;">
+              <button class="btn btn-primary" onclick="watchtowerView.addSource()" style="height: 38px; padding: 0 1.25rem; font-size: 0.82rem; white-space: nowrap; width: 100%;">
+                Add Single Creator
+              </button>
+            </div>
           </div>
+
+          <!-- Bulk Import Form Drawer (Collapsible) -->
+          <div id="wt-bulk-add-drawer" class="hidden" style="margin-top: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+            <label class="form-label font-bold" style="font-size: 0.76rem; margin-bottom: 4px; display: block;">
+              Bulk Import Instagram Usernames (One per line)
+            </label>
+            <div style="display: flex; gap: 0.85rem; align-items: flex-start; flex-wrap: wrap; width: 100%;">
+              <div style="flex: 1; min-width: 280px;">
+                <textarea id="wt-bulk-add" class="form-input" rows="3" placeholder="rockstargames&#10;gtanewz&#10;gamingbible" style="font-family: var(--font-mono); font-size: 0.8rem; width: 100%;"></textarea>
+              </div>
+              <div style="min-width: 180px; display: flex; flex-direction: column; gap: 0.5rem;">
+                <button class="btn btn-primary btn-sm" onclick="watchtowerView.bulkAddSources()" style="height: 38px; font-size: 0.82rem; white-space: nowrap;">
+                  Bulk Import Creators
+                </button>
+                <span style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
+                  All imported accounts will be linked to the selected page above.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Tracked Accounts Table Card (Full-Width End-to-End) -->
+        <div class="card table-container" style="padding: 0; overflow-x: auto; border-radius: 10px; border: 1px solid var(--border-card); box-shadow: none; width: 100%;">
+          ${sources.length === 0 ? `
+            <div style="padding: 3.5rem 1.5rem; text-align: center; color: var(--text-muted);">
+              <div style="font-weight: 600; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.25rem;">No Accounts Tracked Yet</div>
+              <p style="font-size: 0.82rem; margin: 0 0 1rem 0;">Add creator profiles using the form above to start automated 24/7 discovery.</p>
+            </div>
+          ` : `
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 24%;">Creator Profile</th>
+                  <th style="width: 20%;">Target Destination</th>
+                  <th style="width: 15%;">Synced Reels</th>
+                  <th style="width: 15%;">Last Checked</th>
+                  <th style="width: 14%;">Health</th>
+                  <th style="width: 12%; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sources.map(s => {
+                  const pageSlug = s.page_slug ? `@${s.page_slug}` : (s.page_id ? `@page#${s.page_id}` : 'General');
+                  const lastChecked = s.last_checked_at ? formatTimeAgo(s.last_checked_at) : 'Pending';
+                  const isHealthy = s.health === 'ok';
+
+                  return `
+                    <tr>
+                      <td>
+                        <a href="https://instagram.com/${s.username}" target="_blank" class="text-link" style="font-weight: 600; font-family: var(--font-mono); font-size: 0.84rem;">
+                          @${s.username} ↗
+                        </a>
+                      </td>
+                      <td>
+                        <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary);">${pageSlug}</div>
+                      </td>
+                      <td style="font-size: 0.82rem; color: var(--text-secondary);">
+                        ${s.synced_posts_count || 0} reels
+                      </td>
+                      <td style="font-size: 0.78rem; color: var(--text-muted);">
+                        ${lastChecked}
+                      </td>
+                      <td>
+                        <span class="status-text ${isHealthy ? 'status-text-success' : 'status-text-warning'}">
+                          ${isHealthy ? 'Operational' : 'Attention'}
+                        </span>
+                      </td>
+                      <td style="text-align: right; white-space: nowrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="watchtowerView.checkSource(${s.id})" style="font-size: 0.74rem; padding: 2px 8px;">
+                          Inspect
+                        </button>
+                        <button onclick="watchtowerView.deleteSource(${s.id})" style="background: none; border: none; padding: 0; color: var(--danger); font-size: 0.78rem; cursor: pointer; text-decoration: underline; margin-left: 10px;">
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          `}
         </div>
       `;
     } catch (err) {
@@ -1535,6 +1553,20 @@ window.watchtowerView = (function() {
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
+  function toggleBulkImport() {
+    const drawer = document.getElementById('wt-bulk-add-drawer');
+    const label = document.getElementById('wt-bulk-toggle-label');
+    if (!drawer) return;
+    const isHidden = drawer.classList.contains('hidden');
+    if (isHidden) {
+      drawer.classList.remove('hidden');
+      if (label) label.textContent = 'Hide Bulk Import';
+    } else {
+      drawer.classList.add('hidden');
+      if (label) label.textContent = 'Bulk Import Mode';
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -1561,6 +1593,7 @@ window.watchtowerView = (function() {
     deleteJob,
     retryJob,
     onCaptionInput,
+    toggleBulkImport,
     refresh: async () => {
       await loadStatus();
       await loadPipelineSummary();
