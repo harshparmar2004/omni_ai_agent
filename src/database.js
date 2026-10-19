@@ -550,6 +550,9 @@ function listPublishJobs(options = {}) {
     sql += ' AND j.agent = ?';
     params.push(options.agent);
   }
+  if (options.telegramOnly) {
+    sql += " AND j.telegram_chat_id IS NOT NULL AND j.telegram_chat_id != ''";
+  }
   if (options.hasMedia) {
     sql += " AND j.media_paths IS NOT NULL AND j.media_paths != '[]' AND j.media_paths != ''";
   }
@@ -582,6 +585,87 @@ function getLastPublishedTimestamp(pageId) {
     ORDER BY id DESC LIMIT 1
   `).get(pageId);
   return row ? row.published_at : null;
+}
+
+// Global Publishing Statistics across all channels & agents (for Command Center)
+function getGlobalPublishingStats() {
+  const db = getDb();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayIso = todayStart.toISOString();
+
+  // 1. Overall counts
+  const publishedToday = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE status = 'published' AND published_at >= ?
+  `).get(todayIso)?.c || 0;
+
+  const publishedAllTime = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE status = 'published'
+  `).get()?.c || 0;
+
+  const activeInFlight = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE status IN ('queued', 'downloading', 'ready', 'publishing')
+  `).get()?.c || 0;
+
+  const failedCount = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE status = 'failed'
+  `).get()?.c || 0;
+
+  // 2. Breakdown by Origin
+  const telegramCount = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE telegram_chat_id IS NOT NULL AND telegram_chat_id != ''
+  `).get()?.c || 0;
+
+  const watchtowerCount = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE agent = 'watchtower'
+  `).get()?.c || 0;
+
+  const webCount = db.prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE (telegram_chat_id IS NULL OR telegram_chat_id = '') AND (agent != 'watchtower' OR agent IS NULL)
+  `).get()?.c || 0;
+
+  // 3. Multi-Page Quota Matrix
+  const pages = db.prepare('SELECT id, slug, name, handle, daily_quota, is_active FROM pages ORDER BY id ASC').all();
+  const pageMatrix = pages.map(p => {
+    const todayCount = getPublishedCountToday(p.id);
+    const allTimeCount = db.prepare("SELECT count(*) as c FROM publish_jobs WHERE page_id = ? AND status = 'published'").get(p.id)?.c || 0;
+    const lastPublishedAt = getLastPublishedTimestamp(p.id);
+    const quota = p.daily_quota || 3;
+    const quotaPercent = Math.min(100, Math.round((todayCount / quota) * 100));
+
+    return {
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      handle: p.handle || `@${p.slug}`,
+      daily_quota: quota,
+      today_published_count: todayCount,
+      all_time_published: allTimeCount,
+      last_published_at: lastPublishedAt,
+      quota_percent: quotaPercent,
+      is_active: Boolean(p.is_active)
+    };
+  });
+
+  return {
+    published_today: publishedToday,
+    published_all_time: publishedAllTime,
+    active_in_flight: activeInFlight,
+    failed_count: failedCount,
+    origins: {
+      telegram: telegramCount,
+      watchtower: watchtowerCount,
+      web: webCount
+    },
+    pages: pageMatrix
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -848,5 +932,6 @@ module.exports = {
   getBrandAssets,
   // Pipeline
   getPipelineSummary,
-  getReposterPipelineSummary
+  getReposterPipelineSummary,
+  getGlobalPublishingStats
 };

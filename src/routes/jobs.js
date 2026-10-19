@@ -10,7 +10,20 @@ const {
   deleteJob,
   updateJobProgress
 } = require('../core/jobQueue');
-const { updatePublishJob } = require('../database');
+const { updatePublishJob, getGlobalPublishingStats } = require('../database');
+
+/**
+ * GET /api/jobs/overview
+ * Global publishing statistics & channel quota usage
+ */
+router.get('/overview', (req, res) => {
+  try {
+    const stats = getGlobalPublishingStats();
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/jobs
@@ -18,7 +31,7 @@ const { updatePublishJob } = require('../database');
  */
 router.get('/', (req, res) => {
   try {
-    const { status, pageId, agent, limit, hasMedia } = req.query;
+    const { status, pageId, agent, limit, hasMedia, telegramOnly } = req.query;
     const filter = {};
     if (status) {
       filter.status = status.includes(',') ? status.split(',') : status;
@@ -27,6 +40,7 @@ router.get('/', (req, res) => {
     if (agent) filter.agent = agent;
     if (limit) filter.limit = parseInt(limit, 10);
     if (hasMedia === 'true' || hasMedia === '1') filter.hasMedia = true;
+    if (telegramOnly === 'true' || telegramOnly === '1') filter.telegramOnly = true;
 
     const jobs = listJobs(filter);
     res.json(jobs);

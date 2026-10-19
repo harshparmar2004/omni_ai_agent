@@ -323,61 +323,125 @@ window.reposterView = (function() {
   // STAGE 1: Ingest & Quick Post Deck
   // ─────────────────────────────────────────────────────────────
   async function renderIngestStage(container) {
+    const selectedPage = (window.app?.pages || []).find(p => p.id === selectedPageId);
+    const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
+
     container.innerHTML = `
-      <div style="display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: start;">
+      <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: stretch;">
         
-        <!-- Direct Link Ingestion Card -->
-        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); border-top: 3px solid var(--accent-primary);">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                Direct Reel Ingestion & Quick Post
-              </h3>
-              <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
-                Paste any Instagram Reel link here to immediately process and publish to your selected page.
-              </p>
+        <!-- Hero: Telegram Mobile Integration Hub Card -->
+        <div class="telegram-hero-card flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
+              <div class="flex items-center gap-2">
+                <span style="font-size: 1.6rem; line-height: 1;">✈️</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                    Telegram Instant Ingestion Hub
+                  </h3>
+                  <div style="font-size: 0.72rem; color: var(--text-muted);">
+                    Agent 1 Primary Pipeline · Zero-click Mobile Reposting
+                  </div>
+                </div>
+              </div>
+              <span class="telegram-status-pill">
+                <span class="pulse-dot"></span>
+                <span>Bot Online & Listening</span>
+              </span>
             </div>
-            <span class="badge badge-blue">Direct Web Ingestion</span>
+
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.85rem;">
+              Share any Instagram Reel link directly from the Instagram mobile app to your OmniStudio Telegram bot. Agent 1 receives, downloads 1080p MP4, generates AI attribution, and dispatches live to your selected page.
+            </p>
+
+            <!-- Telegram Bot & Auth Details Box -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle); margin-bottom: 0.95rem;">
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 2px;">
+                  Telegram Bot
+                </div>
+                <a href="https://t.me/omnistudio_bot" target="_blank" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem; color: #2AABEE; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                  <span>@omnistudio_bot</span> <span style="font-size: 0.72rem;">↗</span>
+                </a>
+              </div>
+              <div>
+                <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; margin-bottom: 2px;">
+                  Authorized Chat ID
+                </div>
+                <code style="font-weight: 700; color: var(--accent-primary); font-size: 0.82rem;" id="rp-telegram-allowed">5443723531</code>
+              </div>
+            </div>
+
+            <div style="font-size: 0.74rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.35rem;">
+              Instant 4-Step Flow:
+            </div>
+            <ol style="font-size: 0.78rem; color: var(--text-secondary); margin-left: 1.15rem; margin-bottom: 0; line-height: 1.6; padding-left: 0;">
+              <li>Send/Forward any Instagram Reel URL to <code style="color: #2AABEE;">@omnistudio_bot</code>.</li>
+              <li>Bot verifies your authorized Telegram Chat ID.</li>
+              <li>Tap your destination page button in Telegram chat.</li>
+              <li>In-place <code>[1. Ingest] ➔ [2. Download] ➔ [3. AI Copy] ➔ [4. Live]</code> progress bar and live link!</li>
+            </ol>
           </div>
 
-          <div class="form-group mb-3">
-            <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel or Video Post URL</label>
-            <input type="text" id="rp-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem;">
-              Supports Instagram reels, video posts, and shortcode formats.
-            </div>
+          <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+            <span style="font-size: 0.72rem; color: var(--text-muted);">Dedicated to Telegram mobile dispatches</span>
+            <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.74rem; padding: 3px 10px; color: #2AABEE;">
+              Open in Telegram ↗
+            </a>
           </div>
+        </div>
 
-          <div class="form-group mb-3">
-            <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
-            <select id="rp-page-select" class="form-input">
-              ${renderPageOptions()}
-            </select>
-          </div>
+        <!-- Direct Reel Quick-Post (On-Demand Dashboard Fallback) -->
+        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); border-top: 3px solid var(--accent-primary); display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                  Direct Quick-Post
+                </h3>
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+                  Paste an Instagram Reel link to manually trigger Agent 1
+                </p>
+              </div>
+              <span class="badge badge-muted" style="font-size: 0.68rem;">Manual Fallback</span>
+            </div>
 
-          <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
-              <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
-              <span>Review & edit AI caption before publishing live</span>
-            </label>
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.6rem; line-height: 1.4;">
-              If checked, job pauses in Stage 3 (AI Copywriting) for manual review. If unchecked, it publishes automatically.
+            <div class="form-group mb-3">
+              <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel URL</label>
+              <input type="text" id="rp-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
             </div>
-          </div>
 
-          <!-- Live Step Progress Box -->
-          <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
-            <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
-              <span class="spinner-sm"></span> Pipeline Executing...
+            <div class="form-group mb-3">
+              <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
+              <select id="rp-page-select" class="form-input">
+                ${renderPageOptions()}
+              </select>
             </div>
-            <div class="step-bar mb-2">
-              <div id="rp-step-1" class="step-bar-item"></div>
-              <div id="rp-step-2" class="step-bar-item"></div>
-              <div id="rp-step-3" class="step-bar-item"></div>
-              <div id="rp-step-4" class="step-bar-item"></div>
+
+            <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
+                <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
+                <span>Review & edit AI caption before publishing live</span>
+              </label>
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.6rem; line-height: 1.4;">
+                If checked, job pauses in Stage 3 for review. If unchecked, it publishes automatically.
+              </div>
             </div>
-            <div id="rp-step-status" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
-              Initializing job...
+
+            <!-- Live Step Progress Box -->
+            <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
+              <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="spinner-sm"></span> Pipeline Executing...
+              </div>
+              <div class="step-bar mb-2">
+                <div id="rp-step-1" class="step-bar-item"></div>
+                <div id="rp-step-2" class="step-bar-item"></div>
+                <div id="rp-step-3" class="step-bar-item"></div>
+                <div id="rp-step-4" class="step-bar-item"></div>
+              </div>
+              <div id="rp-step-status" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
+                Initializing job...
+              </div>
             </div>
           </div>
 
@@ -386,52 +450,28 @@ window.reposterView = (function() {
           </button>
         </div>
 
-        <!-- Telegram Mobile Integration Hub Card -->
-        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <span style="font-size: 1.5rem; line-height: 1;">✈️</span>
-              <div>
-                <div style="font-weight: 700; font-size: 0.95rem;">Telegram Integration Hub</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">One-click mobile reposting</div>
-              </div>
-            </div>
-
-            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.75rem;">
-              Share any Instagram Reel directly with your OmniStudio Telegram bot from your phone. Agent 1 executes the 4-stage pipeline:
-            </p>
-
-            <ol style="font-size: 0.78rem; color: var(--text-secondary); margin-left: 1.25rem; margin-bottom: 1.15rem; line-height: 1.6;">
-              <li>Send Instagram Reel link to <code>@omnistudio_bot</code>.</li>
-              <li>Bot verifies your Whitelisted Chat ID.</li>
-              <li>Select destination page with interactive buttons.</li>
-              <li>In-place <code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code> progress bar in chat.</li>
-              <li>Receives live Instagram permalink when live!</li>
-            </ol>
-          </div>
-
-          <div style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 0.75rem;">
-            <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Authorized Telegram Chat ID:</div>
-            <code style="font-weight: 700; color: var(--accent-primary);" id="rp-telegram-allowed">5443723531</code>
-          </div>
-        </div>
-
       </div>
 
-      <!-- Recent Ingestions Feed Table -->
+      <!-- Telegram Received Dispatches Feed Table -->
       <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
         <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-              Recent Dispatches & Ingestions
-            </h3>
+            <div class="flex items-center gap-2">
+              <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                📱 Telegram Received Dispatches & Pipeline
+              </h3>
+              <span class="badge badge-blue" style="font-size: 0.7rem;">Telegram Originals Only</span>
+            </div>
             <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
-              Latest reels ingested via Telegram Bot or Web Dashboard
+              Showing only incoming and published reels received via your Telegram Bot (<code>@omnistudio_bot</code>) targeting <b>${pageLabel}</b>
             </p>
           </div>
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
+            Refresh
+          </button>
         </div>
         <div id="rp-jobs-table" class="table-container" style="padding: 0; overflow-x: auto;">
-          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">Loading dispatches...</div>
+          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">Loading Telegram dispatches...</div>
         </div>
       </div>
     `;
@@ -1008,22 +1048,39 @@ window.reposterView = (function() {
     }
   }
 
-  // Helper for loading Ingest stage table
+  // Helper for loading Ingest stage table (Strictly Telegram-only)
   async function loadIngestedTableData() {
     const container = document.getElementById('rp-jobs-table');
     if (!container) return;
 
     try {
-      let query = '?limit=15';
+      let query = '?telegramOnly=true&limit=30';
       if (selectedPageId) query += `&pageId=${selectedPageId}`;
       const res = await fetch(`/api/reposter/jobs${query}`);
       if (!res.ok) return;
-      const jobs = await res.json();
+      let jobs = await res.json();
 
-      if (!jobs || jobs.length === 0) {
+      // Strict Telegram filter guarantee
+      jobs = (jobs || []).filter(j => Boolean(j.telegram_chat_id));
+
+      if (jobs.length === 0) {
         container.innerHTML = `
-          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">
-            No dispatches found. Paste an Instagram link above or share to Telegram to begin!
+          <div style="padding: 3.5rem 1.5rem; text-align: center; color: var(--text-muted);">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📱</div>
+            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.35rem;">
+              No Telegram Reels Received Yet
+            </div>
+            <p style="font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto; line-height: 1.5;">
+              Share any Instagram Reel link directly to your Telegram bot <code style="color: #2AABEE; font-weight: 700;">@omnistudio_bot</code> from your phone. Only Telegram-originated reels are processed and tracked in Agent 1.
+            </p>
+            <div class="flex items-center justify-center gap-2">
+              <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">
+                ✈️ Open @omnistudio_bot in Telegram
+              </a>
+              <button class="btn btn-secondary btn-sm" onclick="app.navigate('command-center')">
+                View All-Source Overview in Command Center ➔
+              </button>
+            </div>
           </div>
         `;
         return;
@@ -1031,42 +1088,89 @@ window.reposterView = (function() {
 
       const rows = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-        const isTelegram = Boolean(j.telegram_chat_id);
-        const originBadge = isTelegram ?
-          `<span style="font-size: 0.72rem; color: var(--info); font-weight: 500;">📱 Telegram</span>` :
-          `<span style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 500;">💻 Web</span>`;
-
+        const parsed = parseCaptionComponents(j.caption);
         const statusBadge = getStatusBadge(j.status);
         const timeStr = j.published_at ?
-          new Date(j.published_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) :
-          formatTimeAgo(j.created_at);
+          `Published ${formatTimeAgo(j.published_at)}` :
+          `Received ${formatTimeAgo(j.created_at)}`;
+        const isReel = (j.media_type === 'reel' || !j.media_type);
 
         return `
           <tr>
-            <td style="font-weight: 600; font-family: var(--font-mono); color: var(--text-primary);">#${j.id}</td>
-            <td style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem;">${pageSlug}</td>
-            <td>${originBadge}</td>
-            <td style="font-family: var(--font-mono); font-size: 0.82rem;">
-              <a href="${j.source_url}" target="_blank" style="text-decoration: none; color: var(--accent-primary);">
-                ${j.shortcode || 'Source'} ↗
+            <!-- 1. Photo Glimpse Preview -->
+            <td style="text-align: center; vertical-align: middle; padding: 0.55rem 0.5rem; width: 68px;">
+              <a href="${j.source_url}" target="_blank" class="reel-table-thumb-container" style="width: 50px; height: 68px;" title="Open reel #${j.id} on Instagram">
+                <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" />
+                ${isReel ? '<div class="reel-thumb-play-icon">▶</div>' : ''}
               </a>
             </td>
-            <td style="font-size: 0.78rem; color: var(--text-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-              ${j.caption ? j.caption.substring(0, 50) + '...' : '—'}
+
+            <!-- 2. Reel ID & Telegram Sender -->
+            <td style="width: 15%;">
+              <div class="flex items-center gap-1 mb-1">
+                <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
+                <span class="badge badge-blue" style="font-size: 0.68rem; font-weight: 600;">📱 Telegram</span>
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
+                Chat: <code>${j.telegram_chat_id || '5443723531'}</code>
+              </div>
+              <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; color: var(--accent-primary); text-decoration: none;">
+                🔗 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
+              </a>
             </td>
-            <td>${statusBadge}</td>
-            <td style="text-align: right;">
+
+            <!-- 3. Target Destination Page -->
+            <td style="width: 14%;">
+              <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
+            </td>
+
+            <!-- 4. Format & Storage -->
+            <td style="width: 14%;">
+              <div class="flex items-center gap-1 mb-1">
+                <span class="badge badge-emerald" style="font-size: 0.68rem; font-weight: 600;">✅ 1080p MP4 Ready</span>
+              </div>
+              <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
+                Step: <b>${j.current_step || 'completed'}</b>
+              </div>
+            </td>
+
+            <!-- 5. AI Caption & Hook Breakdown -->
+            <td style="max-width: 250px;">
+              <div style="font-weight: 600; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
+                <span class="caption-segment-tag">AI Hook</span> ${escapeHtml(parsed.hook)}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <span class="caption-segment-tag">Credit</span> ${escapeHtml(parsed.credit)}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--accent-primary); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') : '—'}
+              </div>
+            </td>
+
+            <!-- 6. Status & Time -->
+            <td style="width: 13%;">
+              <div class="mb-1">${statusBadge}</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+            </td>
+
+            <!-- 7. Actions -->
+            <td style="text-align: right; width: 14%;">
               ${j.permalink ? `
-                <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 600;">
+                <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; font-size: 0.76rem; color: var(--accent-primary); font-weight: 600; white-space: nowrap;">
                   Live on Feed ↗
                 </a>
+              ` : (j.status === 'pending_review' || j.status === 'ready' ? `
+                <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
+                  🚀 Publish Live
+                </button>
               ` : (j.status === 'failed' ? `
-                <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.72rem; padding: 2px 7px;">
+                <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
                   🔄 Retry
                 </button>
               ` : `
-                <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
-              `)}
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
+              `))}
             </td>
           </tr>
         `;
@@ -1076,13 +1180,13 @@ window.reposterView = (function() {
         <table class="data-table" style="width: 100%;">
           <thead>
             <tr>
-              <th style="width: 8%;">ID</th>
-              <th style="width: 18%;">Destination</th>
-              <th style="width: 14%;">Origin</th>
-              <th style="width: 14%;">Reel Shortcode</th>
-              <th style="width: 22%;">Caption Excerpt</th>
-              <th style="width: 12%;">Status</th>
-              <th style="text-align: right; width: 12%;">Instagram Link</th>
+              <th style="width: 68px; text-align: center;">Preview</th>
+              <th style="width: 15%;">Reel / Sender</th>
+              <th style="width: 14%;">Destination</th>
+              <th style="width: 14%;">Format & Step</th>
+              <th style="width: 25%;">AI Hook & Copy</th>
+              <th style="width: 13%;">Status & Time</th>
+              <th style="text-align: right; width: 14%;">Actions</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>

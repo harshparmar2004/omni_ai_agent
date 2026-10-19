@@ -48,7 +48,7 @@ router.post('/jobs', async (req, res) => {
  */
 router.get('/jobs', (req, res) => {
   try {
-    const filter = { agent: 'reposter', limit: 50 };
+    const filter = { agent: 'reposter', limit: req.query.limit ? parseInt(req.query.limit, 10) : 50 };
     if (req.query.pageId) {
       filter.pageId = parseInt(req.query.pageId, 10);
     }
@@ -57,6 +57,9 @@ router.get('/jobs', (req, res) => {
     }
     if (req.query.hasMedia === 'true' || req.query.hasMedia === '1') {
       filter.hasMedia = true;
+    }
+    if (req.query.telegramOnly === 'true' || req.query.telegramOnly === '1') {
+      filter.telegramOnly = true;
     }
     const jobs = listJobs(filter);
     res.json(jobs);
