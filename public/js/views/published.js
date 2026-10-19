@@ -70,7 +70,6 @@ window.publishedView = (function() {
     if (!jobs || jobs.length === 0) {
       container.innerHTML = `
         <div class="card" style="padding: 3.5rem; text-align: center;">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📸</div>
           <div style="font-weight: 800; font-size: 1.15rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Submit a reel link via Agent 1 (Reposter) or let Agent 2 (Watchtower) discover and publish content!</p>
         </div>
@@ -91,11 +90,11 @@ window.publishedView = (function() {
           <div>
             <!-- Header -->
             <div class="flex items-center justify-between mb-2">
-              <span class="badge badge-emerald">
+              <span style="font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary);">
                 ${pageSlug}
               </span>
               <span style="font-size: 0.72rem; color: var(--text-muted);">
-                ${isWatchtower ? '🛰️ Watchtower' : '📲 Reposter'}
+                ${isWatchtower ? 'Watchtower' : 'Reposter'}
               </span>
             </div>
 
@@ -110,7 +109,7 @@ window.publishedView = (function() {
             </div>
 
             <div class="flex items-center justify-between" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-              <span>🕒 ${timeAgo}</span>
+              <span>${timeAgo}</span>
               <a href="${j.source_url}" target="_blank">Original Source ↗</a>
             </div>
           </div>
@@ -119,7 +118,7 @@ window.publishedView = (function() {
           <div class="flex gap-2">
             ${videoWebUrl ? `
               <button class="btn btn-secondary btn-sm w-full" onclick="app.openVideoModal('${videoWebUrl}')" style="font-size: 0.75rem;">
-                ▶ Preview Reel
+                Preview Reel
               </button>
             ` : ''}
             <a href="${directUrl}" target="_blank" class="btn btn-primary btn-sm w-full" style="text-align: center; font-size: 0.75rem;">

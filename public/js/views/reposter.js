@@ -18,15 +18,7 @@ window.reposterView = (function() {
   };
 
   function getPageIcon(slug) {
-    const s = (slug || '').toLowerCase();
-    if (s.includes('gta') || s.includes('game')) return '🎮';
-    if (s.includes('tech') || s.includes('ai')) return '💡';
-    if (s.includes('meme') || s.includes('humor')) return '🎭';
-    if (s.includes('fit') || s.includes('gym')) return '💪';
-    if (s.includes('food') || s.includes('cook')) return '🍳';
-    if (s.includes('news')) return '📰';
-    if (s.includes('crypto') || s.includes('finance')) return '📈';
-    return '📱';
+    return '';
   }
 
   function escapeHtml(str) {
@@ -93,19 +85,16 @@ window.reposterView = (function() {
     container.innerHTML = `
       <!-- 1. Header Bar -->
       <div class="mb-4 flex items-center justify-between" style="flex-wrap: wrap; gap: 1rem;">
-        <div class="flex items-center gap-3">
-          <span style="font-size: 2rem; line-height: 1;">📲</span>
-          <div>
-            <div class="flex items-center gap-2">
-              <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                Agent 1: Reposter & On-Demand Pipeline
-              </h2>
-              <span class="badge badge-emerald">● READY</span>
-            </div>
-            <p class="text-sm text-muted" style="margin-top: 0.15rem; margin-bottom: 0;">
-              Direct single-reel ingestion via Telegram Bot (<code>@omnistudio_bot</code>) and Web Dashboard
-            </p>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+              Agent 1: Reposter & On-Demand Pipeline
+            </h2>
+            <span class="status-text-success" style="font-size: 0.75rem; font-weight: 500;">Ready</span>
           </div>
+          <p class="text-sm text-muted" style="margin-top: 0.15rem; margin-bottom: 0;">
+            Direct single-reel ingestion via Telegram Bot (@omnistudio_bot) and Web Dashboard
+          </p>
         </div>
         <div class="flex items-center gap-2">
           <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
@@ -141,17 +130,14 @@ window.reposterView = (function() {
 
     let html = `
       <button class="pipeline-page-pill ${isAll ? 'active' : ''}" onclick="reposterView.selectPage(null)">
-        <span>🌐</span>
         <span>All Connected Pages</span>
       </button>
     `;
 
     pages.forEach(p => {
       const isActive = selectedPageId === p.id;
-      const icon = getPageIcon(p.slug);
       html += `
         <button class="pipeline-page-pill ${isActive ? 'active' : ''}" onclick="reposterView.selectPage(${p.id})">
-          <span>${icon}</span>
           <span>${p.name}</span>
           <span style="font-family: var(--font-mono); font-size: 0.72rem; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-muted)'}; margin-left: 2px;">
             ${p.handle || '@' + p.slug}
@@ -182,9 +168,8 @@ window.reposterView = (function() {
 
     return `
       <div class="pipeline-stepper-header">
-        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-          <span>⚡</span>
-          <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em;">
+          Publishing Pipeline Flow for <b>${pageLabel}</b>
         </div>
         <div style="font-size: 0.75rem; color: var(--text-muted);">
           Agent 1: <strong>On-Demand Reposter & Downloader</strong>
@@ -194,7 +179,7 @@ window.reposterView = (function() {
       <div class="pipeline-stepper">
         <!-- Stage 1: Ingest & Quick Post -->
         <div class="pipeline-step-node ${activeStage === 'ingest' ? 'active' : ''}" onclick="reposterView.switchStage('ingest')" title="Ingest reels via Web URL or Telegram Bot">
-          <div class="pipeline-step-num">1</div>
+          <span class="pipeline-step-num">1.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Ingest & Quick Post</span>
             <span class="pipeline-step-count" id="rps-count-ingested">${s.ingested} Received</span>
@@ -204,7 +189,7 @@ window.reposterView = (function() {
 
         <!-- Stage 2: Downloaded Media -->
         <div class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="reposterView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
-          <div class="pipeline-step-num">2</div>
+          <span class="pipeline-step-num">2.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Downloaded Media</span>
             <span class="pipeline-step-count" id="rps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded} Ready Files</span>
@@ -214,7 +199,7 @@ window.reposterView = (function() {
 
         <!-- Stage 3: AI Copywriting & Review -->
         <div class="pipeline-step-node ${activeStage === 'ready' ? 'active' : ''}" onclick="reposterView.switchStage('ready')" title="AI Copywritten, Attribution & Review">
-          <div class="pipeline-step-num">3</div>
+          <span class="pipeline-step-num">3.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">AI Copywriting</span>
             <span class="pipeline-step-count" id="rps-count-ready">${s.ready} Staged/Ready</span>
@@ -224,7 +209,7 @@ window.reposterView = (function() {
 
         <!-- Stage 4: Live Published -->
         <div class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="reposterView.switchStage('published')" title="Live on Instagram Feed">
-          <div class="pipeline-step-num">4</div>
+          <span class="pipeline-step-num">4.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Live Published</span>
             <span class="pipeline-step-count" id="rps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
@@ -234,7 +219,7 @@ window.reposterView = (function() {
 
         <!-- Stage 5: Retries -->
         <div class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="reposterView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <div class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'background: var(--danger); color: #fff;' : ''}">5</div>
+          <span class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'color: var(--danger);' : ''}">5.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Retries</span>
             <span class="pipeline-step-count" id="rps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
@@ -333,20 +318,16 @@ window.reposterView = (function() {
         <div class="telegram-hero-card flex flex-col justify-between">
           <div>
             <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
-              <div class="flex items-center gap-2">
-                <span style="font-size: 1.5rem; line-height: 1;">✈️</span>
-                <div>
-                  <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                    Telegram Mobile Ingestion Hub
-                  </h3>
-                  <div style="font-size: 0.72rem; color: var(--text-muted);">
-                    Agent 1 Primary Pipeline · Zero-Click Mobile Reposting
-                  </div>
+              <div>
+                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                  Telegram Mobile Ingestion Hub
+                </h3>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">
+                  Agent 1 Primary Pipeline · Zero-Click Mobile Reposting
                 </div>
               </div>
-              <span class="telegram-status-pill">
-                <span class="pulse-dot"></span>
-                <span>Bot Online & Listening</span>
+              <span class="status-text-success" style="font-size: 0.75rem; font-weight: 500;">
+                Bot Online & Listening
               </span>
             </div>
 
@@ -358,50 +339,50 @@ window.reposterView = (function() {
             <div class="tg-credentials-strip">
               <div class="tg-credential-item">
                 <span class="tg-credential-label">Telegram Bot</span>
-                <a href="https://t.me/omnistudio_bot" target="_blank" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-primary); text-decoration: none;">
+                <a href="https://t.me/omnistudio_bot" target="_blank" style="font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-primary); text-decoration: none;">
                   @omnistudio_bot ↗
                 </a>
               </div>
               <div class="tg-credential-item">
                 <span class="tg-credential-label">Authorized Chat ID</span>
-                <code style="font-weight: 700; color: var(--text-primary); font-size: 0.82rem;" id="rp-telegram-allowed">5443723531</code>
+                <span style="font-weight: 600; color: var(--text-primary); font-size: 0.82rem; font-family: var(--font-mono);" id="rp-telegram-allowed">5443723531</span>
               </div>
               <div style="text-align: right;">
-                <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; white-space: nowrap; color: var(--accent-primary);">
+                <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; white-space: nowrap;">
                   Open Bot ↗
                 </a>
               </div>
             </div>
 
             <!-- Horizontal 4-Step Stepper -->
-            <div style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.45rem;">
+            <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.45rem;">
               Instant Mobile Flow:
             </div>
             <div class="tg-steps-row">
               <div class="tg-step-box">
                 <div class="tg-step-head">
-                  <span class="tg-step-num-pill">1</span>
+                  <span class="tg-step-num-pill">1.</span>
                   <span>Share</span>
                 </div>
                 <span class="tg-step-desc">Forward reel to bot</span>
               </div>
               <div class="tg-step-box">
                 <div class="tg-step-head">
-                  <span class="tg-step-num-pill">2</span>
+                  <span class="tg-step-num-pill">2.</span>
                   <span>Verify</span>
                 </div>
                 <span class="tg-step-desc">Auto-whitelist check</span>
               </div>
               <div class="tg-step-box">
                 <div class="tg-step-head">
-                  <span class="tg-step-num-pill">3</span>
+                  <span class="tg-step-num-pill">3.</span>
                   <span>Select</span>
                 </div>
                 <span class="tg-step-desc">Tap target page</span>
               </div>
               <div class="tg-step-box">
                 <div class="tg-step-head">
-                  <span class="tg-step-num-pill">4</span>
+                  <span class="tg-step-num-pill">4.</span>
                   <span>Live</span>
                 </div>
                 <span class="tg-step-desc">Live Instagram post</span>
@@ -413,42 +394,39 @@ window.reposterView = (function() {
           <div class="tg-live-stream-box">
             <div class="tg-stream-header">
               <span class="tg-stream-tag">
-                <span class="pulse-dot"></span>
-                <span>Live Pipeline Signal Stream</span>
+                Live Pipeline Signal Stream
               </span>
-              <span class="tg-stream-radar-pill">
-                <span>●</span> POLLING ACTIVE · 0ms
-              </span>
+              <span class="ui-tag status-success">Active · 0ms</span>
             </div>
 
             <!-- Connected Stream Flow Track with Traveling Light Photons -->
             <div class="tg-stream-track">
               <div class="tg-stream-node active" title="Share directly from Instagram Mobile App">
-                <div class="tg-stream-node-icon">📱</div>
+                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">IN</div>
                 <span class="tg-stream-node-label">Share</span>
               </div>
               <div class="tg-stream-wire"></div>
               <div class="tg-stream-node active" title="OmniStudio Telegram Ingestion Gateway">
-                <div class="tg-stream-node-icon">✈️</div>
+                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">TG</div>
                 <span class="tg-stream-node-label">Bot Gate</span>
               </div>
               <div class="tg-stream-wire fast"></div>
               <div class="tg-stream-node active" title="AI Attribution Engine & 1080p MP4 Synthesis">
-                <div class="tg-stream-node-icon">🧠</div>
+                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">AI</div>
                 <span class="tg-stream-node-label">AI Engine</span>
               </div>
               <div class="tg-stream-wire"></div>
               <div class="tg-stream-node online" title="Published live to Instagram feed">
-                <div class="tg-stream-node-icon">🚀</div>
+                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">OUT</div>
                 <span class="tg-stream-node-label">Live Reel</span>
               </div>
             </div>
 
             <!-- Real-time Telemetry Status Strip -->
             <div class="tg-telemetry-strip">
-              <span class="tg-telemetry-chip">⚡ <code>1080p MP4</code> Auto-Sync</span>
-              <span class="tg-telemetry-chip">🤖 <code>AI Hook</code> Auto-Generated</span>
-              <span class="tg-telemetry-chip">🛡️ Chat <code>5443723531</code> Secured</span>
+              <span class="tg-telemetry-chip">1080p MP4 Auto-Sync</span>
+              <span class="tg-telemetry-chip">AI Attribution Ready</span>
+              <span class="tg-telemetry-chip">Chat 5443723531 Secured</span>
             </div>
           </div>
         </div>
@@ -462,10 +440,9 @@ window.reposterView = (function() {
                   Direct Quick-Post
                 </h3>
                 <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
-                  Paste an Instagram Reel link to manually trigger Agent 1
+                  Manual fallback to paste an Instagram Reel link and trigger Agent 1
                 </p>
               </div>
-              <span class="badge badge-muted" style="font-size: 0.68rem;">Manual Fallback</span>
             </div>
 
             <div class="form-group mb-3">
@@ -508,7 +485,7 @@ window.reposterView = (function() {
           </div>
 
           <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.65rem 1rem; font-size: 0.9rem; font-weight: 600;">
-            🚀 Ingest & Dispatch Reel Live
+            Ingest & Dispatch Reel Live
           </button>
         </div>
 
@@ -518,14 +495,11 @@ window.reposterView = (function() {
       <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
         <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <div class="flex items-center gap-2">
-              <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                📱 Telegram Ingested Reels
-              </h3>
-              <span class="badge badge-blue" style="font-size: 0.7rem;">Telegram Originals Only</span>
-            </div>
+            <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+              Telegram Ingested Reels
+            </h3>
             <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
-              Original reels received via <code>@omnistudio_bot</code> targeting <b>${pageLabel}</b>
+              Original reels received via @omnistudio_bot targeting <b>${pageLabel}</b>
             </p>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
@@ -566,8 +540,8 @@ window.reposterView = (function() {
         <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <div class="pipeline-stage-title">
-              <span>📁 Stage 2: Downloaded Media Library</span>
-              <span class="badge badge-emerald">${jobs.length} Downloaded Reels</span>
+              <span>Stage 2: Downloaded Media Library</span>
+              <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">${jobs.length} reels</span>
             </div>
             <div class="text-sm text-muted">
               Locally downloaded 1080p MP4 clips with verified media paths, AI copy breakdown, and publication tracking for <b>${pageLabel}</b>
@@ -576,11 +550,11 @@ window.reposterView = (function() {
           <div class="flex items-center gap-2">
             <!-- View Mode Switcher: Table View (Default) vs Grid Cards -->
             <div class="view-mode-switcher">
-              <button class="view-mode-btn ${downloadedViewMode === 'table' ? 'active' : ''}" onclick="reposterView.setDownloadedViewMode('table')" title="Table View (Rows & Columns)">
-                <span>📋</span> <span>Table View</span>
+              <button class="view-mode-btn ${downloadedViewMode === 'table' ? 'active' : ''}" onclick="reposterView.setDownloadedViewMode('table')" title="Table View">
+                <span>Table View</span>
               </button>
-              <button class="view-mode-btn ${downloadedViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setDownloadedViewMode('grid')" title="Grid Cards View">
-                <span>⊞</span> <span>Grid Cards</span>
+              <button class="view-mode-btn ${downloadedViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setDownloadedViewMode('grid')" title="Grid Cards">
+                <span>Grid Cards</span>
               </button>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
@@ -591,13 +565,12 @@ window.reposterView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📥</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Downloaded Reels Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto;">
               When reels are ingested via Telegram or Web, their 1080p MP4 videos are downloaded to local storage and indexed here in organized rows and columns.
             </p>
             <button class="btn btn-primary btn-sm" onclick="reposterView.switchStage('ingest')">
-              + Ingest a Reel Now
+              Ingest a Reel Now
             </button>
           </div>
         ` : (downloadedViewMode === 'table' ? `
@@ -609,7 +582,7 @@ window.reposterView = (function() {
                   <th style="width: 14%;">Reel / ID</th>
                   <th style="width: 13%;">Destination</th>
                   <th style="width: 15%;">Format & Storage</th>
-                  <th style="width: 26%;">AI Hook & Caption Breakdown</th>
+                  <th style="width: 26%;">AI Hook & Caption</th>
                   <th style="width: 14%;">Status & Time</th>
                   <th style="width: 14%; text-align: right;">Actions</th>
                 </tr>
@@ -634,9 +607,9 @@ window.reposterView = (function() {
   function renderDownloadedTableRow(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
     const isTelegram = Boolean(j.telegram_chat_id);
-    const originBadge = isTelegram ?
-      `<span class="badge badge-blue" style="font-size: 0.68rem;">📱 Telegram</span>` :
-      `<span class="badge badge-muted" style="font-size: 0.68rem;">💻 Web</span>`;
+    const originText = isTelegram ?
+      `<span style="color: var(--text-muted); font-size: 0.72rem;">Telegram</span>` :
+      `<span style="color: var(--text-muted); font-size: 0.72rem;">Web</span>`;
 
     const parsed = parseCaptionComponents(j.caption);
     const timeStr = j.published_at ?
@@ -670,40 +643,39 @@ window.reposterView = (function() {
 
         <!-- 2. Reel ID & Source Link -->
         <td>
-          <div class="flex items-center gap-1 mb-1">
-            <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
-            ${originBadge}
+          <div class="flex items-center gap-2 mb-1">
+            <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">#${j.id}</span>
+            ${originText}
           </div>
-          <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--accent-primary); text-decoration: none;" title="${j.source_url}">
-            🔗 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
+          <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.8rem;" title="${j.source_url}">
+            ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
           </a>
         </td>
 
         <!-- 3. Target Destination Page -->
         <td>
-          <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
+          <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
           <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
         </td>
 
         <!-- 4. Format & Local Storage -->
         <td>
-          <div class="flex items-center gap-1 mb-1">
-            <span class="badge badge-emerald" style="font-size: 0.68rem; font-weight: 600;">✅ 1080p MP4 Ready</span>
+          <div style="font-size: 0.76rem; font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">
+            1080p MP4
           </div>
           <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
-            📁 ${filename}
+            ${filename}
           </div>
           <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 1px;">${mediaTypeLabel} (${mediaCount} item)</div>
         </td>
 
         <!-- 5. AI Caption Breakdown -->
         <td style="max-width: 280px;">
-          <div class="ai-quote-capsule" title="${escapeHtml(parsed.hook)}">
-            "${escapeHtml(parsed.hook)}"
+          <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
+            ${escapeHtml(parsed.hook)}
           </div>
-          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            <span class="caption-segment-tag">Credit</span>
-            <span style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);">${escapeHtml(parsed.credit)}</span>
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+            Creator credit included
           </div>
           <div style="font-size: 0.68rem; color: var(--accent-primary); font-family: var(--font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
             ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') + (parsed.hashtags.length > 4 ? ` +${parsed.hashtags.length - 4}` : '') : '—'}
@@ -712,23 +684,22 @@ window.reposterView = (function() {
 
         <!-- 6. Status & Timestamp -->
         <td>
-          <div class="mb-1">${getStatusBadge(j.status)}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+          ${app.renderStatusText(j.status, timeStr)}
         </td>
 
         <!-- 7. Actions -->
         <td style="text-align: right;">
           ${j.permalink ? `
-            <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; font-size: 0.76rem; color: var(--accent-primary); font-weight: 600; white-space: nowrap;">
+            <a href="${j.permalink}" target="_blank" class="text-link">
               View on Instagram ↗
             </a>
           ` : (j.status === 'pending_review' || j.status === 'ready' ? `
             <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              🚀 Publish Live
+              Publish Live
             </button>
           ` : (j.status === 'failed' ? `
             <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              🔄 Retry
+              Retry
             </button>
           ` : `
             <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
@@ -741,9 +712,9 @@ window.reposterView = (function() {
   function renderDownloadedCardHtml(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
     const isTelegram = Boolean(j.telegram_chat_id);
-    const originBadge = isTelegram ?
-      `<span class="badge badge-blue" style="font-size: 0.7rem;">📱 Telegram Bot</span>` :
-      `<span class="badge badge-muted" style="font-size: 0.7rem;">💻 Web Ingestion</span>`;
+    const originText = isTelegram ?
+      `<span style="color: var(--text-muted); font-size: 0.72rem;">Telegram</span>` :
+      `<span style="color: var(--text-muted); font-size: 0.72rem;">Web</span>`;
 
     const parsed = parseCaptionComponents(j.caption);
     const timeStr = j.published_at ?
@@ -777,58 +748,42 @@ window.reposterView = (function() {
           <!-- Header Bar -->
           <div class="downloaded-media-header">
             <div class="flex items-center gap-2">
-              <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
-              <span style="font-weight: 700; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
+              <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">#${j.id}</span>
+              <span style="font-weight: 600; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
             </div>
-            ${originBadge}
+            ${originText}
           </div>
 
           <!-- Reel Link & Source Info -->
           <div style="margin-bottom: 0.65rem;">
             <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
-            <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); text-decoration: none; word-break: break-all;">
-              🔗 ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
+            <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.8rem; word-break: break-all;">
+              ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
             </a>
           </div>
 
           <!-- Verified Local Media Details -->
           <div class="downloaded-media-fileinfo">
             <div class="flex items-center justify-between" style="margin-bottom: 0.35rem;">
-              <span style="font-weight: 700; color: var(--success); display: flex; align-items: center; gap: 4px;">
-                <span>✅</span> 1080p MP4 Ready
+              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
+                1080p MP4 Ready
               </span>
-              <span class="badge badge-muted" style="font-size: 0.68rem; font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
             </div>
             <div style="color: var(--text-muted); font-size: 0.72rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
-              📁 storage/reels/${filename}
+              storage/reels/${filename}
             </div>
           </div>
 
           <!-- AI Caption Breakdown -->
           <div class="downloaded-caption-box">
-            <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">AI Hook</span>
-              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
-                ${escapeHtml(parsed.hook)}
-              </span>
+            <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; margin-bottom: 4px;">
+              ${escapeHtml(parsed.hook)}
             </div>
-
-            <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">Credit</span>
-              <span style="color: var(--text-secondary); font-size: 0.74rem;">
-                ${escapeHtml(parsed.credit)}
-              </span>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px;">
+              Creator credit included
             </div>
-
-            <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">CTA</span>
-              <span style="color: var(--text-secondary); font-size: 0.74rem;">
-                ${escapeHtml(parsed.cta)}
-              </span>
-            </div>
-
             <div>
-              <span class="caption-segment-tag">Tags</span>
               <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-primary);">
                 ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 5).join(' ') + (parsed.hashtags.length > 5 ? ` +${parsed.hashtags.length - 5}` : '') : '—'}
               </span>
@@ -839,26 +794,25 @@ window.reposterView = (function() {
         <!-- Footer / Action Row -->
         <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
           <div class="flex items-center justify-between mb-2">
-            <div>${getStatusBadge(j.status)}</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+            ${app.renderStatusText(j.status, timeStr)}
           </div>
 
           <div class="flex items-center gap-2">
             ${j.permalink ? `
-              <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm w-full" style="text-decoration: none; justify-content: center; font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">
+              <a href="${j.permalink}" target="_blank" class="text-link" style="justify-content: center; width: 100%;">
                 View on Instagram ↗
               </a>
             ` : (j.status === 'pending_review' || j.status === 'ready' ? `
               <button class="btn btn-primary btn-sm w-full" onclick="reposterView.approveJob(${j.id})">
-                🚀 Publish Live Now
+                Publish Live Now
               </button>
             ` : (j.status === 'failed' ? `
               <button class="btn btn-secondary btn-sm w-full" onclick="reposterView.retryJob(${j.id})">
-                🔄 Retry Job
+                Retry Job
               </button>
             ` : `
               <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 100%;">
-                ⚙️ In Pipeline (${j.current_step || j.status})
+                In Pipeline (${j.current_step || j.status})
               </div>
             `))}
           </div>
@@ -881,8 +835,8 @@ window.reposterView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>✍️ Stage 3: AI Copywriting & Staged Reels</span>
-              <span class="badge ${jobs.length > 0 ? 'badge-amber' : 'badge-muted'}">${jobs.length} Staged</span>
+              <span>Stage 3: AI Copywriting & Staged Reels</span>
+              <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">${jobs.length} staged</span>
             </div>
             <div class="text-sm text-muted">
               Review AI crafted hook, creator attribution shoutout, follow CTA, and approve for live publishing
@@ -895,7 +849,6 @@ window.reposterView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">✨</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Reels Staged for Copywriting Review</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               Reels marked with "Review caption before publishing" or waiting for manual confirmation appear here.
@@ -910,11 +863,11 @@ window.reposterView = (function() {
                 <div class="card mb-3" style="border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); border-left: 4px solid var(--warning); box-shadow: none;">
                   <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
                     <div class="flex items-center gap-2">
-                      <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
-                      <span style="font-weight: 700;">Target: ${pageSlug}</span>
-                      <span class="badge badge-muted" style="font-size: 0.7rem;">${Boolean(j.telegram_chat_id) ? '📱 Telegram' : '💻 Web'}</span>
+                      <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">#${j.id}</span>
+                      <span style="font-weight: 600;">Target: ${pageSlug}</span>
+                      <span style="font-size: 0.72rem; color: var(--text-muted);">${Boolean(j.telegram_chat_id) ? 'Telegram' : 'Web'}</span>
                     </div>
-                    <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">
+                    <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.8rem;">
                       ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
                     </a>
                   </div>
@@ -928,10 +881,10 @@ window.reposterView = (function() {
 
                   <div class="flex items-center justify-between mt-3">
                     <button class="btn btn-secondary btn-sm" onclick="reposterView.deleteJob(${j.id})" style="color: var(--danger);">
-                      🗑️ Discard
+                      Discard
                     </button>
                     <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})">
-                      🚀 Approve & Publish Live Now
+                      Approve & Publish Live Now
                     </button>
                   </div>
                 </div>
@@ -959,8 +912,8 @@ window.reposterView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>🚀 Stage 4: Live Published Reels</span>
-              <span class="badge badge-emerald">${jobs.length} Published</span>
+              <span>Stage 4: Live Published Reels</span>
+              <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">${jobs.length} published</span>
             </div>
             <div class="text-sm text-muted">
               Reels actively broadcasted to Instagram feeds via Meta Graph API v21.0
@@ -973,7 +926,6 @@ window.reposterView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📱</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               Ingest a reel to see it publish live to your Instagram page feed.
@@ -1003,23 +955,23 @@ window.reposterView = (function() {
                       <td style="font-weight: 600; font-family: var(--font-mono);">#${j.id}</td>
                       <td style="font-weight: 600; font-family: var(--font-mono);">${pageSlug}</td>
                       <td>
-                        <span style="font-size: 0.72rem; color: var(--text-secondary);">${isTelegram ? '📱 Telegram' : '💻 Web'}</span>
+                        <span style="font-size: 0.72rem; color: var(--text-muted);">${isTelegram ? 'Telegram' : 'Web'}</span>
                       </td>
                       <td style="font-family: var(--font-mono);">
-                        <a href="${j.source_url}" target="_blank" style="text-decoration: none; color: var(--accent-primary);">
+                        <a href="${j.source_url}" target="_blank" class="text-link">
                           ${j.shortcode || 'Source'} ↗
                         </a>
                       </td>
                       <td style="font-size: 0.75rem; color: var(--text-secondary);">
                         <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">${escapeHtml(parsed.hook)}</div>
-                        <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(parsed.credit)}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Creator credit included</div>
                       </td>
                       <td style="font-size: 0.75rem; color: var(--text-muted);">
                         ${j.published_at ? formatTimeAgo(j.published_at) : '--'}
                       </td>
                       <td style="text-align: right;">
                         ${j.permalink ? `
-                          <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 600;">
+                          <a href="${j.permalink}" target="_blank" class="text-link">
                             Live on Feed ↗
                           </a>
                         ` : '<span style="font-size: 0.72rem; color: var(--text-muted);">No permalink</span>'}
@@ -1051,8 +1003,8 @@ window.reposterView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⚠️ Stage 5: Retries & Errors</span>
-              <span class="badge badge-red">${jobs.length} Failed</span>
+              <span>Stage 5: Retries & Errors</span>
+              <span style="font-size: 0.82rem; color: var(--danger); font-weight: 500;">${jobs.length} failed</span>
             </div>
             <div class="text-sm text-muted">
               Inspect failure reasons and trigger 1-click pipeline recovery
@@ -1065,7 +1017,6 @@ window.reposterView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎉</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Zero Failed Jobs</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               All on-demand dispatches completed without pipeline errors.
@@ -1079,11 +1030,11 @@ window.reposterView = (function() {
                 <div class="card mb-3" style="border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); border-left: 4px solid var(--danger); box-shadow: none;">
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-2">
-                      <span class="badge badge-red" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
-                      <span style="font-weight: 700;">Target: ${pageSlug}</span>
+                      <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">#${j.id}</span>
+                      <span style="font-weight: 600;">Target: ${pageSlug}</span>
                       <span style="font-size: 0.72rem; color: var(--text-muted);">Step: ${j.current_step || 'unknown'}</span>
                     </div>
-                    <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">
+                    <a href="${j.source_url}" target="_blank" class="text-link">
                       ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
                     </a>
                   </div>
@@ -1094,10 +1045,10 @@ window.reposterView = (function() {
 
                   <div class="flex items-center justify-between">
                     <button class="btn btn-secondary btn-sm" onclick="reposterView.deleteJob(${j.id})" style="color: var(--danger);">
-                      🗑️ Delete Job
+                      Delete Job
                     </button>
                     <button class="btn btn-primary btn-sm" onclick="reposterView.retryJob(${j.id})">
-                      🔄 Retry Pipeline Now
+                      Retry Pipeline Now
                     </button>
                   </div>
                 </div>
@@ -1129,16 +1080,15 @@ window.reposterView = (function() {
       if (jobs.length === 0) {
         container.innerHTML = `
           <div style="padding: 3.5rem 1.5rem; text-align: center; color: var(--text-muted);">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📱</div>
             <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.35rem;">
               No Telegram Reels Received Yet
             </div>
             <p style="font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto; line-height: 1.5;">
-              Share any Instagram Reel link directly to your Telegram bot <code style="color: #2AABEE; font-weight: 700;">@omnistudio_bot</code> from your phone. Only Telegram-originated reels are processed and tracked in Agent 1.
+              Share any Instagram Reel link directly to your Telegram bot @omnistudio_bot from your phone. Only Telegram-originated reels are processed and tracked in Agent 1.
             </p>
             <div class="flex items-center justify-center gap-2">
               <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">
-                ✈️ Open @omnistudio_bot in Telegram
+                Open @omnistudio_bot in Telegram
               </a>
               <button class="btn btn-secondary btn-sm" onclick="app.navigate('command-center')">
                 View All-Source Overview in Command Center ➔
@@ -1152,7 +1102,6 @@ window.reposterView = (function() {
       const rows = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
         const parsed = parseCaptionComponents(j.caption);
-        const statusBadge = getStatusBadge(j.status);
         const timeStr = j.published_at ?
           `Published ${formatTimeAgo(j.published_at)}` :
           `Received ${formatTimeAgo(j.created_at)}`;
@@ -1170,42 +1119,41 @@ window.reposterView = (function() {
 
             <!-- 2. Reel ID & Telegram Sender -->
             <td style="width: 15%;">
-              <div class="flex items-center gap-1 mb-1">
-                <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
-                <span class="badge badge-blue" style="font-size: 0.68rem; font-weight: 600;">📱 Telegram</span>
+              <div class="flex items-center gap-2 mb-1">
+                <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">#${j.id}</span>
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Telegram</span>
               </div>
               <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
-                Chat: <code>${j.telegram_chat_id || '5443723531'}</code>
+                Chat: ${j.telegram_chat_id || '5443723531'}
               </div>
-              <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; color: var(--accent-primary); text-decoration: none;">
-                🔗 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
+              <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.78rem;">
+                ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
               </a>
             </td>
 
             <!-- 3. Target Destination Page -->
             <td style="width: 14%;">
-              <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
+              <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
               <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
             </td>
 
             <!-- 4. Format & Storage -->
             <td style="width: 14%;">
-              <div class="flex items-center gap-1 mb-1">
-                <span class="badge badge-emerald" style="font-size: 0.68rem; font-weight: 600;">✅ 1080p MP4 Ready</span>
+              <div style="font-size: 0.76rem; font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">
+                1080p MP4
               </div>
               <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
-                Step: <b>${j.current_step || 'completed'}</b>
+                Step: ${j.current_step || 'completed'}
               </div>
             </td>
 
             <!-- 5. AI Caption & Hook Breakdown -->
             <td style="max-width: 280px;">
-              <div class="ai-quote-capsule" title="${escapeHtml(parsed.hook)}">
-                "${escapeHtml(parsed.hook)}"
+              <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
+                ${escapeHtml(parsed.hook)}
               </div>
-              <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <span class="caption-segment-tag">Credit</span>
-                <span style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);">${escapeHtml(parsed.credit)}</span>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
+                Creator credit included
               </div>
               <div style="font-size: 0.68rem; color: var(--accent-primary); font-family: var(--font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') : '—'}
@@ -1214,23 +1162,22 @@ window.reposterView = (function() {
 
             <!-- 6. Status & Time -->
             <td style="width: 13%;">
-              <div class="mb-1">${statusBadge}</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+              ${app.renderStatusText(j.status, timeStr)}
             </td>
 
             <!-- 7. Actions -->
             <td style="text-align: right; width: 14%;">
               ${j.permalink ? `
-                <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; font-size: 0.76rem; color: var(--accent-primary); font-weight: 600; white-space: nowrap;">
+                <a href="${j.permalink}" target="_blank" class="text-link">
                   Live on Feed ↗
                 </a>
               ` : (j.status === 'pending_review' || j.status === 'ready' ? `
                 <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-                  🚀 Publish Live
+                  Publish Live
                 </button>
               ` : (j.status === 'failed' ? `
                 <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-                  🔄 Retry
+                  Retry
                 </button>
               ` : `
                 <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
@@ -1282,7 +1229,7 @@ window.reposterView = (function() {
     try {
       if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.textContent = '⏳ Initializing Pipeline...';
+        submitBtn.textContent = 'Initializing Pipeline...';
       }
 
       showProgressBox('Starting 4-stage publishing pipeline...');
@@ -1303,7 +1250,7 @@ window.reposterView = (function() {
       if (data.duplicate) {
         app.toast('Notice: ' + data.message, 'info');
       } else {
-        app.toast('🚀 Reel dispatched to publishing pipeline!', 'success');
+        app.toast('Reel dispatched to publishing pipeline!', 'success');
       }
 
       updateProgressStep(1, 'active', 'Step 1/4: Ingested & Fetching 1080p MP4...');
@@ -1317,7 +1264,7 @@ window.reposterView = (function() {
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = '🚀 Ingest & Dispatch Reel Live';
+        submitBtn.textContent = 'Ingest & Dispatch Reel Live';
       }
     }
   }
@@ -1377,8 +1324,8 @@ window.reposterView = (function() {
       } else if (event.status === 'publishing' || event.status === 'uploading') {
         updateProgressStep(3, 'active', 'Step 3/4: Uploading container to Meta Graph API v21.0...');
       } else if (event.status === 'published') {
-        updateProgressStep(4, 'completed', '✅ Step 4/4: Successfully published live to Instagram!');
-        app.toast('🎉 Reel published live to Instagram!', 'success');
+        updateProgressStep(4, 'completed', 'Step 4/4: Successfully published live to Instagram!');
+        app.toast('Reel published live to Instagram!', 'success');
         setTimeout(() => hideProgressBox(), 6000);
         loadSummary();
         renderActiveStage();
@@ -1386,7 +1333,7 @@ window.reposterView = (function() {
         const s4 = document.getElementById('rp-step-4');
         if (s4) s4.className = 'step-bar-item failed';
         const statusEl = document.getElementById('rp-step-status');
-        if (statusEl) statusEl.textContent = '❌ Failed: ' + (event.error || 'Job failed');
+        if (statusEl) statusEl.textContent = 'Failed: ' + (event.error || 'Job failed');
         loadSummary();
         renderActiveStage();
       }
@@ -1405,7 +1352,7 @@ window.reposterView = (function() {
       });
       const data = await res.json();
       if (data.success) {
-        app.toast('🚀 Reel approved and queued for live publishing!', 'success');
+        app.toast('Reel approved and queued for live publishing!', 'success');
         activeTrackingJobId = id;
         showProgressBox(`Publishing job #${id} live...`);
         await loadSummary();
@@ -1452,21 +1399,7 @@ window.reposterView = (function() {
   }
 
   function getStatusBadge(status) {
-    switch (status) {
-      case 'published':
-        return `<span class="badge badge-emerald">Live Published</span>`;
-      case 'failed':
-        return `<span class="badge badge-red">Failed</span>`;
-      case 'pending_review':
-        return `<span class="badge badge-amber">Staged Review</span>`;
-      case 'downloading':
-      case 'processing':
-      case 'uploading':
-      case 'publishing':
-        return `<span class="badge badge-blue">⚙️ ${status}</span>`;
-      default:
-        return `<span class="badge badge-muted">${status}</span>`;
-    }
+    return app.renderStatusText(status);
   }
 
   return {

@@ -20,15 +20,7 @@ window.watchtowerView = (function() {
   };
 
   function getPageIcon(slug) {
-    const s = (slug || '').toLowerCase();
-    if (s.includes('gta') || s.includes('game')) return '🎮';
-    if (s.includes('tech') || s.includes('ai')) return '💡';
-    if (s.includes('meme') || s.includes('humor')) return '🎭';
-    if (s.includes('fit') || s.includes('gym')) return '💪';
-    if (s.includes('food') || s.includes('cook')) return '🍳';
-    if (s.includes('news')) return '📰';
-    if (s.includes('crypto') || s.includes('finance')) return '📈';
-    return '📱';
+    return '';
   }
 
   async function render() {
@@ -53,13 +45,12 @@ window.watchtowerView = (function() {
       <!-- 1. Header Bar -->
       <div class="mb-4 flex items-center justify-between" style="flex-wrap: wrap; gap: 1rem;">
         <div class="flex items-center gap-3">
-          <span style="font-size: 2rem; line-height: 1;">🛰️</span>
           <div>
             <div class="flex items-center gap-2">
               <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
                 Agent 2: Watchtower & Pipeline Engine
               </h2>
-              <span id="wt-header-status-badge" class="badge badge-blue">● ACTIVE</span>
+              <span id="wt-header-status-badge" class="status-text status-text-info">Active</span>
             </div>
             <p class="text-sm text-muted" style="margin-top: 0.15rem; margin-bottom: 0;">
               Autonomous 24/7 competitor surveillance, AI copywriting, review staging, and Meta live publishing
@@ -68,15 +59,15 @@ window.watchtowerView = (function() {
         </div>
         <div class="flex items-center gap-2">
           <button id="wt-btn-pause-toggle" class="btn btn-secondary btn-sm" onclick="watchtowerView.togglePause()">
-            ⏸️ Pause
+            Pause
           </button>
           <button class="btn btn-primary btn-sm" onclick="watchtowerView.runCycle()">
-            ⚡ Run Surveillance Now
+            Run Surveillance Now
           </button>
         </div>
       </div>
 
-      <!-- 2. Multi-Page Selector Pills Bar -->
+      <!-- 2. Multi-Page Selector Bar -->
       <div class="pipeline-page-switcher" id="wt-page-switcher">
         ${renderPageSwitcherPills()}
       </div>
@@ -103,19 +94,16 @@ window.watchtowerView = (function() {
 
     let html = `
       <button class="pipeline-page-pill ${isAll ? 'active' : ''}" onclick="watchtowerView.selectPage(null)">
-        <span>🌐</span>
         <span>All Connected Pages</span>
       </button>
     `;
 
     pages.forEach(p => {
       const isActive = selectedPageId === p.id;
-      const icon = getPageIcon(p.slug);
       html += `
         <button class="pipeline-page-pill ${isActive ? 'active' : ''}" onclick="watchtowerView.selectPage(${p.id})">
-          <span>${icon}</span>
-          <span>${p.name}</span>
-          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-muted)'}; margin-left: 2px;">
+          <span>${escapeHtml(p.name)}</span>
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-muted)'}; margin-left: 4px;">
             ${p.handle || '@' + p.slug}
           </span>
         </button>
@@ -133,7 +121,6 @@ window.watchtowerView = (function() {
     return `
       <div class="pipeline-stepper-header">
         <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-          <span>⚡</span>
           <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
         </div>
         <div style="font-size: 0.75rem; color: var(--text-muted);">
@@ -144,7 +131,7 @@ window.watchtowerView = (function() {
       <div class="pipeline-stepper">
         <!-- Stage 1: Sources -->
         <div class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Monitored Competitor Creators">
-          <div class="pipeline-step-num">1</div>
+          <span class="pipeline-step-num">1.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Sources</span>
             <span class="pipeline-step-count" id="ps-count-sources">${s.sources} Profiles</span>
@@ -154,7 +141,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 2: Discovered -->
         <div class="pipeline-step-node ${activeStage === 'discovered' ? 'active' : ''}" onclick="watchtowerView.switchStage('discovered')" title="Raw Discovered Reels">
-          <div class="pipeline-step-num">2</div>
+          <span class="pipeline-step-num">2.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Discovered</span>
             <span class="pipeline-step-count" id="ps-count-discovered">${s.discovered} Ingested</span>
@@ -164,7 +151,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 3: AI Ranked -->
         <div class="pipeline-step-node ${activeStage === 'ranked' ? 'active' : ''}" onclick="watchtowerView.switchStage('ranked')" title="Viral Scored Reels (≥70)">
-          <div class="pipeline-step-num">3</div>
+          <span class="pipeline-step-num">3.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">AI Ranked</span>
             <span class="pipeline-step-count" id="ps-count-ranked">${s.ranked} Scored</span>
@@ -174,7 +161,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 4: Downloaded Media -->
         <div class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="watchtowerView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
-          <div class="pipeline-step-num">4</div>
+          <span class="pipeline-step-num">4.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Downloaded Media</span>
             <span class="pipeline-step-count" id="ps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready Files</span>
@@ -184,7 +171,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 5: Review & Staged -->
         <div class="pipeline-step-node ${activeStage === 'review' ? 'active' : ''} ${s.review > 0 ? 'has-review' : ''}" onclick="watchtowerView.switchStage('review')" title="Staged Reels Awaiting Approval">
-          <div class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'background: var(--warning); color: #fff;' : ''}">5</div>
+          <span class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'color: var(--warning);' : ''}">5.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Review & Staged</span>
             <span class="pipeline-step-count" id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning); font-weight: 700;' : ''}">${s.review} Needs Review</span>
@@ -194,7 +181,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 6: In-Flight -->
         <div class="pipeline-step-node ${activeStage === 'active' ? 'active' : ''}" onclick="watchtowerView.switchStage('active')" title="Active Downloading & Meta Upload">
-          <div class="pipeline-step-num">6</div>
+          <span class="pipeline-step-num">6.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">In-Flight</span>
             <span class="pipeline-step-count" id="ps-count-active">${s.active} Processing</span>
@@ -204,7 +191,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 7: Live Published -->
         <div class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="watchtowerView.switchStage('published')" title="Live on Instagram">
-          <div class="pipeline-step-num">7</div>
+          <span class="pipeline-step-num">7.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Live Posts</span>
             <span class="pipeline-step-count" id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
@@ -214,7 +201,7 @@ window.watchtowerView = (function() {
 
         <!-- Stage 8: Failed / Retries -->
         <div class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="watchtowerView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <div class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'background: var(--danger); color: #fff;' : ''}">8</div>
+          <span class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'color: var(--danger);' : ''}">8.</span>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Retries</span>
             <span class="pipeline-step-count" id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
@@ -243,17 +230,17 @@ window.watchtowerView = (function() {
 
     if (badge && toggleBtn) {
       if (isPaused) {
-        badge.textContent = '● PAUSED';
-        badge.className = 'badge badge-red';
-        toggleBtn.innerHTML = '▶️ Resume';
+        badge.textContent = 'Paused';
+        badge.className = 'status-text status-text-danger';
+        toggleBtn.textContent = 'Resume';
       } else if (status.isScanning) {
-        badge.textContent = '● SCANNING NOW';
-        badge.className = 'badge badge-blue';
-        toggleBtn.innerHTML = '⏸️ Pause';
+        badge.textContent = 'Scanning';
+        badge.className = 'status-text status-text-info';
+        toggleBtn.textContent = 'Pause';
       } else {
-        badge.textContent = '● ACTIVE';
-        badge.className = 'badge badge-blue';
-        toggleBtn.innerHTML = '⏸️ Pause';
+        badge.textContent = 'Active';
+        badge.className = 'status-text status-text-info';
+        toggleBtn.textContent = 'Pause';
       }
     }
   }
@@ -373,8 +360,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>🎯 Stage 1: Monitored Competitors</span>
-              <span class="badge badge-blue">${sources.length} Channels</span>
+              <span>Stage 1: Monitored Competitors</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${sources.length} channels</span>
             </div>
             <div class="text-sm text-muted">
               Creators inspected every 3 hours for viral reels targeting <b>${selectedPage ? selectedPage.name : 'all connected pages'}</b>
@@ -390,7 +377,6 @@ window.watchtowerView = (function() {
           <div class="card" style="padding: 0; overflow: hidden; border-radius: 10px; box-shadow: none;">
             ${sources.length === 0 ? `
               <div style="padding: 3rem; text-align: center; color: var(--text-muted);">
-                <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎯</div>
                 <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;">No Competitor Sources Monitored</div>
                 <p style="font-size: 0.82rem; margin: 0;">Add creator profiles using the form on the right to start automated discovery.</p>
               </div>
@@ -429,13 +415,13 @@ window.watchtowerView = (function() {
                           ${lastChecked}
                         </td>
                         <td>
-                          <span style="color: ${isHealthy ? 'var(--success)' : 'var(--warning)'}; font-weight: 500; font-size: 0.78rem;">
-                            ${isHealthy ? '● Operational' : '● Attention'}
+                          <span class="status-text ${isHealthy ? 'status-text-success' : 'status-text-warning'}">
+                            ${isHealthy ? 'Operational' : 'Attention'}
                           </span>
                         </td>
                         <td style="text-align: right;">
                           <button class="btn btn-secondary btn-sm" onclick="watchtowerView.checkSource(${s.id})" style="font-size: 0.72rem; padding: 2px 7px;">
-                            ⚡ Inspect
+                            Inspect
                           </button>
                           <button onclick="watchtowerView.deleteSource(${s.id})" style="background: none; border: none; padding: 0; color: var(--danger); font-size: 0.78rem; cursor: pointer; text-decoration: underline; margin-left: 8px;">
                             Remove
@@ -501,8 +487,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>📥 Stage 2: Raw Discovered Reels</span>
-              <span class="badge badge-blue">${posts.length} Ingested</span>
+              <span>Stage 2: Raw Discovered Reels</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${posts.length} ingested</span>
             </div>
             <div class="text-sm text-muted">
               Fresh candidate reels harvested across competitor surveillance feeds
@@ -515,7 +501,6 @@ window.watchtowerView = (function() {
 
         ${posts.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📥</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Discovered Reels Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">
               Execute a surveillance cycle to discover viral reels across your monitored accounts.
@@ -549,13 +534,13 @@ window.watchtowerView = (function() {
                   </div>
 
                   <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-                    ❤️ ${(p.like_count || 0).toLocaleString()} · 💬 ${(p.comment_count || 0).toLocaleString()} · 👁️ ${(p.view_count || 0).toLocaleString()}
+                    Likes: ${(p.like_count || 0).toLocaleString()} · Comments: ${(p.comment_count || 0).toLocaleString()} · Views: ${(p.view_count || 0).toLocaleString()}
                   </div>
                 </div>
 
                 <div class="flex items-center gap-2">
                   <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.postDiscovery(${p.id})">
-                    🚀 Dispatch to Pipeline
+                    Dispatch to Pipeline
                   </button>
                   <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip this reel">
                     ✕
@@ -587,8 +572,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⭐ Stage 3: AI Ranked & Scored</span>
-              <span class="badge badge-emerald">${rankedPosts.length} High Virality</span>
+              <span>Stage 3: AI Ranked & Scored</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${rankedPosts.length} high virality</span>
             </div>
             <div class="text-sm text-muted">
               Reels meeting the virality engagement threshold (Score ≥ 70) ready for staging
@@ -601,7 +586,6 @@ window.watchtowerView = (function() {
 
         ${rankedPosts.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">⭐</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No High-Virality Reels Ranked Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               Watchtower evaluates reels every 3 hours. Candidate reels scoring 70+ will appear here automatically.
@@ -632,13 +616,13 @@ window.watchtowerView = (function() {
                   </div>
 
                   <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-                    ❤️ ${(p.like_count || 0).toLocaleString()} · 💬 ${(p.comment_count || 0).toLocaleString()} · 👁️ ${(p.view_count || 0).toLocaleString()}
+                    Likes: ${(p.like_count || 0).toLocaleString()} · Comments: ${(p.comment_count || 0).toLocaleString()} · Views: ${(p.view_count || 0).toLocaleString()}
                   </div>
                 </div>
 
                 <div class="flex items-center gap-2">
                   <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.postDiscovery(${p.id})">
-                    🚀 Dispatch Reel
+                    Dispatch Reel
                   </button>
                   <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip">
                     ✕
@@ -681,21 +665,10 @@ window.watchtowerView = (function() {
   }
 
   function getStatusBadge(status) {
-    switch (status) {
-      case 'published':
-        return `<span class="badge badge-emerald">Live Published</span>`;
-      case 'failed':
-        return `<span class="badge badge-red">Failed</span>`;
-      case 'pending_review':
-        return `<span class="badge badge-amber">Staged Review</span>`;
-      case 'downloading':
-      case 'processing':
-      case 'uploading':
-      case 'publishing':
-        return `<span class="badge badge-blue">⚙️ ${status}</span>`;
-      default:
-        return `<span class="badge badge-muted">${status}</span>`;
+    if (window.app && window.app.renderStatusText) {
+      return window.app.renderStatusText(status);
     }
+    return `<span class="status-text status-text-muted">${escapeHtml(status)}</span>`;
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -723,8 +696,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <div class="pipeline-stage-title">
-              <span>📁 Stage 4: Downloaded Media Repository</span>
-              <span class="badge badge-emerald">${jobs.length} Downloaded Reels</span>
+              <span>Stage 4: Downloaded Media Repository</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${jobs.length} reels</span>
             </div>
             <div class="text-sm text-muted">
               Locally downloaded 1080p MP4 clips with verified media paths, AI copy breakdown, and publication tracking for <b>${pageLabel}</b>
@@ -734,10 +707,10 @@ window.watchtowerView = (function() {
             <!-- View Mode Switcher: Table View (Default) vs Grid Cards -->
             <div class="view-mode-switcher">
               <button class="view-mode-btn ${downloadedViewMode === 'table' ? 'active' : ''}" onclick="watchtowerView.setDownloadedViewMode('table')" title="Table View (Rows & Columns)">
-                <span>📋</span> <span>Table View</span>
+                <span>Table View</span>
               </button>
               <button class="view-mode-btn ${downloadedViewMode === 'grid' ? 'active' : ''}" onclick="watchtowerView.setDownloadedViewMode('grid')" title="Grid Cards View">
-                <span>⊞</span> <span>Grid Cards</span>
+                <span>Grid Cards</span>
               </button>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()">
@@ -748,7 +721,6 @@ window.watchtowerView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📥</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Downloaded Reels Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto;">
               When candidate reels pass AI ranking and enter the download queue, their 1080p MP4 videos are downloaded to local storage and indexed here in organized rows and columns.
@@ -766,7 +738,7 @@ window.watchtowerView = (function() {
                   <th style="width: 14%;">Reel / ID</th>
                   <th style="width: 13%;">Destination</th>
                   <th style="width: 15%;">Format & Storage</th>
-                  <th style="width: 26%;">AI Hook & Caption Breakdown</th>
+                  <th style="width: 26%;">AI Caption & Attribution</th>
                   <th style="width: 14%;">Status & Time</th>
                   <th style="width: 14%; text-align: right;">Actions</th>
                 </tr>
@@ -790,9 +762,7 @@ window.watchtowerView = (function() {
 
   function renderDownloadedTableRow(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-    const agentBadge = j.agent === 'watchtower' ?
-      `<span class="badge badge-blue" style="font-size: 0.68rem;">🛰️ Watchtower</span>` :
-      `<span class="badge badge-muted" style="font-size: 0.68rem;">📲 Reposter</span>`;
+    const agentText = j.agent === 'watchtower' ? 'Watchtower' : 'Reposter';
 
     const parsed = parseCaptionComponents(j.caption);
     const timeStr = j.published_at ?
@@ -826,12 +796,13 @@ window.watchtowerView = (function() {
 
         <!-- 2. Reel ID & Source Link -->
         <td>
-          <div class="flex items-center gap-1 mb-1">
-            <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
-            ${agentBadge}
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">
+            <span style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">#${j.id}</span>
+            <span style="margin: 0 4px; color: var(--border-subtle);">·</span>
+            <span>${agentText}</span>
           </div>
           <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--accent-primary); text-decoration: none;" title="${j.source_url}">
-            🔗 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
+            ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
           </a>
         </td>
 
@@ -843,22 +814,20 @@ window.watchtowerView = (function() {
 
         <!-- 4. Format & Local Storage -->
         <td>
-          <div class="flex items-center gap-1 mb-1">
-            <span class="badge badge-emerald" style="font-size: 0.68rem; font-weight: 600;">✅ 1080p MP4 Ready</span>
-          </div>
+          <div style="font-size: 0.76rem; color: var(--text-primary); font-weight: 600; margin-bottom: 2px;">1080p MP4 Ready</div>
           <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
-            📁 ${filename}
+            ${filename}
           </div>
           <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 1px;">${mediaTypeLabel} (${mediaCount} item)</div>
         </td>
 
         <!-- 5. AI Caption Breakdown -->
         <td style="max-width: 280px;">
-          <div style="font-weight: 600; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 3px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
-            <span class="caption-segment-tag">AI Hook</span> ${escapeHtml(parsed.hook)}
+          <div style="font-weight: 600; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 2px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
+            ${escapeHtml(parsed.hook)}
           </div>
-          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            <span class="caption-segment-tag">Credit</span> ${escapeHtml(parsed.credit)}
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            Creator credit included ${parsed.credit ? '· ' + escapeHtml(parsed.credit) : ''}
           </div>
           <div style="font-size: 0.7rem; color: var(--accent-primary); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
             ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') + (parsed.hashtags.length > 4 ? ` +${parsed.hashtags.length - 4}` : '') : '—'}
@@ -867,23 +836,23 @@ window.watchtowerView = (function() {
 
         <!-- 6. Status & Timestamp -->
         <td>
-          <div class="mb-1">${getStatusBadge(j.status)}</div>
+          <div class="mb-1">${app.renderStatusText ? app.renderStatusText(j.status) : getStatusBadge(j.status)}</div>
           <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
         </td>
 
         <!-- 7. Actions -->
         <td style="text-align: right;">
           ${j.permalink ? `
-            <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; font-size: 0.76rem; color: var(--accent-primary); font-weight: 600; white-space: nowrap;">
+            <a href="${j.permalink}" target="_blank" class="text-link" style="white-space: nowrap;">
               View on Instagram ↗
             </a>
           ` : (j.status === 'pending_review' || j.status === 'ready' ? `
             <button class="btn btn-primary btn-sm" onclick="watchtowerView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              🚀 Publish Live
+              Publish Live
             </button>
           ` : (j.status === 'failed' ? `
             <button class="btn btn-secondary btn-sm" onclick="watchtowerView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              🔄 Retry
+              Retry
             </button>
           ` : `
             <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
@@ -895,9 +864,7 @@ window.watchtowerView = (function() {
 
   function renderDownloadedCardHtml(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-    const agentBadge = j.agent === 'watchtower' ?
-      `<span class="badge badge-blue" style="font-size: 0.7rem;">🛰️ Watchtower</span>` :
-      `<span class="badge badge-muted" style="font-size: 0.7rem;">📲 Reposter</span>`;
+    const agentText = j.agent === 'watchtower' ? 'Watchtower' : 'Reposter';
 
     const parsed = parseCaptionComponents(j.caption);
     const timeStr = j.published_at ?
@@ -931,58 +898,52 @@ window.watchtowerView = (function() {
           <!-- Header Bar -->
           <div class="downloaded-media-header">
             <div class="flex items-center gap-2">
-              <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+              <span style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); font-size: 0.85rem;">#${j.id}</span>
               <span style="font-weight: 700; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
             </div>
-            ${agentBadge}
+            <span style="font-size: 0.75rem; color: var(--text-muted);">${agentText}</span>
           </div>
 
           <!-- Reel Link & Source Info -->
           <div style="margin-bottom: 0.65rem;">
             <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
             <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); text-decoration: none; word-break: break-all;">
-              🔗 ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
+              ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
             </a>
           </div>
 
           <!-- Verified Local Media Details -->
           <div class="downloaded-media-fileinfo">
             <div class="flex items-center justify-between" style="margin-bottom: 0.35rem;">
-              <span style="font-weight: 700; color: var(--success); display: flex; align-items: center; gap: 4px;">
-                <span>✅</span> 1080p MP4 Ready
-              </span>
-              <span class="badge badge-muted" style="font-size: 0.68rem; font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
+              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.76rem;">1080p MP4 Ready</span>
+              <span style="font-size: 0.68rem; font-family: var(--font-mono); color: var(--text-muted);">${mediaTypeLabel} (${mediaCount} item)</span>
             </div>
             <div style="color: var(--text-muted); font-size: 0.72rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
-              📁 storage/reels/${filename}
+              storage/reels/${filename}
             </div>
           </div>
 
           <!-- AI Caption Breakdown -->
           <div class="downloaded-caption-box">
             <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">AI Hook</span>
               <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
                 ${escapeHtml(parsed.hook)}
               </span>
             </div>
 
             <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">Credit</span>
-              <span style="color: var(--text-secondary); font-size: 0.74rem;">
-                ${escapeHtml(parsed.credit)}
+              <span style="color: var(--text-muted); font-size: 0.74rem;">
+                Creator credit included ${parsed.credit ? '· ' + escapeHtml(parsed.credit) : ''}
               </span>
             </div>
 
             <div style="margin-bottom: 0.45rem;">
-              <span class="caption-segment-tag">CTA</span>
               <span style="color: var(--text-secondary); font-size: 0.74rem;">
                 ${escapeHtml(parsed.cta)}
               </span>
             </div>
 
             <div>
-              <span class="caption-segment-tag">Tags</span>
               <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-primary);">
                 ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 5).join(' ') + (parsed.hashtags.length > 5 ? ` +${parsed.hashtags.length - 5}` : '') : '—'}
               </span>
@@ -1004,15 +965,15 @@ window.watchtowerView = (function() {
               </a>
             ` : (j.status === 'pending_review' || j.status === 'ready' ? `
               <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.approveJob(${j.id})">
-                🚀 Publish Live Now
+                Publish Live Now
               </button>
             ` : (j.status === 'failed' ? `
               <button class="btn btn-secondary btn-sm w-full" onclick="watchtowerView.retryJob(${j.id})">
-                🔄 Retry Job
+                Retry Job
               </button>
             ` : `
               <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 100%;">
-                ⚙️ In Pipeline (${j.current_step || j.status})
+                In Pipeline (${j.current_step || j.status})
               </div>
             `))}
           </div>
@@ -1036,8 +997,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>✍️ Stage 5: Review & Staged Reels</span>
-              <span class="badge ${jobs.length > 0 ? 'badge-amber' : 'badge-muted'}">${jobs.length} Staged</span>
+              <span>Stage 5: Review & Staged Reels</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${jobs.length} staged</span>
             </div>
             <div class="text-sm text-muted">
               Inspect AI copywritten captions, review attribution tags, and approve for live Instagram publishing
@@ -1050,7 +1011,6 @@ window.watchtowerView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎉</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Review Queue Empty</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               No reels currently pending manual operator review. Incoming reels will appear here for 1-click approval.
@@ -1068,9 +1028,9 @@ window.watchtowerView = (function() {
                 <div class="review-reel-card">
                   <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
                     <div class="flex items-center gap-2">
-                      <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+                      <span style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); font-size: 0.85rem;">#${j.id}</span>
                       <span style="font-weight: 600; font-size: 0.95rem;">Target: ${pageSlug}</span>
-                      <span style="font-size: 0.72rem; color: var(--text-muted);">• ${j.agent === 'watchtower' ? '🛰️ Watchtower' : '📲 Reposter'}</span>
+                      <span style="font-size: 0.72rem; color: var(--text-muted);">• ${j.agent === 'watchtower' ? 'Watchtower' : 'Reposter'}</span>
                     </div>
                     <a href="${j.source_url}" target="_blank" style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--accent-primary); text-decoration: none;">
                       ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
@@ -1092,10 +1052,10 @@ window.watchtowerView = (function() {
 
                   <div class="flex items-center justify-between mt-3" style="flex-wrap: wrap; gap: 0.5rem;">
                     <button class="btn btn-secondary btn-sm" onclick="watchtowerView.deleteJob(${j.id})" style="color: var(--danger);">
-                      🗑️ Discard Reel
+                      Discard Reel
                     </button>
                     <button class="btn btn-primary btn-sm" onclick="watchtowerView.approveJob(${j.id})">
-                      ✅ Approve & Publish Live Now
+                      Approve & Publish Live Now
                     </button>
                   </div>
                 </div>
@@ -1123,8 +1083,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⚙️ Stage 6: In-Flight Execution</span>
-              <span class="badge badge-blue">${jobs.length} Active</span>
+              <span>Stage 6: In-Flight Execution</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${jobs.length} active</span>
             </div>
             <div class="text-sm text-muted">
               Live worker pipeline downloading 1080p MP4, crafting AI captions, and publishing Meta containers
@@ -1137,7 +1097,6 @@ window.watchtowerView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">💤</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Pipeline Idle</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               No downloading, AI copywriting, or Meta uploading jobs in progress right now.
@@ -1159,6 +1118,7 @@ window.watchtowerView = (function() {
               <tbody>
                 ${jobs.map(j => {
                   const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+                  const statusHtml = app.renderStatusText ? app.renderStatusText(j.status) : `<span class="status-text status-text-info">${escapeHtml(j.status)}</span>`;
                   return `
                     <tr>
                       <td style="font-weight: 600; font-family: var(--font-mono); color: var(--text-primary);">#${j.id}</td>
@@ -1169,7 +1129,7 @@ window.watchtowerView = (function() {
                         </a>
                       </td>
                       <td>
-                        <span class="badge badge-blue">⚙️ ${j.status}</span>
+                        ${statusHtml}
                       </td>
                       <td style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
                         ${j.current_step || 'in-progress'}
@@ -1206,8 +1166,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>🚀 Stage 7: Live Published Feed</span>
-              <span class="badge badge-emerald">${posts.length} Live Reels</span>
+              <span>Stage 7: Live Published Feed</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${posts.length} live reels</span>
             </div>
             <div class="text-sm text-muted">
               Live dispatches confirmed on Instagram feed with direct permalinks
@@ -1220,7 +1180,6 @@ window.watchtowerView = (function() {
 
         ${posts.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🚀</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               Reels published via Watchtower or Telegram Bot will appear here with live Instagram links.
@@ -1260,11 +1219,11 @@ window.watchtowerView = (function() {
                       </td>
                       <td style="text-align: right;">
                         ${j.permalink ? `
-                          <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 500;">
+                          <a href="${j.permalink}" target="_blank" class="text-link" style="font-size: 0.8rem; font-weight: 500;">
                             View Live ↗
                           </a>
                         ` : `
-                          <span style="color: var(--success); font-size: 0.78rem; font-weight: 500;">Live on Feed</span>
+                          <span class="status-text status-text-success" style="font-size: 0.78rem; font-weight: 500;">Live on Feed</span>
                         `}
                       </td>
                     </tr>
@@ -1294,8 +1253,8 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⚠️ Stage 8: Failed & Retries</span>
-              <span class="badge ${jobs.length > 0 ? 'badge-red' : 'badge-emerald'}">${jobs.length} Errors</span>
+              <span>Stage 8: Failed & Retries</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${jobs.length} errors</span>
             </div>
             <div class="text-sm text-muted">
               Diagnose pipeline errors and trigger 1-click retry attempts
@@ -1308,7 +1267,6 @@ window.watchtowerView = (function() {
 
         ${jobs.length === 0 ? `
           <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">✨</div>
             <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Zero Failed Jobs</div>
             <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
               The publishing pipeline is operating with 100% health for the selected page.
@@ -1322,7 +1280,7 @@ window.watchtowerView = (function() {
                 <div class="card mb-3" style="border-left: 4px solid var(--danger); background: var(--bg-card); border-radius: 10px; padding: 1.25rem; box-shadow: none;">
                   <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-2">
-                      <span class="badge badge-red">#${j.id} Failed</span>
+                      <span class="status-text status-text-danger" style="font-weight: 700; font-family: var(--font-mono);">#${j.id} Failed</span>
                       <span style="font-weight: 600;">${pageSlug}</span>
                       <span style="font-size: 0.72rem; color: var(--text-muted);">• Attempts: ${j.attempts || 1}</span>
                     </div>
@@ -1337,10 +1295,10 @@ window.watchtowerView = (function() {
 
                   <div class="flex items-center justify-between">
                     <button class="btn btn-secondary btn-sm" onclick="watchtowerView.deleteJob(${j.id})" style="color: var(--danger);">
-                      🗑️ Discard
+                      Discard
                     </button>
                     <button class="btn btn-primary btn-sm" onclick="watchtowerView.retryJob(${j.id})">
-                      🔄 1-Click Retry
+                      1-Click Retry
                     </button>
                   </div>
                 </div>
@@ -1380,7 +1338,7 @@ window.watchtowerView = (function() {
       });
       const data = await res.json();
       if (data.success) {
-        app.toast('✅ Job approved! Moved to active publishing queue.', 'success');
+        app.toast('Job approved! Moved to active publishing queue.', 'success');
         await loadPipelineSummary();
         await renderActiveStage();
       } else {
@@ -1429,7 +1387,7 @@ window.watchtowerView = (function() {
         body: JSON.stringify({ force: true })
       });
       const data = await res.json();
-      app.toast('🛰️ Surveillance cycle initiated across competitors!', 'success');
+      app.toast('Surveillance cycle initiated across competitors!', 'success');
       setTimeout(async () => {
         await loadStatus();
         await loadPipelineSummary();

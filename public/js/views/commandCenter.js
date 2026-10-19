@@ -26,14 +26,11 @@ window.commandCenterView = (function() {
         <!-- Agent 1: Reposter Card -->
         <div class="card card-agent-reposter" style="position: relative;">
           <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span style="font-size: 1.6rem; line-height: 1;">📲</span>
-              <div>
-                <div style="font-weight: 800; font-size: 1.05rem;">Agent 1: Reposter</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Direct Telegram & Dashboard Ingestion</div>
-              </div>
+            <div>
+              <div style="font-weight: 800; font-size: 1.05rem;">Agent 1: Reposter</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Direct Telegram & Dashboard Ingestion</div>
             </div>
-            <span class="badge badge-emerald">● ONLINE</span>
+            <span class="status-text status-text-success">Online</span>
           </div>
 
           <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1rem;">
@@ -53,7 +50,7 @@ window.commandCenterView = (function() {
 
           <div class="flex gap-2">
             <button class="btn btn-emerald btn-sm w-full" onclick="app.openRepostModal()">
-              🚀 Repost New Reel
+              Repost New Reel
             </button>
             <button class="btn btn-secondary btn-sm" onclick="app.navigate('reposter')">
               View Agent ➔
@@ -64,14 +61,11 @@ window.commandCenterView = (function() {
         <!-- Agent 2: Watchtower Card -->
         <div class="card card-agent-watchtower" style="position: relative;">
           <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-2">
-              <span style="font-size: 1.6rem; line-height: 1;">🛰️</span>
-              <div>
-                <div style="font-weight: 800; font-size: 1.05rem;">Agent 2: Watchtower</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">24/7 Source Surveillance & Discovery</div>
-              </div>
+            <div>
+              <div style="font-weight: 800; font-size: 1.05rem;">Agent 2: Watchtower</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">24/7 Source Surveillance & Discovery</div>
             </div>
-            <span id="cc-watchtower-badge" class="badge badge-blue">● ACTIVE</span>
+            <span id="cc-watchtower-badge" class="status-text status-text-info">Active</span>
           </div>
 
           <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1rem;">
@@ -91,7 +85,7 @@ window.commandCenterView = (function() {
 
           <div class="flex gap-2">
             <button class="btn btn-blue btn-sm w-full" id="cc-btn-run-watchtower" onclick="commandCenterView.runWatchtower()">
-              ⚡ Run Surveillance Now
+              Run Surveillance Now
             </button>
             <button class="btn btn-secondary btn-sm" onclick="app.navigate('watchtower')">
               Manage Sources ➔
@@ -112,19 +106,19 @@ window.commandCenterView = (function() {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
           <div style="background: var(--bg-input); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 0.78rem; color: var(--text-secondary);">Database</span>
-            <span id="cc-health-db" class="badge badge-emerald">SQLite OK</span>
+            <span id="cc-health-db" class="status-text status-text-success">SQLite OK</span>
           </div>
           <div style="background: var(--bg-input); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 0.78rem; color: var(--text-secondary);">Meta Graph API</span>
-            <span id="cc-health-meta" class="badge badge-emerald">v21.0 Active</span>
+            <span id="cc-health-meta" class="status-text status-text-success">v21.0 Active</span>
           </div>
           <div style="background: var(--bg-input); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 0.78rem; color: var(--text-secondary);">Cloudflare Tunnel</span>
-            <span id="cc-health-tunnel" class="badge badge-emerald">Active</span>
+            <span id="cc-health-tunnel" class="status-text status-text-success">Active</span>
           </div>
           <div style="background: var(--bg-input); padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
             <span style="font-size: 0.78rem; color: var(--text-secondary);">Telegram Bot</span>
-            <span id="cc-health-tg" class="badge badge-emerald">Listening</span>
+            <span id="cc-health-tg" class="status-text status-text-success">Listening</span>
           </div>
         </div>
       </div>
@@ -137,7 +131,6 @@ window.commandCenterView = (function() {
               <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
                 Multi-Channel Publishing Overview & Quota Matrix
               </h3>
-              <span class="badge badge-emerald" style="font-size: 0.7rem;">Live Common Center</span>
             </div>
             <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
               Centralized performance tracker across all connected Instagram pages and publishing agents
@@ -172,8 +165,7 @@ window.commandCenterView = (function() {
         <!-- Live Activity Stream (SSE) -->
         <div class="card">
           <div class="flex items-center justify-between mb-3">
-            <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-              <span class="pulse-dot"></span>
+            <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0;">
               Live Agent Activity Stream
             </h3>
             <button class="btn btn-secondary btn-sm" onclick="commandCenterView.clearLogs()">Clear</button>
@@ -198,10 +190,10 @@ window.commandCenterView = (function() {
         if (tunnelBadge) {
           if (health.tunnel?.healthy) {
             tunnelBadge.textContent = 'Active';
-            tunnelBadge.className = 'badge badge-emerald';
+            tunnelBadge.className = 'status-text status-text-success';
           } else {
             tunnelBadge.textContent = health.tunnel?.hasPublicUrl ? 'Local/Host' : 'Offline';
-            tunnelBadge.className = 'badge badge-amber';
+            tunnelBadge.className = 'status-text status-text-warning';
           }
         }
       }
@@ -237,14 +229,14 @@ window.commandCenterView = (function() {
         }
         if (wtBadge) {
           if (wt.paused || wt.isPaused) {
-            wtBadge.textContent = '● PAUSED';
-            wtBadge.className = 'badge badge-red';
+            wtBadge.textContent = 'Paused';
+            wtBadge.className = 'status-text status-text-danger';
           } else if (wt.isScanning) {
-            wtBadge.textContent = '● SCANNING';
-            wtBadge.className = 'badge badge-blue';
+            wtBadge.textContent = 'Scanning';
+            wtBadge.className = 'status-text status-text-info';
           } else {
-            wtBadge.textContent = '● ACTIVE';
-            wtBadge.className = 'badge badge-blue';
+            wtBadge.textContent = 'Active';
+            wtBadge.className = 'status-text status-text-info';
           }
         }
       }
@@ -274,19 +266,17 @@ window.commandCenterView = (function() {
   function renderPublishingOverview(stats) {
     if (!stats) return;
 
-    // 1. Origin Breakdown Pills
+    // 1. Origin Breakdown
     const originContainer = document.getElementById('cc-origin-breakdown');
     if (originContainer && stats.origins) {
       originContainer.innerHTML = `
-        <span class="origin-stat-pill" title="Reels received via Telegram bot (@omnistudio_bot)">
-          <span style="color: #2AABEE;">📱 Telegram:</span> <b>${stats.origins.telegram || 0}</b>
-        </span>
-        <span class="origin-stat-pill" title="Reels discovered via Watchtower competitor surveillance">
-          <span style="color: #6366F1;">🛰️ Watchtower:</span> <b>${stats.origins.watchtower || 0}</b>
-        </span>
-        <span class="origin-stat-pill" title="Reels submitted directly via web dashboard">
-          <span style="color: var(--text-secondary);">💻 Web Direct:</span> <b>${stats.origins.web || 0}</b>
-        </span>
+        <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+          <span>Telegram: <b style="color: var(--text-primary); font-family: var(--font-mono);">${stats.origins.telegram || 0}</b></span>
+          <span style="color: var(--border-subtle);">·</span>
+          <span>Watchtower: <b style="color: var(--text-primary); font-family: var(--font-mono);">${stats.origins.watchtower || 0}</b></span>
+          <span style="color: var(--border-subtle);">·</span>
+          <span>Web Direct: <b style="color: var(--text-primary); font-family: var(--font-mono);">${stats.origins.web || 0}</b></span>
+        </div>
       `;
     }
 
@@ -306,15 +296,12 @@ window.commandCenterView = (function() {
         return `
           <div class="page-quota-card">
             <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2">
-                <span style="font-size: 1.25rem;">📱</span>
-                <div>
-                  <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">${escapeHtml(p.name)}</div>
-                  <div style="font-size: 0.72rem; color: var(--accent-primary); font-family: var(--font-mono);">${p.handle}</div>
-                </div>
+              <div>
+                <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">${escapeHtml(p.name)}</div>
+                <div style="font-size: 0.72rem; color: var(--accent-primary); font-family: var(--font-mono);">${p.handle}</div>
               </div>
-              <span class="badge ${isQuotaMet ? 'badge-emerald' : 'badge-muted'}" style="font-size: 0.68rem;">
-                ${isQuotaMet ? '✅ Quota Met' : 'Active Quota'}
+              <span class="status-text ${isQuotaMet ? 'status-text-success' : 'status-text-muted'}" style="font-size: 0.72rem;">
+                ${isQuotaMet ? 'Quota Met' : 'Active Quota'}
               </span>
             </div>
 
@@ -366,11 +353,7 @@ window.commandCenterView = (function() {
       const isWatchtower = j.agent === 'watchtower';
       const isReel = (j.media_type === 'reel' || !j.media_type);
 
-      const originBadge = isTelegram ?
-        `<span class="badge badge-blue" style="font-size: 0.68rem;">📱 Telegram</span>` :
-        (isWatchtower ?
-          `<span class="badge badge-indigo" style="font-size: 0.68rem; background: rgba(99, 102, 241, 0.12); color: #6366F1;">🛰️ Watchtower</span>` :
-          `<span class="badge badge-muted" style="font-size: 0.68rem;">💻 Web Direct</span>`);
+      const originText = isTelegram ? 'Telegram' : (isWatchtower ? 'Watchtower' : 'Web Direct');
 
       return `
         <tr>
@@ -384,9 +367,10 @@ window.commandCenterView = (function() {
 
           <!-- ID & Origin -->
           <td>
-            <div class="flex items-center gap-1 mb-1">
-              <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
-              ${originBadge}
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">
+              <span style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">#${j.id}</span>
+              <span style="margin: 0 4px; color: var(--border-subtle);">·</span>
+              <span>${originText}</span>
             </div>
             <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.78rem; text-decoration: none; color: var(--accent-primary); font-weight: 600;" title="${j.source_url}">
               ${shortcode} ↗
@@ -408,7 +392,7 @@ window.commandCenterView = (function() {
           <!-- Live Feed Link -->
           <td style="text-align: right;">
             ${j.permalink ? `
-              <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.76rem; text-decoration: none; font-weight: 600; white-space: nowrap;">
+              <a href="${j.permalink}" target="_blank" class="text-link" style="white-space: nowrap;">
                 Live on Feed ↗
               </a>
             ` : `
@@ -446,21 +430,10 @@ window.commandCenterView = (function() {
   }
 
   function getStatusBadge(status) {
-    switch (status) {
-      case 'published':
-        return `<span class="badge badge-emerald">Published</span>`;
-      case 'failed':
-        return `<span class="badge badge-red">Failed</span>`;
-      case 'pending_review':
-        return `<span class="badge badge-amber">Needs Review</span>`;
-      case 'downloading':
-      case 'processing':
-      case 'uploading':
-      case 'publishing':
-        return `<span class="badge badge-blue">⚙️ ${status}</span>`;
-      default:
-        return `<span class="badge badge-muted">${status}</span>`;
+    if (window.app && window.app.renderStatusText) {
+      return window.app.renderStatusText(status);
     }
+    return `<span class="status-text status-text-muted">${escapeHtml(status)}</span>`;
   }
 
   function formatTimeAgo(timestamp) {
@@ -500,7 +473,7 @@ window.commandCenterView = (function() {
     const btn = document.getElementById('cc-btn-run-watchtower');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = '⏳ Triggering...';
+      btn.textContent = 'Triggering...';
     }
     try {
       const res = await fetch('/api/watchtower/run', {
@@ -509,14 +482,14 @@ window.commandCenterView = (function() {
         body: JSON.stringify({ force: true })
       });
       const data = await res.json();
-      app.toast('🛰️ Watchtower surveillance cycle initiated!', 'success');
+      app.toast('Watchtower surveillance cycle initiated!', 'success');
       setTimeout(() => loadData(), 2000);
     } catch (err) {
       app.toast('Failed to trigger Watchtower: ' + err.message, 'error');
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.textContent = '⚡ Run Surveillance Now';
+        btn.textContent = 'Run Surveillance Now';
       }
     }
   }

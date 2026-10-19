@@ -218,13 +218,8 @@ window.app = (function() {
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
 
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
-
     el.innerHTML = `
       <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <span>${icon}</span>
         <span>${message}</span>
       </div>
     `;
@@ -313,7 +308,7 @@ window.app = (function() {
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = '🚀 Repost Live Now';
+        submitBtn.textContent = 'Repost Live Now';
       }
     }
   }
@@ -345,8 +340,8 @@ window.app = (function() {
     } else if (event.status === 'uploading' || event.status === 'publishing') {
       setModalStep(3, 'active', 'Step 3/3: Publishing live to Meta Graph API v21.0...');
     } else if (event.status === 'published') {
-      setModalStep(3, 'completed', '✅ Successfully published live to Instagram!');
-      toast('🎉 Reel published live to Instagram!', 'success');
+      setModalStep(3, 'completed', 'Successfully published live to Instagram!');
+      toast('Reel published live to Instagram!', 'success');
       setTimeout(() => {
         closeRepostModal();
         navigate('published');
@@ -355,7 +350,7 @@ window.app = (function() {
       const s3 = document.getElementById('rm-step-3');
       if (s3) s3.className = 'step-bar-item failed';
       const statusEl = document.getElementById('rm-step-status');
-      if (statusEl) statusEl.textContent = '❌ Failed: ' + (event.error || 'Pipeline error');
+      if (statusEl) statusEl.textContent = 'Failed: ' + (event.error || 'Pipeline error');
     }
   }
 
@@ -382,6 +377,49 @@ window.app = (function() {
     if (modal) modal.classList.add('hidden');
   }
 
+  /**
+   * Global Minimalist Tag & Status Helpers
+   */
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderTag(text, options = {}) {
+    if (!text) return '';
+    const statusClass = options.status ? `status-${options.status}` : '';
+    const upperClass = options.uppercase ? 'text-uppercase' : '';
+    return `<span class="ui-tag ${statusClass} ${upperClass}">${escapeHtml(text)}</span>`;
+  }
+
+  function renderStatusText(status, timeStr) {
+    const s = String(status || '').toLowerCase();
+    let colorClass = 'status-text-muted';
+    let label = status || 'Unknown';
+
+    if (s === 'published' || s === 'live') {
+      colorClass = 'status-text-success';
+      label = 'Live Published';
+    } else if (s === 'failed' || s === 'error') {
+      colorClass = 'status-text-danger';
+      label = 'Failed';
+    } else if (s === 'pending_review' || s === 'staged' || s === 'needs_review') {
+      colorClass = 'status-text-warning';
+      label = 'Staged Review';
+    } else if (s === 'downloading' || s === 'processing' || s === 'uploading' || s === 'publishing' || s === 'active') {
+      colorClass = 'status-text-info';
+      label = s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    const timeHtml = timeStr ? `<span class="status-time">${escapeHtml(timeStr)}</span>` : '';
+    return `<span class="status-text ${colorClass}">${escapeHtml(label)}</span>${timeHtml}`;
+  }
+
   // Initialize on DOM ready
   document.addEventListener('DOMContentLoaded', init);
 
@@ -395,6 +433,9 @@ window.app = (function() {
     submitRepostModal,
     openVideoModal,
     closeVideoModal,
-    refreshBadgeCounts: updateBadgeCounts
+    refreshBadgeCounts: updateBadgeCounts,
+    escapeHtml,
+    renderTag,
+    renderStatusText
   };
 })();

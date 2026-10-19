@@ -11,15 +11,7 @@ window.pagesView = (function() {
   let currentEditingPageId = null;
 
   function getPageIcon(slug) {
-    const s = (slug || '').toLowerCase();
-    if (s.includes('gta') || s.includes('game')) return '🎮';
-    if (s.includes('tech') || s.includes('ai')) return '💡';
-    if (s.includes('meme') || s.includes('humor')) return '🎭';
-    if (s.includes('fit') || s.includes('gym')) return '💪';
-    if (s.includes('food') || s.includes('cook')) return '🍳';
-    if (s.includes('news')) return '📰';
-    if (s.includes('crypto') || s.includes('finance')) return '📈';
-    return '📱';
+    return '';
   }
 
   async function render() {
@@ -105,8 +97,8 @@ window.pagesView = (function() {
             <div class="form-group mb-4">
               <label class="form-label font-bold" style="font-size: 0.8rem; font-weight: 600;">Publishing Mode</label>
               <select id="pem-post-mode" class="form-input" style="border-radius: 8px;">
-                <option value="review">📋 Review First (Save to Queue)</option>
-                <option value="auto">⚡ Auto-Publish Directly</option>
+                <option value="review">Review First (Save to Queue)</option>
+                <option value="auto">Auto-Publish Directly</option>
               </select>
             </div>
 
@@ -138,7 +130,6 @@ window.pagesView = (function() {
         if (contentArea) {
           contentArea.innerHTML = `
             <div class="card" style="padding: 3.5rem; text-align: center; width: 100%; border-radius: 12px; box-shadow: none;">
-              <div style="font-size: 2.4rem; margin-bottom: 0.5rem;">📱</div>
               <div style="font-weight: 600; font-size: 1.15rem; margin-bottom: 0.25rem;">No Instagram Pages Connected</div>
               <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.25rem 0;">Add your target Instagram page and Meta Graph API token to begin niche tracking and publishing.</p>
               <button class="btn btn-primary" onclick="pagesView.openAddModal()">+ Connect Your First Page</button>
@@ -156,13 +147,11 @@ window.pagesView = (function() {
       // Render Switcher Bar (Clean, no dots, plain text)
       const buttonsHtml = pagesList.map(p => {
         const isActive = p.id === selectedPageId;
-        const icon = getPageIcon(p.slug);
         return `
           <button class="workspace-tab-btn ${isActive ? 'active' : ''}" onclick="pagesView.selectPage(${p.id})" style="border-radius: 10px; box-shadow: none; padding: 0.6rem 0.95rem;">
-            <span class="channel-avatar-small">${icon}</span>
             <div style="text-align: left;">
               <div style="font-weight: ${isActive ? '600' : '500'}; font-size: 0.85rem; line-height: 1.2; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-primary)'};">
-                ${p.name}
+                ${escapeHtml(p.name)}
               </div>
               <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">
                 ${p.handle || '@' + p.slug} · Quota: ${p.today_published_count || 0}/${p.daily_quota || 3}
@@ -172,8 +161,7 @@ window.pagesView = (function() {
         `;
       }).join('') + `
         <button class="workspace-tab-btn" style="border-style: dashed; color: var(--accent-primary); background: transparent; border-radius: 10px; box-shadow: none;" onclick="pagesView.openAddModal()">
-          <span>➕</span>
-          <span>Connect Page</span>
+          <span>+ Connect Page</span>
         </button>
       `;
 
@@ -215,7 +203,6 @@ window.pagesView = (function() {
     if (!contentArea || !currentWorkspaceData) return;
 
     const { page, sources, stockReels, publishedPosts, stats, cadence, recentRuns } = currentWorkspaceData;
-    const pageIcon = getPageIcon(page.slug);
 
     // Format next scan display
     let nextScanText = 'Every 3 Hours';
@@ -237,31 +224,28 @@ window.pagesView = (function() {
     }
 
     contentArea.innerHTML = `
-      <!-- 1. Header Card (Minimalist: Icon, Page Name, @handle link, and one muted meta line. No chips.) -->
+      <!-- 1. Header Card (Minimalist: Page Name, @handle link, and one muted meta line) -->
       <div class="workspace-hero-card">
         <div class="flex items-center justify-between" style="flex-wrap: wrap; gap: 1.25rem;">
           <div class="flex items-center gap-3.5">
-            <div class="channel-avatar-badge">
-              ${pageIcon}
-            </div>
             <div>
               <div class="flex items-center gap-2.5" style="flex-wrap: wrap;">
                 <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary);">
-                  ${page.name}
+                  ${escapeHtml(page.name)}
                 </h3>
                 <a href="https://instagram.com/${page.handle ? page.handle.replace('@', '') : ''}" target="_blank" style="color: var(--accent-primary); text-decoration: none; font-size: 0.85rem; font-weight: 500; font-family: var(--font-mono);">
                   ${page.handle || '@' + page.slug} ↗
                 </a>
               </div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.4;">
-                slug: ${page.slug} · ${page.post_mode === 'auto' ? 'Autonomous Publishing' : 'Review & Approval'} · Meta Graph API v21.0: <span style="color: ${page.has_valid_token ? 'var(--success)' : 'var(--danger)'}; font-weight: 500;">${page.has_valid_token ? 'Operational' : 'Token Required'}</span>
+                slug: ${page.slug} · ${page.post_mode === 'auto' ? 'Autonomous Publishing' : 'Review & Approval'} · Meta Graph API v21.0: <span class="status-text ${page.has_valid_token ? 'status-text-success' : 'status-text-danger'}">${page.has_valid_token ? 'Operational' : 'Token Required'}</span>
               </div>
             </div>
           </div>
 
           <div class="flex items-center gap-2" style="flex-wrap: wrap;">
             <button class="btn btn-secondary btn-sm" onclick="app.navigate('watchtower'); watchtowerView.selectPage(${page.id});" title="Open full visual pipeline stepper for this page">
-              ⚡ View Pipeline
+              View Pipeline
             </button>
             <button class="btn btn-primary btn-sm" onclick="pagesView.triggerPageScan(${page.id})" title="Initiate 3-hour intelligence cycle now for this page">
               Execute 3h Cycle Now
@@ -273,7 +257,7 @@ window.pagesView = (function() {
               Settings
             </button>
             <button class="btn btn-secondary btn-sm" onclick="pagesView.deletePage(${page.id})" title="Delete this page" style="color: var(--danger); border-color: var(--border-card);">
-              🗑️
+              Delete
             </button>
           </div>
         </div>
@@ -342,19 +326,19 @@ window.pagesView = (function() {
       <!-- 3. Sub-Tabs Navigation Bar (Clean: counts as plain muted text, orange underline on active tab) -->
       <div class="workspace-subtabs-nav">
         <div class="workspace-subtab-item ${activeSubtab === 'sources' ? 'active' : ''}" onclick="pagesView.selectSubtab('sources')">
-          <span>🎯 Monitored Competitors</span>
+          <span>Monitored Competitors</span>
           <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 400;">(${stats.sourcesCount})</span>
         </div>
         <div class="workspace-subtab-item ${activeSubtab === 'stock' ? 'active' : ''}" onclick="pagesView.selectSubtab('stock')">
-          <span>📦 Curated Content Reservoir</span>
+          <span>Curated Content Reservoir</span>
           <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 400;">(${stats.stockCount})</span>
         </div>
         <div class="workspace-subtab-item ${activeSubtab === 'published' ? 'active' : ''}" onclick="pagesView.selectSubtab('published')">
-          <span>🚀 Dispatch History & Live Feed</span>
+          <span>Dispatch History & Live Feed</span>
           <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 400;">(${stats.publishedCount})</span>
         </div>
         <div class="workspace-subtab-item ${activeSubtab === 'audit' ? 'active' : ''}" onclick="pagesView.selectSubtab('audit')">
-          <span>⏱️ Chronos Surveillance Audit</span>
+          <span>Chronos Surveillance Audit</span>
           <span style="color: var(--text-muted); font-size: 0.8rem; font-weight: 400;">(${recentRuns?.length || 0})</span>
         </div>
       </div>
@@ -388,8 +372,7 @@ window.pagesView = (function() {
   function renderSourcesTab(page, sources) {
     const listHtml = sources.length === 0 ? `
       <div class="card" style="padding: 3rem; text-align: center; background: var(--bg-card); width: 100%; border-radius: 10px; box-shadow: none;">
-        <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎯</div>
-        <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Competitor Accounts Monitored for ${page.name}</div>
+        <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Competitor Accounts Monitored for ${escapeHtml(page.name)}</div>
         <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">Add 2 to 5 high-performing creator accounts in this niche to begin autonomous 3-hour intelligence surveillance.</p>
       </div>
     ` : `
@@ -418,7 +401,7 @@ window.pagesView = (function() {
                     </div>
                   </td>
                   <td>
-                    <span style="color: ${isHealthy ? 'var(--success)' : 'var(--warning)'}; font-weight: 500; font-size: 0.82rem;">
+                    <span class="status-text ${isHealthy ? 'status-text-success' : 'status-text-warning'}">
                       ${isHealthy ? 'Operational' : 'Attention (' + (s.consecutive_failures || 1) + ')'}
                     </span>
                   </td>
@@ -455,7 +438,7 @@ window.pagesView = (function() {
           <div class="flex gap-2" style="width: 100%;">
             <input type="text" id="pw-new-competitor" class="form-input" placeholder="Enter competitor Instagram handle or URL e.g. @rockstargames" style="font-family: var(--font-mono); font-size: 0.85rem; flex: 1; border-radius: 8px;">
             <button class="btn btn-primary" onclick="pagesView.addCompetitor(${page.id})" style="white-space: nowrap;">
-              + Track Competitor Account
+              Track Competitor Account
             </button>
           </div>
         </div>
@@ -473,8 +456,7 @@ window.pagesView = (function() {
     if (stockReels.length === 0) {
       return `
         <div class="card" style="padding: 3rem; text-align: center; background: var(--bg-card); width: 100%; border-radius: 10px; box-shadow: none;">
-          <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📦</div>
-          <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Curated Reservoir Empty for ${page.name}</div>
+          <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Curated Reservoir Empty for ${escapeHtml(page.name)}</div>
           <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">
             Watchtower automatically discovers viral reels from your monitored competitor accounts every 3 hours.
           </p>
@@ -510,7 +492,7 @@ window.pagesView = (function() {
               </div>
 
               <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-                ❤️ ${(r.like_count || 0).toLocaleString()} · 💬 ${(r.comment_count || 0).toLocaleString()} · 👁️ ${(r.view_count || 0).toLocaleString()}
+                Likes: ${(r.like_count || 0).toLocaleString()} · Comments: ${(r.comment_count || 0).toLocaleString()} · Views: ${(r.view_count || 0).toLocaleString()}
               </div>
             </div>
 
@@ -532,8 +514,7 @@ window.pagesView = (function() {
     if (publishedPosts.length === 0) {
       return `
         <div class="card" style="padding: 3rem; text-align: center; background: var(--bg-card); width: 100%; border-radius: 10px; box-shadow: none;">
-          <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🚀</div>
-          <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Dispatches Published Yet to ${page.name}</div>
+          <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Dispatches Published Yet to ${escapeHtml(page.name)}</div>
           <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
             Reels dispatched through Telegram Bot (Agent 1) or Watchtower (Agent 2) will appear here with live Instagram permalinks.
           </p>
@@ -570,11 +551,11 @@ window.pagesView = (function() {
                 </td>
                 <td style="text-align: right;">
                   ${j.permalink ? `
-                    <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none;">
+                    <a href="${j.permalink}" target="_blank" class="text-link" style="font-size: 0.8rem;">
                       View on Instagram ↗
                     </a>
                   ` : `
-                    <span style="color: var(--success); font-size: 0.8rem; font-weight: 500;">Live on Feed</span>
+                    <span class="status-text status-text-success" style="font-size: 0.8rem;">Live on Feed</span>
                   `}
                 </td>
               </tr>
@@ -592,7 +573,6 @@ window.pagesView = (function() {
     if (!recentRuns || recentRuns.length === 0) {
       return `
         <div class="card" style="padding: 3rem; text-align: center; background: var(--bg-card); width: 100%; border-radius: 10px; box-shadow: none;">
-          <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">⏱️</div>
           <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Surveillance Cycles Logged Yet</div>
           <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">
             Watchtower runs every 3 hours with human anti-detection jitter. You can trigger an on-demand cycle below.
@@ -630,7 +610,7 @@ window.pagesView = (function() {
                   +${run.new_posts} new reels
                 </td>
                 <td style="text-align: right;">
-                  <span style="color: ${run.errors && run.errors !== '[]' ? 'var(--warning)' : 'var(--success)'}; font-size: 0.8rem; font-weight: 500;">
+                  <span class="status-text ${run.errors && run.errors !== '[]' ? 'status-text-warning' : 'status-text-success'}" style="font-size: 0.8rem;">
                     ${run.errors && run.errors !== '[]' ? 'Completed w/ Warnings' : 'Operational'}
                   </span>
                 </td>
@@ -648,7 +628,7 @@ window.pagesView = (function() {
   }
 
   async function triggerPageScan(pageId) {
-    app.toast('⚡ Initiating 3-hour surveillance cycle for this page...', 'info');
+    app.toast('Initiating 3-hour surveillance cycle for this page...', 'info');
     try {
       const res = await fetch(`/api/pages/${pageId}/scan`, { method: 'POST' });
       const data = await res.json();
@@ -722,7 +702,7 @@ window.pagesView = (function() {
       const data = await res.json();
 
       if (data.success) {
-        app.toast('🚀 Reel queued and dispatched to publishing pipeline!', 'success');
+        app.toast('Reel queued and dispatched to publishing pipeline!', 'success');
         await loadPageWorkspace(selectedPageId);
       } else {
         app.toast(data.error || 'Failed to dispatch reel', 'error');
@@ -739,9 +719,9 @@ window.pagesView = (function() {
       const data = await res.json();
 
       if (data.valid) {
-        app.toast(`✅ Meta API Valid! Connected to @${data.username} (${data.accountType || 'BUSINESS'})`, 'success');
+        app.toast(`Meta API Valid! Connected to @${data.username} (${data.accountType || 'BUSINESS'})`, 'success');
       } else {
-        app.toast(`❌ Connection Test Failed: ${data.error || 'Invalid API Token'}`, 'error');
+        app.toast(`Connection Test Failed: ${data.error || 'Invalid API Token'}`, 'error');
       }
     } catch (err) {
       app.toast('Test error: ' + err.message, 'error');
