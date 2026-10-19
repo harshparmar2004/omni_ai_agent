@@ -134,15 +134,25 @@ class JobWorkerPool {
     console.log(`[Job Worker] Source: ${job.source_url}`);
     console.log(`======================================================\n`);
 
-    const tgHeader = `🎬 <b>Reposting to ${page.handle}</b>`;
+    const shortcode = job.shortcode || 'reel';
+    const renderStepperMsg = (stepNum, statusLine, subDetail = '') => [
+      `🎬 <b>REPOST PIPELINE: ${page.handle}</b>`,
+      `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+      `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
+      ``,
+      `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
+      ``,
+      `▶ <b>1. Ingestion:</b> ✅ Received`,
+      `▶ <b>2. Download:</b> ${stepNum > 2 ? '✅ 1080p Media Ready' : (stepNum === 2 ? '⏳ Fetching 1080p MP4...' : '⚪ Waiting')}`,
+      `▶ <b>3. AI Copy:</b> ${stepNum > 3 ? '✅ Hook + Attribution + Tags Ready' : (stepNum === 3 ? '⏳ Crafting viral caption with AI...' : '⚪ Waiting')}`,
+      `▶ <b>4. Meta Live:</b> ${stepNum === 4 ? (subDetail || '⏳ Uploading container to Instagram...') : '⚪ Waiting'}`,
+      statusLine ? `\n<i>Status: ${statusLine}</i>` : ''
+    ].filter(Boolean);
 
     try {
       // ── Step 1: Download Media ──────────────────────────────
       job = updateJobProgress(jobId, 'downloading', 'download_starting');
-      await this.updateTelegramProgress(job, [
-        tgHeader,
-        `⏳ <b>Downloading 1080p media...</b>`
-      ]);
+      await this.updateTelegramProgress(job, renderStepperMsg(2, 'Downloading high-definition video...'));
 
       let mediaPaths = [];
       let rawCaption = job.caption || '';
@@ -171,11 +181,7 @@ class JobWorkerPool {
         });
       }
 
-      await this.updateTelegramProgress(job, [
-        tgHeader,
-        `✅ <b>Media downloaded</b> (1080p ${mediaType.toUpperCase()})`,
-        `⏳ <b>Generating viral caption with AI...</b>`
-      ]);
+      await this.updateTelegramProgress(job, renderStepperMsg(3, `1080p ${mediaType.toUpperCase()} downloaded. Generating caption...`));
 
       // ── Step 2: Build Caption ───────────────────────────────
       job = updateJobProgress(jobId, 'ready', 'caption_building');
@@ -187,21 +193,14 @@ class JobWorkerPool {
 
       // ── Step 3: Meta Graph API Publishing ────────────────────
       job = updateJobProgress(jobId, 'publishing', 'meta_upload');
-      await this.updateTelegramProgress(job, [
-        tgHeader,
-        `✅ <b>Media downloaded</b> (${mediaType.toUpperCase()})`,
-        `✅ <b>AI Caption & Attribution ready</b>`,
-        `⏳ <b>Uploading to Meta Graph API v21.0...</b>`
-      ]);
+      await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading media container to Meta Graph API v21.0...', '⏳ Initializing container upload...'));
 
       const onProgress = (step, current, total) => {
         if (step === 'polling') {
-          this.updateTelegramProgress(job, [
-            tgHeader,
-            `✅ <b>Media downloaded</b>`,
-            `✅ <b>AI Caption generated</b>`,
-            `⏳ <b>Meta transcoding & processing...</b> (attempt ${current}/${total})`
-          ]).catch(() => {});
+          this.updateTelegramProgress(
+            job,
+            renderStepperMsg(4, 'Processing media container...', `⏳ Transcoding & verifying container (${current}/${total})...`)
+          ).catch(() => {});
         }
       };
 
@@ -252,9 +251,17 @@ class JobWorkerPool {
 
       // Telegram success announcement with clickable live link, creator attribution, and full caption
       const successLines = [
-        `🎉 <b>Reel Successfully Published to ${page.handle}!</b>`,
+        `🎉 <b>REPOST PIPELINE: LIVE ON INSTAGRAM!</b>`,
+        `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+        `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
-        `🌐 <b>Live Instagram Link:</b>`,
+        `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
+        `✅ <b>1. Ingested via Telegram</b>`,
+        `✅ <b>2. Downloaded 1080p MP4</b>`,
+        `✅ <b>3. AI Caption & Attribution Ready</b>`,
+        `✅ <b>4. Published Live via Meta Graph API v21.0</b>`,
+        ``,
+        `🌐 <b>Live Instagram Reel:</b>`,
         `👉 <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
         ``
       ];

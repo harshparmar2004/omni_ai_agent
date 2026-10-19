@@ -345,8 +345,18 @@ async function handleCallbackQuery(cb) {
     await notifier.editTelegramMessage(
       chatId,
       messageId,
-      `🎬 <b>Reposting to ${page.handle}</b>\n` +
-      `⏳ <b>Initializing pipeline...</b>`
+      [
+        `🎬 <b>REPOST PIPELINE: ${page.handle}</b>`,
+        `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+        `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
+        ``,
+        `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
+        ``,
+        `▶ <b>1. Ingestion:</b> ✅ Received from Telegram`,
+        `▶ <b>2. Download:</b> ⏳ Initializing 1080p fetch...`,
+        `▶ <b>3. AI Copy:</b> ⚪ Waiting`,
+        `▶ <b>4. Meta Live:</b> ⚪ Waiting`
+      ].join('\n')
     );
 
     try {

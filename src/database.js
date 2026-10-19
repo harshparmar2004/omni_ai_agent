@@ -730,6 +730,51 @@ function getPipelineSummary(pageId = null) {
   };
 }
 
+function getReposterPipelineSummary(pageId = null) {
+  const pId = pageId ? parseInt(pageId, 10) : null;
+  const db = getDb();
+
+  const params = ['reposter'];
+  let pageClause = '';
+  if (pId) {
+    pageClause = ' AND page_id = ?';
+    params.push(pId);
+  }
+
+  const rows = db.prepare(`
+    SELECT status, count(*) as c FROM publish_jobs
+    WHERE agent = ? ${pageClause}
+    GROUP BY status
+  `).all(...params);
+
+  const counts = {
+    pending_review: 0,
+    queued: 0,
+    downloading: 0,
+    ready: 0,
+    publishing: 0,
+    published: 0,
+    failed: 0
+  };
+
+  let totalIngested = 0;
+  for (const r of rows) {
+    if (counts[r.status] !== undefined) {
+      counts[r.status] = r.c;
+    }
+    totalIngested += r.c;
+  }
+
+  return {
+    pageId: pId,
+    ingested: totalIngested,
+    downloading: counts.queued + counts.downloading,
+    ready: counts.ready + counts.publishing + counts.pending_review,
+    published: counts.published,
+    failed: counts.failed
+  };
+}
+
 module.exports = {
   getDb,
   // Settings
@@ -774,5 +819,6 @@ module.exports = {
   getTrackedChannels,
   getBrandAssets,
   // Pipeline
-  getPipelineSummary
+  getPipelineSummary,
+  getReposterPipelineSummary
 };

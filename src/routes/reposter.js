@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const { submitLink } = require('../agents/reposter/reposterAgent');
 const { listJobs } = require('../core/jobQueue');
+const { getReposterPipelineSummary } = require('../database');
+
+/**
+ * GET /api/reposter/pipeline-summary
+ * Summary counts across the 4 publishing pipeline stages
+ */
+router.get('/pipeline-summary', (req, res) => {
+  try {
+    const pageId = req.query.pageId ? parseInt(req.query.pageId, 10) : null;
+    const summary = getReposterPipelineSummary(pageId);
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * POST /api/reposter/jobs
@@ -33,7 +48,11 @@ router.post('/jobs', async (req, res) => {
  */
 router.get('/jobs', (req, res) => {
   try {
-    const jobs = listJobs({ agent: 'reposter', limit: 50 });
+    const filter = { agent: 'reposter', limit: 50 };
+    if (req.query.pageId) {
+      filter.pageId = parseInt(req.query.pageId, 10);
+    }
+    const jobs = listJobs(filter);
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ error: err.message });
