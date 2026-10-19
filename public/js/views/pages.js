@@ -260,6 +260,9 @@ window.pagesView = (function() {
           </div>
 
           <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="app.navigate('watchtower'); watchtowerView.selectPage(${page.id});" title="Open full visual pipeline stepper for this page">
+              ⚡ View Pipeline
+            </button>
             <button class="btn btn-primary btn-sm" onclick="pagesView.triggerPageScan(${page.id})" title="Initiate 3-hour intelligence cycle now for this page">
               Execute 3h Cycle Now
             </button>

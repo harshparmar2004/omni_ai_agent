@@ -1412,6 +1412,206 @@ table.data-table tr:hover td {
   box-shadow: none;
 }
 
+/* ==========================================================================
+   OmniStudio v7 — Unified Visual Pipeline Stepper & Stages Deck
+   ========================================================================== */
+
+.pipeline-page-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.pipeline-page-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-card);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.pipeline-page-pill:hover {
+  border-color: var(--accent-border);
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.pipeline-page-pill.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.pipeline-stepper-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: none;
+}
+
+.pipeline-stepper-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.85rem;
+}
+
+.pipeline-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+}
+
+.pipeline-step-node {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 9px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex: 1;
+  min-width: 125px;
+  user-select: none;
+}
+
+.pipeline-step-node:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-border);
+}
+
+.pipeline-step-node.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.pipeline-step-node.has-review:not(.active) {
+  border-color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.pipeline-step-node.has-failed:not(.active) {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.pipeline-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pipeline-step-node.active .pipeline-step-num {
+  background: var(--accent-primary);
+  color: #FFFFFF;
+}
+
+.pipeline-step-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.pipeline-step-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.pipeline-step-node.active .pipeline-step-label {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.pipeline-step-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.pipeline-step-node.active .pipeline-step-count {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.pipeline-step-arrow {
+  color: var(--border-subtle);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  user-select: none;
+  padding: 0 1px;
+}
+
+.pipeline-deck-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pipeline-stage-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.review-reel-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-left: 4px solid var(--warning);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+
+.inflight-job-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-left: 4px solid var(--accent-primary);
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+
 
 
 

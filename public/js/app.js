@@ -13,8 +13,8 @@ window.app = (function() {
   const TAB_TITLES = {
     'command-center': 'Command Center',
     'reposter': 'Agent 1: Reposter',
-    'watchtower': 'Agent 2: Watchtower',
-    'queue': 'Review & Queue',
+    'watchtower': 'Agent 2: Watchtower & Pipeline Engine',
+    'queue': 'Review & Staged Reels',
     'published': 'Published Feed',
     'pages': 'Channel Command Hub',
     'settings': 'System & Security'

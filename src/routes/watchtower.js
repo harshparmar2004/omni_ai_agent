@@ -1,8 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const scheduler = require('../agents/watchtower/scheduler');
-const { setSetting, listAgentRuns } = require('../database');
+const { setSetting, listAgentRuns, getPipelineSummary } = require('../database');
 const notifier = require('../core/notifier');
+
+/**
+ * GET /api/watchtower/pipeline-summary
+ * Aggregated reel counts across all 7 stages
+ */
+router.get('/pipeline-summary', (req, res) => {
+  try {
+    const pageId = req.query.pageId ? parseInt(req.query.pageId, 10) : null;
+    const summary = getPipelineSummary(pageId);
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /**
  * GET /api/watchtower/status

@@ -644,6 +644,92 @@ function getBrandAssets() {
   return { brand_handle: getSetting('instagram_handle', '@gta6_updates_007') };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Unified Pipeline Aggregation
+// ─────────────────────────────────────────────────────────────
+
+function getPipelineSummary(pageId = null) {
+  const pId = pageId ? parseInt(pageId, 10) : null;
+  const db = getDb();
+
+  // 1. Sources count
+  let sourcesSql = 'SELECT count(*) as c FROM source_accounts WHERE is_active = 1';
+  const sourcesParams = [];
+  if (pId) {
+    sourcesSql += ' AND page_id = ?';
+    sourcesParams.push(pId);
+  }
+  const sourcesCount = db.prepare(sourcesSql).get(...sourcesParams)?.c || 0;
+
+  // 2. Discovered (raw)
+  let discSql = `
+    SELECT count(*) as c FROM discovered_posts d
+    LEFT JOIN source_accounts s ON d.source_account_id = s.id
+    WHERE d.status IN ('new', 'discovered')
+  `;
+  const discParams = [];
+  if (pId) {
+    discSql += ' AND s.page_id = ?';
+    discParams.push(pId);
+  }
+  const discoveredCount = db.prepare(discSql).get(...discParams)?.c || 0;
+
+  // 3. AI Ranked (score >= 70, not skipped or published)
+  let rankedSql = `
+    SELECT count(*) as c FROM discovered_posts d
+    LEFT JOIN source_accounts s ON d.source_account_id = s.id
+    WHERE d.score >= 70 AND d.status NOT IN ('published', 'skipped')
+  `;
+  const rankedParams = [];
+  if (pId) {
+    rankedSql += ' AND s.page_id = ?';
+    rankedParams.push(pId);
+  }
+  const rankedCount = db.prepare(rankedSql).get(...rankedParams)?.c || 0;
+
+  // 4. Jobs by status
+  const jobParams = [];
+  let pageJobClause = '';
+  if (pId) {
+    pageJobClause = ' WHERE page_id = ?';
+    jobParams.push(pId);
+  }
+
+  const jobRows = db.prepare(`
+    SELECT status, count(*) as c FROM publish_jobs
+    ${pageJobClause}
+    GROUP BY status
+  `).all(...jobParams);
+
+  const jobCounts = {
+    pending_review: 0,
+    queued: 0,
+    downloading: 0,
+    ready: 0,
+    publishing: 0,
+    published: 0,
+    failed: 0
+  };
+  for (const r of jobRows) {
+    if (jobCounts[r.status] !== undefined) {
+      jobCounts[r.status] = r.c;
+    }
+  }
+
+  const activeCount = jobCounts.queued + jobCounts.downloading + jobCounts.ready + jobCounts.publishing;
+
+  return {
+    pageId: pId,
+    sources: sourcesCount,
+    discovered: discoveredCount,
+    ranked: rankedCount,
+    review: jobCounts.pending_review,
+    active: activeCount,
+    published: jobCounts.published,
+    failed: jobCounts.failed
+  };
+}
+
 module.exports = {
   getDb,
   // Settings
@@ -686,5 +772,7 @@ module.exports = {
   getConnectedPages,
   getConnectedPageBySlug,
   getTrackedChannels,
-  getBrandAssets
+  getBrandAssets,
+  // Pipeline
+  getPipelineSummary
 };
