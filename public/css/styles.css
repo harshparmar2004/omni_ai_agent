@@ -1360,60 +1360,62 @@ table.data-table tr:hover td {
 
 .workspace-metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.15rem;
   width: 100%;
 }
 
 .workspace-metric-card {
   background: var(--bg-card);
   border: 1px solid var(--border-card);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-  box-shadow: none;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.95rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: border-color var(--transition-fast);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color var(--transition-fast);
 }
 
 .workspace-metric-card:hover {
   border-color: var(--border-hover);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .workspace-metric-label {
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .workspace-metric-val {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 1.35rem;
+  font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.2;
-  margin-bottom: 0.25rem;
+  line-height: 1.15;
+  margin-bottom: 0.2rem;
   font-family: inherit;
 }
 
 .workspace-metric-sub {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
-  line-height: 1.4;
-  margin-top: 0.25rem;
+  line-height: 1.3;
+  margin-top: 0.2rem;
 }
 
 .workspace-metric-progress-bar {
   background: var(--bg-elevated);
-  height: 4px;
+  height: 3.5px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  margin-top: 0.5rem;
-  margin-bottom: 0.35rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.25rem;
 }
 
 .workspace-metric-progress-fill {

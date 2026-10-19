@@ -272,15 +272,15 @@ window.pagesView = (function() {
         </div>
       </div>
 
-      <!-- 2. 4 Stat Cards Grid (Minimalist: label, big number, one short muted sub-line, progress bar on first card only. No pill badges.) -->
+      <!-- 2. 4 Stat Cards Grid (Compact, soft elevated shadow, sleek 2px border) -->
       <div class="workspace-metrics-grid">
         
         <!-- Card 1: Daily Publication Pipeline (Orange top border) -->
-        <div class="workspace-metric-card" style="border-top: 3px solid var(--accent-primary);">
+        <div class="workspace-metric-card" style="border-top: 2px solid var(--accent-primary);">
           <div>
             <div class="workspace-metric-label">Daily Publication Pipeline</div>
             <div class="workspace-metric-val">
-              ${stats.todayCount} <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">/ ${stats.quotaMax} Reels</span>
+              ${stats.todayCount} <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">/ ${stats.quotaMax} Reels</span>
             </div>
             <div class="workspace-metric-progress-bar">
               <div class="workspace-metric-progress-fill" style="width: ${stats.quotaPct}%;"></div>
@@ -292,11 +292,11 @@ window.pagesView = (function() {
         </div>
 
         <!-- Card 2: Competitive Surveillance (Green top border) -->
-        <div class="workspace-metric-card" style="border-top: 3px solid var(--agent-reposter);">
+        <div class="workspace-metric-card" style="border-top: 2px solid var(--agent-reposter);">
           <div>
             <div class="workspace-metric-label">Competitive Surveillance</div>
             <div class="workspace-metric-val">
-              ${stats.sourcesCount} <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">Creators</span>
+              ${stats.sourcesCount} <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">Creators</span>
             </div>
           </div>
           <div class="workspace-metric-sub">
@@ -305,11 +305,11 @@ window.pagesView = (function() {
         </div>
 
         <!-- Card 3: Curated Content Reservoir (Blue top border) -->
-        <div class="workspace-metric-card" style="border-top: 3px solid var(--agent-watchtower);">
+        <div class="workspace-metric-card" style="border-top: 2px solid var(--agent-watchtower);">
           <div>
             <div class="workspace-metric-label">Curated Content Reservoir</div>
             <div class="workspace-metric-val">
-              ${stats.stockCount} <span style="font-size: 0.9rem; font-weight: 400; color: var(--text-muted);">Reels</span>
+              ${stats.stockCount} <span style="font-size: 0.8rem; font-weight: 400; color: var(--text-muted);">Reels</span>
             </div>
           </div>
           <div class="workspace-metric-sub">
@@ -318,7 +318,7 @@ window.pagesView = (function() {
         </div>
 
         <!-- Card 4: Surveillance Cadence (Indigo top border) -->
-        <div class="workspace-metric-card" style="border-top: 3px solid #6366F1;">
+        <div class="workspace-metric-card" style="border-top: 2px solid #6366F1;">
           <div>
             <div class="workspace-metric-label">Surveillance Cadence</div>
             <div class="workspace-metric-val" style="color: #6366F1;">
