@@ -605,14 +605,65 @@ function listPublishJobs(options = {}) {
   if (options.hasMedia) {
     sql += " AND j.media_paths IS NOT NULL AND j.media_paths != '[]' AND j.media_paths != ''";
   }
+  if (options.search) {
+    sql += ' AND (j.caption LIKE ? OR j.shortcode LIKE ? OR j.permalink LIKE ? OR j.source_url LIKE ? OR p.handle LIKE ? OR p.slug LIKE ? OR j.ig_media_id LIKE ?)';
+    const sTerm = `%${options.search}%`;
+    params.push(sTerm, sTerm, sTerm, sTerm, sTerm, sTerm, sTerm);
+  }
 
   sql += ' ORDER BY j.id DESC';
   if (options.limit) {
     sql += ' LIMIT ?';
     params.push(options.limit);
+    if (options.offset) {
+      sql += ' OFFSET ?';
+      params.push(options.offset);
+    }
   }
 
   return getDb().prepare(sql).all(...params);
+}
+
+function countPublishJobs(options = {}) {
+  let sql = `
+    SELECT count(*) as c
+    FROM publish_jobs j
+    LEFT JOIN pages p ON j.page_id = p.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (options.status) {
+    if (Array.isArray(options.status)) {
+      sql += ` AND j.status IN (${options.status.map(() => '?').join(',')})`;
+      params.push(...options.status);
+    } else {
+      sql += ' AND j.status = ?';
+      params.push(options.status);
+    }
+  }
+  if (options.pageId) {
+    sql += ' AND j.page_id = ?';
+    params.push(options.pageId);
+  }
+  if (options.agent) {
+    sql += ' AND j.agent = ?';
+    params.push(options.agent);
+  }
+  if (options.telegramOnly) {
+    sql += " AND j.telegram_chat_id IS NOT NULL AND j.telegram_chat_id != ''";
+  }
+  if (options.hasMedia) {
+    sql += " AND j.media_paths IS NOT NULL AND j.media_paths != '[]' AND j.media_paths != ''";
+  }
+  if (options.search) {
+    sql += ' AND (j.caption LIKE ? OR j.shortcode LIKE ? OR j.permalink LIKE ? OR j.source_url LIKE ? OR p.handle LIKE ? OR p.slug LIKE ? OR j.ig_media_id LIKE ?)';
+    const sTerm = `%${options.search}%`;
+    params.push(sTerm, sTerm, sTerm, sTerm, sTerm, sTerm, sTerm);
+  }
+
+  const row = getDb().prepare(sql).get(...params);
+  return row ? row.c : 0;
 }
 
 // Count jobs published for a page today
@@ -636,33 +687,73 @@ function getLastPublishedTimestamp(pageId) {
   return row ? row.published_at : null;
 }
 
-// Global Publishing Statistics across all channels & agents (for Command Center)
-function getGlobalPublishingStats() {
+// Global & Page-specific Publishing Statistics across channels & agents
+function getGlobalPublishingStats(filterPageId = null) {
   const db = getDb();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayIso = todayStart.toISOString();
+  const pId = filterPageId ? parseInt(filterPageId, 10) : null;
 
-  // 1. Overall counts
-  const publishedToday = db.prepare(`
-    SELECT count(*) as c FROM publish_jobs
-    WHERE status = 'published' AND published_at >= ?
-  `).get(todayIso)?.c || 0;
+  // 1. Overall counts (respecting filterPageId if provided)
+  const pubTodaySql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND published_at >= ? AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND published_at >= ?`;
+  const publishedToday = (pId
+    ? db.prepare(pubTodaySql).get(todayIso, pId)
+    : db.prepare(pubTodaySql).get(todayIso))?.c || 0;
 
-  const publishedAllTime = db.prepare(`
-    SELECT count(*) as c FROM publish_jobs
-    WHERE status = 'published'
-  `).get()?.c || 0;
+  const pubAllTimeSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status = 'published'`;
+  const publishedAllTime = (pId
+    ? db.prepare(pubAllTimeSql).get(pId)
+    : db.prepare(pubAllTimeSql).get())?.c || 0;
 
-  const activeInFlight = db.prepare(`
-    SELECT count(*) as c FROM publish_jobs
-    WHERE status IN ('queued', 'downloading', 'ready', 'publishing')
-  `).get()?.c || 0;
+  const inFlightSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status IN ('queued', 'downloading', 'ready', 'publishing') AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status IN ('queued', 'downloading', 'ready', 'publishing')`;
+  const activeInFlight = (pId
+    ? db.prepare(inFlightSql).get(pId)
+    : db.prepare(inFlightSql).get())?.c || 0;
 
-  const failedCount = db.prepare(`
-    SELECT count(*) as c FROM publish_jobs
-    WHERE status = 'failed'
-  `).get()?.c || 0;
+  const failedSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status = 'failed' AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status = 'failed'`;
+  const failedCount = (pId
+    ? db.prepare(failedSql).get(pId)
+    : db.prepare(failedSql).get())?.c || 0;
+
+  // Total all-time jobs processed in system
+  const totalJobsSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs`;
+  const totalJobs = (pId
+    ? db.prepare(totalJobsSql).get(pId)
+    : db.prepare(totalJobsSql).get())?.c || 0;
+
+  // Total scraped candidate reels from competitor tracking
+  const scrapedSql = pId
+    ? `SELECT count(*) as c FROM discovered_posts dp JOIN source_accounts sa ON dp.source_account_id = sa.id WHERE sa.page_id = ?`
+    : `SELECT count(*) as c FROM discovered_posts`;
+  const totalScraped = (pId
+    ? db.prepare(scrapedSql).get(pId)
+    : db.prepare(scrapedSql).get())?.c || 0;
+
+  // Published breakdown by agent
+  const pubReposterSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND agent = 'reposter' AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND agent = 'reposter'`;
+  const publishedReposter = (pId
+    ? db.prepare(pubReposterSql).get(pId)
+    : db.prepare(pubReposterSql).get())?.c || 0;
+
+  const pubWatchtowerSql = pId
+    ? `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND agent = 'watchtower' AND page_id = ?`
+    : `SELECT count(*) as c FROM publish_jobs WHERE status = 'published' AND agent = 'watchtower'`;
+  const publishedWatchtower = (pId
+    ? db.prepare(pubWatchtowerSql).get(pId)
+    : db.prepare(pubWatchtowerSql).get())?.c || 0;
 
   // 2. Breakdown by Origin
   const telegramCount = db.prepare(`
@@ -706,6 +797,12 @@ function getGlobalPublishingStats() {
   return {
     published_today: publishedToday,
     published_all_time: publishedAllTime,
+    published_combined: publishedAllTime,
+    published_reposter: publishedReposter,
+    published_watchtower: publishedWatchtower,
+    total_scraped: totalScraped,
+    live_on_instagram: publishedAllTime,
+    total_reels: totalJobs,
     active_in_flight: activeInFlight,
     failed_count: failedCount,
     origins: {
@@ -979,6 +1076,7 @@ module.exports = {
   createPublishJob,
   updatePublishJob,
   listPublishJobs,
+  countPublishJobs,
   getPublishedCountToday,
   getLastPublishedTimestamp,
   getPostsCountInWindow,

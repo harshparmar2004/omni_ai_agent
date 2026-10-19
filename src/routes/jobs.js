@@ -10,7 +10,11 @@ const {
   deleteJob,
   updateJobProgress
 } = require('../core/jobQueue');
-const { updatePublishJob, getGlobalPublishingStats } = require('../database');
+const {
+  updatePublishJob,
+  getGlobalPublishingStats,
+  countPublishJobs
+} = require('../database');
 
 /**
  * GET /api/jobs/overview
@@ -18,7 +22,8 @@ const { updatePublishJob, getGlobalPublishingStats } = require('../database');
  */
 router.get('/overview', (req, res) => {
   try {
-    const stats = getGlobalPublishingStats();
+    const pageId = req.query.pageId ? parseInt(req.query.pageId, 10) : null;
+    const stats = getGlobalPublishingStats(pageId);
     res.json(stats);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -27,11 +32,11 @@ router.get('/overview', (req, res) => {
 
 /**
  * GET /api/jobs
- * List jobs with optional filtering by status, pageId, agent
+ * List jobs with optional filtering by status, pageId, agent, offset, search
  */
 router.get('/', (req, res) => {
   try {
-    const { status, pageId, agent, limit, hasMedia, telegramOnly } = req.query;
+    const { status, pageId, agent, limit, offset, search, hasMedia, telegramOnly } = req.query;
     const filter = {};
     if (status) {
       filter.status = status.includes(',') ? status.split(',') : status;
@@ -39,10 +44,16 @@ router.get('/', (req, res) => {
     if (pageId) filter.pageId = parseInt(pageId, 10);
     if (agent) filter.agent = agent;
     if (limit) filter.limit = parseInt(limit, 10);
+    if (offset) filter.offset = parseInt(offset, 10);
+    if (search && search.trim()) filter.search = search.trim();
     if (hasMedia === 'true' || hasMedia === '1') filter.hasMedia = true;
     if (telegramOnly === 'true' || telegramOnly === '1') filter.telegramOnly = true;
 
+    const total = countPublishJobs(filter);
     const jobs = listJobs(filter);
+
+    res.setHeader('X-Total-Count', String(total));
+    res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ error: err.message });
