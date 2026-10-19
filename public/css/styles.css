@@ -1850,6 +1850,467 @@ table.data-table tr:hover td {
   border: 1px solid var(--border-subtle);
 }
 
+/* ==========================================================================
+   Page-Scoped Styles: Agent 1 Reposter Redesign
+   ========================================================================== */
+body[data-page="reposter"] .topbar-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+body[data-page="reposter"] .bridge-status-pill {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+body[data-page="reposter"] .bridge-status-pill .pulse-dot {
+  display: none !important;
+}
+
+body[data-page="reposter"] #agent-status-text {
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+}
+
+body[data-page="reposter"] .topbar .btn-primary {
+  height: 40px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  background-color: var(--accent-primary) !important;
+  border: 1px solid var(--accent-primary) !important;
+  padding: 0 16px !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+body[data-page="reposter"] .topbar .btn-primary svg {
+  display: none !important;
+}
+
+body[data-page="reposter"] .topbar .btn-primary::before {
+  content: "+ ";
+  font-weight: 600;
+}
+
+/* Container & Layout */
+.reposter-page-wrapper {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.reposter-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: stretch;
+}
+
+@media (max-width: 860px) {
+  .reposter-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Clean Cards */
+.reposter-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.reposter-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.reposter-card-sub {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Status Text (Plain, No Pill, No Background) */
+.reposter-status-ok {
+  color: #2D8A4E;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.reposter-status-warn {
+  color: #B45309;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.reposter-status-err {
+  color: #DC2626;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Left Card Details */
+.reposter-kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.reposter-kv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reposter-kv-label {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.reposter-kv-val {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.reposter-kv-val a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.reposter-kv-val a:hover {
+  text-decoration: underline;
+}
+
+.reposter-kv-val.mono {
+  font-family: monospace;
+  font-weight: 500;
+}
+
+.reposter-how-it-works {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.reposter-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.reposter-steps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reposter-steps-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.reposter-step-num {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 14px;
+}
+
+/* Right Card Form */
+.reposter-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.reposter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reposter-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.reposter-input {
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: #FFFFFF;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.reposter-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.2);
+}
+
+.reposter-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reposter-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.reposter-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+}
+
+.reposter-hint {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: 24px;
+}
+
+.reposter-inline-status {
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Buttons */
+.reposter-btn-primary {
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: background-color 0.15s;
+}
+
+.reposter-btn-primary:hover {
+  background-color: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+}
+
+.reposter-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reposter-btn-secondary {
+  height: 40px;
+  border-radius: 8px;
+  background-color: transparent;
+  border: 1px solid var(--border-card);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 16px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.reposter-btn-secondary:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-hover);
+}
+
+.reposter-btn-secondary.sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+/* Section 2: Recent Dispatches */
+.reposter-dispatches-card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: none;
+}
+
+.reposter-dispatches-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.reposter-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.reposter-table thead th {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 0 12px 12px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.reposter-table tbody tr {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reposter-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.reposter-table tbody td {
+  padding: 16px 12px;
+  vertical-align: middle;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.reposter-thumb-wrap {
+  width: 44px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1C1917;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+}
+
+.reposter-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.reposter-reel-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: monospace;
+}
+
+.reposter-reel-link:hover {
+  text-decoration: underline;
+}
+
+.reposter-text-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reposter-text-link:hover {
+  text-decoration: underline;
+}
+
+.reposter-text-action {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reposter-text-action:hover {
+  text-decoration: underline;
+}
+
+.reposter-empty-state {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-muted);
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+
 
 
 

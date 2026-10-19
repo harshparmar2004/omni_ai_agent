@@ -72,6 +72,7 @@ window.app = (function() {
   function navigate(tabId, updateHash = true) {
     if (!TAB_TITLES[tabId]) tabId = 'command-center';
     state.currentTab = tabId;
+    document.body.setAttribute('data-page', tabId);
 
     if (updateHash && window.location.hash !== `#${tabId}`) {
       window.location.hash = tabId;
