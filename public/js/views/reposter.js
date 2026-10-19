@@ -312,17 +312,17 @@ window.reposterView = (function() {
     const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
 
     container.innerHTML = `
-      <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: stretch;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.15rem; margin-bottom: 1.35rem; align-items: stretch;">
         
         <!-- Hero: Telegram Mobile Integration Hub Card -->
-        <div class="telegram-hero-card flex flex-col justify-between">
+        <div class="telegram-hero-card">
           <div>
-            <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
+            <div class="flex items-center justify-between mb-2" style="flex-wrap: wrap; gap: 0.5rem;">
               <div>
                 <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
                   Telegram Mobile Ingestion Hub
                 </h3>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">
                   Agent 1 Primary Pipeline · Zero-Click Mobile Reposting
                 </div>
               </div>
@@ -331,12 +331,12 @@ window.reposterView = (function() {
               </span>
             </div>
 
-            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.85rem;">
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.95rem;">
               Share any Instagram Reel link directly from your Instagram app to your OmniStudio Telegram bot. Agent 1 downloads 1080p MP4, generates AI attribution, and posts live.
             </p>
 
             <!-- 3-Column Dedicated Credentials Strip -->
-            <div class="tg-credentials-strip">
+            <div class="tg-credentials-strip" style="margin-bottom: 1rem;">
               <div class="tg-credential-item">
                 <span class="tg-credential-label">Telegram Bot</span>
                 <a href="https://t.me/omnistudio_bot" target="_blank" style="font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-primary); text-decoration: none;">
@@ -390,56 +390,25 @@ window.reposterView = (function() {
             </div>
           </div>
 
-          <!-- Animated Live Pipeline Stream Visualizer (Agent 1 Signal Radar) -->
-          <div class="tg-live-stream-box">
-            <div class="tg-stream-header">
-              <span class="tg-stream-tag">
-                Live Pipeline Signal Stream
-              </span>
-              <span class="ui-tag status-success">Active · 0ms</span>
-            </div>
-
-            <!-- Connected Stream Flow Track with Traveling Light Photons -->
-            <div class="tg-stream-track">
-              <div class="tg-stream-node active" title="Share directly from Instagram Mobile App">
-                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">IN</div>
-                <span class="tg-stream-node-label">Share</span>
-              </div>
-              <div class="tg-stream-wire"></div>
-              <div class="tg-stream-node active" title="OmniStudio Telegram Ingestion Gateway">
-                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">TG</div>
-                <span class="tg-stream-node-label">Bot Gate</span>
-              </div>
-              <div class="tg-stream-wire fast"></div>
-              <div class="tg-stream-node active" title="AI Attribution Engine & 1080p MP4 Synthesis">
-                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">AI</div>
-                <span class="tg-stream-node-label">AI Engine</span>
-              </div>
-              <div class="tg-stream-wire"></div>
-              <div class="tg-stream-node online" title="Published live to Instagram feed">
-                <div class="tg-stream-node-icon" style="font-size: 0.7rem; font-weight: 600;">OUT</div>
-                <span class="tg-stream-node-label">Live Reel</span>
-              </div>
-            </div>
-
-            <!-- Real-time Telemetry Status Strip -->
-            <div class="tg-telemetry-strip">
-              <span class="tg-telemetry-chip">1080p MP4 Auto-Sync</span>
-              <span class="tg-telemetry-chip">AI Attribution Ready</span>
-              <span class="tg-telemetry-chip">Chat 5443723531 Secured</span>
-            </div>
+          <!-- Bottom Telemetry Chips -->
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 1.15rem; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; gap: 0.5rem;">
+            <span>1080p MP4 Auto-Sync</span>
+            <span>·</span>
+            <span>AI Attribution Ready</span>
+            <span>·</span>
+            <span>Chat 5443723531 Secured</span>
           </div>
         </div>
 
         <!-- Direct Reel Quick-Post (On-Demand Dashboard Fallback) -->
-        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); border-top: 3px solid var(--accent-primary); display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="card" style="background: var(--bg-card); border-radius: var(--radius-sm); padding: 1.25rem 1.4rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04); border: 1px solid var(--border-card); border-top: 2px solid var(--accent-primary); display: flex; flex-direction: column; justify-content: space-between;">
           <div>
             <div class="flex items-center justify-between mb-3">
               <div>
                 <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
                   Direct Quick-Post
                 </h3>
-                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
                   Manual fallback to paste an Instagram Reel link and trigger Agent 1
                 </p>
               </div>
@@ -457,18 +426,18 @@ window.reposterView = (function() {
               </select>
             </div>
 
-            <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
+            <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
                 <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
                 <span>Review & edit AI caption before publishing live</span>
               </label>
-              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.6rem; line-height: 1.4;">
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; margin-left: 1.6rem; line-height: 1.35;">
                 If checked, job pauses in Stage 3 for review. If unchecked, it publishes automatically.
               </div>
             </div>
 
             <!-- Live Step Progress Box -->
-            <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
+            <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.85rem;">
               <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
                 <span class="spinner-sm"></span> Pipeline Executing...
               </div>
@@ -484,7 +453,7 @@ window.reposterView = (function() {
             </div>
           </div>
 
-          <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.65rem 1rem; font-size: 0.9rem; font-weight: 600;">
+          <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.6rem 1rem; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem;">
             Ingest & Dispatch Reel Live
           </button>
         </div>
