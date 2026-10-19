@@ -501,13 +501,13 @@ a:hover {
 }
 
 .card-agent-reposter {
-  border-left: 4px solid var(--agent-reposter);
-  background: linear-gradient(180deg, #F4FAF7 0%, #FFFFFF 100%);
+  border-top: 2px solid var(--agent-reposter);
+  background: var(--bg-card);
 }
 
 .card-agent-watchtower {
-  border-left: 4px solid var(--agent-watchtower);
-  background: linear-gradient(180deg, #F4F8FC 0%, #FFFFFF 100%);
+  border-top: 2px solid var(--agent-watchtower);
+  background: var(--bg-card);
 }
 
 /* Forms & Inputs */
@@ -2306,6 +2306,108 @@ table.data-table tr:hover td {
   padding: 2px 7px;
   border-radius: 4px;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Command Center Operations Cockpit & Overview Styles
+   ───────────────────────────────────────────────────────────── */
+
+.cc-header-deck {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.15rem;
+  flex-wrap: wrap;
+}
+
+.cc-pulse-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  flex-wrap: wrap;
+}
+
+.cc-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  display: inline-block;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+
+.cc-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.15rem;
+}
+
+.cc-agent-cockpit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  align-items: stretch;
+}
+
+.cc-cockpit-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 1.15rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cc-cockpit-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.cc-micro-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  padding: 0.65rem 0.85rem;
+  margin: 0.85rem 0 1rem 0;
+}
+
+.cc-micro-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cc-micro-stat-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.cc-micro-stat-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  line-height: 1.2;
+}
+
 
 
 
