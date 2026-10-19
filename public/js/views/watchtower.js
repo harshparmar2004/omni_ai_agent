@@ -5,7 +5,8 @@
  */
 window.watchtowerView = (function() {
   let selectedPageId = null; // null = 'all', or page id integer
-  let activeStage = 'review'; // 'sources' | 'discovered' | 'ranked' | 'review' | 'active' | 'published' | 'failed'
+  let activeStage = 'review'; // 'sources' | 'discovered' | 'ranked' | 'downloaded' | 'review' | 'active' | 'published' | 'failed'
+  let downloadedViewMode = 'table'; // 'table' (default) | 'grid'
   let cachedStatus = null;
   let pipelineSummary = {
     sources: 0,
@@ -698,8 +699,16 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 4: Downloaded Media Repository Deck
+  // STAGE 4: Downloaded Media Repository Deck (Table Default + Grid Toggle)
   // ─────────────────────────────────────────────────────────────
+  function setDownloadedViewMode(mode) {
+    downloadedViewMode = mode;
+    const container = document.getElementById('wt-stage-deck');
+    if (container && activeStage === 'downloaded') {
+      renderDownloadedStage(container);
+    }
+  }
+
   async function renderDownloadedStage(container) {
     try {
       let query = '?hasMedia=true&limit=60';
@@ -711,7 +720,7 @@ window.watchtowerView = (function() {
       const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
 
       container.innerHTML = `
-        <div class="pipeline-deck-header">
+        <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <div class="pipeline-stage-title">
               <span>📁 Stage 4: Downloaded Media Repository</span>
@@ -722,6 +731,15 @@ window.watchtowerView = (function() {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <!-- View Mode Switcher: Table View (Default) vs Grid Cards -->
+            <div class="view-mode-switcher">
+              <button class="view-mode-btn ${downloadedViewMode === 'table' ? 'active' : ''}" onclick="watchtowerView.setDownloadedViewMode('table')" title="Table View (Rows & Columns)">
+                <span>📋</span> <span>Table View</span>
+              </button>
+              <button class="view-mode-btn ${downloadedViewMode === 'grid' ? 'active' : ''}" onclick="watchtowerView.setDownloadedViewMode('grid')" title="Grid Cards View">
+                <span>⊞</span> <span>Grid Cards</span>
+              </button>
+            </div>
             <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()">
               Refresh
             </button>
@@ -739,16 +757,140 @@ window.watchtowerView = (function() {
               View AI Ranked Reels
             </button>
           </div>
+        ` : (downloadedViewMode === 'table' ? `
+          <div class="card table-container" style="padding: 0; overflow-x: auto; border-radius: 12px; box-shadow: none;">
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 68px; text-align: center;">Preview</th>
+                  <th style="width: 14%;">Reel / ID</th>
+                  <th style="width: 13%;">Destination</th>
+                  <th style="width: 15%;">Format & Storage</th>
+                  <th style="width: 26%;">AI Hook & Caption Breakdown</th>
+                  <th style="width: 14%;">Status & Time</th>
+                  <th style="width: 14%; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${jobs.map(j => renderDownloadedTableRow(j)).join('')}
+              </tbody>
+            </table>
+          </div>
         ` : `
           <div class="downloaded-media-grid">
             ${jobs.map(j => renderDownloadedCardHtml(j)).join('')}
           </div>
-        `}
+        `)}
       `;
     } catch (err) {
       console.warn('[renderDownloadedStage error]:', err);
       container.innerHTML = `<div class="card" style="color: var(--danger); padding: 2rem;">Failed to load downloaded media: ${err.message}</div>`;
     }
+  }
+
+  function renderDownloadedTableRow(j) {
+    const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+    const agentBadge = j.agent === 'watchtower' ?
+      `<span class="badge badge-blue" style="font-size: 0.68rem;">🛰️ Watchtower</span>` :
+      `<span class="badge badge-muted" style="font-size: 0.68rem;">📲 Reposter</span>`;
+
+    const parsed = parseCaptionComponents(j.caption);
+    const timeStr = j.published_at ?
+      `Published ${formatTimeAgo(j.published_at)}` :
+      `Created ${formatTimeAgo(j.created_at)}`;
+
+    // Parse media paths
+    let mediaArr = [];
+    try {
+      mediaArr = typeof j.media_paths === 'string' ? JSON.parse(j.media_paths) : (j.media_paths || []);
+    } catch (e) {
+      mediaArr = [j.media_paths];
+    }
+    const mediaCount = Array.isArray(mediaArr) ? mediaArr.length : 1;
+    const mediaTypeLabel = (j.media_type || 'reel').toUpperCase();
+
+    // Short path preview
+    const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
+    const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
+    const isReel = (j.media_type === 'reel' || !j.media_type);
+
+    return `
+      <tr>
+        <!-- 1. Glimpse / Photo Snapshot Preview -->
+        <td style="text-align: center; vertical-align: middle; padding: 0.55rem 0.5rem;">
+          <a href="${j.source_url}" target="_blank" class="reel-table-thumb-container" title="Open ${j.shortcode || 'reel'} on Instagram">
+            <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" />
+            ${isReel ? '<div class="reel-thumb-play-icon">▶</div>' : ''}
+          </a>
+        </td>
+
+        <!-- 2. Reel ID & Source Link -->
+        <td>
+          <div class="flex items-center gap-1 mb-1">
+            <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;">#${j.id}</span>
+            ${agentBadge}
+          </div>
+          <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--accent-primary); text-decoration: none;" title="${j.source_url}">
+            🔗 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
+          </a>
+        </td>
+
+        <!-- 3. Target Destination Page -->
+        <td>
+          <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
+        </td>
+
+        <!-- 4. Format & Local Storage -->
+        <td>
+          <div class="flex items-center gap-1 mb-1">
+            <span class="badge badge-emerald" style="font-size: 0.68rem; font-weight: 600;">✅ 1080p MP4 Ready</span>
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
+            📁 ${filename}
+          </div>
+          <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 1px;">${mediaTypeLabel} (${mediaCount} item)</div>
+        </td>
+
+        <!-- 5. AI Caption Breakdown -->
+        <td style="max-width: 280px;">
+          <div style="font-weight: 600; font-size: 0.78rem; color: var(--text-primary); margin-bottom: 3px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
+            <span class="caption-segment-tag">AI Hook</span> ${escapeHtml(parsed.hook)}
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <span class="caption-segment-tag">Credit</span> ${escapeHtml(parsed.credit)}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--accent-primary); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') + (parsed.hashtags.length > 4 ? ` +${parsed.hashtags.length - 4}` : '') : '—'}
+          </div>
+        </td>
+
+        <!-- 6. Status & Timestamp -->
+        <td>
+          <div class="mb-1">${getStatusBadge(j.status)}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+        </td>
+
+        <!-- 7. Actions -->
+        <td style="text-align: right;">
+          ${j.permalink ? `
+            <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none; font-size: 0.76rem; color: var(--accent-primary); font-weight: 600; white-space: nowrap;">
+              View on Instagram ↗
+            </a>
+          ` : (j.status === 'pending_review' || j.status === 'ready' ? `
+            <button class="btn btn-primary btn-sm" onclick="watchtowerView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
+              🚀 Publish Live
+            </button>
+          ` : (j.status === 'failed' ? `
+            <button class="btn btn-secondary btn-sm" onclick="watchtowerView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
+              🔄 Retry
+            </button>
+          ` : `
+            <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
+          `))}
+        </td>
+      </tr>
+    `;
   }
 
   function renderDownloadedCardHtml(j) {
@@ -775,10 +917,17 @@ window.watchtowerView = (function() {
     // Short path preview
     const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
     const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
+    const isReel = (j.media_type === 'reel' || !j.media_type);
 
     return `
       <div class="downloaded-media-card">
         <div>
+          <!-- Glimpse Photo Snapshot Preview in Grid -->
+          <a href="${j.source_url}" target="_blank" class="downloaded-media-thumb-preview" title="Open reel ${j.shortcode}">
+            <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" loading="lazy" />
+            ${isReel ? '<div class="reel-thumb-play-icon" style="width: 24px; height: 24px; font-size: 11px; bottom: 8px; right: 8px;">▶</div>' : ''}
+          </a>
+
           <!-- Header Bar -->
           <div class="downloaded-media-header">
             <div class="flex items-center gap-2">
@@ -871,6 +1020,7 @@ window.watchtowerView = (function() {
       </div>
     `;
   }
+
 
   // ─────────────────────────────────────────────────────────────
   // STAGE 5: Review & Staged Deck (Replaces Standalone Queue!)
@@ -1440,6 +1590,7 @@ window.watchtowerView = (function() {
     render,
     selectPage,
     switchStage,
+    setDownloadedViewMode,
     runCycle,
     togglePause,
     addSource,

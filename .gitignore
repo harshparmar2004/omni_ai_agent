@@ -24,6 +24,7 @@ public/generated/reels/
 public/generated/carousels/
 public/generated/images/
 public/generated/diagrams/
+public/generated/thumbnails/
 !public/generated/assets/
 !public/generated/assets/**
 

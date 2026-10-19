@@ -1683,6 +1683,103 @@ table.data-table tr:hover td {
   margin-right: 4px;
 }
 
+/* View Mode Switcher (Table vs Grid) */
+.view-mode-switcher {
+  display: inline-flex;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-mode-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.view-mode-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+}
+
+.view-mode-btn.active {
+  background: var(--bg-card);
+  color: var(--accent-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Reel Photo Thumbnail in Table */
+.reel-table-thumb-container {
+  position: relative;
+  width: 54px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1A1816;
+  border: 1px solid var(--border-card);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.reel-table-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.reel-thumb-play-icon {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #FFFFFF;
+  pointer-events: none;
+}
+
+/* Reel Photo Preview in Grid Cards */
+.downloaded-media-thumb-preview {
+  width: 100%;
+  height: 150px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1A1816;
+  position: relative;
+  margin-bottom: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.downloaded-media-thumb-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 
 
 

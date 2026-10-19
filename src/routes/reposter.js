@@ -65,4 +65,8 @@ router.get('/jobs', (req, res) => {
   }
 });
 
+router.get('/jobs/:id/thumbnail', (req, res) => {
+  res.redirect(`/api/jobs/${req.params.id}/thumbnail`);
+});
+
 module.exports = router;
