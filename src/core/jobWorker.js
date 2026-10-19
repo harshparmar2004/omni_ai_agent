@@ -116,6 +116,15 @@ class JobWorkerPool {
       return;
     }
 
+    // Hard safety barrier for Meta Graph API 25-reels/day limit
+    if (todayCount >= 24) {
+      console.log(`[Job Worker] 🛑 Meta Graph API 25 post barrier triggered (${todayCount}/25). Holding job #${job.id} for safety.`);
+      updateJobProgress(jobId, 'queued', 'meta_limit_hold', {
+        error: `Meta Graph API 25-reels/day safety barrier active (${todayCount}/25). Post held to prevent account restrictions.`
+      });
+      return;
+    }
+
     // Check min spacing between posts (for Watchtower jobs)
     if (job.agent === 'watchtower' && page.min_spacing_minutes > 0) {
       const lastPublishedAt = getLastPublishedTimestamp(page.id);

@@ -40,8 +40,8 @@ function initV7Schema(db) {
       watermark_enabled INTEGER DEFAULT 0,
       post_mode TEXT DEFAULT 'review', -- 'auto' | 'review'
       posts_per_cycle INTEGER DEFAULT 1,
-      daily_quota INTEGER DEFAULT 3,
-      min_spacing_minutes INTEGER DEFAULT 60,
+      daily_quota INTEGER DEFAULT 12,
+      min_spacing_minutes INTEGER DEFAULT 25,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -134,6 +134,25 @@ function initV7Schema(db) {
       value TEXT
     );
   `);
+
+  // Seed default peak traffic windows settings
+  const defaultSettings = {
+    peak_windows_enabled: 'true',
+    peak_timezone: 'Asia/Kolkata',
+    peak_window_morning: '08:00-11:00|3',
+    peak_window_evening: '17:00-21:00|5',
+    peak_window_midnight: '23:00-01:00|4',
+    watchtower_interval_hours: '3'
+  };
+  const insertSettingStmt = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
+  for (const [k, v] of Object.entries(defaultSettings)) {
+    insertSettingStmt.run(k, v);
+  }
+
+  // Auto-migrate existing pages to high-potential peak defaults if still on old limits
+  try {
+    db.prepare('UPDATE pages SET daily_quota = 12, min_spacing_minutes = 25 WHERE daily_quota <= 3').run();
+  } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -804,18 +823,18 @@ function getPipelineSummary(pageId = null) {
   }
   const rankedCount = db.prepare(rankedSql).get(...rankedParams)?.c || 0;
 
-  // 4. Jobs by status
-  const jobParams = [];
-  let pageJobClause = '';
+  // 4. Jobs by status (strictly for Watchtower agent)
+  const jobParams = ['watchtower'];
+  let pageJobClause = ' WHERE agent = ?';
   if (pId) {
-    pageJobClause = ' WHERE page_id = ?';
+    pageJobClause += ' AND page_id = ?';
     jobParams.push(pId);
   }
 
-  // 5. Downloaded Media (media_paths populated and not empty)
+  // 5. Downloaded Media (media_paths populated and not empty, strictly for Watchtower agent)
   let dlSql = `
     SELECT count(*) as c FROM publish_jobs
-    WHERE media_paths IS NOT NULL AND media_paths != '[]' AND media_paths != ''
+    WHERE agent = 'watchtower' AND media_paths IS NOT NULL AND media_paths != '[]' AND media_paths != ''
   `;
   const dlParams = [];
   if (pId) {
@@ -917,6 +936,16 @@ function getReposterPipelineSummary(pageId = null) {
   };
 }
 
+function getPostsCountInWindow(pageId, windowStartIso) {
+  const row = getDb().prepare(`
+    SELECT count(*) as c FROM publish_jobs
+    WHERE page_id = ? AND agent = 'watchtower'
+      AND status IN ('published', 'publishing', 'queued', 'ready', 'downloading')
+      AND created_at >= ?
+  `).get(pageId, windowStartIso);
+  return row ? row.c : 0;
+}
+
 module.exports = {
   getDb,
   // Settings
@@ -952,6 +981,7 @@ module.exports = {
   listPublishJobs,
   getPublishedCountToday,
   getLastPublishedTimestamp,
+  getPostsCountInWindow,
   // Agent Runs
   createAgentRun,
   updateAgentRun,

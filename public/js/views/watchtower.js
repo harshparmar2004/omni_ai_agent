@@ -74,6 +74,9 @@ window.watchtowerView = (function() {
         ${renderPageSwitcherPills()}
       </div>
 
+      <!-- 2.5 Peak Audience Traffic Windows Widget -->
+      <div id="wt-peak-windows-container" style="margin-bottom: 1rem;"></div>
+
       <!-- 3. Top Interactive Pipeline Stepper -->
       <div class="pipeline-stepper-container" id="wt-stepper-container">
         ${renderStepperHtml()}
@@ -86,6 +89,7 @@ window.watchtowerView = (function() {
     `;
 
     await loadStatus();
+    await loadPeakWindows();
     await loadPipelineSummary();
     await renderActiveStage();
   }
@@ -294,6 +298,7 @@ window.watchtowerView = (function() {
     const stepper = document.getElementById('wt-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
 
+    await loadPeakWindows();
     await loadPipelineSummary();
     await renderActiveStage();
   }
@@ -812,7 +817,7 @@ window.watchtowerView = (function() {
 
   async function renderDownloadedStage(container) {
     try {
-      let query = '?hasMedia=true&limit=60';
+      let query = '?agent=watchtower&hasMedia=true&limit=60';
       if (selectedPageId) query += `&pageId=${selectedPageId}`;
       const res = await fetch(`/api/jobs${query}`);
       const jobs = res.ok ? await res.json() : [];
@@ -1700,6 +1705,68 @@ window.watchtowerView = (function() {
     }
   }
 
+  async function loadPeakWindows() {
+    const bannerEl = document.getElementById('wt-peak-windows-container');
+    if (!bannerEl) return;
+
+    try {
+      const url = selectedPageId ? `/api/watchtower/peak-windows?pageId=${selectedPageId}` : '/api/watchtower/peak-windows';
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const isActive = Boolean(data.activeWindow);
+      const activeName = data.activeWindow ? data.activeWindow.name : (data.nextWindow?.name || 'Next Peak Window');
+      const timeRange = data.activeWindow ? data.activeWindow.rangeStr : (data.nextWindow?.rangeStr || '');
+      const countdown = data.activeWindow ? `Window Open (Target: ${data.activeWindow.target} reels)` : (data.nextWindow?.countdown || 'Upcoming window');
+
+      bannerEl.innerHTML = `
+        <div class="card" style="padding: 0.9rem 1.25rem; border-radius: 10px; border: 1px solid var(--border-card); background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: none;">
+          <div style="display: flex; align-items: center; gap: 0.85rem;">
+            <div style="width: 38px; height: 38px; border-radius: 8px; background: rgba(217, 119, 87, 0.08); display: flex; align-items: center; justify-content: center; font-size: 1.15rem; color: var(--accent-primary); flex-shrink: 0;">
+              ${isActive ? '⚡' : '⏱️'}
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span style="font-weight: 700; font-size: 0.88rem; color: var(--text-primary);">
+                  ${isActive ? 'High-Traffic Window Active:' : 'Next Traffic Surge:'} ${escapeHtml(activeName)} (${escapeHtml(timeRange)})
+                </span>
+                <span class="status-text ${isActive ? 'status-text-success' : 'status-text-muted'}" style="font-size: 0.72rem;">
+                  ${escapeHtml(countdown)}
+                </span>
+              </div>
+              <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">
+                Morning: 08:00–11:00 (3 Reels) · Evening: 17:00–21:00 (5 Reels) · Midnight: 23:00–01:00 (4 Reels) · Current IST: ${escapeHtml(data.currentTime || 'Active')}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 1.25rem; font-size: 0.78rem;">
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">Today's Output</div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--accent-primary); font-family: var(--font-mono);">
+                ${data.publishedToday || 0} / ${data.dailyTarget || 12} Reels
+              </div>
+            </div>
+            <div style="border-left: 1px solid var(--border-subtle); padding-left: 1.25rem;">
+              <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">Meta Quota Cap</div>
+              <div style="font-weight: 600; color: var(--text-secondary); font-family: var(--font-mono);">
+                25 Max API Limit
+              </div>
+            </div>
+            <div style="border-left: 1px solid var(--border-subtle); padding-left: 1.25rem;">
+              <div style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">Safe Spacing</div>
+              <div style="font-weight: 600; color: var(--text-secondary); font-family: var(--font-mono);">
+                25m Safe Delay
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      console.warn('[loadPeakWindows notice]:', e.message);
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -1731,6 +1798,7 @@ window.watchtowerView = (function() {
     toggleBulkImport,
     refresh: async () => {
       await loadStatus();
+      await loadPeakWindows();
       await loadPipelineSummary();
       await renderActiveStage();
     }

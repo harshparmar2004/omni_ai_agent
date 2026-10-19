@@ -31,6 +31,41 @@ router.get('/status', (req, res) => {
 });
 
 /**
+ * GET /api/watchtower/peak-windows
+ * Real-time peak audience windows status, quota tracking, and countdown
+ */
+router.get('/peak-windows', (req, res) => {
+  try {
+    const { getPeakWindowStatus } = require('../agents/watchtower/selector');
+    const { getPublishedCountToday, getPages } = require('../database');
+    const pageId = req.query.pageId ? parseInt(req.query.pageId, 10) : null;
+    const windowStatus = getPeakWindowStatus();
+
+    let publishedToday = 0;
+    let dailyTarget = 12;
+    if (pageId) {
+      publishedToday = getPublishedCountToday(pageId);
+      const pages = getPages();
+      const p = pages.find(item => item.id === pageId);
+      if (p) dailyTarget = p.daily_quota || 12;
+    } else {
+      const pages = getPages({ isActiveOnly: true });
+      publishedToday = pages.reduce((acc, p) => acc + getPublishedCountToday(p.id), 0);
+      dailyTarget = pages.reduce((acc, p) => acc + (p.daily_quota || 12), 0);
+    }
+
+    res.json({
+      ...windowStatus,
+      pageId,
+      publishedToday,
+      dailyTarget
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * POST /api/watchtower/run
  * Manually trigger surveillance cycle
  */

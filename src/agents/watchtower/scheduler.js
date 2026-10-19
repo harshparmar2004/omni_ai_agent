@@ -80,12 +80,28 @@ class WatchtowerScheduler {
 
     // Initial scan after 45s boot cooldown
     this.scheduleNext(45000);
+
+    // Lightweight peak traffic window evaluation check every 15 minutes
+    this.windowCheckInterval = setInterval(async () => {
+      try {
+        const isPaused = getSetting('watchtower_paused', '0') === '1';
+        if (!isPaused && !this.isScanning) {
+          await evaluateAndSelectPosts();
+        }
+      } catch (e) {
+        console.warn('[Watchtower Window Check Notice]:', e.message);
+      }
+    }, 15 * 60 * 1000);
   }
 
   stop() {
     if (this.timerHandle) {
       clearTimeout(this.timerHandle);
       this.timerHandle = null;
+    }
+    if (this.windowCheckInterval) {
+      clearInterval(this.windowCheckInterval);
+      this.windowCheckInterval = null;
     }
     this.isRunning = false;
   }
@@ -119,7 +135,7 @@ class WatchtowerScheduler {
       scanRes = await scanAllSources({ runId: run.id, quick: options.quick });
 
       // 2. Evaluate & Select
-      selectRes = await evaluateAndSelectPosts();
+      selectRes = await evaluateAndSelectPosts({ force: options.force });
 
       // 3. Auto-Prune Media Cache
       try {
