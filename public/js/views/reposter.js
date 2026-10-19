@@ -408,6 +408,49 @@ window.reposterView = (function() {
               </div>
             </div>
           </div>
+
+          <!-- Animated Live Pipeline Stream Visualizer (Agent 1 Signal Radar) -->
+          <div class="tg-live-stream-box">
+            <div class="tg-stream-header">
+              <span class="tg-stream-tag">
+                <span class="pulse-dot"></span>
+                <span>Live Pipeline Signal Stream</span>
+              </span>
+              <span class="tg-stream-radar-pill">
+                <span>●</span> POLLING ACTIVE · 0ms
+              </span>
+            </div>
+
+            <!-- Connected Stream Flow Track with Traveling Light Photons -->
+            <div class="tg-stream-track">
+              <div class="tg-stream-node active" title="Share directly from Instagram Mobile App">
+                <div class="tg-stream-node-icon">📱</div>
+                <span class="tg-stream-node-label">Share</span>
+              </div>
+              <div class="tg-stream-wire"></div>
+              <div class="tg-stream-node active" title="OmniStudio Telegram Ingestion Gateway">
+                <div class="tg-stream-node-icon">✈️</div>
+                <span class="tg-stream-node-label">Bot Gate</span>
+              </div>
+              <div class="tg-stream-wire fast"></div>
+              <div class="tg-stream-node active" title="AI Attribution Engine & 1080p MP4 Synthesis">
+                <div class="tg-stream-node-icon">🧠</div>
+                <span class="tg-stream-node-label">AI Engine</span>
+              </div>
+              <div class="tg-stream-wire"></div>
+              <div class="tg-stream-node online" title="Published live to Instagram feed">
+                <div class="tg-stream-node-icon">🚀</div>
+                <span class="tg-stream-node-label">Live Reel</span>
+              </div>
+            </div>
+
+            <!-- Real-time Telemetry Status Strip -->
+            <div class="tg-telemetry-strip">
+              <span class="tg-telemetry-chip">⚡ <code>1080p MP4</code> Auto-Sync</span>
+              <span class="tg-telemetry-chip">🤖 <code>AI Hook</code> Auto-Generated</span>
+              <span class="tg-telemetry-chip">🛡️ Chat <code>5443723531</code> Secured</span>
+            </div>
+          </div>
         </div>
 
         <!-- Direct Reel Quick-Post (On-Demand Dashboard Fallback) -->

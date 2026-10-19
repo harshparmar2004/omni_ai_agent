@@ -1957,6 +1957,183 @@ table.data-table tr:hover td {
   border: 1px solid var(--border-subtle);
 }
 
+/* ==========================================================================
+   Telegram Live Ingestion Visualizer & Signal Stream
+   ========================================================================== */
+
+.tg-live-stream-box {
+  background: linear-gradient(145deg, #181513 0%, #201C19 100%);
+  border: 1px solid rgba(217, 119, 87, 0.25);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  margin-top: 0.95rem;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Subtle background glowing radial light */
+.tg-live-stream-box::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(217, 119, 87, 0.18) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.tg-stream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.72rem;
+}
+
+.tg-stream-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #F5EFEB;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tg-stream-radar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+
+.tg-stream-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  margin: 0.5rem 0.15rem 0.75rem 0.15rem;
+}
+
+.tg-stream-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+.tg-stream-node-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.tg-stream-node.active .tg-stream-node-icon {
+  border-color: var(--accent-primary);
+  background: rgba(217, 119, 87, 0.22);
+  box-shadow: 0 0 10px rgba(217, 119, 87, 0.45);
+}
+
+.tg-stream-node.online .tg-stream-node-icon {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.18);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.35);
+}
+
+.tg-stream-node-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: #D1C7BD;
+}
+
+.tg-stream-wire {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 6px;
+  margin-top: -14px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+
+/* Traveling animated light beam photon */
+.tg-stream-wire::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, var(--accent-primary) 50%, #FFB088 100%);
+  animation: streamBeam 2.2s infinite ease-in-out;
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--accent-primary);
+}
+
+.tg-stream-wire.fast::after {
+  animation: streamBeam 1.8s infinite ease-in-out 0.4s;
+  background: linear-gradient(90deg, transparent 0%, #22c55e 50%, #86efac 100%);
+  box-shadow: 0 0 6px #22c55e;
+}
+
+@keyframes streamBeam {
+  0% {
+    left: -50%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.tg-telemetry-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.55rem;
+  font-size: 0.67rem;
+  color: #A89F95;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.tg-telemetry-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tg-telemetry-chip code {
+  color: #E6DFD5;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+}
+
+
 
 
 
