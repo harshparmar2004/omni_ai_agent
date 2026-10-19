@@ -1,15 +1,16 @@
 /**
  * OmniStudio v7 — Agent 1: Reposter & On-Demand Publishing Pipeline
  * Multi-page reel ingestion via Telegram Bot (@omnistudio_bot) and Web Dashboard,
- * real-time 4-stage pipeline stepper, and live Instagram publishing.
+ * 5-stage interactive publishing stepper, dedicated Downloaded Media grid deck,
+ * AI copywriting review, and live Instagram publishing.
  */
 window.reposterView = (function() {
   let selectedPageId = null; // null = all pages
-  let activeFilter = 'all'; // 'all' | 'ingested' | 'downloading' | 'ready' | 'published' | 'failed'
+  let activeStage = 'ingest'; // 'ingest' | 'downloaded' | 'ready' | 'published' | 'failed'
   let activeTrackingJobId = null;
   let pipelineSummary = {
     ingested: 0,
-    downloading: 0,
+    downloaded: 0,
     ready: 0,
     published: 0,
     failed: 0
@@ -25,6 +26,50 @@ window.reposterView = (function() {
     if (s.includes('news')) return '📰';
     if (s.includes('crypto') || s.includes('finance')) return '📈';
     return '📱';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatTimeAgo(timestamp) {
+    if (!timestamp) return '--';
+    const diff = (Date.now() - new Date(timestamp).getTime()) / 1000;
+    if (diff < 60) return `${Math.floor(diff)}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function parseCaptionComponents(caption = '') {
+    if (!caption) {
+      return {
+        hook: 'No caption generated yet',
+        credit: 'Pending AI attribution',
+        cta: 'Follow for updates',
+        hashtags: [],
+        raw: ''
+      };
+    }
+
+    const lines = caption.split('\n').map(l => l.trim()).filter(Boolean);
+    const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
+    const creditLine = lines.find(l => /credit|thanks|via|shoutout|original/i.test(l)) || '';
+    const ctaLine = lines.find(l => /follow|stay tuned|subscribe|more gta/i.test(l)) || '';
+    const hookLine = lines.find(l => !l.startsWith('#') && l !== creditLine && l !== ctaLine) || lines[0] || 'Instagram Reel Clip';
+
+    return {
+      hook: hookLine,
+      credit: creditLine || 'Creator attribution included',
+      cta: ctaLine || 'Follow GTA 6 CTA included',
+      hashtags,
+      raw: caption
+    };
   }
 
   async function render() {
@@ -61,10 +106,12 @@ window.reposterView = (function() {
             </p>
           </div>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-          Refresh
-        </button>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       <!-- 2. Multi-Page Selector Bar -->
@@ -72,135 +119,19 @@ window.reposterView = (function() {
         ${renderPageSwitcherPills()}
       </div>
 
-      <!-- 3. Top 4-Stage Visual Publishing Stepper -->
+      <!-- 3. Top 5-Stage Visual Publishing Stepper -->
       <div class="pipeline-stepper-container" id="rp-stepper-container">
         ${renderStepperHtml()}
       </div>
 
-      <!-- 4. Direct Ingestion & Telegram Hub Grid -->
-      <div style="display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: start;">
-        
-        <!-- Direct Link Ingestion Card -->
-        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); border-top: 3px solid var(--accent-primary);">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                Direct Reel Ingestion & Quick Post
-              </h3>
-              <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
-                Paste any Instagram Reel link here to immediately process and publish to your selected page.
-              </p>
-            </div>
-            <span class="badge badge-blue">Direct Web Ingestion</span>
-          </div>
-
-          <div class="form-group mb-3">
-            <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel or Video Post URL</label>
-            <input type="text" id="rp-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem;">
-              Supports Instagram reels, video posts, and shortcode formats.
-            </div>
-          </div>
-
-          <div class="form-group mb-3">
-            <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
-            <select id="rp-page-select" class="form-input">
-              ${renderPageOptions()}
-            </select>
-          </div>
-
-          <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
-              <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
-              <span>Review & edit AI caption before publishing live</span>
-            </label>
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.6rem; line-height: 1.4;">
-              If checked, job pauses in Stage 4 (Review) for your manual approval. If unchecked, it publishes automatically.
-            </div>
-          </div>
-
-          <!-- Live Step Progress Box -->
-          <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
-            <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
-              <span class="spinner-sm"></span> Pipeline Executing...
-            </div>
-            <div class="step-bar mb-2">
-              <div id="rp-step-1" class="step-bar-item"></div>
-              <div id="rp-step-2" class="step-bar-item"></div>
-              <div id="rp-step-3" class="step-bar-item"></div>
-              <div id="rp-step-4" class="step-bar-item"></div>
-            </div>
-            <div id="rp-step-status" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
-              Initializing job...
-            </div>
-          </div>
-
-          <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.65rem 1rem; font-size: 0.9rem; font-weight: 600;">
-            🚀 Publish Reel Live to Instagram
-          </button>
-        </div>
-
-        <!-- Telegram Mobile Integration Hub Card -->
-        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <span style="font-size: 1.5rem; line-height: 1;">✈️</span>
-              <div>
-                <div style="font-weight: 700; font-size: 0.95rem;">Telegram Integration Hub</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">One-click mobile reposting</div>
-              </div>
-            </div>
-
-            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.75rem;">
-              Share any Instagram Reel link directly with your OmniStudio Telegram bot from your phone. Agent 1 executes the 4-stage pipeline:
-            </p>
-
-            <ol style="font-size: 0.78rem; color: var(--text-secondary); margin-left: 1.25rem; margin-bottom: 1.15rem; line-height: 1.6;">
-              <li>Send Instagram Reel link to <code>@omnistudio_bot</code>.</li>
-              <li>Bot verifies your Whitelisted Chat ID.</li>
-              <li>Select destination page with inline button.</li>
-              <li>Live 1, 2, 3, 4 progress updates in chat.</li>
-              <li>Receives live Instagram permalink when live!</li>
-            </ol>
-          </div>
-
-          <div style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 0.75rem;">
-            <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Authorized Telegram Chat ID:</div>
-            <code style="font-weight: 700; color: var(--accent-primary);" id="rp-telegram-allowed">5443723531</code>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- 5. Reposter Publishing History & Live Feed Table -->
-      <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
-        <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-              Agent 1 Publishing History & Live Feed
-            </h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
-              On-demand reels submitted via Telegram Bot or Web Dashboard
-            </p>
-          </div>
-          <div class="flex items-center gap-2">
-            <select id="rp-table-filter" class="form-input" style="font-size: 0.76rem; padding: 3px 8px; width: auto;" onchange="reposterView.filterTable(this.value)">
-              <option value="all">All Dispatches</option>
-              <option value="published">Live Published</option>
-              <option value="pending_review">Staged for Review</option>
-              <option value="active">Active In-Flight</option>
-              <option value="failed">Failed / Errors</option>
-            </select>
-          </div>
-        </div>
-        <div id="rp-jobs-table" class="table-container" style="padding: 0; overflow-x: auto;">
-          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">Loading reposter dispatches...</div>
-        </div>
+      <!-- 4. Dynamic Active Stage Inspection Deck -->
+      <div id="rp-stage-deck">
+        <div style="color: var(--text-muted); padding: 3rem; text-align: center;">Loading pipeline stage...</div>
       </div>
     `;
 
     await loadSummary();
-    await loadData();
+    await renderActiveStage();
   }
 
   function renderPageSwitcherPills() {
@@ -255,33 +186,33 @@ window.reposterView = (function() {
           <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
         </div>
         <div style="font-size: 0.75rem; color: var(--text-muted);">
-          Agent 1: <strong>On-Demand Reposter</strong>
+          Agent 1: <strong>On-Demand Reposter & Downloader</strong>
         </div>
       </div>
 
       <div class="pipeline-stepper">
-        <!-- Stage 1: Ingested -->
-        <div class="pipeline-step-node ${activeFilter === 'ingested' ? 'active' : ''}" onclick="reposterView.filterTable('ingested')" title="Reels received via Telegram or Dashboard">
+        <!-- Stage 1: Ingest & Quick Post -->
+        <div class="pipeline-step-node ${activeStage === 'ingest' ? 'active' : ''}" onclick="reposterView.switchStage('ingest')" title="Ingest reels via Web URL or Telegram Bot">
           <div class="pipeline-step-num">1</div>
           <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Ingested</span>
+            <span class="pipeline-step-label">Ingest & Quick Post</span>
             <span class="pipeline-step-count" id="rps-count-ingested">${s.ingested} Received</span>
           </div>
         </div>
         <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 2: Download & Transcode -->
-        <div class="pipeline-step-node ${activeFilter === 'downloading' ? 'active' : ''}" onclick="reposterView.filterTable('downloading')" title="1080p MP4 download & verification">
+        <!-- Stage 2: Downloaded Media -->
+        <div class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="reposterView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
           <div class="pipeline-step-num">2</div>
           <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Download & Media</span>
-            <span class="pipeline-step-count" id="rps-count-downloading">${s.downloading} In Flight</span>
+            <span class="pipeline-step-label">Downloaded Media</span>
+            <span class="pipeline-step-count" id="rps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded} Ready Files</span>
           </div>
         </div>
         <div class="pipeline-step-arrow">→</div>
 
         <!-- Stage 3: AI Copywriting & Review -->
-        <div class="pipeline-step-node ${activeFilter === 'ready' ? 'active' : ''}" onclick="reposterView.filterTable('ready')" title="AI Copywritten, Attribution & Review">
+        <div class="pipeline-step-node ${activeStage === 'ready' ? 'active' : ''}" onclick="reposterView.switchStage('ready')" title="AI Copywritten, Attribution & Review">
           <div class="pipeline-step-num">3</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">AI Copywriting</span>
@@ -291,11 +222,21 @@ window.reposterView = (function() {
         <div class="pipeline-step-arrow">→</div>
 
         <!-- Stage 4: Live Published -->
-        <div class="pipeline-step-node ${activeFilter === 'published' ? 'active' : ''}" onclick="reposterView.filterTable('published')" title="Live on Instagram Feed">
+        <div class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="reposterView.switchStage('published')" title="Live on Instagram Feed">
           <div class="pipeline-step-num">4</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Live Published</span>
-            <span class="pipeline-step-count" id="rps-count-published" style="color: var(--agent-reposter);">${s.published} Live</span>
+            <span class="pipeline-step-count" id="rps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
+          </div>
+        </div>
+        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Stage 5: Retries -->
+        <div class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="reposterView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
+          <div class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'background: var(--danger); color: #fff;' : ''}">5</div>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Retries</span>
+            <span class="pipeline-step-count" id="rps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
           </div>
         </div>
       </div>
@@ -318,14 +259,16 @@ window.reposterView = (function() {
   function updateStepperCounts() {
     const s = pipelineSummary;
     const cIng = document.getElementById('rps-count-ingested');
-    const cDl = document.getElementById('rps-count-downloading');
+    const cDl = document.getElementById('rps-count-downloaded');
     const cReady = document.getElementById('rps-count-ready');
     const cPub = document.getElementById('rps-count-published');
+    const cFailed = document.getElementById('rps-count-failed');
 
     if (cIng) cIng.textContent = `${s.ingested} Received`;
-    if (cDl) cDl.textContent = `${s.downloading} In Flight`;
+    if (cDl) cDl.textContent = `${s.downloaded} Ready Files`;
     if (cReady) cReady.textContent = `${s.ready} Staged/Ready`;
     if (cPub) cPub.textContent = `${s.published} Live`;
+    if (cFailed) cFailed.textContent = `${s.failed} Errors`;
   }
 
   async function selectPage(pageId) {
@@ -337,124 +280,672 @@ window.reposterView = (function() {
     const stepper = document.getElementById('rp-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
 
-    const pageSelect = document.getElementById('rp-page-select');
-    if (pageSelect) pageSelect.innerHTML = renderPageOptions();
-
     await loadSummary();
-    await loadData();
+    await renderActiveStage();
   }
 
-  function filterTable(filter) {
-    activeFilter = filter;
+  async function switchStage(stageName) {
+    activeStage = stageName;
+
     const stepper = document.getElementById('rp-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
-    const select = document.getElementById('rp-table-filter');
-    if (select) select.value = filter;
-    loadData();
+
+    await renderActiveStage();
   }
 
-  async function loadData() {
+  async function renderActiveStage() {
+    const container = document.getElementById('rp-stage-deck');
+    if (!container) return;
+
+    switch (activeStage) {
+      case 'ingest':
+        await renderIngestStage(container);
+        break;
+      case 'downloaded':
+        await renderDownloadedStage(container);
+        break;
+      case 'ready':
+        await renderReadyStage(container);
+        break;
+      case 'published':
+        await renderPublishedStage(container);
+        break;
+      case 'failed':
+        await renderFailedStage(container);
+        break;
+      default:
+        await renderIngestStage(container);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 1: Ingest & Quick Post Deck
+  // ─────────────────────────────────────────────────────────────
+  async function renderIngestStage(container) {
+    container.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 1.25rem; margin-bottom: 1.5rem; align-items: start;">
+        
+        <!-- Direct Link Ingestion Card -->
+        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); border-top: 3px solid var(--accent-primary);">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                Direct Reel Ingestion & Quick Post
+              </h3>
+              <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
+                Paste any Instagram Reel link here to immediately process and publish to your selected page.
+              </p>
+            </div>
+            <span class="badge badge-blue">Direct Web Ingestion</span>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel or Video Post URL</label>
+            <input type="text" id="rp-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.35rem;">
+              Supports Instagram reels, video posts, and shortcode formats.
+            </div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
+            <select id="rp-page-select" class="form-input">
+              ${renderPageOptions()}
+            </select>
+          </div>
+
+          <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.82rem; font-weight: 600;">
+              <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
+              <span>Review & edit AI caption before publishing live</span>
+            </label>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; margin-left: 1.6rem; line-height: 1.4;">
+              If checked, job pauses in Stage 3 (AI Copywriting) for manual review. If unchecked, it publishes automatically.
+            </div>
+          </div>
+
+          <!-- Live Step Progress Box -->
+          <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem;">
+            <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="spinner-sm"></span> Pipeline Executing...
+            </div>
+            <div class="step-bar mb-2">
+              <div id="rp-step-1" class="step-bar-item"></div>
+              <div id="rp-step-2" class="step-bar-item"></div>
+              <div id="rp-step-3" class="step-bar-item"></div>
+              <div id="rp-step-4" class="step-bar-item"></div>
+            </div>
+            <div id="rp-step-status" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
+              Initializing job...
+            </div>
+          </div>
+
+          <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.65rem 1rem; font-size: 0.9rem; font-weight: 600;">
+            🚀 Ingest & Dispatch Reel Live
+          </button>
+        </div>
+
+        <!-- Telegram Mobile Integration Hub Card -->
+        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.35rem; box-shadow: none; border: 1px solid var(--border-card); display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <span style="font-size: 1.5rem; line-height: 1;">✈️</span>
+              <div>
+                <div style="font-weight: 700; font-size: 0.95rem;">Telegram Integration Hub</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">One-click mobile reposting</div>
+              </div>
+            </div>
+
+            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.75rem;">
+              Share any Instagram Reel directly with your OmniStudio Telegram bot from your phone. Agent 1 executes the 4-stage pipeline:
+            </p>
+
+            <ol style="font-size: 0.78rem; color: var(--text-secondary); margin-left: 1.25rem; margin-bottom: 1.15rem; line-height: 1.6;">
+              <li>Send Instagram Reel link to <code>@omnistudio_bot</code>.</li>
+              <li>Bot verifies your Whitelisted Chat ID.</li>
+              <li>Select destination page with interactive buttons.</li>
+              <li>In-place <code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code> progress bar in chat.</li>
+              <li>Receives live Instagram permalink when live!</li>
+            </ol>
+          </div>
+
+          <div style="background: var(--bg-input); padding: 0.75rem 0.95rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 0.75rem;">
+            <div style="color: var(--text-muted); margin-bottom: 0.25rem;">Authorized Telegram Chat ID:</div>
+            <code style="font-weight: 700; color: var(--accent-primary);" id="rp-telegram-allowed">5443723531</code>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recent Ingestions Feed Table -->
+      <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
+        <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+              Recent Dispatches & Ingestions
+            </h3>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
+              Latest reels ingested via Telegram Bot or Web Dashboard
+            </p>
+          </div>
+        </div>
+        <div id="rp-jobs-table" class="table-container" style="padding: 0; overflow-x: auto;">
+          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">Loading dispatches...</div>
+        </div>
+      </div>
+    `;
+
+    await loadIngestedTableData();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 2: Downloaded Media Deck (Dedicated Rows & Columns Grid)
+  // ─────────────────────────────────────────────────────────────
+  async function renderDownloadedStage(container) {
+    try {
+      let query = '?hasMedia=true&limit=60';
+      if (selectedPageId) query += `&pageId=${selectedPageId}`;
+      const res = await fetch(`/api/reposter/jobs${query}`);
+      const jobs = res.ok ? await res.json() : [];
+
+      const selectedPage = (window.app?.pages || []).find(p => p.id === selectedPageId);
+      const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
+
+      container.innerHTML = `
+        <div class="pipeline-deck-header">
+          <div>
+            <div class="pipeline-stage-title">
+              <span>📁 Stage 2: Downloaded Media Library</span>
+              <span class="badge badge-emerald">${jobs.length} Downloaded Reels</span>
+            </div>
+            <div class="text-sm text-muted">
+              Locally downloaded 1080p MP4 clips with verified media paths, AI copy breakdown, and publication tracking for <b>${pageLabel}</b>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        ${jobs.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📥</div>
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Downloaded Reels Yet</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto;">
+              When reels are ingested via Telegram or Web, their 1080p MP4 videos are downloaded to local storage and indexed here in organized rows and columns.
+            </p>
+            <button class="btn btn-primary btn-sm" onclick="reposterView.switchStage('ingest')">
+              + Ingest a Reel Now
+            </button>
+          </div>
+        ` : `
+          <div class="downloaded-media-grid">
+            ${jobs.map(j => renderDownloadedCardHtml(j)).join('')}
+          </div>
+        `}
+      `;
+    } catch (err) {
+      console.warn('[renderDownloadedStage error]:', err);
+      container.innerHTML = `<div class="card" style="color: var(--danger); padding: 2rem;">Failed to load downloaded media: ${err.message}</div>`;
+    }
+  }
+
+  function renderDownloadedCardHtml(j) {
+    const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+    const isTelegram = Boolean(j.telegram_chat_id);
+    const originBadge = isTelegram ?
+      `<span class="badge badge-blue" style="font-size: 0.7rem;">📱 Telegram Bot</span>` :
+      `<span class="badge badge-muted" style="font-size: 0.7rem;">💻 Web Ingestion</span>`;
+
+    const parsed = parseCaptionComponents(j.caption);
+    const timeStr = j.published_at ?
+      `Published ${formatTimeAgo(j.published_at)}` :
+      `Ingested ${formatTimeAgo(j.created_at)}`;
+
+    // Parse media paths
+    let mediaArr = [];
+    try {
+      mediaArr = typeof j.media_paths === 'string' ? JSON.parse(j.media_paths) : (j.media_paths || []);
+    } catch (e) {
+      mediaArr = [j.media_paths];
+    }
+    const mediaCount = Array.isArray(mediaArr) ? mediaArr.length : 1;
+    const mediaTypeLabel = (j.media_type || 'reel').toUpperCase();
+
+    // Short path preview
+    const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
+    const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
+
+    return `
+      <div class="downloaded-media-card">
+        <div>
+          <!-- Header Bar -->
+          <div class="downloaded-media-header">
+            <div class="flex items-center gap-2">
+              <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+              <span style="font-weight: 700; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
+            </div>
+            ${originBadge}
+          </div>
+
+          <!-- Reel Link & Source Info -->
+          <div style="margin-bottom: 0.65rem;">
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
+            <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); text-decoration: none; word-break: break-all;">
+              🔗 ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
+            </a>
+          </div>
+
+          <!-- Verified Local Media Details -->
+          <div class="downloaded-media-fileinfo">
+            <div class="flex items-center justify-between" style="margin-bottom: 0.35rem;">
+              <span style="font-weight: 700; color: var(--success); display: flex; align-items: center; gap: 4px;">
+                <span>✅</span> 1080p MP4 Ready
+              </span>
+              <span class="badge badge-muted" style="font-size: 0.68rem; font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
+            </div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
+              📁 storage/reels/${filename}
+            </div>
+          </div>
+
+          <!-- AI Caption Breakdown -->
+          <div class="downloaded-caption-box">
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">AI Hook</span>
+              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
+                ${escapeHtml(parsed.hook)}
+              </span>
+            </div>
+
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">Credit</span>
+              <span style="color: var(--text-secondary); font-size: 0.74rem;">
+                ${escapeHtml(parsed.credit)}
+              </span>
+            </div>
+
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">CTA</span>
+              <span style="color: var(--text-secondary); font-size: 0.74rem;">
+                ${escapeHtml(parsed.cta)}
+              </span>
+            </div>
+
+            <div>
+              <span class="caption-segment-tag">Tags</span>
+              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-primary);">
+                ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 5).join(' ') + (parsed.hashtags.length > 5 ? ` +${parsed.hashtags.length - 5}` : '') : '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer / Action Row -->
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
+          <div class="flex items-center justify-between mb-2">
+            <div>${getStatusBadge(j.status)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            ${j.permalink ? `
+              <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm w-full" style="text-decoration: none; justify-content: center; font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">
+                View on Instagram ↗
+              </a>
+            ` : (j.status === 'pending_review' || j.status === 'ready' ? `
+              <button class="btn btn-primary btn-sm w-full" onclick="reposterView.approveJob(${j.id})">
+                🚀 Publish Live Now
+              </button>
+            ` : (j.status === 'failed' ? `
+              <button class="btn btn-secondary btn-sm w-full" onclick="reposterView.retryJob(${j.id})">
+                🔄 Retry Job
+              </button>
+            ` : `
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 100%;">
+                ⚙️ In Pipeline (${j.current_step || j.status})
+              </div>
+            `))}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 3: AI Copywriting & Staged Review Deck
+  // ─────────────────────────────────────────────────────────────
+  async function renderReadyStage(container) {
+    try {
+      let query = '?status=pending_review,ready';
+      if (selectedPageId) query += `&pageId=${selectedPageId}`;
+      const res = await fetch(`/api/reposter/jobs${query}`);
+      const jobs = res.ok ? await res.json() : [];
+
+      container.innerHTML = `
+        <div class="pipeline-deck-header">
+          <div>
+            <div class="pipeline-stage-title">
+              <span>✍️ Stage 3: AI Copywriting & Staged Reels</span>
+              <span class="badge ${jobs.length > 0 ? 'badge-amber' : 'badge-muted'}">${jobs.length} Staged</span>
+            </div>
+            <div class="text-sm text-muted">
+              Review AI crafted hook, creator attribution shoutout, follow CTA, and approve for live publishing
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
+            Refresh
+          </button>
+        </div>
+
+        ${jobs.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">✨</div>
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Reels Staged for Copywriting Review</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
+              Reels marked with "Review caption before publishing" or waiting for manual confirmation appear here.
+            </p>
+          </div>
+        ` : `
+          <div>
+            ${jobs.map(j => {
+              const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+              const initialCaption = j.caption || '';
+              return `
+                <div class="card mb-3" style="border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); border-left: 4px solid var(--warning); box-shadow: none;">
+                  <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
+                    <div class="flex items-center gap-2">
+                      <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+                      <span style="font-weight: 700;">Target: ${pageSlug}</span>
+                      <span class="badge badge-muted" style="font-size: 0.7rem;">${Boolean(j.telegram_chat_id) ? '📱 Telegram' : '💻 Web'}</span>
+                    </div>
+                    <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">
+                      ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
+                    </a>
+                  </div>
+
+                  <div class="form-group mb-2">
+                    <label class="form-label font-bold" style="font-size: 0.78rem;">
+                      AI Hook, Attribution & Caption:
+                    </label>
+                    <textarea id="rp-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.45;">${escapeHtml(initialCaption)}</textarea>
+                  </div>
+
+                  <div class="flex items-center justify-between mt-3">
+                    <button class="btn btn-secondary btn-sm" onclick="reposterView.deleteJob(${j.id})" style="color: var(--danger);">
+                      🗑️ Discard
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})">
+                      🚀 Approve & Publish Live Now
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      `;
+    } catch (err) {
+      console.warn('[renderReadyStage error]:', err);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 4: Live Published Deck
+  // ─────────────────────────────────────────────────────────────
+  async function renderPublishedStage(container) {
+    try {
+      let query = '?status=published&limit=50';
+      if (selectedPageId) query += `&pageId=${selectedPageId}`;
+      const res = await fetch(`/api/reposter/jobs${query}`);
+      const jobs = res.ok ? await res.json() : [];
+
+      container.innerHTML = `
+        <div class="pipeline-deck-header">
+          <div>
+            <div class="pipeline-stage-title">
+              <span>🚀 Stage 4: Live Published Reels</span>
+              <span class="badge badge-emerald">${jobs.length} Published</span>
+            </div>
+            <div class="text-sm text-muted">
+              Reels actively broadcasted to Instagram feeds via Meta Graph API v21.0
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
+            Refresh
+          </button>
+        </div>
+
+        ${jobs.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">📱</div>
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Published Reels Yet</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
+              Ingest a reel to see it publish live to your Instagram page feed.
+            </p>
+          </div>
+        ` : `
+          <div class="table-container card" style="padding: 0; border-radius: 12px; box-shadow: none;">
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 8%;">ID</th>
+                  <th style="width: 18%;">Destination</th>
+                  <th style="width: 14%;">Origin</th>
+                  <th style="width: 14%;">Shortcode</th>
+                  <th style="width: 24%;">Caption Breakdown</th>
+                  <th style="width: 10%;">Published</th>
+                  <th style="text-align: right; width: 12%;">Instagram Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${jobs.map(j => {
+                  const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+                  const isTelegram = Boolean(j.telegram_chat_id);
+                  const parsed = parseCaptionComponents(j.caption);
+                  return `
+                    <tr>
+                      <td style="font-weight: 600; font-family: var(--font-mono);">#${j.id}</td>
+                      <td style="font-weight: 600; font-family: var(--font-mono);">${pageSlug}</td>
+                      <td>
+                        <span style="font-size: 0.72rem; color: var(--text-secondary);">${isTelegram ? '📱 Telegram' : '💻 Web'}</span>
+                      </td>
+                      <td style="font-family: var(--font-mono);">
+                        <a href="${j.source_url}" target="_blank" style="text-decoration: none; color: var(--accent-primary);">
+                          ${j.shortcode || 'Source'} ↗
+                        </a>
+                      </td>
+                      <td style="font-size: 0.75rem; color: var(--text-secondary);">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">${escapeHtml(parsed.hook)}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(parsed.credit)}</div>
+                      </td>
+                      <td style="font-size: 0.75rem; color: var(--text-muted);">
+                        ${j.published_at ? formatTimeAgo(j.published_at) : '--'}
+                      </td>
+                      <td style="text-align: right;">
+                        ${j.permalink ? `
+                          <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 600;">
+                            Live on Feed ↗
+                          </a>
+                        ` : '<span style="font-size: 0.72rem; color: var(--text-muted);">No permalink</span>'}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      `;
+    } catch (err) {
+      console.warn('[renderPublishedStage error]:', err);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 5: Failed / Retries Deck
+  // ─────────────────────────────────────────────────────────────
+  async function renderFailedStage(container) {
+    try {
+      let query = '?status=failed&limit=50';
+      if (selectedPageId) query += `&pageId=${selectedPageId}`;
+      const res = await fetch(`/api/reposter/jobs${query}`);
+      const jobs = res.ok ? await res.json() : [];
+
+      container.innerHTML = `
+        <div class="pipeline-deck-header">
+          <div>
+            <div class="pipeline-stage-title">
+              <span>⚠️ Stage 5: Retries & Errors</span>
+              <span class="badge badge-red">${jobs.length} Failed</span>
+            </div>
+            <div class="text-sm text-muted">
+              Inspect failure reasons and trigger 1-click pipeline recovery
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
+            Refresh
+          </button>
+        </div>
+
+        ${jobs.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
+            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🎉</div>
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">Zero Failed Jobs</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0;">
+              All on-demand dispatches completed without pipeline errors.
+            </p>
+          </div>
+        ` : `
+          <div>
+            ${jobs.map(j => {
+              const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+              return `
+                <div class="card mb-3" style="border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); border-left: 4px solid var(--danger); box-shadow: none;">
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <span class="badge badge-red" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+                      <span style="font-weight: 700;">Target: ${pageSlug}</span>
+                      <span style="font-size: 0.72rem; color: var(--text-muted);">Step: ${j.current_step || 'unknown'}</span>
+                    </div>
+                    <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-primary); text-decoration: none;">
+                      ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Link'} ↗
+                    </a>
+                  </div>
+
+                  <div style="background: var(--bg-canvas); padding: 0.65rem 0.85rem; border-radius: 8px; font-family: var(--font-mono); font-size: 0.75rem; color: var(--danger); margin-bottom: 0.75rem; word-break: break-all;">
+                    ${escapeHtml(j.error || 'Pipeline execution halted')}
+                  </div>
+
+                  <div class="flex items-center justify-between">
+                    <button class="btn btn-secondary btn-sm" onclick="reposterView.deleteJob(${j.id})" style="color: var(--danger);">
+                      🗑️ Delete Job
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="reposterView.retryJob(${j.id})">
+                      🔄 Retry Pipeline Now
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      `;
+    } catch (err) {
+      console.warn('[renderFailedStage error]:', err);
+    }
+  }
+
+  // Helper for loading Ingest stage table
+  async function loadIngestedTableData() {
     const container = document.getElementById('rp-jobs-table');
     if (!container) return;
 
     try {
-      let query = '?limit=35';
+      let query = '?limit=15';
       if (selectedPageId) query += `&pageId=${selectedPageId}`;
       const res = await fetch(`/api/reposter/jobs${query}`);
       if (!res.ok) return;
-      let jobs = await res.json();
+      const jobs = await res.json();
 
-      // Apply client filter if active
-      if (activeFilter === 'published') {
-        jobs = jobs.filter(j => j.status === 'published');
-      } else if (activeFilter === 'pending_review') {
-        jobs = jobs.filter(j => j.status === 'pending_review');
-      } else if (activeFilter === 'downloading') {
-        jobs = jobs.filter(j => j.status === 'downloading' || j.status === 'queued');
-      } else if (activeFilter === 'ready') {
-        jobs = jobs.filter(j => j.status === 'ready' || j.status === 'publishing' || j.status === 'pending_review');
-      } else if (activeFilter === 'failed') {
-        jobs = jobs.filter(j => j.status === 'failed');
+      if (!jobs || jobs.length === 0) {
+        container.innerHTML = `
+          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">
+            No dispatches found. Paste an Instagram link above or share to Telegram to begin!
+          </div>
+        `;
+        return;
       }
 
-      renderJobs(jobs);
-    } catch (err) {
-      console.warn('[Reposter loadData failed]:', err);
-    }
-  }
+      const rows = jobs.map(j => {
+        const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+        const isTelegram = Boolean(j.telegram_chat_id);
+        const originBadge = isTelegram ?
+          `<span style="font-size: 0.72rem; color: var(--info); font-weight: 500;">📱 Telegram</span>` :
+          `<span style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 500;">💻 Web</span>`;
 
-  function renderJobs(jobs) {
-    const container = document.getElementById('rp-jobs-table');
-    if (!container) return;
+        const statusBadge = getStatusBadge(j.status);
+        const timeStr = j.published_at ?
+          new Date(j.published_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) :
+          formatTimeAgo(j.created_at);
 
-    if (!jobs || jobs.length === 0) {
-      container.innerHTML = `
-        <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">
-          No dispatches found for this filter. Paste an Instagram link above or share to Telegram!
-        </div>
-      `;
-      return;
-    }
-
-    const rows = jobs.map(j => {
-      const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-      const isTelegram = Boolean(j.telegram_chat_id);
-      const originBadge = isTelegram ?
-        `<span style="font-size: 0.75rem; color: var(--info); font-weight: 500;">📱 Telegram Bot</span>` :
-        `<span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 500;">💻 Web Ingestion</span>`;
-
-      const statusBadge = getStatusBadge(j.status);
-      const timeStr = j.published_at ? new Date(j.published_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : formatTimeAgo(j.created_at);
-
-      return `
-        <tr>
-          <td style="font-weight: 600; font-family: var(--font-mono); color: var(--text-primary);">#${j.id}</td>
-          <td style="font-weight: 600; font-family: var(--font-mono);">${pageSlug}</td>
-          <td>${originBadge}</td>
-          <td style="font-family: var(--font-mono);">
-            <a href="${j.source_url}" target="_blank" style="text-decoration: none; color: var(--accent-primary);">
-              ${j.shortcode || 'Source'} ↗
-            </a>
-          </td>
-          <td style="font-size: 0.78rem; color: var(--text-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            ${j.caption ? j.caption.substring(0, 50) + '...' : '—'}
-          </td>
-          <td>${statusBadge}</td>
-          <td style="text-align: right;">
-            ${j.permalink ? `
-              <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 500;">
-                Live on Feed ↗
-              </a>
-            ` : (j.status === 'failed' ? `
-              <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.72rem; padding: 2px 7px;">
-                🔄 Retry
-              </button>
-            ` : `
-              <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
-            `)}
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    container.innerHTML = `
-      <table class="data-table" style="width: 100%;">
-        <thead>
+        return `
           <tr>
-            <th style="width: 8%;">ID</th>
-            <th style="width: 18%;">Destination</th>
-            <th style="width: 16%;">Origin</th>
-            <th style="width: 14%;">Reel Shortcode</th>
-            <th style="width: 20%;">Caption Excerpt</th>
-            <th style="width: 12%;">Status</th>
-            <th style="text-align: right; width: 12%;">Instagram Link</th>
+            <td style="font-weight: 600; font-family: var(--font-mono); color: var(--text-primary);">#${j.id}</td>
+            <td style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem;">${pageSlug}</td>
+            <td>${originBadge}</td>
+            <td style="font-family: var(--font-mono); font-size: 0.82rem;">
+              <a href="${j.source_url}" target="_blank" style="text-decoration: none; color: var(--accent-primary);">
+                ${j.shortcode || 'Source'} ↗
+              </a>
+            </td>
+            <td style="font-size: 0.78rem; color: var(--text-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${j.caption ? j.caption.substring(0, 50) + '...' : '—'}
+            </td>
+            <td>${statusBadge}</td>
+            <td style="text-align: right;">
+              ${j.permalink ? `
+                <a href="${j.permalink}" target="_blank" style="color: var(--accent-primary); font-size: 0.8rem; text-decoration: none; font-weight: 600;">
+                  Live on Feed ↗
+                </a>
+              ` : (j.status === 'failed' ? `
+                <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.72rem; padding: 2px 7px;">
+                  🔄 Retry
+                </button>
+              ` : `
+                <span style="font-size: 0.75rem; color: var(--text-muted);">${timeStr}</span>
+              `)}
+            </td>
           </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    `;
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <table class="data-table" style="width: 100%;">
+          <thead>
+            <tr>
+              <th style="width: 8%;">ID</th>
+              <th style="width: 18%;">Destination</th>
+              <th style="width: 14%;">Origin</th>
+              <th style="width: 14%;">Reel Shortcode</th>
+              <th style="width: 22%;">Caption Excerpt</th>
+              <th style="width: 12%;">Status</th>
+              <th style="text-align: right; width: 12%;">Instagram Link</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    } catch (err) {
+      console.warn('[loadIngestedTableData error]:', err);
+    }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Action Handlers
+  // ─────────────────────────────────────────────────────────────
   async function submitJob() {
     const urlInput = document.getElementById('rp-url');
     const pageSelect = document.getElementById('rp-page-select');
@@ -501,14 +992,14 @@ window.reposterView = (function() {
       urlInput.value = '';
 
       await loadSummary();
-      await loadData();
+      await renderActiveStage();
     } catch (err) {
       hideProgressBox();
       app.toast(err.message, 'error');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
-        submitBtn.textContent = '🚀 Publish Reel Live to Instagram';
+        submitBtn.textContent = '🚀 Ingest & Dispatch Reel Live';
       }
     }
   }
@@ -572,15 +1063,40 @@ window.reposterView = (function() {
         app.toast('🎉 Reel published live to Instagram!', 'success');
         setTimeout(() => hideProgressBox(), 6000);
         loadSummary();
-        loadData();
+        renderActiveStage();
       } else if (event.status === 'failed') {
         const s4 = document.getElementById('rp-step-4');
         if (s4) s4.className = 'step-bar-item failed';
         const statusEl = document.getElementById('rp-step-status');
         if (statusEl) statusEl.textContent = '❌ Failed: ' + (event.error || 'Job failed');
         loadSummary();
-        loadData();
+        renderActiveStage();
       }
+    }
+  }
+
+  async function approveJob(id) {
+    try {
+      const captionInput = document.getElementById(`rp-caption-${id}`);
+      const caption = captionInput ? captionInput.value : undefined;
+
+      const res = await fetch(`/api/jobs/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caption })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.toast('🚀 Reel approved and queued for live publishing!', 'success');
+        activeTrackingJobId = id;
+        showProgressBox(`Publishing job #${id} live...`);
+        await loadSummary();
+        await renderActiveStage();
+      } else {
+        app.toast(data.error || 'Failed to approve job', 'error');
+      }
+    } catch (err) {
+      app.toast(err.message, 'error');
     }
   }
 
@@ -592,10 +1108,25 @@ window.reposterView = (function() {
         app.toast('Job queued for retry!', 'success');
         activeTrackingJobId = id;
         showProgressBox(`Retrying job #${id}...`);
-        loadSummary();
-        loadData();
+        await loadSummary();
+        await renderActiveStage();
       } else {
         app.toast(data.error || 'Failed to retry', 'error');
+      }
+    } catch (err) {
+      app.toast(err.message, 'error');
+    }
+  }
+
+  async function deleteJob(id) {
+    if (!confirm(`Are you sure you want to delete job #${id}?`)) return;
+    try {
+      const res = await fetch(`/api/jobs/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        app.toast('Job deleted', 'info');
+        await loadSummary();
+        await renderActiveStage();
       }
     } catch (err) {
       app.toast(err.message, 'error');
@@ -620,25 +1151,18 @@ window.reposterView = (function() {
     }
   }
 
-  function formatTimeAgo(timestamp) {
-    if (!timestamp) return '--';
-    const diff = (Date.now() - new Date(timestamp).getTime()) / 1000;
-    if (diff < 60) return `${Math.floor(diff)}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  }
-
   return {
     render,
     selectPage,
-    filterTable,
+    switchStage,
+    submitJob,
+    approveJob,
+    retryJob,
+    deleteJob,
+    onEvent,
     refresh: async () => {
       await loadSummary();
-      await loadData();
-    },
-    submitJob,
-    retryJob,
-    onEvent
+      await renderActiveStage();
+    }
   };
 })();

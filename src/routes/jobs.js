@@ -15,7 +15,7 @@ const { updatePublishJob } = require('../database');
  */
 router.get('/', (req, res) => {
   try {
-    const { status, pageId, agent, limit } = req.query;
+    const { status, pageId, agent, limit, hasMedia } = req.query;
     const filter = {};
     if (status) {
       filter.status = status.includes(',') ? status.split(',') : status;
@@ -23,6 +23,7 @@ router.get('/', (req, res) => {
     if (pageId) filter.pageId = parseInt(pageId, 10);
     if (agent) filter.agent = agent;
     if (limit) filter.limit = parseInt(limit, 10);
+    if (hasMedia === 'true' || hasMedia === '1') filter.hasMedia = true;
 
     const jobs = listJobs(filter);
     res.json(jobs);

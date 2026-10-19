@@ -550,6 +550,9 @@ function listPublishJobs(options = {}) {
     sql += ' AND j.agent = ?';
     params.push(options.agent);
   }
+  if (options.hasMedia) {
+    sql += " AND j.media_paths IS NOT NULL AND j.media_paths != '[]' AND j.media_paths != ''";
+  }
 
   sql += ' ORDER BY j.id DESC';
   if (options.limit) {
@@ -695,6 +698,18 @@ function getPipelineSummary(pageId = null) {
     jobParams.push(pId);
   }
 
+  // 5. Downloaded Media (media_paths populated and not empty)
+  let dlSql = `
+    SELECT count(*) as c FROM publish_jobs
+    WHERE media_paths IS NOT NULL AND media_paths != '[]' AND media_paths != ''
+  `;
+  const dlParams = [];
+  if (pId) {
+    dlSql += ' AND page_id = ?';
+    dlParams.push(pId);
+  }
+  const downloadedCount = db.prepare(dlSql).get(...dlParams)?.c || 0;
+
   const jobRows = db.prepare(`
     SELECT status, count(*) as c FROM publish_jobs
     ${pageJobClause}
@@ -723,6 +738,7 @@ function getPipelineSummary(pageId = null) {
     sources: sourcesCount,
     discovered: discoveredCount,
     ranked: rankedCount,
+    downloaded: downloadedCount,
     review: jobCounts.pending_review,
     active: activeCount,
     published: jobCounts.published,
@@ -765,10 +781,22 @@ function getReposterPipelineSummary(pageId = null) {
     totalIngested += r.c;
   }
 
+  // Count jobs that have downloaded media files ready locally
+  let dlSql = `
+    SELECT count(*) as c FROM publish_jobs
+    WHERE agent = 'reposter' AND media_paths IS NOT NULL AND media_paths != '[]' AND media_paths != ''
+  `;
+  const dlParams = [];
+  if (pId) {
+    dlSql += ' AND page_id = ?';
+    dlParams.push(pId);
+  }
+  const downloadedCount = db.prepare(dlSql).get(...dlParams)?.c || 0;
+
   return {
     pageId: pId,
     ingested: totalIngested,
-    downloading: counts.queued + counts.downloading,
+    downloaded: downloadedCount,
     ready: counts.ready + counts.publishing + counts.pending_review,
     published: counts.published,
     failed: counts.failed

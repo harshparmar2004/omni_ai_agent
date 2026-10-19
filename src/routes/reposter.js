@@ -52,6 +52,12 @@ router.get('/jobs', (req, res) => {
     if (req.query.pageId) {
       filter.pageId = parseInt(req.query.pageId, 10);
     }
+    if (req.query.status) {
+      filter.status = req.query.status.includes(',') ? req.query.status.split(',') : req.query.status;
+    }
+    if (req.query.hasMedia === 'true' || req.query.hasMedia === '1') {
+      filter.hasMedia = true;
+    }
     const jobs = listJobs(filter);
     res.json(jobs);
   } catch (err) {

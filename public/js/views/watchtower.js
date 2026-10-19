@@ -11,6 +11,7 @@ window.watchtowerView = (function() {
     sources: 0,
     discovered: 0,
     ranked: 0,
+    downloaded: 0,
     review: 0,
     active: 0,
     published: 0,
@@ -170,9 +171,19 @@ window.watchtowerView = (function() {
         </div>
         <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 4: Review & Staged -->
+        <!-- Stage 4: Downloaded Media -->
+        <div class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="watchtowerView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
+          <div class="pipeline-step-num">4</div>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Downloaded Media</span>
+            <span class="pipeline-step-count" id="ps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready Files</span>
+          </div>
+        </div>
+        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Stage 5: Review & Staged -->
         <div class="pipeline-step-node ${activeStage === 'review' ? 'active' : ''} ${s.review > 0 ? 'has-review' : ''}" onclick="watchtowerView.switchStage('review')" title="Staged Reels Awaiting Approval">
-          <div class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'background: var(--warning); color: #fff;' : ''}">4</div>
+          <div class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'background: var(--warning); color: #fff;' : ''}">5</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Review & Staged</span>
             <span class="pipeline-step-count" id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning); font-weight: 700;' : ''}">${s.review} Needs Review</span>
@@ -180,9 +191,9 @@ window.watchtowerView = (function() {
         </div>
         <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 5: In-Flight -->
+        <!-- Stage 6: In-Flight -->
         <div class="pipeline-step-node ${activeStage === 'active' ? 'active' : ''}" onclick="watchtowerView.switchStage('active')" title="Active Downloading & Meta Upload">
-          <div class="pipeline-step-num">5</div>
+          <div class="pipeline-step-num">6</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">In-Flight</span>
             <span class="pipeline-step-count" id="ps-count-active">${s.active} Processing</span>
@@ -190,19 +201,19 @@ window.watchtowerView = (function() {
         </div>
         <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 6: Live Published -->
+        <!-- Stage 7: Live Published -->
         <div class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="watchtowerView.switchStage('published')" title="Live on Instagram">
-          <div class="pipeline-step-num">6</div>
+          <div class="pipeline-step-num">7</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Live Posts</span>
-            <span class="pipeline-step-count" id="ps-count-published" style="color: var(--agent-reposter);">${s.published} Live</span>
+            <span class="pipeline-step-count" id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
           </div>
         </div>
         <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 7: Failed / Retries -->
+        <!-- Stage 8: Failed / Retries -->
         <div class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="watchtowerView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <div class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'background: var(--danger); color: #fff;' : ''}">7</div>
+          <div class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'background: var(--danger); color: #fff;' : ''}">8</div>
           <div class="pipeline-step-info">
             <span class="pipeline-step-label">Retries</span>
             <span class="pipeline-step-count" id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
@@ -264,6 +275,7 @@ window.watchtowerView = (function() {
     const cSources = document.getElementById('ps-count-sources');
     const cDisc = document.getElementById('ps-count-discovered');
     const cRanked = document.getElementById('ps-count-ranked');
+    const cDl = document.getElementById('ps-count-downloaded');
     const cReview = document.getElementById('ps-count-review');
     const cActive = document.getElementById('ps-count-active');
     const cPub = document.getElementById('ps-count-published');
@@ -272,6 +284,7 @@ window.watchtowerView = (function() {
     if (cSources) cSources.textContent = `${s.sources} Profiles`;
     if (cDisc) cDisc.textContent = `${s.discovered} Ingested`;
     if (cRanked) cRanked.textContent = `${s.ranked} Scored`;
+    if (cDl) cDl.textContent = `${s.downloaded || 0} Ready Files`;
     if (cReview) cReview.textContent = `${s.review} Needs Review`;
     if (cActive) cActive.textContent = `${s.active} Processing`;
     if (cPub) cPub.textContent = `${s.published} Live`;
@@ -322,6 +335,9 @@ window.watchtowerView = (function() {
         break;
       case 'ranked':
         await renderRankedStage(container);
+        break;
+      case 'downloaded':
+        await renderDownloadedStage(container);
         break;
       case 'review':
         await renderReviewStage(container);
@@ -637,8 +653,227 @@ window.watchtowerView = (function() {
     }
   }
 
+  function parseCaptionComponents(caption = '') {
+    if (!caption) {
+      return {
+        hook: 'No caption generated yet',
+        credit: 'Pending AI attribution',
+        cta: 'Follow for updates',
+        hashtags: [],
+        raw: ''
+      };
+    }
+
+    const lines = caption.split('\n').map(l => l.trim()).filter(Boolean);
+    const hashtags = caption.match(/#[a-zA-Z0-9_]+/g) || [];
+    const creditLine = lines.find(l => /credit|thanks|via|shoutout|original/i.test(l)) || '';
+    const ctaLine = lines.find(l => /follow|stay tuned|subscribe|more gta/i.test(l)) || '';
+    const hookLine = lines.find(l => !l.startsWith('#') && l !== creditLine && l !== ctaLine) || lines[0] || 'Instagram Reel Clip';
+
+    return {
+      hook: hookLine,
+      credit: creditLine || 'Creator attribution included',
+      cta: ctaLine || 'Page follow CTA included',
+      hashtags,
+      raw: caption
+    };
+  }
+
+  function getStatusBadge(status) {
+    switch (status) {
+      case 'published':
+        return `<span class="badge badge-emerald">Live Published</span>`;
+      case 'failed':
+        return `<span class="badge badge-red">Failed</span>`;
+      case 'pending_review':
+        return `<span class="badge badge-amber">Staged Review</span>`;
+      case 'downloading':
+      case 'processing':
+      case 'uploading':
+      case 'publishing':
+        return `<span class="badge badge-blue">⚙️ ${status}</span>`;
+      default:
+        return `<span class="badge badge-muted">${status}</span>`;
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────
-  // STAGE 4: Review & Staged Deck (Replaces Standalone Queue!)
+  // STAGE 4: Downloaded Media Repository Deck
+  // ─────────────────────────────────────────────────────────────
+  async function renderDownloadedStage(container) {
+    try {
+      let query = '?hasMedia=true&limit=60';
+      if (selectedPageId) query += `&pageId=${selectedPageId}`;
+      const res = await fetch(`/api/jobs${query}`);
+      const jobs = res.ok ? await res.json() : [];
+
+      const selectedPage = (window.app?.pages || []).find(p => p.id === selectedPageId);
+      const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
+
+      container.innerHTML = `
+        <div class="pipeline-deck-header">
+          <div>
+            <div class="pipeline-stage-title">
+              <span>📁 Stage 4: Downloaded Media Repository</span>
+              <span class="badge badge-emerald">${jobs.length} Downloaded Reels</span>
+            </div>
+            <div class="text-sm text-muted">
+              Locally downloaded 1080p MP4 clips with verified media paths, AI copy breakdown, and publication tracking for <b>${pageLabel}</b>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()">
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        ${jobs.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 12px; box-shadow: none;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📥</div>
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Downloaded Reels Yet</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto;">
+              When candidate reels pass AI ranking and enter the download queue, their 1080p MP4 videos are downloaded to local storage and indexed here in organized rows and columns.
+            </p>
+            <button class="btn btn-primary btn-sm" onclick="watchtowerView.switchStage('ranked')">
+              View AI Ranked Reels
+            </button>
+          </div>
+        ` : `
+          <div class="downloaded-media-grid">
+            ${jobs.map(j => renderDownloadedCardHtml(j)).join('')}
+          </div>
+        `}
+      `;
+    } catch (err) {
+      console.warn('[renderDownloadedStage error]:', err);
+      container.innerHTML = `<div class="card" style="color: var(--danger); padding: 2rem;">Failed to load downloaded media: ${err.message}</div>`;
+    }
+  }
+
+  function renderDownloadedCardHtml(j) {
+    const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+    const agentBadge = j.agent === 'watchtower' ?
+      `<span class="badge badge-blue" style="font-size: 0.7rem;">🛰️ Watchtower</span>` :
+      `<span class="badge badge-muted" style="font-size: 0.7rem;">📲 Reposter</span>`;
+
+    const parsed = parseCaptionComponents(j.caption);
+    const timeStr = j.published_at ?
+      `Published ${formatTimeAgo(j.published_at)}` :
+      `Created ${formatTimeAgo(j.created_at)}`;
+
+    // Parse media paths
+    let mediaArr = [];
+    try {
+      mediaArr = typeof j.media_paths === 'string' ? JSON.parse(j.media_paths) : (j.media_paths || []);
+    } catch (e) {
+      mediaArr = [j.media_paths];
+    }
+    const mediaCount = Array.isArray(mediaArr) ? mediaArr.length : 1;
+    const mediaTypeLabel = (j.media_type || 'reel').toUpperCase();
+
+    // Short path preview
+    const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
+    const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
+
+    return `
+      <div class="downloaded-media-card">
+        <div>
+          <!-- Header Bar -->
+          <div class="downloaded-media-header">
+            <div class="flex items-center gap-2">
+              <span class="badge badge-amber" style="font-family: var(--font-mono); font-weight: 700;">#${j.id}</span>
+              <span style="font-weight: 700; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
+            </div>
+            ${agentBadge}
+          </div>
+
+          <!-- Reel Link & Source Info -->
+          <div style="margin-bottom: 0.65rem;">
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
+            <a href="${j.source_url}" target="_blank" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); text-decoration: none; word-break: break-all;">
+              🔗 ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
+            </a>
+          </div>
+
+          <!-- Verified Local Media Details -->
+          <div class="downloaded-media-fileinfo">
+            <div class="flex items-center justify-between" style="margin-bottom: 0.35rem;">
+              <span style="font-weight: 700; color: var(--success); display: flex; align-items: center; gap: 4px;">
+                <span>✅</span> 1080p MP4 Ready
+              </span>
+              <span class="badge badge-muted" style="font-size: 0.68rem; font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
+            </div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
+              📁 storage/reels/${filename}
+            </div>
+          </div>
+
+          <!-- AI Caption Breakdown -->
+          <div class="downloaded-caption-box">
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">AI Hook</span>
+              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
+                ${escapeHtml(parsed.hook)}
+              </span>
+            </div>
+
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">Credit</span>
+              <span style="color: var(--text-secondary); font-size: 0.74rem;">
+                ${escapeHtml(parsed.credit)}
+              </span>
+            </div>
+
+            <div style="margin-bottom: 0.45rem;">
+              <span class="caption-segment-tag">CTA</span>
+              <span style="color: var(--text-secondary); font-size: 0.74rem;">
+                ${escapeHtml(parsed.cta)}
+              </span>
+            </div>
+
+            <div>
+              <span class="caption-segment-tag">Tags</span>
+              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-primary);">
+                ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 5).join(' ') + (parsed.hashtags.length > 5 ? ` +${parsed.hashtags.length - 5}` : '') : '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer / Action Row -->
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
+          <div class="flex items-center justify-between mb-2">
+            <div>${getStatusBadge(j.status)}</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${timeStr}</div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            ${j.permalink ? `
+              <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm w-full" style="text-decoration: none; justify-content: center; font-size: 0.78rem; color: var(--accent-primary); font-weight: 600;">
+                View on Instagram ↗
+              </a>
+            ` : (j.status === 'pending_review' || j.status === 'ready' ? `
+              <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.approveJob(${j.id})">
+                🚀 Publish Live Now
+              </button>
+            ` : (j.status === 'failed' ? `
+              <button class="btn btn-secondary btn-sm w-full" onclick="watchtowerView.retryJob(${j.id})">
+                🔄 Retry Job
+              </button>
+            ` : `
+              <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 100%;">
+                ⚙️ In Pipeline (${j.current_step || j.status})
+              </div>
+            `))}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // STAGE 5: Review & Staged Deck (Replaces Standalone Queue!)
   // ─────────────────────────────────────────────────────────────
   async function renderReviewStage(container) {
     try {
@@ -651,7 +886,7 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>✍️ Stage 4: Review & Staged Reels</span>
+              <span>✍️ Stage 5: Review & Staged Reels</span>
               <span class="badge ${jobs.length > 0 ? 'badge-amber' : 'badge-muted'}">${jobs.length} Staged</span>
             </div>
             <div class="text-sm text-muted">
@@ -725,7 +960,7 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 5: In-Flight Processing Deck
+  // STAGE 6: In-Flight Processing Deck
   // ─────────────────────────────────────────────────────────────
   async function renderActiveStageDeck(container) {
     try {
@@ -738,7 +973,7 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⚙️ Stage 5: In-Flight Execution</span>
+              <span>⚙️ Stage 6: In-Flight Execution</span>
               <span class="badge badge-blue">${jobs.length} Active</span>
             </div>
             <div class="text-sm text-muted">
@@ -808,7 +1043,7 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 6: Live Published Feed Deck
+  // STAGE 7: Live Published Feed Deck
   // ─────────────────────────────────────────────────────────────
   async function renderPublishedStage(container) {
     try {
@@ -821,7 +1056,7 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>🚀 Stage 6: Live Published Feed</span>
+              <span>🚀 Stage 7: Live Published Feed</span>
               <span class="badge badge-emerald">${posts.length} Live Reels</span>
             </div>
             <div class="text-sm text-muted">
@@ -896,7 +1131,7 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 7: Failed / Deadletter Deck
+  // STAGE 8: Failed / Deadletter Deck
   // ─────────────────────────────────────────────────────────────
   async function renderFailedStage(container) {
     try {
@@ -909,7 +1144,7 @@ window.watchtowerView = (function() {
         <div class="pipeline-deck-header">
           <div>
             <div class="pipeline-stage-title">
-              <span>⚠️ Stage 7: Failed & Retries</span>
+              <span>⚠️ Stage 8: Failed & Retries</span>
               <span class="badge ${jobs.length > 0 ? 'badge-red' : 'badge-emerald'}">${jobs.length} Errors</span>
             </div>
             <div class="text-sm text-muted">
