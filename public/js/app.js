@@ -439,3 +439,6 @@ window.app = (function() {
     renderStatusText
   };
 })();
+
+// Global helper safeguard
+window.escapeHtml = window.app.escapeHtml;

@@ -14,6 +14,15 @@ window.pagesView = (function() {
     return '';
   }
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
   async function render() {
     const container = document.getElementById('view-pages');
     if (!container) return;
