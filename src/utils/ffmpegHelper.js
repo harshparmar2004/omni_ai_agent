@@ -172,27 +172,23 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
     const audioStream = streams.find(s => s.codec_type === 'audio');
 
     const isH264 = videoStream?.codec_name === 'h264';
-    const isYuv420p = videoStream?.pix_fmt === 'yuv420p';
     const hasAudio = Boolean(audioStream);
-    const isAac = audioStream?.codec_name === 'aac';
-
-    const isFullyCompliant = isH264 && isYuv420p && hasAudio && isAac;
     const finalDest = targetOutputPath || inputVideoPath;
 
-    if (isFullyCompliant && !targetOutputPath) {
-      console.log(`[FFmpeg Helper] ✅ Video is already 100% Meta compliant (h264/yuv420p/aac): ${inputVideoPath}`);
-      return resolve({ success: true, outputPath: inputVideoPath, transcoded: false });
-    }
-
-    console.log(`[FFmpeg Helper] 🔄 Transcoding video to Meta-compliant H.264/AAC... (h264:${isH264}, yuv420p:${isYuv420p}, audio:${hasAudio ? (isAac ? 'aac' : audioStream.codec_name) : 'none'})`);
+    console.log(`[FFmpeg Helper] 🎨 Applying Material Transformation & Anti-Duplicate Transcode... (audio:${hasAudio ? 'yes' : 'none'})`);
 
     const tempOut = path.join(path.dirname(finalDest), `transcode_temp_${Date.now()}.mp4`);
 
     let ffmpegArgs = [];
     if (hasAudio) {
+      // Material transformation: 1.02x speed shift, 1080x1920 crop/scale, color pop, scrub metadata
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
+        '-filter_complex',
+        '[0:v]setpts=PTS/1.02,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.03:brightness=0.01:saturation=1.04[v];[0:a]atempo=1.02[a]',
+        '-map', '[v]',
+        '-map', '[a]',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'fast',
@@ -201,16 +197,21 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         '-b:a', '128k',
         '-ar', '44100',
         '-ac', '2',
+        '-map_metadata', '-1',
         '-movflags', '+faststart',
         tempOut
       ];
     } else {
-      // Input has no audio: add silent stereo audio track so Meta Graph API does not reject it
+      // Input has no audio: add synthetic silent stereo audio track + material video transformation
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
         '-f', 'lavfi',
         '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+        '-filter_complex',
+        '[0:v]setpts=PTS/1.02,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.03:brightness=0.01:saturation=1.04[v]',
+        '-map', '[v]',
+        '-map', '1:a',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'fast',
@@ -218,6 +219,7 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         '-c:a', 'aac',
         '-b:a', '128k',
         '-shortest',
+        '-map_metadata', '-1',
         '-movflags', '+faststart',
         tempOut
       ];

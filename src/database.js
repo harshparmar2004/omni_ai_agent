@@ -149,9 +149,9 @@ function initV7Schema(db) {
     insertSettingStmt.run(k, v);
   }
 
-  // Auto-migrate existing pages to high-potential peak defaults if still on old limits
+  // Auto-migrate existing pages to viral anti-spam pacing defaults (120m spacing, 5 daily quota)
   try {
-    db.prepare('UPDATE pages SET daily_quota = 12, min_spacing_minutes = 25 WHERE daily_quota <= 3').run();
+    db.prepare('UPDATE pages SET daily_quota = 5, min_spacing_minutes = 120 WHERE min_spacing_minutes < 120').run();
   } catch (e) {}
 }
 

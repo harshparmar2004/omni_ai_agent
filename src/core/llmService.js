@@ -12,10 +12,7 @@ const { cleanRawCaption, extractHashtags, stripHashtagsFromText } = require('./c
  */
 
 const DEFAULT_GTA6_TAGS = [
-  '#gta6', '#gtavi', '#rockstargames', '#grandtheftauto',
-  '#vicecity', '#gta6trailer', '#gta6leaks', '#gaming',
-  '#gamers', '#playstation5', '#ps5', '#xboxseriesx',
-  '#videogames', '#gtaonline', '#gamingcommunity'
+  '#gta6', '#gta6leaks', '#rockstargames', '#gtavi'
 ];
 
 /**
@@ -144,12 +141,13 @@ Analyze the following source reel description and rewrite it into an exciting, h
 
 Rules:
 1. Start with an irresistible, punchy 1-2 line hook with emojis (e.g. 🚨 BREAKING: ..., 🔥 NEW DETAILS REVEALED: ..., 🤯 LOOK AT THIS: ...).
-2. Buff and expand the breakdown: explain the feature, leak, mechanic, or storyline clearly in 2 to 4 engaging bullet points or short punchy paragraphs.
-3. Make it feel authoritative, immersive, and thrilling for fans.
-4. DO NOT write any shout-out or follow CTA lines (these are automatically appended).
-5. DO NOT include hashtags (these are automatically appended).
-6. DO NOT include fake URLs, links in bio, or spam comments.
-7. Length: 60-120 words maximum.
+2. Buff and expand the breakdown: explain the feature, leak, mechanic, or storyline clearly in 2 to 3 engaging bullet points.
+3. Include an interactive debate or engagement question at the end (e.g. "What do you think about this? Drop your thoughts below 👇" or "Save this reel so you don't lose it! 💾").
+4. Make it feel authoritative, immersive, and thrilling for fans.
+5. DO NOT write any shout-out or follow CTA lines (these are automatically appended).
+6. DO NOT include hashtags (these are automatically appended).
+7. DO NOT include fake URLs, links in bio, or spam comments.
+8. Length: 60-120 words maximum.
 
 Source Content:
 """
@@ -199,23 +197,23 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
   if (!aiBreakdown) {
     console.log('[LLM Service] ℹ️ Using deterministic caption transformer fallback.');
     if (cleanedSource) {
-      aiBreakdown = `🔥 LATEST UPDATE:\n\n${cleanedSource}`;
+      aiBreakdown = `🔥 LATEST UPDATE:\n\n${cleanedSource}\n\n💬 What are your thoughts on this? Drop your reaction below 👇`;
     } else {
-      aiBreakdown = `🔥 Exclusive look at the latest ${pageName} breakdown! The graphics, mechanics, and realism are taking this to an unprecedented level.`;
+      aiBreakdown = `🔥 Exclusive look at the latest ${pageName} breakdown! The graphics, mechanics, and realism are taking this to an unprecedented level.\n\n💬 What are your thoughts on this? Drop your reaction below 👇`;
     }
   }
 
   // ── Construct Structured Components ──────────────────────
-  // 1. Shout-out line
+  // 1. Clean Attribution line
   let shoutoutLine = '';
   if (page.attribution_enabled !== 0 && sourceUsername && sourceUsername.toLowerCase() !== 'instagram' && !sourceUsername.toLowerCase().includes(page.slug || 'none')) {
-    shoutoutLine = `🙌 Shout-out & thanks to @${sourceUsername} for this resource!`;
+    shoutoutLine = `🎥 Credit: @${sourceUsername}`;
   }
 
-  // 2. Hourly Follow CTA line
-  const followLine = `🔔 Follow ${handle} for the latest ${pageName} updates every hour!`;
+  // 2. High-converting Follow CTA line
+  const followLine = `👉 Follow ${handle} for daily ${pageName} leaks & updates!`;
 
-  // 3. Deduplicate and collect hashtags
+  // 3. Deduplicate and collect hashtags (Strict 4-5 high-impact niche tags)
   const originalTags = extractHashtags(rawCaption);
   const defaultTags = extractHashtags(page.default_hashtags || '');
   const nicheTags = (page.slug && page.slug.includes('gta')) ? DEFAULT_GTA6_TAGS : [];
@@ -223,9 +221,9 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
   const tagSet = new Set();
   const mergedTags = [];
 
-  for (const tag of [...defaultTags, ...nicheTags, ...originalTags]) {
+  for (const tag of [...nicheTags, ...defaultTags, ...originalTags]) {
     const lower = tag.toLowerCase();
-    if (!tagSet.has(lower) && tagSet.size < 25) {
+    if (!tagSet.has(lower) && tagSet.size < 5) {
       tagSet.add(lower);
       mergedTags.push(tag);
     }

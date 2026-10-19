@@ -5,6 +5,7 @@ const {
   getPages,
   getPageById,
   getPublishedCountToday,
+  getLastPublishedTimestamp,
   listPublishJobs,
   updatePublishJob
 } = require('../../database');
@@ -267,11 +268,20 @@ async function handleMessage(msg) {
     return;
   }
 
-  // If only 1 page configured, dispatch directly or prompt
+  // Build page options with viral cooldown status
   const buttons = [];
   for (const page of activePages) {
+    const lastPublishedAt = getLastPublishedTimestamp(page.id);
+    let statusSuffix = '';
+    if (lastPublishedAt && page.min_spacing_minutes > 0) {
+      const elapsedMin = (Date.now() - new Date(lastPublishedAt).getTime()) / (1000 * 60);
+      if (elapsedMin < page.min_spacing_minutes) {
+        const waitMin = Math.ceil(page.min_spacing_minutes - elapsedMin);
+        statusSuffix = ` ⏳ (~${waitMin}m queue)`;
+      }
+    }
     buttons.push([{
-      text: `🚀 Post to ${page.name} (${page.handle})`,
+      text: `🚀 Post to ${page.name}${statusSuffix}`,
       callback_data: `post:${page.id}:${shortcode}`
     }]);
   }

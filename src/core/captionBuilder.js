@@ -49,6 +49,23 @@ function stripHashtagsFromText(text) {
   return text.replace(/#[a-zA-Z0-9_]+/g, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+const ENGAGEMENT_PROMPTS = [
+  '💬 What are your thoughts on this? Drop your reaction below 👇',
+  '💾 Save this reel so you have it ready when the game drops!',
+  '🚀 Send this to your crew who needs to see this!',
+  '👀 Real or overhyped? Let us know in the comments 👇',
+  '🔥 Double tap if you are hyped for this!'
+];
+
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 /**
  * Builds the final ready-to-post Instagram caption
  *
@@ -62,22 +79,28 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const bodyWithoutHashtags = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
-  // Attribution & Hourly Follow CTA
+  // Attribution & Viral Follow CTA
   let attribution = '';
   if (page.attribution_enabled && sourceUsername && sourceUsername !== 'instagram') {
-    const handle = page.handle || `@${page.slug || 'our_page'}`;
-    const pageName = page.name || 'GTA 6';
-    attribution = `🙌 Shout-out & thanks to @${sourceUsername} for this resource!\n\n🔔 Follow ${handle} for the latest ${pageName} updates every hour!`;
+    attribution = `🎥 Credit: @${sourceUsername}`;
   }
 
-  // Collect and deduplicate hashtags
+  const handle = page.handle || `@${page.slug || 'our_page'}`;
+  const pageName = page.name || 'GTA 6';
+  const followCta = `👉 Follow ${handle} for daily ${pageName} leaks & updates!`;
+
+  // Dynamic interactive prompt to trigger comments, saves, and shares
+  const promptIdx = Math.abs(simpleHash(bodyWithoutHashtags || 'default')) % ENGAGEMENT_PROMPTS.length;
+  const engagementPrompt = ENGAGEMENT_PROMPTS[promptIdx];
+
+  // Collect and deduplicate hashtags (Meta Reels Algorithm 2025/2026: 3-5 hyper-relevant tags)
   const originalTags = extractHashtags(rawCaption);
   const defaultTags = extractHashtags(page.default_hashtags || '');
 
   const tagSet = new Set();
   const mergedTags = [];
 
-  for (const tag of [...originalTags, ...defaultTags]) {
+  for (const tag of [...defaultTags, ...originalTags]) {
     const lower = tag.toLowerCase();
     if (!tagSet.has(lower)) {
       tagSet.add(lower);
@@ -85,21 +108,19 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
     }
   }
 
-  // Meta Instagram limits: Max 30 hashtags
-  const finalTags = mergedTags.slice(0, 30);
+  // Hard cap at 5 hashtags max to avoid spam dampening
+  const finalTags = mergedTags.slice(0, 5);
   const hashtagBlock = finalTags.join(' ');
 
-  // Template interpolation
-  let finalCaption = '';
-  const template = page.caption_template || '{caption}\n\n{attribution}\n\n{hashtags}';
+  // Assemble caption parts cleanly
+  const sections = [];
+  if (bodyWithoutHashtags) sections.push(bodyWithoutHashtags);
+  if (engagementPrompt) sections.push(engagementPrompt);
+  if (attribution) sections.push(attribution);
+  if (followCta) sections.push(followCta);
+  if (hashtagBlock) sections.push(hashtagBlock);
 
-  finalCaption = template
-    .replace('{caption}', bodyWithoutHashtags)
-    .replace('{attribution}', attribution)
-    .replace('{hashtags}', hashtagBlock);
-
-  // Clean up excessive blank lines from empty placeholders
-  finalCaption = finalCaption.replace(/\n{3,}/g, '\n\n').trim();
+  let finalCaption = sections.join('\n\n').trim();
 
   // Meta Instagram limits: Max 2,200 characters
   if (finalCaption.length > 2200) {
