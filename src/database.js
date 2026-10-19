@@ -414,6 +414,32 @@ function updateDiscoveredPost(id, data) {
   return getDiscoveredPostById(id);
 }
 
+function countDiscoveredPosts(options = {}) {
+  let sql = `
+    SELECT count(*) as c
+    FROM discovered_posts d
+    LEFT JOIN source_accounts s ON d.source_account_id = s.id
+    WHERE 1=1
+  `;
+  const params = [];
+
+  if (options.status) {
+    sql += ' AND d.status = ?';
+    params.push(options.status);
+  }
+  if (options.pageId) {
+    sql += ' AND s.page_id = ?';
+    params.push(options.pageId);
+  }
+  if (options.sourceAccountId) {
+    sql += ' AND d.source_account_id = ?';
+    params.push(options.sourceAccountId);
+  }
+
+  const row = getDb().prepare(sql).get(...params);
+  return row ? row.c : 0;
+}
+
 function listDiscoveredPosts(options = {}) {
   let sql = `
     SELECT d.*, s.username as source_username, p.slug as page_slug, p.name as page_name
@@ -441,6 +467,10 @@ function listDiscoveredPosts(options = {}) {
   if (options.limit) {
     sql += ' LIMIT ?';
     params.push(options.limit);
+    if (options.offset) {
+      sql += ' OFFSET ?';
+      params.push(options.offset);
+    }
   }
 
   return getDb().prepare(sql).all(...params);
@@ -913,6 +943,7 @@ module.exports = {
   createDiscoveredPost,
   updateDiscoveredPost,
   listDiscoveredPosts,
+  countDiscoveredPosts,
   // Publish Jobs
   getPublishJobById,
   getPublishJob,

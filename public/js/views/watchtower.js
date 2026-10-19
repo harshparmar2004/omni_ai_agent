@@ -7,6 +7,8 @@ window.watchtowerView = (function() {
   let selectedPageId = null; // null = 'all', or page id integer
   let activeStage = 'review'; // 'sources' | 'discovered' | 'ranked' | 'downloaded' | 'review' | 'active' | 'published' | 'failed'
   let downloadedViewMode = 'table'; // 'table' (default) | 'grid'
+  let stage2Page = 0; // 0-indexed page for Stage 2 discovered reels
+  const STAGE2_PAGE_SIZE = 50;
   let cachedStatus = null;
   let pipelineSummary = {
     sources: 0,
@@ -285,6 +287,7 @@ window.watchtowerView = (function() {
 
   async function selectPage(pageId) {
     selectedPageId = pageId;
+    stage2Page = 0;
     const switcher = document.getElementById('wt-page-switcher');
     if (switcher) switcher.innerHTML = renderPageSwitcherPills();
 
@@ -299,6 +302,9 @@ window.watchtowerView = (function() {
     activeStage = stageName;
     if (pageId !== undefined) {
       selectedPageId = pageId;
+    }
+    if (stageName === 'discovered') {
+      stage2Page = 0;
     }
 
     const switcher = document.getElementById('wt-page-switcher');
@@ -492,29 +498,59 @@ window.watchtowerView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 2: Discovered Raw Candidate Reels Deck
+  // STAGE 2: Raw Discovered Reels Deck (Table Layout with Pagination)
   // ─────────────────────────────────────────────────────────────
   async function renderDiscoveredStage(container) {
     try {
-      let query = '?limit=40';
+      const offset = stage2Page * STAGE2_PAGE_SIZE;
+      let query = `?limit=${STAGE2_PAGE_SIZE}&offset=${offset}`;
       if (selectedPageId) query += `&pageId=${selectedPageId}`;
       const res = await fetch(`/api/discoveries${query}`);
       const posts = res.ok ? await res.json() : [];
+      const totalHeader = res.headers.get('x-total-count');
+      const totalCount = totalHeader !== null ? parseInt(totalHeader, 10) : posts.length;
+
+      // Handle edge-case: page out of bounds if items were dispatched/skipped
+      if (posts.length === 0 && stage2Page > 0 && totalCount > 0) {
+        stage2Page = Math.max(0, Math.ceil(totalCount / STAGE2_PAGE_SIZE) - 1);
+        return renderDiscoveredStage(container);
+      }
+
+      const totalPages = Math.max(1, Math.ceil(totalCount / STAGE2_PAGE_SIZE));
+      const startItem = totalCount === 0 ? 0 : offset + 1;
+      const endItem = Math.min(offset + posts.length, totalCount);
+      const hasPrev = stage2Page > 0;
+      const hasNext = offset + posts.length < totalCount;
 
       container.innerHTML = `
-        <div class="pipeline-deck-header">
+        <div class="pipeline-deck-header" style="margin-bottom: 1.25rem;">
           <div>
             <div class="pipeline-stage-title">
               <span>Stage 2: Raw Discovered Reels</span>
-              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">${posts.length} ingested</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">
+                ${totalCount} ingested
+              </span>
             </div>
             <div class="text-sm text-muted">
               Fresh candidate reels harvested across competitor surveillance feeds
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()">
-            Refresh
-          </button>
+          <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+            ${totalCount > 0 ? `
+              <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 0.25rem;">
+                Showing <b>${startItem}–${endItem}</b> of <b>${totalCount}</b>
+              </span>
+              <button class="btn btn-secondary btn-sm" onclick="watchtowerView.prevDiscoveredPage()" ${!hasPrev ? 'disabled style="opacity: 0.45; cursor: not-allowed;"' : ''}>
+                ← Previous 50
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="watchtowerView.nextDiscoveredPage()" ${!hasNext ? 'disabled style="opacity: 0.45; cursor: not-allowed;"' : ''}>
+                Next 50 →
+              </button>
+            ` : ''}
+            <button class="btn btn-secondary btn-sm" onclick="watchtowerView.renderActiveStage()" title="Refresh Discovered Feed">
+              Refresh
+            </button>
+          </div>
         </div>
 
         ${posts.length === 0 ? `
@@ -528,44 +564,118 @@ window.watchtowerView = (function() {
             </button>
           </div>
         ` : `
-          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 1rem;">
-            ${posts.map(p => `
-              <div class="card" style="background: var(--bg-card); border-radius: 10px; padding: 1rem; border: 1px solid var(--border-card); display: flex; flex-direction: column; justify-content: space-between; box-shadow: none;">
-                <div>
-                  <div class="flex items-center justify-between mb-2">
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">
-                      Virality: <b style="color: var(--accent-primary); font-weight: 700;">${Math.round(p.score || 70)}</b>
-                    </span>
-                    <a href="${p.url}" target="_blank" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); text-decoration: none;">
-                      #${p.shortcode} ↗
-                    </a>
-                  </div>
+          <!-- Full-Width End-to-End Table Card -->
+          <div class="card table-container" style="padding: 0; overflow-x: auto; border-radius: 10px; border: 1px solid var(--border-card); box-shadow: none; width: 100%;">
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 70px; text-align: center;">Preview</th>
+                  <th style="width: 22%;">Reel & Creator</th>
+                  <th style="width: 16%;">Shared Target</th>
+                  <th style="width: 32%;">Content & Caption</th>
+                  <th style="width: 11%;">Virality</th>
+                  <th style="width: 19%; text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${posts.map(p => {
+                  const reelUrl = p.url || `https://www.instagram.com/reel/${p.shortcode}/`;
+                  const pageSlug = p.page_slug ? `@${p.page_slug}` : 'Auto / General';
+                  const pubDate = formatPublishDate(p.posted_at || p.created_at);
+                  const timeAgo = formatTimeAgo(p.posted_at || p.created_at);
+                  const viralityScore = Math.round(p.score ? (p.score <= 1.0 ? p.score * 100 : p.score) : 70);
 
-                  <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
-                    <a href="https://instagram.com/${p.source_username || ''}" target="_blank" style="text-decoration: none; color: var(--text-primary);">
-                      From @${p.source_username || 'creator'} <span style="color: var(--accent-primary); font-size: 0.72rem;">↗</span>
-                    </a>
-                  </div>
+                  return `
+                    <tr>
+                      <!-- 1. Thumbnail / Reel Preview -->
+                      <td style="text-align: center; vertical-align: middle; padding: 0.6rem 0.5rem;">
+                        <a href="${reelUrl}" target="_blank" class="reel-table-thumb-container" title="Open reel #${p.shortcode} on Instagram">
+                          <img src="/api/discoveries/${p.id}/thumbnail" alt="${p.shortcode}" class="reel-table-thumb-img" loading="lazy" />
+                          <div class="reel-thumb-play-icon">▶</div>
+                        </a>
+                      </td>
 
-                  <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45; max-height: 48px; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.75rem;">
-                    ${p.caption ? p.caption.substring(0, 85) + '...' : 'Instagram Reel discovered via Watchtower surveillance'}
-                  </div>
+                      <!-- 2. Reel ID & Creator -->
+                      <td>
+                        <div style="margin-bottom: 3px;">
+                          <a href="${reelUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="${reelUrl}">
+                            #${p.shortcode} ↗
+                          </a>
+                        </div>
+                        <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">
+                          <a href="https://instagram.com/${p.source_username || ''}" target="_blank" style="text-decoration: none; color: var(--text-primary);">
+                            From @${p.source_username || 'creator'} <span style="color: var(--accent-primary); font-size: 0.72rem;">↗</span>
+                          </a>
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">
+                          Published ${pubDate} · ${timeAgo}
+                        </div>
+                      </td>
 
-                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.85rem;">
-                    Likes: ${(p.like_count || 0).toLocaleString()} · Comments: ${(p.comment_count || 0).toLocaleString()} · Views: ${(p.view_count || 0).toLocaleString()}
-                  </div>
-                </div>
+                      <!-- 3. Shared Target Destination -->
+                      <td>
+                        <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">
+                          ${pageSlug}
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">
+                          ${escapeHtml(p.page_name || 'Instagram Page')}
+                        </div>
+                      </td>
 
-                <div class="flex items-center gap-2">
-                  <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.postDiscovery(${p.id})">
-                    Dispatch to Pipeline
-                  </button>
-                  <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip this reel">
-                    ✕
-                  </button>
-                </div>
+                      <!-- 4. Content & Caption -->
+                      <td>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 5px; max-width: 480px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${escapeHtml(p.caption || '')}">
+                          ${escapeHtml(p.caption ? (p.caption.length > 140 ? p.caption.substring(0, 140) + '...' : p.caption) : 'Instagram Reel discovered via Watchtower surveillance')}
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                          ${(p.like_count || 0).toLocaleString()} likes · ${(p.comment_count || 0).toLocaleString()} comments · ${(p.view_count || 0).toLocaleString()} views
+                        </div>
+                      </td>
+
+                      <!-- 5. Virality Score -->
+                      <td>
+                        <div style="font-weight: 700; font-size: 0.86rem; color: var(--accent-primary); margin-bottom: 2px;">
+                          ${viralityScore}
+                        </div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">
+                          Virality Score
+                        </div>
+                      </td>
+
+                      <!-- 6. Actions -->
+                      <td style="text-align: right; white-space: nowrap;">
+                        <div style="display: inline-flex; align-items: center; gap: 8px;">
+                          <button class="btn btn-primary btn-sm" onclick="watchtowerView.postDiscovery(${p.id})" style="font-size: 0.78rem; padding: 4px 10px;">
+                            Dispatch to Pipeline
+                          </button>
+                          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip this reel" style="font-size: 0.78rem; padding: 4px 8px; color: var(--text-muted);">
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+
+            <!-- Bottom Pagination Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; border-top: 1px solid var(--border-subtle); background: var(--bg-surface); flex-wrap: wrap; gap: 0.75rem;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">
+                Showing <b>${startItem}</b> to <b>${endItem}</b> of <b>${totalCount}</b> discovered reels
+              </span>
+              <div class="flex items-center gap-2">
+                <button class="btn btn-secondary btn-sm" onclick="watchtowerView.prevDiscoveredPage()" ${!hasPrev ? 'disabled style="opacity: 0.45; cursor: not-allowed;"' : ''}>
+                  ← Previous 50
+                </button>
+                <span style="font-size: 0.78rem; font-weight: 600; padding: 0 0.5rem; color: var(--text-secondary);">
+                  Page ${stage2Page + 1} of ${totalPages}
+                </span>
+                <button class="btn btn-secondary btn-sm" onclick="watchtowerView.nextDiscoveredPage()" ${!hasNext ? 'disabled style="opacity: 0.45; cursor: not-allowed;"' : ''}>
+                  Next 50 →
+                </button>
               </div>
-            `).join('')}
+            </div>
           </div>
         `}
       `;
@@ -1567,6 +1677,29 @@ window.watchtowerView = (function() {
     }
   }
 
+  function formatPublishDate(timestamp) {
+    if (!timestamp) return 'Recently discovered';
+    try {
+      const d = new Date(timestamp);
+      if (isNaN(d.getTime())) return 'Recently discovered';
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return 'Recently discovered';
+    }
+  }
+
+  async function nextDiscoveredPage() {
+    stage2Page++;
+    await renderActiveStage();
+  }
+
+  async function prevDiscoveredPage() {
+    if (stage2Page > 0) {
+      stage2Page--;
+      await renderActiveStage();
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -1589,6 +1722,8 @@ window.watchtowerView = (function() {
     checkSource,
     postDiscovery,
     skipDiscovery,
+    nextDiscoveredPage,
+    prevDiscoveredPage,
     approveJob,
     deleteJob,
     retryJob,
