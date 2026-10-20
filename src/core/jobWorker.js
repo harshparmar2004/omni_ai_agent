@@ -125,33 +125,16 @@ class JobWorkerPool {
       return;
     }
 
-    // Enforce universal min spacing between posts (Anti-Spam & Viral Algorithm Guard)
-    if (page.min_spacing_minutes > 0 && !job.force_instant) {
+    // Check min spacing between posts (Applies exclusively to Agent 2: Watchtower autonomous surveillance)
+    // Agent 1 (Telegram / Reposter) publishes immediately on-demand without schedule delays
+    if (job.agent === 'watchtower' && page.min_spacing_minutes > 0 && !job.force_instant) {
       const lastPublishedAt = getLastPublishedTimestamp(page.id);
       if (lastPublishedAt) {
         const elapsedMin = (Date.now() - new Date(lastPublishedAt).getTime()) / (1000 * 60);
         if (elapsedMin < page.min_spacing_minutes) {
           const waitMin = Math.ceil(page.min_spacing_minutes - elapsedMin);
-          console.log(`[Job Worker] ⏳ Viral spacing guard: Waiting ${waitMin}m before next post on ${page.handle} to prevent Instagram algorithm penalty...`);
-
-          // Update Telegram once about scheduled release
-          if (job.telegram_chat_id && job.telegram_message_id && job.current_step !== 'spacing_hold') {
-            updateJobProgress(jobId, 'queued', 'spacing_hold', {
-              error: `Viral Spacing Guard: Scheduled to post in ${waitMin}m to protect Instagram reach.`
-            });
-            const targetTime = new Date(Date.now() + waitMin * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            this.updateTelegramProgress(job, [
-              `🎬 <b>REPOST PIPELINE: ${page.handle}</b>`,
-              `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
-              `🔗 <b>Source Reel:</b> <code>#${job.shortcode || 'reel'}</code>`,
-              ``,
-              `⏳ <b>Viral Spacing Guard Active</b>`,
-              `To protect your account from Instagram's aggregator penalty & spam dampening, this reel is scheduled to go live at <b>${targetTime}</b> (~${waitMin}m).`,
-              ``,
-              `<i>Status: Safely queued for optimal algorithm distribution</i>`
-            ]).catch(() => {});
-          }
-          return; // Will automatically pick up when cooldown expires
+          console.log(`[Job Worker] ⏳ Watchtower pacing guard: Waiting ${waitMin}m before next autonomous post on ${page.handle}...`);
+          return; // Will automatically pick up in future ticks when cooldown expires
         }
       }
     }

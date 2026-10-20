@@ -268,20 +268,11 @@ async function handleMessage(msg) {
     return;
   }
 
-  // Build page options with viral cooldown status
+  // Build direct publish destination options for Telegram sharing
   const buttons = [];
   for (const page of activePages) {
-    const lastPublishedAt = getLastPublishedTimestamp(page.id);
-    let statusSuffix = '';
-    if (lastPublishedAt && page.min_spacing_minutes > 0) {
-      const elapsedMin = (Date.now() - new Date(lastPublishedAt).getTime()) / (1000 * 60);
-      if (elapsedMin < page.min_spacing_minutes) {
-        const waitMin = Math.ceil(page.min_spacing_minutes - elapsedMin);
-        statusSuffix = ` ⏳ (~${waitMin}m queue)`;
-      }
-    }
     buttons.push([{
-      text: `🚀 Post to ${page.name}${statusSuffix}`,
+      text: `🚀 Post to ${page.name} (${page.handle})`,
       callback_data: `post:${page.id}:${shortcode}`
     }]);
   }
