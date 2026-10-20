@@ -181,12 +181,12 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
 
     let ffmpegArgs = [];
     if (hasAudio) {
-      // Material transformation: 1.02x speed shift, 1080x1920 crop/scale, color pop, scrub metadata
+      // Material transformation: 1.02x speed shift, preserve native aspect ratio & resolution, color pop, scrub metadata
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
         '-filter_complex',
-        '[0:v]setpts=PTS/1.02,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.03:brightness=0.01:saturation=1.04[v];[0:a]atempo=1.02[a]',
+        '[0:v]setpts=PTS/1.02,scale=trunc(iw/2)*2:trunc(ih/2)*2,eq=contrast=1.03:brightness=0.01:saturation=1.04[v];[0:a]atempo=1.02[a]',
         '-map', '[v]',
         '-map', '[a]',
         '-c:v', 'libx264',
@@ -202,14 +202,14 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         tempOut
       ];
     } else {
-      // Input has no audio: add synthetic silent stereo audio track + material video transformation
+      // Input has no audio: add synthetic silent stereo audio track + preserve native aspect ratio
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
         '-f', 'lavfi',
         '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
         '-filter_complex',
-        '[0:v]setpts=PTS/1.02,scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,eq=contrast=1.03:brightness=0.01:saturation=1.04[v]',
+        '[0:v]setpts=PTS/1.02,scale=trunc(iw/2)*2:trunc(ih/2)*2,eq=contrast=1.03:brightness=0.01:saturation=1.04[v]',
         '-map', '[v]',
         '-map', '1:a',
         '-c:v', 'libx264',
