@@ -101,9 +101,14 @@ class NotifierService extends EventEmitter {
     const token = this.getTelegramToken();
     if (!token || !chatId) return null;
 
-    const absPath = path.isAbsolute(localVideoPath)
-      ? localVideoPath
-      : path.join(__dirname, '..', '..', 'public', localVideoPath.replace(/^\//, ''));
+    let absPath = localVideoPath;
+    if (!fs.existsSync(absPath)) {
+      const cleanRel = localVideoPath.replace(/^[/\\]+/, '');
+      const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+      if (fs.existsSync(candidate)) {
+        absPath = candidate;
+      }
+    }
 
     if (!fs.existsSync(absPath)) {
       console.warn(`[Notifier] Video file not found on disk: ${absPath}`);
@@ -146,9 +151,14 @@ class NotifierService extends EventEmitter {
 
       const mediaArray = [];
       localImagePaths.slice(0, 10).forEach((imgRel, index) => {
-        const absPath = path.isAbsolute(imgRel)
-          ? imgRel
-          : path.join(__dirname, '..', '..', 'public', imgRel.replace(/^\//, ''));
+        let absPath = imgRel;
+        if (!fs.existsSync(absPath)) {
+          const cleanRel = imgRel.replace(/^[/\\]+/, '');
+          const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+          if (fs.existsSync(candidate)) {
+            absPath = candidate;
+          }
+        }
 
         if (fs.existsSync(absPath)) {
           const attachName = `photo_${index}`;

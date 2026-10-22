@@ -272,9 +272,14 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
 async function ensureMetaCompliantImage(inputImagePath) {
   if (!inputImagePath) throw new Error('No image path provided');
 
-  const absPath = path.isAbsolute(inputImagePath)
-    ? inputImagePath
-    : path.join(__dirname, '..', '..', 'public', inputImagePath.replace(/^\//, ''));
+  let absPath = inputImagePath;
+  if (!fs.existsSync(absPath)) {
+    const cleanRel = inputImagePath.replace(/^[/\\]+/, '');
+    const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+    if (fs.existsSync(candidate)) {
+      absPath = candidate;
+    }
+  }
 
   if (!fs.existsSync(absPath)) {
     throw new Error(`Image file not found on disk: ${absPath}`);
@@ -351,15 +356,28 @@ async function ensureMetaCompliantImage(inputImagePath) {
  * Prepares video for Instagram Story container (Max 60 seconds duration limit)
  */
 async function prepareVideoForStory(inputVideoPath) {
-  if (!fs.existsSync(inputVideoPath)) {
-    throw new Error(`Input video not found: ${inputVideoPath}`);
+  if (!inputVideoPath) {
+    throw new Error('No input video path provided for story');
+  }
+
+  let absPath = inputVideoPath;
+  if (!fs.existsSync(absPath)) {
+    const cleanRel = inputVideoPath.replace(/^[/\\]+/, '');
+    const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+    if (fs.existsSync(candidate)) {
+      absPath = candidate;
+    }
+  }
+
+  if (!fs.existsSync(absPath)) {
+    throw new Error(`Input video not found: ${absPath}`);
   }
 
   const { execSync } = require('child_process');
   let duration = 0;
   try {
     const raw = execSync(
-      `ffprobe -v error -show_entries format=duration -of json "${inputVideoPath}"`,
+      `ffprobe -v error -show_entries format=duration -of json "${absPath}"`,
       { timeout: 10000 }
     ).toString();
     const data = JSON.parse(raw);
@@ -368,25 +386,25 @@ async function prepareVideoForStory(inputVideoPath) {
     console.warn(`[FFmpeg Helper] Story ffprobe duration error: ${e.message}`);
   }
 
-  // If video is within 60s limit, return as is
+  // If video is within 60s limit, return original path as is
   if (duration <= 60 && duration > 0) {
     return inputVideoPath;
   }
 
   // If video is > 60s, clip to 59.5s for Story compliance
-  const dir = path.dirname(inputVideoPath);
-  const ext = path.extname(inputVideoPath);
-  const base = path.basename(inputVideoPath, ext);
+  const dir = path.dirname(absPath);
+  const ext = path.extname(absPath);
+  const base = path.basename(absPath, ext);
   const storyOutput = path.join(dir, `${base}_story.mp4`);
 
   console.log(`[FFmpeg Helper] ✂️ Reel duration is ${duration.toFixed(1)}s (> 60s limit). Clipping to 59.5s for Instagram Story...`);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const args = [
       '-y',
       '-ss', '0',
       '-t', '59.5',
-      '-i', inputVideoPath,
+      '-i', absPath,
       '-c:v', 'libx264',
       '-c:a', 'aac',
       '-pix_fmt', 'yuv420p',
@@ -398,9 +416,12 @@ async function prepareVideoForStory(inputVideoPath) {
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(storyOutput)) {
         console.log(`[FFmpeg Helper] ✅ Story-ready clip generated: ${storyOutput}`);
-        resolve(storyOutput);
+        // Return relative path matching publicDir convention
+        const publicDir = path.join(__dirname, '..', '..', 'public');
+        let rel = storyOutput.replace(publicDir, '').replace(/\\/g, '/');
+        if (!rel.startsWith('/')) rel = '/' + rel;
+        resolve(rel);
       } else {
-        // Fallback to original
         resolve(inputVideoPath);
       }
     });
