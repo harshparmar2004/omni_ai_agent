@@ -290,19 +290,30 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
 
   if (isVideo) {
     const { prepareVideoForStory } = require('../utils/ffmpegHelper');
-    const safeVideoPath = await prepareVideoForStory(videoPath);
+    const safeVideoPath = await prepareVideoForStory(videoPath, { handle: page.handle });
     publicMediaUrl = await getPublicUrlForMedia(safeVideoPath);
   } else {
-    publicMediaUrl = await getPublicUrlForMedia(imagePath);
+    const { prepareImageForStory } = require('../utils/ffmpegHelper');
+    const safeImagePath = await prepareImageForStory(imagePath, { handle: page.handle });
+    publicMediaUrl = await getPublicUrlForMedia(safeImagePath);
   }
 
   console.log(`[Publisher] 🌟 Publishing Instagram Story for ${page.handle} via ${baseUrl}...`);
   console.log(`[Publisher] 🌐 Public story media URL: ${publicMediaUrl}`);
 
+  const cleanHandle = page.handle ? page.handle.replace(/^@/, '') : '';
+
   const initParams = {
     media_type: 'STORIES',
     access_token: token
   };
+
+  // Attach interactive native profile tag aligned with the "Watch Full Reel" button (x: 0.5, y: 0.85)
+  if (cleanHandle) {
+    initParams.user_tags = JSON.stringify([
+      { username: cleanHandle, x: 0.5, y: 0.85 }
+    ]);
+  }
 
   if (isVideo) {
     initParams.video_url = publicMediaUrl;
@@ -339,7 +350,6 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
     throw new Error('Meta API media_publish did not return media ID for Story');
   }
 
-  const cleanHandle = page.handle ? page.handle.replace(/^@/, '') : '';
   const storyUrl = cleanHandle ? `https://www.instagram.com/stories/${cleanHandle}/` : 'https://www.instagram.com/';
   console.log(`[Publisher] ✅ Story published live! Media ID: ${igMediaId} | Story URL: ${storyUrl}`);
 

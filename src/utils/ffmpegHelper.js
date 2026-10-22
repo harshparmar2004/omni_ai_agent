@@ -353,9 +353,84 @@ async function ensureMetaCompliantImage(inputImagePath) {
 }
 
 /**
- * Prepares video for Instagram Story container (Max 60 seconds duration limit)
+ * Generates transparent UI overlay PNG for Instagram Story Reshare Card
  */
-async function prepareVideoForStory(inputVideoPath) {
+function generateStoryOverlay(handle, options = {}) {
+  const { createCanvas } = require('@napi-rs/canvas');
+  const width = 1080;
+  const height = 1920;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const cleanHandle = (handle || '').replace(/^@/, '');
+  const typeLabel = options.typeLabel || 'REEL';
+
+  // 1. Top Header Banner Pill
+  const headerY = 220;
+  const headerWidth = 520;
+  const headerHeight = 64;
+  const headerX = (width - headerWidth) / 2;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(headerX, headerY, headerWidth, headerHeight, 32);
+  } else {
+    ctx.rect(headerX, headerY, headerWidth, headerHeight);
+  }
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 26px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`@${cleanHandle} • ${typeLabel}`, width / 2, headerY + headerHeight / 2);
+
+  // 2. Bottom CTA Button
+  const ctaY = 1620;
+  const ctaWidth = 460;
+  const ctaHeight = 74;
+  const ctaX = (width - ctaWidth) / 2;
+
+  const grad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaWidth, ctaY);
+  grad.addColorStop(0, '#E1306C');
+  grad.addColorStop(0.5, '#FD1D1D');
+  grad.addColorStop(1, '#F77737');
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(ctaX, ctaY, ctaWidth, ctaHeight, 37);
+  } else {
+    ctx.rect(ctaX, ctaY, ctaWidth, ctaHeight);
+  }
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.fillText('▶ Watch Full Reel', width / 2, ctaY + ctaHeight / 2);
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  const genDir = path.join(publicDir, 'generated');
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  const overlayPath = path.join(genDir, `story_overlay_${cleanHandle || 'default'}.png`);
+  fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+  return overlayPath;
+}
+
+/**
+ * Prepares video for Instagram Story container as an authentic "Reel Reshare Card":
+ * 1. Preserves original video aspect ratio in a centered card (never stretched).
+ * 2. Renders dynamic ambient blurred background.
+ * 3. Overlays branded handle header and "Watch Full Reel" CTA aligned with Meta user_tags.
+ * 4. Limits duration to <= 59.5 seconds for Meta Story compliance.
+ */
+async function prepareVideoForStory(inputVideoPath, options = {}) {
   if (!inputVideoPath) {
     throw new Error('No input video path provided for story');
   }
@@ -373,6 +448,9 @@ async function prepareVideoForStory(inputVideoPath) {
     throw new Error(`Input video not found: ${absPath}`);
   }
 
+  const handle = options.handle || 'gta6_updates_007';
+  const overlayPngPath = generateStoryOverlay(handle, options);
+
   const { execSync } = require('child_process');
   let duration = 0;
   try {
@@ -386,28 +464,35 @@ async function prepareVideoForStory(inputVideoPath) {
     console.warn(`[FFmpeg Helper] Story ffprobe duration error: ${e.message}`);
   }
 
-  // If video is within 60s limit, return original path as is
-  if (duration <= 60 && duration > 0) {
-    return inputVideoPath;
-  }
-
-  // If video is > 60s, clip to 59.5s for Story compliance
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);
   const base = path.basename(absPath, ext);
-  const storyOutput = path.join(dir, `${base}_story.mp4`);
+  const storyOutput = path.join(dir, `${base}_story_card.mp4`);
 
-  console.log(`[FFmpeg Helper] ✂️ Reel duration is ${duration.toFixed(1)}s (> 60s limit). Clipping to 59.5s for Instagram Story...`);
+  console.log(`[FFmpeg Helper] 🎨 Composing Instagram Story Reel Card for @${handle} (ambient blur + original aspect ratio + CTA overlay)...`);
+
+  const filter = [
+    '[0:v]split=2[bg_raw][fg_raw]',
+    '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:5,eq=brightness=-0.28:contrast=0.92[bg]',
+    '[fg_raw]scale=w=860:h=1240:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2[card]',
+    '[bg][card]overlay=(W-w)/2:(H-h)/2[v1]',
+    '[v1][1:v]overlay=0:0[outv]'
+  ].join(';');
+
+  const clipLimit = duration > 60 ? '59.5' : String(Math.max(duration, 1));
 
   return new Promise((resolve) => {
     const args = [
       '-y',
-      '-ss', '0',
-      '-t', '59.5',
       '-i', absPath,
+      '-i', overlayPngPath,
+      '-t', clipLimit,
+      '-filter_complex', filter,
+      '-map', '[outv]',
+      '-map', '0:a?',
       '-c:v', 'libx264',
-      '-c:a', 'aac',
       '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
       '-movflags', '+faststart',
       storyOutput
     ];
@@ -415,24 +500,138 @@ async function prepareVideoForStory(inputVideoPath) {
     const proc = spawn('ffmpeg', args);
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(storyOutput)) {
-        console.log(`[FFmpeg Helper] ✅ Story-ready clip generated: ${storyOutput}`);
-        // Return relative path matching publicDir convention
+        console.log(`[FFmpeg Helper] ✅ Story Reel Card generated: ${storyOutput}`);
         const publicDir = path.join(__dirname, '..', '..', 'public');
         let rel = storyOutput.replace(publicDir, '').replace(/\\/g, '/');
         if (!rel.startsWith('/')) rel = '/' + rel;
         resolve(rel);
       } else {
+        console.warn(`[FFmpeg Helper] ⚠️ Story Reel Card FFmpeg exited with code ${code}, falling back to original media`);
         resolve(inputVideoPath);
       }
     });
-    proc.on('error', () => resolve(inputVideoPath));
+    proc.on('error', (err) => {
+      console.warn(`[FFmpeg Helper] Story render error: ${err.message}, falling back to original`);
+      resolve(inputVideoPath);
+    });
   });
+}
+
+/**
+ * Prepares image for Instagram Story container as an authentic Post Card:
+ * 1. Preserves original image aspect ratio in a centered card.
+ * 2. Renders dynamic blurred background from the image.
+ * 3. Overlays branded header and "View Post" CTA.
+ */
+async function prepareImageForStory(inputImagePath, options = {}) {
+  if (!inputImagePath) throw new Error('No input image path provided for story');
+
+  let absPath = inputImagePath;
+  if (!fs.existsSync(absPath)) {
+    const cleanRel = inputImagePath.replace(/^[/\\]+/, '');
+    const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+    if (fs.existsSync(candidate)) absPath = candidate;
+  }
+
+  if (!fs.existsSync(absPath)) {
+    throw new Error(`Input image not found: ${absPath}`);
+  }
+
+  const { createCanvas, loadImage } = require('@napi-rs/canvas');
+  const handle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
+
+  const width = 1080;
+  const height = 1920;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const img = await loadImage(absPath);
+
+  // Draw blurred ambient background (using drawImage scaled with darken overlay)
+  ctx.drawImage(img, -width * 0.25, -height * 0.25, width * 1.5, height * 1.5);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillRect(0, 0, width, height);
+
+  // Compute centered card size in original aspect ratio
+  const maxW = 860;
+  const maxH = 1240;
+  const imgRatio = img.width / img.height;
+  let cardW = maxW;
+  let cardH = cardW / imgRatio;
+
+  if (cardH > maxH) {
+    cardH = maxH;
+    cardW = cardH * imgRatio;
+  }
+
+  const cardX = (width - cardW) / 2;
+  const cardY = (height - cardH) / 2;
+
+  // Draw centered card
+  ctx.drawImage(img, cardX, cardY, cardW, cardH);
+
+  // Top header pill
+  const headerY = 220;
+  const headerWidth = 520;
+  const headerHeight = 64;
+  const headerX = (width - headerWidth) / 2;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(headerX, headerY, headerWidth, headerHeight, 32);
+  else ctx.rect(headerX, headerY, headerWidth, headerHeight);
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 26px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`@${handle} • POST`, width / 2, headerY + headerHeight / 2);
+
+  // Bottom CTA
+  const ctaY = 1620;
+  const ctaWidth = 460;
+  const ctaHeight = 74;
+  const ctaX = (width - ctaWidth) / 2;
+
+  const grad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaWidth, ctaY);
+  grad.addColorStop(0, '#E1306C');
+  grad.addColorStop(0.5, '#FD1D1D');
+  grad.addColorStop(1, '#F77737');
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaWidth, ctaHeight, 37);
+  else ctx.rect(ctaX, ctaY, ctaWidth, ctaHeight);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 28px Arial, sans-serif';
+  ctx.fillText('▶ View Post', width / 2, ctaY + ctaHeight / 2);
+
+  const dir = path.dirname(absPath);
+  const ext = path.extname(absPath);
+  const base = path.basename(absPath, ext);
+  const storyOutput = path.join(dir, `${base}_story_card.jpg`);
+
+  fs.writeFileSync(storyOutput, canvas.toBuffer('image/jpeg'));
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  let rel = storyOutput.replace(publicDir, '').replace(/\\/g, '/');
+  if (!rel.startsWith('/')) rel = '/' + rel;
+  return rel;
 }
 
 module.exports = {
   renderReelVideo,
   ensureMetaCompliantVideo,
   ensureMetaCompliantImage,
-  prepareVideoForStory
+  prepareVideoForStory,
+  prepareImageForStory,
+  generateStoryOverlay
 };
 
