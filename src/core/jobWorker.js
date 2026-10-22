@@ -246,13 +246,13 @@ class JobWorkerPool {
       // ── Step 4: Auto-Publish to Instagram Story ──────────────
       let storyResult = null;
       const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
-      if (autoPostStory && (mediaType === 'reel' || mediaType === 'image') && mediaPaths[0]) {
+      if (autoPostStory && mediaPaths[0]) {
         try {
           console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
           storyResult = await publishStory({
             page,
             videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
-            imagePath: mediaType === 'image' ? mediaPaths[0] : null
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
           });
           console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult.ig_media_id}`);
         } catch (storyErr) {
