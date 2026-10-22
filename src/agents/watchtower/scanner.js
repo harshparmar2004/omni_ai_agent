@@ -51,7 +51,7 @@ async function scanAllSources(options = {}) {
 
       if (!res.success) {
         const failCount = (src.consecutive_failures || 0) + 1;
-        const newHealth = failCount >= 5 ? 'paused' : 'failing';
+        const newHealth = failCount >= 5 ? 'warning' : 'retrying';
         updateSourceAccount(src.id, {
           consecutive_failures: failCount,
           health: newHealth,

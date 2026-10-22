@@ -347,9 +347,71 @@ async function ensureMetaCompliantImage(inputImagePath) {
   });
 }
 
+/**
+ * Prepares video for Instagram Story container (Max 60 seconds duration limit)
+ */
+async function prepareVideoForStory(inputVideoPath) {
+  if (!fs.existsSync(inputVideoPath)) {
+    throw new Error(`Input video not found: ${inputVideoPath}`);
+  }
+
+  const { execSync } = require('child_process');
+  let duration = 0;
+  try {
+    const raw = execSync(
+      `ffprobe -v error -show_entries format=duration -of json "${inputVideoPath}"`,
+      { timeout: 10000 }
+    ).toString();
+    const data = JSON.parse(raw);
+    duration = parseFloat(data?.format?.duration) || 0;
+  } catch (e) {
+    console.warn(`[FFmpeg Helper] Story ffprobe duration error: ${e.message}`);
+  }
+
+  // If video is within 60s limit, return as is
+  if (duration <= 60 && duration > 0) {
+    return inputVideoPath;
+  }
+
+  // If video is > 60s, clip to 59.5s for Story compliance
+  const dir = path.dirname(inputVideoPath);
+  const ext = path.extname(inputVideoPath);
+  const base = path.basename(inputVideoPath, ext);
+  const storyOutput = path.join(dir, `${base}_story.mp4`);
+
+  console.log(`[FFmpeg Helper] ✂️ Reel duration is ${duration.toFixed(1)}s (> 60s limit). Clipping to 59.5s for Instagram Story...`);
+
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-y',
+      '-ss', '0',
+      '-t', '59.5',
+      '-i', inputVideoPath,
+      '-c:v', 'libx264',
+      '-c:a', 'aac',
+      '-pix_fmt', 'yuv420p',
+      '-movflags', '+faststart',
+      storyOutput
+    ];
+
+    const proc = spawn('ffmpeg', args);
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(storyOutput)) {
+        console.log(`[FFmpeg Helper] ✅ Story-ready clip generated: ${storyOutput}`);
+        resolve(storyOutput);
+      } else {
+        // Fallback to original
+        resolve(inputVideoPath);
+      }
+    });
+    proc.on('error', () => resolve(inputVideoPath));
+  });
+}
+
 module.exports = {
   renderReelVideo,
   ensureMetaCompliantVideo,
-  ensureMetaCompliantImage
+  ensureMetaCompliantImage,
+  prepareVideoForStory
 };
 

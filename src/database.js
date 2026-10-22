@@ -142,7 +142,8 @@ function initV7Schema(db) {
     peak_window_morning: '08:00-11:00|3',
     peak_window_evening: '17:00-21:00|5',
     peak_window_midnight: '23:00-01:00|4',
-    watchtower_interval_hours: '3'
+    watchtower_interval_hours: '3',
+    auto_post_to_story: 'true'
   };
   const insertSettingStmt = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [k, v] of Object.entries(defaultSettings)) {
@@ -153,6 +154,11 @@ function initV7Schema(db) {
   try {
     db.prepare('UPDATE pages SET daily_quota = 5, min_spacing_minutes = 120 WHERE min_spacing_minutes < 120').run();
   } catch (e) {}
+
+  // Story publishing migrations
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_ig_media_id TEXT DEFAULT ""'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_status TEXT DEFAULT "idle"'); } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -553,7 +559,8 @@ function updatePublishJob(id, data) {
   const allowed = [
     'status', 'current_step', 'attempts', 'error', 'media_paths',
     'caption', 'ig_media_id', 'permalink', 'telegram_chat_id',
-    'telegram_message_id', 'published_at'
+    'telegram_message_id', 'published_at',
+    'story_ig_media_id', 'story_published_at', 'story_status'
   ];
 
   for (const k of allowed) {

@@ -16,7 +16,7 @@ function readSourcePosts(username, limit = 6) {
 
     console.log(`[Watchtower Guest Reader] 🔍 Inspecting @${cleanUser}...`);
 
-    exec(command, { timeout: 45000 }, (error, stdout, stderr) => {
+    exec(command, { timeout: 75000 }, (error, stdout, stderr) => {
       let data = null;
       try {
         const out = stdout.trim();
@@ -24,7 +24,9 @@ function readSourcePosts(username, limit = 6) {
         if (jsonStart !== -1) {
           data = JSON.parse(out.slice(jsonStart));
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[Watchtower Guest Reader] JSON parse warning: ${e.message}`);
+      }
 
       if (!data || !data.success) {
         const errMsg = data?.error || stderr || error?.message || 'Failed to inspect profile';

@@ -4,7 +4,7 @@ const { getPageById, updateDiscoveredPost, getPublishedCountToday, getLastPublis
 const { updateJobProgress, getJob, listJobs } = require('./jobQueue');
 const { downloadInstagramMedia } = require('./downloader');
 const { buildCaption, buildAiCaption } = require('./captionBuilder');
-const { publishReel, publishCarousel, publishImage } = require('./publisher');
+const { publishReel, publishCarousel, publishImage, publishStory } = require('./publisher');
 const notifier = require('./notifier');
 
 function escapeHtml(str) {
@@ -243,12 +243,32 @@ class JobWorkerPool {
         throw new Error(pubResult?.error || 'Publish did not return an Instagram media ID');
       }
 
-      // ── Step 4: Finalise Success ─────────────────────────────
+      // ── Step 4: Auto-Publish to Instagram Story ──────────────
+      let storyResult = null;
+      const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
+      if (autoPostStory && (mediaType === 'reel' || mediaType === 'image') && mediaPaths[0]) {
+        try {
+          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
+          storyResult = await publishStory({
+            page,
+            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
+            imagePath: mediaType === 'image' ? mediaPaths[0] : null
+          });
+          console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult.ig_media_id}`);
+        } catch (storyErr) {
+          console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
+        }
+      }
+
+      // ── Step 5: Finalise Success ─────────────────────────────
       const publishedAt = pubResult.published_at || new Date().toISOString();
       job = updateJobProgress(jobId, 'published', 'live', {
         ig_media_id: pubResult.ig_media_id,
         permalink: pubResult.permalink,
         published_at: publishedAt,
+        story_ig_media_id: storyResult?.ig_media_id || '',
+        story_published_at: storyResult?.published_at || null,
+        story_status: storyResult?.success ? 'published' : 'idle',
         error: ''
       });
 
@@ -259,22 +279,24 @@ class JobWorkerPool {
         } catch (e) {}
       }
 
-      // Telegram success announcement with clickable live link, creator attribution, and full caption
+      // Telegram success announcement with clickable live link, creator attribution, full caption, and story confirmation
       const successLines = [
         `🎉 <b>REPOST PIPELINE: LIVE ON INSTAGRAM!</b>`,
         `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
         `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
         `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
-        `✅ <b>1. Ingested via Telegram</b>`,
+        `✅ <b>1. Ingested via ${job.agent === 'watchtower' ? 'Watchtower Tracking' : 'Telegram'}</b>`,
         `✅ <b>2. Downloaded 1080p MP4</b>`,
         `✅ <b>3. AI Caption & Attribution Ready</b>`,
-        `✅ <b>4. Published Live via Meta Graph API v21.0</b>`,
+        `✅ <b>4. Published Live to Profile Feed</b>`,
+        storyResult?.success ? `✅ <b>5. Published Live to Instagram Story!</b> 🌟` : '',
         ``,
         `🌐 <b>Live Instagram Reel:</b>`,
         `👉 <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
+        storyResult?.success ? `👉 <a href="${storyResult.story_url}">View on Instagram Story</a>` : '',
         ``
-      ];
+      ].filter(Boolean);
       if (sourceUploader && sourceUploader !== 'instagram') {
         successLines.push(`🙌 <b>Original Creator:</b> @${sourceUploader}`);
       }

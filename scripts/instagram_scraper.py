@@ -64,10 +64,18 @@ async def scrape_post(shortcode, url):
             await page.mouse.wheel(0, random.randint(150, 350))
             await page.wait_for_timeout(random.randint(600, 1200))
 
-            title = await page.title()
-            meta_desc = await page.get_attribute('meta[property="og:description"]', 'content') or ''
-            meta_image = await page.get_attribute('meta[property="og:image"]', 'content') or ''
-            meta_title = await page.get_attribute('meta[property="og:title"]', 'content') or ''
+            meta_data = await page.evaluate("""() => {
+                return {
+                    title: document.title || '',
+                    meta_desc: document.querySelector('meta[property="og:description"]')?.content || document.querySelector('meta[name="description"]')?.content || '',
+                    meta_image: document.querySelector('meta[property="og:image"]')?.content || '',
+                    meta_title: document.querySelector('meta[property="og:title"]')?.content || ''
+                };
+            }""")
+            title = meta_data.get('title', '')
+            meta_desc = meta_data.get('meta_desc', '')
+            meta_image = meta_data.get('meta_image', '')
+            meta_title = meta_data.get('meta_title', '')
 
             # Extract likes and caption from meta_desc (Format: "123 likes, 4 comments - username on date: "caption"")
             likes_match = re.search(r'([\d,KkMm.]+)\s+likes', meta_desc)
@@ -171,41 +179,61 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            title = await page.title()
-            meta_desc = await page.get_attribute('meta[property="og:description"]', 'content') or ''
-            meta_image = await page.get_attribute('meta[property="og:image"]', 'content') or ''
+            # Fast, non-blocking metadata and link extraction via evaluate
+            profile_data = await page.evaluate("""() => {
+                const metaDesc = document.querySelector('meta[property="og:description"]')?.content || document.querySelector('meta[name="description"]')?.content || '';
+                const metaImg = document.querySelector('meta[property="og:image"]')?.content || '';
+                const links = [];
+
+                // 1. Direct href links from grid / reels
+                document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(a => {
+                    if (a.href) links.push(a.href);
+                });
+
+                // 2. Embedded Polaris / Relay JSON state
+                document.querySelectorAll('script').forEach(s => {
+                    const text = s.innerText || s.textContent || '';
+                    if (text.includes('shortcode') || text.includes('/reel/') || text.includes('/p/')) {
+                        const codeMatches = text.match(/"shortcode":"([A-Za-z0-9_-]+)"/g);
+                        if (codeMatches) {
+                            codeMatches.forEach(m => {
+                                const parts = m.split(':');
+                                if (parts.length > 1) {
+                                    const code = parts[1].replace(/["\\s]/g, '');
+                                    if (code && code.length >= 8) {
+                                        links.push('https://www.instagram.com/reel/' + code + '/');
+                                    }
+                                }
+                            });
+                        }
+                        const urlMatches = text.match(/(?:\\/p\\/|\\/reel\\/)([A-Za-z0-9_-]{10,13})/g);
+                        if (urlMatches) {
+                            urlMatches.forEach(u => {
+                                const code = u.split('/').pop();
+                                if (code) {
+                                    links.push('https://www.instagram.com/reel/' + code + '/');
+                                }
+                            });
+                        }
+                    }
+                });
+
+                return {
+                    meta_desc: metaDesc,
+                    meta_image: metaImg,
+                    links: Array.from(new Set(links))
+                };
+            }""")
+
+            meta_desc = profile_data.get('meta_desc', '')
+            meta_image = profile_data.get('meta_image', '')
+            post_links = profile_data.get('links', [])
 
             # Format: "406K Followers, 13 Following, 649 Posts - See Instagram photos and videos from GitHub (@github)"
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)
             posts_match = re.search(r'([\d,KkMm.]+)\s+Posts', meta_desc)
             bio_match = re.search(r':\s+"(.*)"', meta_desc, re.DOTALL)
-
-            # Find post and reel links on page if rendered
-            post_links = []
-            try:
-                found_links = await page.eval_on_selector_all('a[href*="/p/"], a[href*="/reel/"]', 'elements => elements.map(el => el.href)')
-                if found_links:
-                    post_links.extend(found_links)
-            except Exception:
-                pass
-
-            # Fallback: Polaris server-state script extraction if DOM grid has not mounted
-            if len(post_links) == 0:
-                try:
-                    script_contents = await page.eval_on_selector_all('script[type="application/json"], script:not([src])', 'els => els.map(e => e.innerText)')
-                    for sc in script_contents:
-                        if not sc:
-                            continue
-                        if 'xdt_api__v1__feed__user_timeline' in sc or 'shortcode' in sc or '/reel/' in sc or '/p/' in sc:
-                            matches = re.findall(r'"shortcode":"([A-Za-z0-9_-]+)"', sc)
-                            for code in matches:
-                                post_links.append(f"https://www.instagram.com/reel/{code}/")
-                            url_matches = re.findall(r'(?:/p/|/reel/)([A-Za-z0-9_-]{10,13})', sc)
-                            for code in url_matches:
-                                post_links.append(f"https://www.instagram.com/reel/{code}/")
-                except Exception:
-                    pass
 
             unique_posts = list(dict.fromkeys(post_links))[:12]
 

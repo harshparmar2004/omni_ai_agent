@@ -267,9 +267,94 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
   };
 }
 
+/**
+ * Publish an Instagram Story (Video or Image)
+ * Meta Graph API v21.0 - media_type: 'STORIES'
+ * Note: Stories do NOT accept captions.
+ */
+async function publishStory({ page, videoPath = null, imagePath = null, onProgress = null }) {
+  const token = page.access_token;
+  const igUserId = page.ig_user_id;
+  const baseUrl = getGraphBase(token);
+
+  if (!token || !igUserId) {
+    throw new Error(`Page ${page.slug} is missing Meta credentials`);
+  }
+
+  if (!videoPath && !imagePath) {
+    throw new Error('Either videoPath or imagePath is required to publish a Story');
+  }
+
+  const isVideo = Boolean(videoPath);
+  let publicMediaUrl = '';
+
+  if (isVideo) {
+    const { prepareVideoForStory } = require('../utils/ffmpegHelper');
+    const safeVideoPath = await prepareVideoForStory(videoPath);
+    publicMediaUrl = await getPublicUrlForMedia(safeVideoPath);
+  } else {
+    publicMediaUrl = await getPublicUrlForMedia(imagePath);
+  }
+
+  console.log(`[Publisher] 🌟 Publishing Instagram Story for ${page.handle} via ${baseUrl}...`);
+  console.log(`[Publisher] 🌐 Public story media URL: ${publicMediaUrl}`);
+
+  const initParams = {
+    media_type: 'STORIES',
+    access_token: token
+  };
+
+  if (isVideo) {
+    initParams.video_url = publicMediaUrl;
+  } else {
+    initParams.image_url = publicMediaUrl;
+  }
+
+  if (onProgress) onProgress('uploading_story', 0, 1);
+
+  // 1. Create Story Media Container
+  const initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+    params: initParams,
+    timeout: 35000
+  });
+
+  const containerId = initRes.data?.id;
+  if (!containerId) {
+    throw new Error('Meta API did not return container ID for Story');
+  }
+
+  // 2. Poll container status until FINISHED
+  await pollContainer(containerId, token, baseUrl, onProgress);
+
+  // 3. Publish Story Container Live
+  if (onProgress) onProgress('publishing_story', 1, 1);
+
+  const publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
+    params: { creation_id: containerId, access_token: token },
+    timeout: 35000
+  });
+
+  const igMediaId = publishRes.data?.id;
+  if (!igMediaId) {
+    throw new Error('Meta API media_publish did not return media ID for Story');
+  }
+
+  const cleanHandle = page.handle ? page.handle.replace(/^@/, '') : '';
+  const storyUrl = cleanHandle ? `https://www.instagram.com/stories/${cleanHandle}/` : 'https://www.instagram.com/';
+  console.log(`[Publisher] ✅ Story published live! Media ID: ${igMediaId} | Story URL: ${storyUrl}`);
+
+  return {
+    success: true,
+    ig_media_id: igMediaId,
+    story_url: storyUrl,
+    published_at: new Date().toISOString()
+  };
+}
+
 module.exports = {
   publishReel,
   publishCarousel,
   publishImage,
+  publishStory,
   getPublishingLimit
 };
