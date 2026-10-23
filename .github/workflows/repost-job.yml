@@ -69,6 +69,11 @@ jobs:
           sudo chmod +x /usr/local/bin/ffmpeg
           ffmpeg -version
 
+      - name: 🌐 Install Playwright Chromium
+        run: |
+          pip install playwright
+          playwright install chromium
+
       - name: 🚀 Run Autonomous Reposter Engine
         env:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}

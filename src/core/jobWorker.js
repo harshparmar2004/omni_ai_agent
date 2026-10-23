@@ -355,7 +355,7 @@ class JobWorkerPool {
         await this.updateTelegramProgress(job, [
           `❌ <b>Publishing Failed for ${page.handle}</b>`,
           ``,
-          `⚠️ <b>Error:</b> <i>${err.message}</i>`,
+          `⚠️ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`,
           `🔗 <b>Source:</b> <a href="${job.source_url}">${job.source_url}</a>`
         ], {
           inline_keyboard: [
