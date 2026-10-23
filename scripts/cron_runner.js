@@ -54,6 +54,10 @@ async function main() {
   if (process.env.GEMINI_API_KEY) {
     setSetting('gemini_api_key', process.env.GEMINI_API_KEY);
   }
+  if (process.env.GROQ_API_KEY) {
+    setSetting('groq_api_key', process.env.GROQ_API_KEY);
+    setSetting('default_provider', 'groq');
+  }
 
   // 2. Start local static media server
   const basePort = parseInt(process.env.PORT || '4000', 10);
