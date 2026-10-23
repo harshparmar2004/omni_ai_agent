@@ -187,7 +187,7 @@ async function main() {
 
   // Ensure status is queued so processJob picks it up immediately
   if (job.status !== 'queued') {
-    db.prepare('UPDATE publish_jobs SET status = "queued", attempts = 0, error = "" WHERE id = ?').run(jobId);
+    db.prepare("UPDATE publish_jobs SET status = 'queued', attempts = 0, error = '' WHERE id = ?").run(jobId);
   }
 
   // 5. Process Job Immediately
