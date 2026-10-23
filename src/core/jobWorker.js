@@ -89,11 +89,27 @@ class JobWorkerPool {
   }
 
   async updateTelegramProgress(job, lines, replyMarkup = null) {
-    if (!job.telegram_chat_id || !job.telegram_message_id) return;
+    if (!job.telegram_chat_id) return;
     const text = lines.join('\n');
-    await notifier.editTelegramMessage(job.telegram_chat_id, job.telegram_message_id, text, {
+    if (job.telegram_message_id) {
+      try {
+        const res = await notifier.editTelegramMessage(job.telegram_chat_id, job.telegram_message_id, text, {
+          reply_markup: replyMarkup
+        });
+        if (res) return res;
+      } catch (e) {}
+    }
+    const res = await notifier.sendTelegramMessage(job.telegram_chat_id, text, {
       reply_markup: replyMarkup
     });
+    if (res && res.message_id) {
+      job.telegram_message_id = String(res.message_id);
+      try {
+        const { updatePublishJob } = require('../database');
+        updatePublishJob(job.id, { telegram_message_id: String(res.message_id) });
+      } catch (e) {}
+    }
+    return res;
   }
 
   async processJob(jobId) {
@@ -302,7 +318,7 @@ class JobWorkerPool {
       }
       successLines.push(`🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`);
       successLines.push(``);
-      successLines.push(`📝 <b>Published Caption:</b>`);
+      successLines.push(`📝 <b>Instagram Post Caption:</b>`);
       successLines.push(`<blockquote>${escapeHtml(finalCaption)}</blockquote>`);
 
       await this.updateTelegramProgress(job, successLines);

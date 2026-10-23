@@ -142,8 +142,32 @@ async function main() {
     origin: 'telegram_cloud'
   });
 
-  const jobId = enqueueResult.jobId;
+  const job = enqueueResult.job || enqueueResult;
+  const jobId = job?.id || enqueueResult.jobId;
   console.log(`[Reposter Runner] ✓ Enqueued Publish Job #${jobId} [${enqueueResult.shortcode}]`);
+
+  if (!jobId) {
+    throw new Error(`Failed to obtain a valid jobId from submitLink (result: ${JSON.stringify(enqueueResult)})`);
+  }
+
+  // Handle already published duplicate reels
+  if (enqueueResult.alreadyPublished && job.permalink) {
+    console.log(`[Reposter Runner] ℹ️ Post #${enqueueResult.shortcode} was already published on ${job.published_at}.`);
+    const notifier = require('../src/core/notifier');
+    await notifier.sendTelegramMessage(
+      chatId,
+      `ℹ️ <b>Already Published to Profile:</b>\n\n` +
+      `Reel #${enqueueResult.shortcode} was already published to <b>@gta6_updates_007</b>!\n\n` +
+      `🌐 <b>Live Instagram Post:</b> <a href="${job.permalink}">${job.permalink}</a>\n` +
+      (job.story_status === 'published' ? `👉 <a href="https://www.instagram.com/stories/gta6_updates_007/">View Story</a>` : '')
+    );
+    return;
+  }
+
+  // Ensure status is queued so processJob picks it up immediately
+  if (job.status !== 'queued') {
+    db.prepare('UPDATE publish_jobs SET status = "queued", attempts = 0, error = "" WHERE id = ?').run(jobId);
+  }
 
   // 5. Process Job Immediately
   if (!isDryRun) {
@@ -151,6 +175,11 @@ async function main() {
     console.log(`\n[Reposter Runner] 🚀 Executing Job #${jobId} end-to-end...`);
     await jobWorkerPool.processJob(jobId);
     console.log(`[Reposter Runner] ✅ Job #${jobId} finished!`);
+
+    const finalJob = db.prepare('SELECT * FROM publish_jobs WHERE id = ?').get(jobId);
+    if (finalJob && finalJob.status === 'failed') {
+      throw new Error(`Job #${jobId} failed: ${finalJob.error}`);
+    }
   } else {
     console.log(`[Dry Run] Simulated execution of Job #${jobId}`);
   }
