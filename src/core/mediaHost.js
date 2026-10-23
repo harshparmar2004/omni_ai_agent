@@ -17,7 +17,15 @@ async function getBasePublicUrl() {
 
 async function getPublicUrlForMedia(relativePathOrFilename) {
   const baseUrl = await getBasePublicUrl();
-  let rel = relativePathOrFilename.replace(/\\/g, '/');
+  let rel = (relativePathOrFilename || '').replace(/\\/g, '/');
+
+  const publicDir = path.resolve(__dirname, '..', '..', 'public').replace(/\\/g, '/');
+  if (rel.includes('/public/')) {
+    rel = rel.slice(rel.indexOf('/public/') + 7);
+  } else if (rel.startsWith(publicDir)) {
+    rel = rel.replace(publicDir, '');
+  }
+
   if (!rel.startsWith('/')) {
     rel = '/' + rel;
   }

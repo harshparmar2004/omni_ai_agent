@@ -246,8 +246,13 @@ class JobWorkerPool {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying GTA 6 Vice City Framed Template to Feed Reel for ${page.handle}...`);
             const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle });
-            if (framed && fs.existsSync(framed)) {
-              feedVideoPath = framed;
+            if (framed) {
+              const absCandidate = (path.isAbsolute(framed) && fs.existsSync(framed))
+                ? framed
+                : path.join(__dirname, '..', '..', 'public', framed.replace(/^[/\\]+/, ''));
+              if (fs.existsSync(absCandidate)) {
+                feedVideoPath = absCandidate;
+              }
             }
           } catch (frameErr) {
             console.warn(`[Job Worker] Feed frame notice: ${frameErr.message}`);
@@ -257,8 +262,13 @@ class JobWorkerPool {
             const { applyBrandedFeedOverlay } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying custom GTA 6 identity watermark to Reel for ${page.handle}...`);
             const branded = await applyBrandedFeedOverlay(mediaPaths[0], { handle: page.handle });
-            if (branded && fs.existsSync(branded)) {
-              feedVideoPath = branded;
+            if (branded) {
+              const absCandidate = (path.isAbsolute(branded) && fs.existsSync(branded))
+                ? branded
+                : path.join(__dirname, '..', '..', 'public', branded.replace(/^[/\\]+/, ''));
+              if (fs.existsSync(absCandidate)) {
+                feedVideoPath = absCandidate;
+              }
             }
           } catch (wmErr) {
             console.warn(`[Job Worker] Watermark notice: ${wmErr.message}`);
