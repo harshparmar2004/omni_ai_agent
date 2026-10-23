@@ -1,0 +1,90 @@
+name: OmniStudio On-Demand Telegram Reposter
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Target Instagram URL to Repost'
+        required: true
+        type: string
+      chat_id:
+        description: 'Telegram Chat ID to notify'
+        required: false
+        default: '5443723531'
+        type: string
+      page_id:
+        description: 'Destination Page ID'
+        required: false
+        default: '1'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repost-job
+  cancel-in-progress: false
+
+jobs:
+  execute-repost:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📁 Ensure Data Directory
+        run: mkdir -p data
+
+      - name: 💾 Restore Database Cache
+        uses: actions/cache@v4
+        id: db-cache
+        with:
+          path: data/
+          key: omnistudio-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            omnistudio-db-${{ runner.os }}-
+
+      - name: ⚙️ Setup Node.js 22 (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: 🐍 Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Node Dependencies
+        run: npm install
+
+      - name: 🎬 Link & Verify FFmpeg
+        run: |
+          FFMPEG_BIN=$(node -e "console.log(require('ffmpeg-static'))")
+          sudo ln -sf "$FFMPEG_BIN" /usr/local/bin/ffmpeg
+          sudo chmod +x /usr/local/bin/ffmpeg
+          ffmpeg -version
+
+      - name: 🚀 Run Autonomous Reposter Engine
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TARGET_URL: ${{ inputs.url }}
+          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+          TARGET_PAGE_ID: ${{ inputs.page_id }}
+          NODE_ENV: production
+        run: |
+          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}"
+
+      - name: 💾 Save Database State
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/
+          key: omnistudio-db-${{ runner.os }}-${{ github.run_id }}
