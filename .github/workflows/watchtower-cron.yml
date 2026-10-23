@@ -1,0 +1,74 @@
+name: OmniStudio Watchtower 24/7 Autonomous Cron
+
+on:
+  schedule:
+    # Runs every 3 hours (8 times daily: 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 UTC)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Allows manual 1-click trigger from GitHub web UI
+
+permissions:
+  contents: write
+
+concurrency:
+  group: watchtower-cron
+  cancel-in-progress: false
+
+jobs:
+  run-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 💾 Restore Database Cache
+        uses: actions/cache@v4
+        id: db-cache
+        with:
+          path: data/
+          key: omnistudio-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            omnistudio-db-${{ runner.os }}-
+
+      - name: ⚙️ Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 🐍 Setup Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 🎬 Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: 📦 Install Node Dependencies
+        run: npm ci || npm install
+
+      - name: 🌐 Install Playwright Headless Browser
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: 🚀 Run Autonomous Surveillance & Auto-Publish Cycle
+        env:
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NODE_ENV: production
+        run: |
+          node scripts/cron_runner.js
+
+      - name: 💾 Save Database State
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: data/
+          key: omnistudio-db-${{ runner.os }}-${{ github.run_id }}
