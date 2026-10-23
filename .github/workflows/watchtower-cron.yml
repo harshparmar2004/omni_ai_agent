@@ -36,10 +36,10 @@ jobs:
           restore-keys: |
             omnistudio-db-${{ runner.os }}-
 
-      - name: ⚙️ Setup Node.js 20
+      - name: ⚙️ Setup Node.js 22 (LTS)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: 🐍 Setup Python 3.10
@@ -52,7 +52,7 @@ jobs:
         run: ffmpeg -version
 
       - name: 📦 Install Node Dependencies
-        run: npm ci || npm install
+        run: npm install
 
       - name: 🌐 Install Playwright Chromium
         run: |
