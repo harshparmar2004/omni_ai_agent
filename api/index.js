@@ -105,11 +105,19 @@ router.get('/pages/:id/workspace', (req, res) => {
     stockReels: [],
     publishedPosts: [
       {
+        id: 92,
+        shortcode: 'Ddk4LcbNzn0',
+        permalink: 'https://www.instagram.com/reel/De1BFLeDejd/',
+        story_permalink: 'https://www.instagram.com/stories/gta6_updates_007/',
+        published_at: new Date().toISOString(),
+        status: 'published'
+      },
+      {
         id: 91,
         shortcode: 'Dd7BW3Rjlkp',
         permalink: 'https://www.instagram.com/p/De06jK7D-qV/',
         story_permalink: 'https://www.instagram.com/stories/gta6_updates_007/',
-        published_at: new Date().toISOString(),
+        published_at: '2026-10-23T06:27:49.959Z',
         status: 'published'
       }
     ],
@@ -279,6 +287,16 @@ router.get('/watchtower/pipeline-summary', (req, res) => {
 router.get('/jobs', (req, res) => {
   res.json([
     {
+      id: 92,
+      shortcode: 'Ddk4LcbNzn0',
+      source_url: 'https://www.instagram.com/reel/Ddk4LcbNzn0/',
+      status: 'published',
+      permalink: 'https://www.instagram.com/reel/De1BFLeDejd/',
+      story_permalink: 'https://www.instagram.com/stories/gta6_updates_007/',
+      page_handle: '@gta6_updates_007',
+      created_at: new Date().toISOString()
+    },
+    {
       id: 91,
       shortcode: 'Dd7BW3Rjlkp',
       source_url: 'https://www.instagram.com/p/Dd7BW3Rjlkp/',
@@ -286,7 +304,7 @@ router.get('/jobs', (req, res) => {
       permalink: 'https://www.instagram.com/p/De06jK7D-qV/',
       story_permalink: 'https://www.instagram.com/stories/gta6_updates_007/',
       page_handle: '@gta6_updates_007',
-      created_at: new Date().toISOString()
+      created_at: '2026-10-23T06:27:49.959Z'
     }
   ]);
 });
