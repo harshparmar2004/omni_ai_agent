@@ -239,13 +239,20 @@ class JobWorkerPool {
       let pubResult = null;
       if (mediaType === 'reel') {
         let feedVideoPath = mediaPaths[0];
-        const isWatermarkEnabled = page.watermark_enabled === 1 ||
-          page.watermark_enabled === true ||
-          process.env.WATERMARK_ENABLED === 'true' ||
-          process.env.WATERMARK_ENABLED === '1' ||
-          getSetting('watermark_enabled', 'false') === 'true';
+        const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode', 'frame');
 
-        if (isWatermarkEnabled) {
+        if (brandingMode === 'frame') {
+          try {
+            const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
+            console.log(`[Job Worker] 🎨 Applying GTA 6 Vice City Framed Template to Feed Reel for ${page.handle}...`);
+            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle });
+            if (framed && fs.existsSync(framed)) {
+              feedVideoPath = framed;
+            }
+          } catch (frameErr) {
+            console.warn(`[Job Worker] Feed frame notice: ${frameErr.message}`);
+          }
+        } else if (brandingMode === 'watermark') {
           try {
             const { applyBrandedFeedOverlay } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying custom GTA 6 identity watermark to Reel for ${page.handle}...`);

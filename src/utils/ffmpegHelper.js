@@ -614,6 +614,202 @@ async function applyBrandedFeedOverlay(inputVideoPath, options = {}) {
 }
 
 /**
+ * Generates GTA 6 Vice City Clip Frame Template Overlay for Feed Reels
+ */
+function generateFeedPostOverlay(handle, options = {}) {
+  const { createCanvas } = require('@napi-rs/canvas');
+  const width = 1080;
+  const height = 1920;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+
+  // 1. Ambient Vice City color tint & vignette on the background
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, 'rgba(13, 2, 33, 0.70)');
+  bgGrad.addColorStop(0.4, 'rgba(45, 10, 78, 0.55)');
+  bgGrad.addColorStop(0.75, 'rgba(160, 26, 125, 0.50)');
+  bgGrad.addColorStop(1, 'rgba(255, 107, 53, 0.60)');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Radial vignette
+  const vig = ctx.createRadialGradient(width / 2, height / 2, 400, width / 2, height / 2, 950);
+  vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vig.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Center Card Cutout & Defined Neon Border (Middle Post)
+  const cardW = 900;
+  const cardH = 1320;
+  const cardX = (width - cardW) / 2;
+  const cardY = (height - cardH) / 2 - 10;
+  const radius = 20;
+
+  ctx.save();
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  else ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.clip();
+  ctx.clearRect(0, 0, width, height);
+  ctx.restore();
+
+  // Glowing neon border
+  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+  borderGrad.addColorStop(0, '#00F0FF');
+  borderGrad.addColorStop(0.5, '#F72585');
+  borderGrad.addColorStop(1, '#FF8A00');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  else ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.stroke();
+  ctx.restore();
+
+  // 3. Top Header: GTA VI Aesthetic Pill
+  const hW = 720;
+  const hH = 88;
+  const hX = (width - hW) / 2;
+  const hY = cardY - hH - 30;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(13, 2, 33, 0.88)';
+  ctx.shadowColor = 'rgba(0, 240, 255, 0.4)';
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(hX, hY, hW, hH, 44);
+  else ctx.rect(hX, hY, hW, hH);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(247, 37, 133, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`🌴 @${cleanHandle} • GTA VI 🎮`, width / 2, hY + 34);
+
+  ctx.fillStyle = '#FFB703';
+  ctx.font = 'bold 15px Arial, sans-serif';
+  ctx.fillText('EXCLUSIVE LEAKS & OFFICIAL NEWS', width / 2, hY + 63);
+
+  // 4. Bottom Footer Banner
+  const fW = 680;
+  const fH = 76;
+  const fX = (width - fW) / 2;
+  const fY = cardY + cardH + 28;
+
+  const fGrad = ctx.createLinearGradient(fX, fY, fX + fW, fY);
+  fGrad.addColorStop(0, '#F72585');
+  fGrad.addColorStop(0.5, '#7209B7');
+  fGrad.addColorStop(1, '#FF6B35');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(255, 107, 53, 0.65)';
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = fGrad;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(fX, fY, fW, fH, 38);
+  else ctx.rect(fX, fY, fW, fH);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`🎮 FOLLOW @${cleanHandle} FOR MORE GTA 6 🔥`, width / 2, fY + fH / 2);
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  const genDir = path.join(publicDir, 'generated');
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'default'}.png`);
+  fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+  return overlayPath;
+}
+
+/**
+ * Frames video in GTA 6 Vice City aesthetic template for Feed Reel
+ */
+async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
+  if (!inputVideoPath) throw new Error('No input video path for feed card');
+
+  let absPath = inputVideoPath;
+  if (!fs.existsSync(absPath)) {
+    const cleanRel = inputVideoPath.replace(/^[/\\]+/, '');
+    const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+    if (fs.existsSync(candidate)) absPath = candidate;
+  }
+  if (!fs.existsSync(absPath)) throw new Error(`Video not found: ${absPath}`);
+
+  const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
+  const overlayPngPath = generateFeedPostOverlay(handle, options);
+
+  const dir = path.dirname(absPath);
+  const ext = path.extname(absPath);
+  const base = path.basename(absPath, ext);
+  const framedOutput = path.join(dir, `${base}_feed_framed.mp4`);
+
+  console.log(`[FFmpeg Helper] 🎨 Composing GTA 6 Vice City Framed Feed Reel for @${handle}...`);
+
+  const filter = [
+    '[0:v]split=2[bg_raw][fg_raw]',
+    '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+    '[fg_raw]scale=w=900:h=1320:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2[card]',
+    '[bg][card]overlay=(W-w)/2:(H-h)/2-10[v1]',
+    '[v1][1:v]overlay=0:0[outv]'
+  ].join(';');
+
+  return new Promise((resolve) => {
+    const args = [
+      '-y',
+      '-i', absPath,
+      '-i', overlayPngPath,
+      '-filter_complex', filter,
+      '-map', '[outv]',
+      '-map', '0:a?',
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-preset', 'fast',
+      '-crf', '18',
+      '-c:a', 'copy',
+      '-movflags', '+faststart',
+      framedOutput
+    ];
+
+    const proc = spawn('ffmpeg', args);
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(framedOutput)) {
+        console.log(`[FFmpeg Helper] ✅ GTA 6 Framed Feed Reel generated: ${framedOutput}`);
+        resolve(framedOutput);
+      } else {
+        console.warn(`[FFmpeg Helper] ⚠️ Feed frame FFmpeg exited with code ${code}, falling back to original media`);
+        resolve(inputVideoPath);
+      }
+    });
+    proc.on('error', (err) => {
+      console.warn(`[FFmpeg Helper] Feed frame render error: ${err.message}, falling back to original`);
+      resolve(inputVideoPath);
+    });
+  });
+}
+
+/**
  * Prepares video for Instagram Story container as an authentic "Reel Reshare Card":
  * 1. Preserves original video aspect ratio in a centered card (never stretched).
  * 2. Renders dynamic ambient blurred background.
@@ -935,6 +1131,8 @@ module.exports = {
   generateStoryOverlay,
   generateFeedWatermark,
   applyBrandedFeedOverlay,
+  generateFeedPostOverlay,
+  prepareVideoForFeedCard,
   extractVideoCover
 };
 

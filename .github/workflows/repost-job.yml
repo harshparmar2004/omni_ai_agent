@@ -103,6 +103,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
           TARGET_PAGE_ID: ${{ inputs.page_id }}
           TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+          FEED_BRANDING_MODE: 'frame'
           NODE_ENV: production
         run: |
           node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}"
