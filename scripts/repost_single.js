@@ -33,6 +33,7 @@ function getArg(flag, defaultValue = '') {
 const targetUrl = getArg('--url') || process.env.TARGET_URL || '';
 const chatId = getArg('--chat-id') || process.env.TELEGRAM_CHAT_ID || '5443723531';
 const pageId = parseInt(getArg('--page-id') || process.env.TARGET_PAGE_ID || '1', 10);
+const messageId = getArg('--message-id') || process.env.TELEGRAM_MESSAGE_ID || '';
 const isDryRun = args.includes('--dry-run');
 
 function findOpenPort(startPort) {
@@ -139,6 +140,7 @@ async function main() {
     url: targetUrl,
     pageId: pageId,
     chatId: chatId,
+    messageId: messageId,
     origin: 'telegram_cloud'
   });
 
@@ -148,6 +150,11 @@ async function main() {
 
   if (!jobId) {
     throw new Error(`Failed to obtain a valid jobId from submitLink (result: ${JSON.stringify(enqueueResult)})`);
+  }
+
+  if (messageId) {
+    db.prepare('UPDATE publish_jobs SET telegram_message_id = ? WHERE id = ?').run(messageId, jobId);
+    job.telegram_message_id = messageId;
   }
 
   // Handle already published duplicate reels

@@ -88,9 +88,9 @@ class NotifierService extends EventEmitter {
       );
       return res.data?.result;
     } catch (err) {
-      // Ignore if message content is not modified
+      // If message content is not modified, consider edit successful
       if (err.response?.data?.description?.includes('message is not modified')) {
-        return null;
+        return { message_id: messageId, not_modified: true };
       }
       console.warn(`[Notifier] Telegram editMessageText error: ${err.response?.data?.description || err.message}`);
       return null;

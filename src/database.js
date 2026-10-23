@@ -182,6 +182,7 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_ig_media_id TEXT DEFAULT ""'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_status TEXT DEFAULT "idle"'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN telegram_message_id TEXT DEFAULT ""'); } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────

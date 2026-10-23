@@ -7,15 +7,17 @@ const ALLOWED_CHATS = (process.env.ALLOWED_CHAT_IDS || '5443723531').split(',').
 
 async function sendTelegram(chatId, text, extra = {}) {
   try {
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       chat_id: chatId,
       text: text,
       parse_mode: 'HTML',
       disable_web_page_preview: false,
       ...extra
     }, { timeout: 10000 });
+    return res.data?.result;
   } catch (err) {
     console.error('[Telegram Send Error]:', err.response?.data || err.message);
+    return null;
   }
 }
 
@@ -92,13 +94,19 @@ module.exports = async function handler(req, res) {
 
   console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
 
-  // Send Immediate Ingestion Alert
-  await sendTelegram(
+  // Send Single In-Place Stepper Message
+  const initialMsg = await sendTelegram(
     chatId,
-    `⚡ <b>Reel Received:</b> #${shortcode}\n\n` +
-    `🚀 <i>Triggering GitHub Actions Cloud Engine...</i>\n` +
-    `Preparing Feed Reel + 9:16 Story Card for <b>@gta6_updates_007</b>.`
+    `⚡ <b>OmniStudio Pipeline:</b> <code>#${shortcode}</code>\n` +
+    `📱 <b>Target Page:</b> <code>@gta6_updates_007</code>\n\n` +
+    `⏳ <b>1. Ingest:</b> Cloud runner initializing...\n` +
+    `⚪ <b>2. Download:</b> Waiting\n` +
+    `⚪ <b>3. AI Copy:</b> Waiting\n` +
+    `⚪ <b>4. Publishing:</b> Waiting (Feed & Story)\n\n` +
+    `<i>Status: Spawning GitHub Actions runner...</i>`
   );
+
+  const messageId = initialMsg?.message_id ? String(initialMsg.message_id) : '';
 
   // Trigger GitHub Actions Workflow
   if (!GITHUB_TOKEN) {
@@ -113,14 +121,15 @@ module.exports = async function handler(req, res) {
 
   try {
     const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`;
-    const response = await axios.post(
+    await axios.post(
       dispatchUrl,
       {
         ref: 'main',
         inputs: {
           url: reelUrl,
           chat_id: String(chatId),
-          page_id: '1'
+          page_id: '1',
+          message_id: messageId
         }
       },
       {
@@ -133,13 +142,7 @@ module.exports = async function handler(req, res) {
       }
     );
 
-    console.log(`[Webhook] GitHub Actions Dispatched. Status: ${response.status}`);
-    await sendTelegram(
-      chatId,
-      `✅ <b>Cloud Worker Started!</b>\n\n` +
-      `Processing #${shortcode} on GitHub Actions runner.\n` +
-      `You will receive the live post and story links here in ~60-90 seconds!`
-    );
+    console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} (Message ID: ${messageId})`);
   } catch (err) {
     console.error('[Webhook Dispatch Error]:', err.response?.data || err.message);
     const detail = err.response?.data?.message || err.message;

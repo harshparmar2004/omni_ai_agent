@@ -17,6 +17,11 @@ on:
         required: false
         default: '1'
         type: string
+      message_id:
+        description: 'Telegram Message ID to edit in-place'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -28,13 +33,13 @@ concurrency:
 jobs:
   execute-repost:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: 📥 Check out repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: 📁 Ensure Data Directory
         run: mkdir -p data
@@ -60,17 +65,19 @@ jobs:
           python-version: '3.10'
 
       - name: 📦 Install Node Dependencies
-        run: npm install
+        run: npm install --prefer-offline
 
       - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          ffmpeg -version
-          ffprobe -version
+          if ! command -v ffmpeg &> /dev/null || ! command -v ffprobe &> /dev/null; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
 
       - name: 🌐 Install Playwright Chromium
         run: |
-          pip install playwright
+          pip install --no-cache-dir playwright
           playwright install chromium
 
       - name: 🚀 Run Autonomous Reposter Engine
@@ -82,9 +89,10 @@ jobs:
           TARGET_URL: ${{ inputs.url }}
           TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
           TARGET_PAGE_ID: ${{ inputs.page_id }}
+          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
           NODE_ENV: production
         run: |
-          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}"
+          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}"
 
       - name: 💾 Save Database State
         uses: actions/cache/save@v4

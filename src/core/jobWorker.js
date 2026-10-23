@@ -162,23 +162,21 @@ class JobWorkerPool {
 
     const shortcode = job.shortcode || 'reel';
     const renderStepperMsg = (stepNum, statusLine, subDetail = '') => [
-      `🎬 <b>REPOST PIPELINE: ${page.handle}</b>`,
-      `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
-      `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
+      `⚡ <b>OmniStudio Pipeline:</b> <code>#${shortcode}</code>`,
+      `📱 <b>Target Page:</b> <code>${page.handle}</code>`,
       ``,
-      `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
+      `✅ <b>1. Ingest:</b> Cloud runner active`,
+      `▶ <b>2. Download:</b> ${stepNum > 2 ? '✅ 1080p MP4 Ready' : (stepNum === 2 ? '⏳ Downloading & transcoding...' : '⚪ Waiting')}`,
+      `▶ <b>3. AI Copy:</b> ${stepNum > 3 ? '✅ Hook & Attribution Ready' : (stepNum === 3 ? '⏳ Crafting viral caption...' : '⚪ Waiting')}`,
+      `▶ <b>4. Publishing:</b> ${stepNum === 4 ? (subDetail || '⏳ Publishing Feed & Story in parallel...') : '⚪ Waiting'}`,
       ``,
-      `▶ <b>1. Ingestion:</b> ✅ Received`,
-      `▶ <b>2. Download:</b> ${stepNum > 2 ? '✅ 1080p Media Ready' : (stepNum === 2 ? '⏳ Fetching 1080p MP4...' : '⚪ Waiting')}`,
-      `▶ <b>3. AI Copy:</b> ${stepNum > 3 ? '✅ Hook + Attribution + Tags Ready' : (stepNum === 3 ? '⏳ Crafting viral caption with AI...' : '⚪ Waiting')}`,
-      `▶ <b>4. Meta Live:</b> ${stepNum === 4 ? (subDetail || '⏳ Uploading container to Instagram...') : '⚪ Waiting'}`,
-      statusLine ? `\n<i>Status: ${statusLine}</i>` : ''
+      statusLine ? `<i>Status: ${statusLine}</i>` : ''
     ].filter(Boolean);
 
     try {
       // ── Step 1: Download Media ──────────────────────────────
       job = updateJobProgress(jobId, 'downloading', 'download_starting');
-      await this.updateTelegramProgress(job, renderStepperMsg(2, 'Downloading high-definition video...'));
+      await this.updateTelegramProgress(job, renderStepperMsg(2, 'Downloading media & applying anti-duplicate transcode...'));
 
       let mediaPaths = [];
       let rawCaption = job.caption || '';
@@ -207,7 +205,7 @@ class JobWorkerPool {
         });
       }
 
-      await this.updateTelegramProgress(job, renderStepperMsg(3, `1080p ${mediaType.toUpperCase()} downloaded. Generating caption...`));
+      await this.updateTelegramProgress(job, renderStepperMsg(3, `1080p ${mediaType.toUpperCase()} ready. Generating viral caption...`));
 
       // ── Step 2: Build Caption ───────────────────────────────
       job = updateJobProgress(jobId, 'ready', 'caption_building');
@@ -217,66 +215,73 @@ class JobWorkerPool {
 
       job = updateJobProgress(jobId, 'ready', 'caption_ready', { caption: finalCaption });
 
-      // ── Step 3: Meta Graph API Publishing ────────────────────
+      // ── Step 3: Meta Graph API Publishing (Feed & Story in Parallel) ──
       job = updateJobProgress(jobId, 'publishing', 'meta_upload');
-      await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading media container to Meta Graph API v21.0...', '⏳ Initializing container upload...'));
+      await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading Feed & Story containers to Instagram...', '⏳ Processing containers concurrently...'));
 
       const onProgress = (step, current, total) => {
         if (step === 'polling') {
           this.updateTelegramProgress(
             job,
-            renderStepperMsg(4, 'Processing media container...', `⏳ Transcoding & verifying container (${current}/${total})...`)
+            renderStepperMsg(4, 'Processing media containers on Instagram...', `⏳ Verifying Meta container (${current}/${total})...`)
           ).catch(() => {});
         }
       };
 
-      let pubResult = null;
-      if (mediaType === 'reel') {
-        pubResult = await publishReel({
-          page,
-          videoPath: mediaPaths[0],
-          caption: finalCaption,
-          coverPath: null,
-          onProgress
-        });
-      } else if (mediaType === 'carousel') {
-        pubResult = await publishCarousel({
-          page,
-          imagePaths: mediaPaths,
-          caption: finalCaption,
-          onProgress
-        });
-      } else {
-        pubResult = await publishImage({
-          page,
-          imagePath: mediaPaths[0],
-          caption: finalCaption,
-          onProgress
-        });
-      }
+      const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
+
+      const publishFeedPromise = (async () => {
+        if (mediaType === 'reel') {
+          return publishReel({
+            page,
+            videoPath: mediaPaths[0],
+            caption: finalCaption,
+            coverPath: null,
+            onProgress
+          });
+        } else if (mediaType === 'carousel') {
+          return publishCarousel({
+            page,
+            imagePaths: mediaPaths,
+            caption: finalCaption,
+            onProgress
+          });
+        } else {
+          return publishImage({
+            page,
+            imagePath: mediaPaths[0],
+            caption: finalCaption,
+            onProgress
+          });
+        }
+      })();
+
+      const publishStoryPromise = (async () => {
+        if (autoPostStory && mediaPaths[0]) {
+          try {
+            console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
+            const sRes = await publishStory({
+              page,
+              videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
+              imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
+            });
+            console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${sRes.ig_media_id}`);
+            return sRes;
+          } catch (storyErr) {
+            console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
+            return null;
+          }
+        }
+        return null;
+      })();
+
+      const [pubResult, storyResult] = await Promise.all([publishFeedPromise, publishStoryPromise]);
 
       if (!pubResult || !pubResult.success || !pubResult.ig_media_id) {
         throw new Error(pubResult?.error || 'Publish did not return an Instagram media ID');
       }
 
-      // ── Step 4: Auto-Publish to Instagram Story ──────────────
-      let storyResult = null;
-      const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
-      if (autoPostStory && mediaPaths[0]) {
-        try {
-          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
-          storyResult = await publishStory({
-            page,
-            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
-          });
-          console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult.ig_media_id}`);
-        } catch (storyErr) {
-          console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
-        }
-      }
-
-      // ── Step 5: Finalise Success ─────────────────────────────
+      // ── Step 4: Finalise Success (Single In-Place Telegram Message) ────
       const publishedAt = pubResult.published_at || new Date().toISOString();
       job = updateJobProgress(jobId, 'published', 'live', {
         ig_media_id: pubResult.ig_media_id,
@@ -295,42 +300,27 @@ class JobWorkerPool {
         } catch (e) {}
       }
 
-      // Telegram success announcement with clickable live link, creator attribution, full caption, and story confirmation
+      // Telegram success announcement with clickable live links, creator attribution, full caption, and story ID
       const successLines = [
-        `🎉 <b>REPOST PIPELINE: LIVE ON INSTAGRAM!</b>`,
+        `🎉 <b>Published Live to Instagram!</b>`,
         `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
         `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
-        `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
-        `✅ <b>1. Ingested via ${job.agent === 'watchtower' ? 'Watchtower Tracking' : 'Telegram'}</b>`,
-        `✅ <b>2. Downloaded 1080p MP4</b>`,
-        `✅ <b>3. AI Caption & Attribution Ready</b>`,
-        `✅ <b>4. Published Live to Profile Feed</b>`,
-        storyResult?.success ? `✅ <b>5. Published Live to Instagram Story!</b> 🌟` : '',
+        `✅ <b>Feed Reel Published Live</b>`,
+        storyResult?.success ? `✅ <b>Instagram Story Published Live</b>` : '',
         ``,
-        `🌐 <b>Live Instagram Reel:</b>`,
-        `👉 <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
-        storyResult?.success ? `👉 <a href="${storyResult.story_url}">View on Instagram Story</a>` : '',
-        ``
+        `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
+        storyResult?.success ? `🌟 <b>Story:</b> <a href="${storyResult.story_url}">View on Instagram Story</a>` : '',
+        ``,
+        `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`,
+        storyResult?.success ? `🆔 <b>Story ID:</b> <code>${storyResult.ig_media_id}</code>` : '',
+        sourceUploader && sourceUploader !== 'instagram' ? `🙌 <b>Original Creator:</b> @${sourceUploader}` : '',
+        ``,
+        `📝 <b>Instagram Post Caption:</b>`,
+        `<blockquote>${escapeHtml(finalCaption)}</blockquote>`
       ].filter(Boolean);
-      if (sourceUploader && sourceUploader !== 'instagram') {
-        successLines.push(`🙌 <b>Original Creator:</b> @${sourceUploader}`);
-      }
-      successLines.push(`🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`);
-      successLines.push(``);
-      successLines.push(`📝 <b>Instagram Post Caption:</b>`);
-      successLines.push(`<blockquote>${escapeHtml(finalCaption)}</blockquote>`);
 
       await this.updateTelegramProgress(job, successLines);
-
-      // Deliver video preview to chat
-      if (job.telegram_chat_id && mediaType === 'reel' && mediaPaths[0]) {
-        notifier.sendTelegramVideo(
-          job.telegram_chat_id,
-          mediaPaths[0],
-          `🎬 <b>Live on Instagram (${page.handle}):</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`
-        ).catch(() => {});
-      }
 
       console.log(`[Job Worker] ✅ Job #${job.id} completed! Live at: ${pubResult.permalink}`);
 
