@@ -69,9 +69,22 @@ jobs:
 
       - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
-          if ! command -v ffmpeg &> /dev/null || ! command -v ffprobe &> /dev/null; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          fi
+          node -e "
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            try {
+              const ff = require('ffmpeg-static');
+              if (ff && fs.existsSync(ff)) {
+                execSync('sudo ln -sf ' + ff + ' /usr/local/bin/ffmpeg');
+              }
+            } catch (e) {}
+            try {
+              const fp = require('ffprobe-static');
+              if (fp && fp.path && fs.existsSync(fp.path)) {
+                execSync('sudo ln -sf ' + fp.path + ' /usr/local/bin/ffprobe');
+              }
+            } catch (e) {}
+          "
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
@@ -93,6 +106,42 @@ jobs:
           NODE_ENV: production
         run: |
           node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}"
+
+      - name: 📢 Notify Telegram on Failure or Cancellation
+        if: failure() || cancelled()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+        run: |
+          node -e "
+            const axios = require('axios');
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
+            const msgId = process.env.TELEGRAM_MESSAGE_ID;
+            if (!token) process.exit(0);
+            const text = '⚠️ <b>Cloud Runner Alert:</b>\n\nThe GitHub runner encountered an issue or timed out before publishing.\n\n🔄 <i>Please try re-sharing the link again!</i>';
+            if (msgId) {
+              axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
+                chat_id: chatId,
+                message_id: parseInt(msgId, 10),
+                text: text,
+                parse_mode: 'HTML'
+              }).catch(() => {
+                axios.post('https://api.telegram.org/bot' + token + '/sendMessage', {
+                  chat_id: chatId,
+                  text: text,
+                  parse_mode: 'HTML'
+                }).catch(() => {});
+              });
+            } else {
+              axios.post('https://api.telegram.org/bot' + token + '/sendMessage', {
+                chat_id: chatId,
+                text: text,
+                parse_mode: 'HTML'
+              }).catch(() => {});
+            }
+          "
 
       - name: 💾 Save Database State
         uses: actions/cache/save@v4

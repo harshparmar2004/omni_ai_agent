@@ -11,12 +11,19 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-// Auto-ensure ffmpeg is available from bundled ffmpeg-static
+// Auto-ensure ffmpeg and ffprobe are available from bundled static packages
 try {
   const ffmpegStatic = require('ffmpeg-static');
+  const ffprobeStatic = require('ffprobe-static');
+  const pathsToAdd = [];
   if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
-    const ffmpegDir = path.dirname(ffmpegStatic);
-    process.env.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
+    pathsToAdd.push(path.dirname(ffmpegStatic));
+  }
+  if (ffprobeStatic && ffprobeStatic.path && fs.existsSync(ffprobeStatic.path)) {
+    pathsToAdd.push(path.dirname(ffprobeStatic.path));
+  }
+  if (pathsToAdd.length > 0) {
+    process.env.PATH = `${pathsToAdd.join(path.delimiter)}${path.delimiter}${process.env.PATH}`;
   }
 } catch (e) {}
 
