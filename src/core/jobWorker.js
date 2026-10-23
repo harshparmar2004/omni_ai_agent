@@ -189,7 +189,13 @@ class JobWorkerPool {
         mediaPaths = [];
       }
 
-      if (mediaPaths.length === 0) {
+      const publicDir = path.join(__dirname, '..', '..', 'public');
+      const filesExistOnDisk = mediaPaths.length > 0 && mediaPaths.every(p => {
+        const cleanRel = (p || '').replace(/^[/\\]+/, '');
+        return fs.existsSync(path.join(publicDir, cleanRel));
+      });
+
+      if (!filesExistOnDisk) {
         const dl = await downloadInstagramMedia(job.source_url);
         if (!dl.success || !dl.mediaPaths || dl.mediaPaths.length === 0) {
           throw new Error(dl.error || 'Failed to download media');
