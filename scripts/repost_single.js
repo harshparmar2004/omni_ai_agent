@@ -111,6 +111,8 @@ async function main() {
   const basePort = parseInt(process.env.PORT || '4000', 10);
   const PORT = await findOpenPort(basePort);
   const app = express();
+  app.get('/health', (req, res) => res.json({ status: 'ok', port: PORT }));
+  app.get('/api/settings', (req, res) => res.json({ status: 'ok', port: PORT }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use('/generated', express.static(path.join(__dirname, '..', 'public', 'generated')));
 

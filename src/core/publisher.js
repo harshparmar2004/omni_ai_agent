@@ -37,6 +37,7 @@ async function pollContainer(containerId, token, baseUrl, onProgress = null) {
     if (statusCode === 'FINISHED') {
       isReady = true;
     } else if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+      console.error(`[Publisher] Container failure payload:`, JSON.stringify(res.data));
       throw new Error(`Meta container processing failed: ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
     }
   }

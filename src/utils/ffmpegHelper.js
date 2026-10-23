@@ -449,7 +449,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
     throw new Error(`Input video not found: ${absPath}`);
   }
 
-  const handle = options.handle || 'gta6_updates_007';
+  const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
   const overlayPngPath = generateStoryOverlay(handle, options);
 
   const { execSync } = require('child_process');

@@ -108,8 +108,18 @@ async function launchLocaltunnelFallback(port = 4000) {
  */
 async function startTunnel(port = 4000) {
   currentPort = port;
-  if (activeTunnelUrl && !activeTunnelUrl.includes('loca.lt')) return activeTunnelUrl;
-  if (isStarting) return activeTunnelUrl || getSetting('public_media_url') || getSetting('ngrok_url', '');
+  if (activeTunnelUrl && tunnelProcess && !tunnelProcess.killed && !activeTunnelUrl.includes('loca.lt')) {
+    return activeTunnelUrl;
+  }
+  if (isStarting) {
+    // Wait for in-flight startup to complete
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      if (activeTunnelUrl) return activeTunnelUrl;
+      if (!isStarting) break;
+    }
+    return activeTunnelUrl || getSetting('public_media_url') || getSetting('ngrok_url', '');
+  }
   isStarting = true;
 
   try {
@@ -136,9 +146,13 @@ async function isUrlReachable(url) {
   // Meta Graph API cannot fetch media from localtunnel due to anti-phishing interstitial screen
   if (url.includes('loca.lt')) return false;
   try {
-    const res = await axios.get(`${url}/api/settings`, { timeout: 4000 });
-    return res.status === 200;
+    const res = await axios.get(`${url}/health`, { timeout: 4000 });
+    return res.status >= 200 && res.status < 400;
   } catch (e) {
+    // If server responded with any status code below 500 (e.g. 200, 404), the tunnel is healthy & reachable
+    if (e.response && e.response.status < 500) {
+      return true;
+    }
     return false;
   }
 }
@@ -147,6 +161,11 @@ async function isUrlReachable(url) {
  * Guarantees that a valid public HTTPS tunnel is online and active before publishing
  */
 async function ensureTunnelOnline() {
+  // If we already have an active tunnel process running, reuse it without restarting
+  if (activeTunnelUrl && tunnelProcess && !tunnelProcess.killed) {
+    return activeTunnelUrl;
+  }
+
   if (activeTunnelUrl && (await isUrlReachable(activeTunnelUrl))) {
     return activeTunnelUrl;
   }
