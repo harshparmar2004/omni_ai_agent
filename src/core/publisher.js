@@ -105,6 +105,8 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
     media_type: 'REELS',
     video_url: publicVideoUrl,
     caption: caption,
+    thumb_offset: 1500,
+    is_ai_generated: false,
     access_token: token
   };
 
@@ -113,10 +115,25 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
   }
 
   // 1. Create Media Container
-  const initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-    params: initParams,
-    timeout: 35000
-  });
+  let initRes;
+  try {
+    initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+      params: initParams,
+      timeout: 35000
+    });
+  } catch (err) {
+    if (initParams.is_ai_generated !== undefined || initParams.thumb_offset !== undefined) {
+      console.warn(`[Publisher] Retrying reel container creation without optional AI/offset tags: ${err.response?.data?.error?.message || err.message}`);
+      delete initParams.is_ai_generated;
+      delete initParams.thumb_offset;
+      initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+        params: initParams,
+        timeout: 35000
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const containerId = initRes.data?.id;
   if (!containerId) {
@@ -190,6 +207,7 @@ async function publishCarousel({ page, imagePaths, caption, onProgress = null })
       media_type: 'CAROUSEL',
       children: childIds.join(','),
       caption: caption,
+      is_ai_generated: false,
       access_token: token
     },
     timeout: 25000
@@ -237,6 +255,7 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
     params: {
       image_url: publicUrl,
       caption: caption,
+      is_ai_generated: false,
       access_token: token
     },
     timeout: 25000
@@ -305,6 +324,7 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
 
   const initParams = {
     media_type: 'STORIES',
+    is_ai_generated: false,
     access_token: token
   };
 

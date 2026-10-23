@@ -175,51 +175,52 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
     const hasAudio = Boolean(audioStream);
     const finalDest = targetOutputPath || inputVideoPath;
 
-    console.log(`[FFmpeg Helper] 🎨 Applying Material Transformation & Anti-Duplicate Transcode... (audio:${hasAudio ? 'yes' : 'none'})`);
+    console.log(`[FFmpeg Helper] 🎨 Applying Studio Audio Normalization & Meta Transcode... (audio:${hasAudio ? 'yes' : 'none'})`);
 
     const tempOut = path.join(path.dirname(finalDest), `transcode_temp_${Date.now()}.mp4`);
 
     let ffmpegArgs = [];
     if (hasAudio) {
-      // Material transformation: 1.02x speed shift, preserve native aspect ratio & resolution, color pop, scrub metadata
+      // High-fidelity natural video + studio dynamic audio mastering:
+      // 1. Natural 1.0x tempo & original colors (eliminates synthetic AI media flags)
+      // 2. Dynamic Audio Normalizer (dynaudnorm) lifts quiet GTA background songs by up to +18dB while leveling loud sounds
+      // 3. Studio-grade 256k AAC stereo
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
         '-filter_complex',
-        '[0:v]setpts=PTS/1.02,scale=trunc(iw/2)*2:trunc(ih/2)*2,eq=contrast=1.03:brightness=0.01:saturation=1.04[v];[0:a]atempo=1.02[a]',
+        '[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[v];[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15[a]',
         '-map', '[v]',
         '-map', '[a]',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'fast',
-        '-crf', '20',
+        '-crf', '18',
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '256k',
         '-ar', '44100',
         '-ac', '2',
-        '-map_metadata', '-1',
         '-movflags', '+faststart',
         tempOut
       ];
     } else {
-      // Input has no audio: add synthetic silent stereo audio track + preserve native aspect ratio
+      // Input has no audio: add clean silent stereo audio track + preserve native aspect ratio
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
         '-f', 'lavfi',
         '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
         '-filter_complex',
-        '[0:v]setpts=PTS/1.02,scale=trunc(iw/2)*2:trunc(ih/2)*2,eq=contrast=1.03:brightness=0.01:saturation=1.04[v]',
+        '[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[v]',
         '-map', '[v]',
         '-map', '1:a',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'fast',
-        '-crf', '20',
+        '-crf', '18',
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '256k',
         '-shortest',
-        '-map_metadata', '-1',
         '-movflags', '+faststart',
         tempOut
       ];
@@ -627,12 +628,67 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   return rel;
 }
 
+/**
+ * Extracts an authentic high-resolution video frame at a given offset (default 1.5s)
+ * Used as a genuine, non-AI cover thumbnail for Instagram Reels
+ */
+function extractVideoCover(inputVideoPath, shortcode = 'reel', offsetSec = 1.5) {
+  return new Promise((resolve) => {
+    let absPath = inputVideoPath;
+    if (!fs.existsSync(absPath)) {
+      const cleanRel = inputVideoPath.replace(/^[/\\]+/, '');
+      const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+      if (fs.existsSync(candidate)) absPath = candidate;
+    }
+
+    if (!fs.existsSync(absPath)) {
+      console.warn(`[FFmpeg Helper] Video not found for cover extraction: ${absPath}`);
+      return resolve(null);
+    }
+
+    const publicDir = path.join(__dirname, '..', '..', 'public');
+    const downloadsDir = path.join(publicDir, 'generated', 'downloads');
+    if (!fs.existsSync(downloadsDir)) fs.mkdirSync(downloadsDir, { recursive: true });
+
+    const cleanCode = (shortcode || 'reel').replace(/[^a-zA-Z0-9_-]/g, '');
+    const coverFileName = `cover_${cleanCode}_${Date.now()}.jpg`;
+    const coverAbsPath = path.join(downloadsDir, coverFileName);
+
+    const args = [
+      '-y',
+      '-ss', String(offsetSec),
+      '-i', absPath,
+      '-vframes', '1',
+      '-q:v', '2',
+      coverAbsPath
+    ];
+
+    const proc = spawn('ffmpeg', args);
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(coverAbsPath)) {
+        let rel = coverAbsPath.replace(publicDir, '').replace(/\\/g, '/');
+        if (!rel.startsWith('/')) rel = '/' + rel;
+        console.log(`[FFmpeg Helper] 📸 Extracted authentic video cover at ${offsetSec}s: ${rel}`);
+        resolve({ absPath: coverAbsPath, relPath: rel });
+      } else {
+        console.warn(`[FFmpeg Helper] Cover extraction exited with code ${code}`);
+        resolve(null);
+      }
+    });
+    proc.on('error', (err) => {
+      console.warn(`[FFmpeg Helper] Cover extraction error: ${err.message}`);
+      resolve(null);
+    });
+  });
+}
+
 module.exports = {
   renderReelVideo,
   ensureMetaCompliantVideo,
   ensureMetaCompliantImage,
   prepareVideoForStory,
   prepareImageForStory,
-  generateStoryOverlay
+  generateStoryOverlay,
+  extractVideoCover
 };
 

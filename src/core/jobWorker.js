@@ -232,11 +232,22 @@ class JobWorkerPool {
 
       const publishFeedPromise = (async () => {
         if (mediaType === 'reel') {
+          const { extractVideoCover } = require('../utils/ffmpegHelper');
+          let reelCoverPath = null;
+          try {
+            const covRes = await extractVideoCover(mediaPaths[0], shortcode, 1.5);
+            if (covRes && covRes.absPath) {
+              reelCoverPath = covRes.absPath;
+            }
+          } catch (covErr) {
+            console.warn(`[Job Worker] Cover extraction note: ${covErr.message}`);
+          }
+
           return publishReel({
             page,
             videoPath: mediaPaths[0],
             caption: finalCaption,
-            coverPath: null,
+            coverPath: reelCoverPath,
             onProgress
           });
         } else if (mediaType === 'carousel') {
