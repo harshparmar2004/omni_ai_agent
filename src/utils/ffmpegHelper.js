@@ -615,6 +615,7 @@ async function applyBrandedFeedOverlay(inputVideoPath, options = {}) {
 
 /**
  * Generates GTA 6 Vice City Clip Frame Template Overlay for Feed Reels
+ * Supports adaptive geometry: 9:16 vertical full screen, 16:9 landscape, 1:1 square.
  */
 function generateFeedPostOverlay(handle, options = {}) {
   const { createCanvas } = require('@napi-rs/canvas');
@@ -624,115 +625,175 @@ function generateFeedPostOverlay(handle, options = {}) {
   const ctx = canvas.getContext('2d');
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+  const {
+    cardX = 24,
+    cardY = 24,
+    cardW = 1032,
+    cardH = 1872,
+    isVertical = true
+  } = options;
 
-  // 1. Ambient Vice City color tint & vignette on the background
-  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  bgGrad.addColorStop(0, 'rgba(13, 2, 33, 0.70)');
-  bgGrad.addColorStop(0.4, 'rgba(45, 10, 78, 0.55)');
-  bgGrad.addColorStop(0.75, 'rgba(160, 26, 125, 0.50)');
-  bgGrad.addColorStop(1, 'rgba(255, 107, 53, 0.60)');
-  ctx.fillStyle = bgGrad;
-  ctx.fillRect(0, 0, width, height);
+  // 1. Ambient Background for letterboxed videos (landscape / square)
+  if (!isVertical) {
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, 'rgba(10, 2, 24, 0.75)');
+    bgGrad.addColorStop(0.5, 'rgba(38, 8, 60, 0.65)');
+    bgGrad.addColorStop(1, 'rgba(10, 2, 24, 0.75)');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
 
-  // Radial vignette
-  const vig = ctx.createRadialGradient(width / 2, height / 2, 400, width / 2, height / 2, 950);
-  vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, width, height);
+    // Vignette
+    const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 900);
+    vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vig.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, width, height);
 
-  // 2. Center Card Cutout & Defined Neon Border (Middle Post)
-  const cardW = 900;
-  const cardH = 1320;
-  const cardX = (width - cardW) / 2;
-  const cardY = (height - cardH) / 2 - 10;
-  const radius = 20;
+    // Clear cutout where video plays
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+    ctx.clip();
+    ctx.clearRect(0, 0, width, height);
+    ctx.restore();
+  }
 
+  // 2. Bolder Boundaries (8px multi-stop neon gradient border)
   ctx.save();
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-  else ctx.rect(cardX, cardY, cardW, cardH);
-  ctx.clip();
-  ctx.clearRect(0, 0, width, height);
-  ctx.restore();
+  const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+  bGrad.addColorStop(0, '#00F0FF');
+  bGrad.addColorStop(0.3, '#7209B7');
+  bGrad.addColorStop(0.65, '#F72585');
+  bGrad.addColorStop(1, '#FF8A00');
 
-  // Glowing neon border
-  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-  borderGrad.addColorStop(0, '#00F0FF');
-  borderGrad.addColorStop(0.5, '#F72585');
-  borderGrad.addColorStop(1, '#FF8A00');
-
-  ctx.save();
+  // Vibrant outer glow
   ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
-  ctx.shadowBlur = 24;
-  ctx.strokeStyle = borderGrad;
-  ctx.lineWidth = 4;
+  ctx.shadowBlur = 22;
+  ctx.strokeStyle = bGrad;
+  ctx.lineWidth = 8;
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-  else ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.roundRect(cardX, cardY, cardW, cardH, 18);
   ctx.stroke();
+
+  // Inner cyber accent rail
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
+  ctx.stroke();
+
+  // 3. Prominent Corner HUD Brackets
+  const bLen = 42;
+  ctx.lineWidth = 5;
+
+  // TL (Cyan)
+  ctx.strokeStyle = '#00F0FF';
+  ctx.shadowColor = '#00F0FF';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+  ctx.stroke();
+
+  // TR (Pink)
+  ctx.strokeStyle = '#F72585';
+  ctx.shadowColor = '#F72585';
+  ctx.beginPath();
+  ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+  ctx.stroke();
+
+  // BL (Pink)
+  ctx.strokeStyle = '#F72585';
+  ctx.shadowColor = '#F72585';
+  ctx.beginPath();
+  ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+  ctx.stroke();
+
+  // BR (Sunset Orange)
+  ctx.strokeStyle = '#FF8A00';
+  ctx.shadowColor = '#FF8A00';
+  ctx.beginPath();
+  ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH - bLen);
+  ctx.stroke();
+
+  // 4. Bottom Boundary GTA Theme (ONLY on boundary)
+  const botBarW = Math.min(680, cardW - 80);
+  const botBarX = cardX + (cardW - botBarW) / 2;
+  const botBarY = cardY + cardH - 12;
+
+  const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+  botGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+  botGrad.addColorStop(0.15, '#00F0FF');
+  botGrad.addColorStop(0.5, '#F72585');
+  botGrad.addColorStop(0.85, '#FF8A00');
+  botGrad.addColorStop(1, 'rgba(255, 138, 0, 0)');
+
+  ctx.fillStyle = botGrad;
+  ctx.shadowColor = 'rgba(255, 138, 0, 0.9)';
+  ctx.shadowBlur = 16;
+  ctx.beginPath();
+  ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
+  ctx.fill();
+
+  ctx.font = '900 13px Impact, Arial Black, sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 6;
+  ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
   ctx.restore();
 
-  // 3. Top Header: GTA VI Aesthetic Pill
-  const hW = 720;
-  const hH = 88;
-  const hX = (width - hW) / 2;
-  const hY = cardY - hH - 30;
+  // 5. Top Account Badge (Square Box with GTA Vibe Typography)
+  const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
+  const text = '@' + cleanHandle.toLowerCase();
 
   ctx.save();
-  ctx.fillStyle = 'rgba(13, 2, 33, 0.88)';
-  ctx.shadowColor = 'rgba(0, 240, 255, 0.4)';
+  ctx.font = '900 24px Impact, Arial Black, sans-serif';
+  const textMetrics = ctx.measureText(text);
+  const padX = 28;
+  const boxW = textMetrics.width + padX * 2;
+  const boxH = 50;
+  const boxX = (width - boxW) / 2;
+  const boxY = badgeY - boxH / 2;
+  const radius = 6; // 'little bit square'
+
+  // Outer glow
+  ctx.shadowColor = 'rgba(247, 37, 133, 0.7)';
   ctx.shadowBlur = 18;
+
+  // Dark glass background
+  ctx.fillStyle = 'rgba(10, 3, 24, 0.94)';
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(hX, hY, hW, hH, 44);
-  else ctx.rect(hX, hY, hW, hH);
+  ctx.roundRect(boxX, boxY, boxW, boxH, radius);
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(247, 37, 133, 0.6)';
-  ctx.lineWidth = 2;
+  // Bolder GTA neon border (3.5px)
+  const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+  boxGrad.addColorStop(0, '#00F0FF');
+  boxGrad.addColorStop(0.5, '#F72585');
+  boxGrad.addColorStop(1, '#FF8A00');
+  ctx.strokeStyle = boxGrad;
+  ctx.lineWidth = 3.5;
   ctx.stroke();
-  ctx.restore();
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 30px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`🌴 @${cleanHandle} • GTA VI 🎮`, width / 2, hY + 34);
-
-  ctx.fillStyle = '#FFB703';
-  ctx.font = 'bold 15px Arial, sans-serif';
-  ctx.fillText('EXCLUSIVE LEAKS & OFFICIAL NEWS', width / 2, hY + 63);
-
-  // 4. Bottom Footer Banner
-  const fW = 680;
-  const fH = 76;
-  const fX = (width - fW) / 2;
-  const fY = cardY + cardH + 28;
-
-  const fGrad = ctx.createLinearGradient(fX, fY, fX + fW, fY);
-  fGrad.addColorStop(0, '#F72585');
-  fGrad.addColorStop(0.5, '#7209B7');
-  fGrad.addColorStop(1, '#FF6B35');
-
-  ctx.save();
-  ctx.shadowColor = 'rgba(255, 107, 53, 0.65)';
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = fGrad;
+  // Inner subtle accent
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(fX, fY, fW, fH, 38);
-  else ctx.rect(fX, fY, fW, fH);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.lineWidth = 2;
+  ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
   ctx.stroke();
-  ctx.restore();
 
+  // Account name in GTA style
+  ctx.font = '900 24px Impact, Arial Black, sans-serif';
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`🎮 FOLLOW @${cleanHandle} FOR MORE GTA 6 🔥`, width / 2, fY + fH / 2);
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 5;
+  ctx.fillText(text, width / 2, badgeY);
+  ctx.restore();
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const genDir = path.join(publicDir, 'generated');
@@ -745,6 +806,7 @@ function generateFeedPostOverlay(handle, options = {}) {
 
 /**
  * Frames video in GTA 6 Vice City aesthetic template for Feed Reel
+ * Automatically detects aspect ratio (9:16 vertical, 16:9 landscape, 1:1 square)
  */
 async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   if (!inputVideoPath) throw new Error('No input video path for feed card');
@@ -758,22 +820,70 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   if (!fs.existsSync(absPath)) throw new Error(`Video not found: ${absPath}`);
 
   const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
-  const overlayPngPath = generateFeedPostOverlay(handle, options);
+
+  // 1. Detect aspect ratio via ffprobe
+  const { execSync } = require('child_process');
+  let inW = 1080;
+  let inH = 1920;
+  try {
+    const raw = execSync(
+      `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json "${absPath}"`,
+      { timeout: 10000 }
+    ).toString();
+    const data = JSON.parse(raw);
+    inW = data?.streams?.[0]?.width || 1080;
+    inH = data?.streams?.[0]?.height || 1920;
+  } catch (e) {
+    console.warn(`[FFmpeg Helper] ffprobe dimension warning: ${e.message}`);
+  }
+
+  const aspect = inW / inH;
+  const isVertical = aspect <= 0.65; // ~9:16 vertical
+
+  let cardW, cardH, cardX, cardY, filter;
+
+  if (isVertical) {
+    // 9:16 Full Screen Immersion with narrow boundaries
+    cardW = 1032;
+    cardH = 1872;
+    cardX = 24;
+    cardY = 24;
+
+    filter = [
+      '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
+      '[v1][1:v]overlay=0:0[outv]'
+    ].join(';');
+  } else {
+    // Landscape (16:9) or Square (1:1) / Portrait (4:5)
+    cardW = 1032;
+    cardH = Math.round(cardW / aspect);
+    if (cardH > 1650) {
+      cardH = 1650;
+      cardW = Math.round(cardH * aspect);
+    }
+    // Ensure even dimensions for libx264
+    cardW = Math.floor(cardW / 2) * 2;
+    cardH = Math.floor(cardH / 2) * 2;
+    cardX = Math.round((1080 - cardW) / 2);
+    cardY = Math.round((1920 - cardH) / 2);
+
+    filter = [
+      '[0:v]split=2[bg_raw][fg_raw]',
+      '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+      `[fg_raw]scale=${cardW}:${cardH}[card]`,
+      `[bg][card]overlay=${cardX}:${cardY}[v1]`,
+      '[v1][1:v]overlay=0:0[outv]'
+    ].join(';');
+  }
+
+  const overlayPngPath = generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical });
 
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);
   const base = path.basename(absPath, ext);
   const framedOutput = path.join(dir, `${base}_feed_framed.mp4`);
 
-  console.log(`[FFmpeg Helper] 🎨 Composing GTA 6 Vice City Framed Feed Reel for @${handle}...`);
-
-  const filter = [
-    '[0:v]split=2[bg_raw][fg_raw]',
-    '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
-    '[fg_raw]scale=w=900:h=1320:force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2[card]',
-    '[bg][card]overlay=(W-w)/2:(H-h)/2-10[v1]',
-    '[v1][1:v]overlay=0:0[outv]'
-  ].join(';');
+  console.log(`[FFmpeg Helper] 🎨 Composing GTA 6 Vice City Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
   return new Promise((resolve) => {
     const args = [
