@@ -52,9 +52,24 @@ jobs:
 
       - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-          ffmpeg -version
-          ffprobe -version
+          node -e "
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            try {
+              const ff = require('ffmpeg-static');
+              if (ff && fs.existsSync(ff)) {
+                execSync('sudo ln -sf ' + ff + ' /usr/local/bin/ffmpeg');
+              }
+            } catch (e) {}
+            try {
+              const fp = require('ffprobe-static');
+              if (fp && fp.path && fs.existsSync(fp.path)) {
+                execSync('sudo ln -sf ' + fp.path + ' /usr/local/bin/ffprobe');
+              }
+            } catch (e) {}
+          "
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
 
       - name: 🌐 Install Playwright Chromium
         run: |
