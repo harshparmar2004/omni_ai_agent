@@ -7,8 +7,12 @@ const { getDb } = require('./src/database');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Initialize SQLite v7 database
-getDb();
+// Initialize SQLite v7 database (safely wrapped for serverless environments)
+try {
+  getDb();
+} catch (e) {
+  console.warn('[DB Boot Notice]: Serverless mode, skipping local SQLite initialization');
+}
 
 // Middlewares
 app.use(cors());

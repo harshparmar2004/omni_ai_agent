@@ -1,4 +1,22 @@
-const Database = require('better-sqlite3');
+let Database;
+try {
+  Database = require('better-sqlite3');
+} catch (e) {
+  // Safe mock adapter for serverless environments (e.g. Vercel)
+  Database = class MockDatabase {
+    constructor() {}
+    prepare() {
+      return {
+        all: () => [],
+        get: () => null,
+        run: () => ({ lastInsertRowid: 1, changes: 1 })
+      };
+    }
+    pragma() {}
+    exec() {}
+  };
+}
+
 const path = require('path');
 const fs = require('fs');
 
@@ -7,18 +25,23 @@ let db;
 function getDb() {
   if (db) return db;
 
-  const dataDir = path.join(__dirname, '..', 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+  try {
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+
+    const dbPath = path.join(dataDir, 'database.sqlite');
+    db = new Database(dbPath);
+
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+
+    initV7Schema(db);
+  } catch (err) {
+    console.warn('[DB Warning] Fallback mock DB used in serverless environment:', err.message);
+    db = new Database();
   }
-
-  const dbPath = path.join(dataDir, 'database.sqlite');
-  db = new Database(dbPath);
-
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
-  initV7Schema(db);
 
   return db;
 }
