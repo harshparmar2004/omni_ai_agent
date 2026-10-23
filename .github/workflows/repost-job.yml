@@ -62,12 +62,11 @@ jobs:
       - name: 📦 Install Node Dependencies
         run: npm install
 
-      - name: 🎬 Link & Verify FFmpeg
+      - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
-          FFMPEG_BIN=$(node -e "console.log(require('ffmpeg-static'))")
-          sudo ln -sf "$FFMPEG_BIN" /usr/local/bin/ffmpeg
-          sudo chmod +x /usr/local/bin/ffmpeg
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           ffmpeg -version
+          ffprobe -version
 
       - name: 🌐 Install Playwright Chromium
         run: |
