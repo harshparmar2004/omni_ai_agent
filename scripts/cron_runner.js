@@ -22,8 +22,14 @@ function findOpenPort(startPort) {
     s.on('error', () => {
       resolve(findOpenPort(startPort + 1));
     });
-  });
-}
+// Auto-ensure ffmpeg is available from bundled ffmpeg-static
+try {
+  const ffmpegStatic = require('ffmpeg-static');
+  if (ffmpegStatic && fs.existsSync(ffmpegStatic)) {
+    const ffmpegDir = path.dirname(ffmpegStatic);
+    process.env.PATH = `${ffmpegDir}${path.delimiter}${process.env.PATH}`;
+  }
+} catch (e) {}
 
 async function main() {
   console.log('======================================================');

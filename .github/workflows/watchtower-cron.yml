@@ -47,14 +47,18 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: 📦 Install Node Dependencies
+        run: npm install
+
       - name: 🎬 Setup FFmpeg
         uses: FedericoCarboni/setup-ffmpeg@v3
 
-      - name: 🎬 Verify FFmpeg
-        run: ffmpeg -version
-
-      - name: 📦 Install Node Dependencies
-        run: npm install
+      - name: 🎬 Link & Verify FFmpeg
+        run: |
+          if ! command -v ffmpeg &> /dev/null; then
+            node -e 'const fs=require("fs"); const f=require("ffmpeg-static"); if(f && fs.existsSync(f)) { require("child_process").execSync("sudo ln -sf " + f + " /usr/local/bin/ffmpeg"); }' || true
+          fi
+          ffmpeg -version
 
       - name: 🌐 Install Playwright Chromium
         run: |
