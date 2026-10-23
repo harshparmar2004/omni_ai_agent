@@ -354,7 +354,7 @@ async function ensureMetaCompliantImage(inputImagePath) {
 }
 
 /**
- * Generates transparent UI overlay PNG for Instagram Story Reshare Card
+ * Generates aesthetic GTA 6 Vice City UI overlay PNG for Instagram Story Reshare Card
  */
 function generateStoryOverlay(handle, options = {}) {
   const { createCanvas } = require('@napi-rs/canvas');
@@ -363,57 +363,131 @@ function generateStoryOverlay(handle, options = {}) {
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  const cleanHandle = (handle || '').replace(/^@/, '');
-  const typeLabel = options.typeLabel || 'REEL';
+  const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+  const typeLabel = options.typeLabel || 'NEW REEL';
 
-  // 1. Top Header Banner Pill
-  const headerY = 220;
-  const headerWidth = 520;
-  const headerHeight = 64;
-  const headerX = (width - headerWidth) / 2;
+  // 1. Ambient Vice City color tint & vignette on the background
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, 'rgba(13, 2, 33, 0.65)');    // Deep Vice City Violet
+  bgGrad.addColorStop(0.4, 'rgba(45, 10, 78, 0.50)');  // Purple
+  bgGrad.addColorStop(0.75, 'rgba(160, 26, 125, 0.45)'); // Neon Magenta
+  bgGrad.addColorStop(1, 'rgba(255, 107, 53, 0.55)');   // Sunset Orange
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
+  // Radial vignette
+  const vig = ctx.createRadialGradient(width / 2, height / 2, 400, width / 2, height / 2, 950);
+  vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vig.addColorStop(1, 'rgba(0, 0, 0, 0.60)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Center Card Cutout & Defined Neon Border (Middle Post)
+  const cardW = 860;
+  const cardH = 1240;
+  const cardX = (width - cardW) / 2;
+  const cardY = (height - cardH) / 2;
+  const radius = 24;
+
+  // Clear center so the crystal-clear video card displays un-tinted
+  ctx.save();
   ctx.beginPath();
   if (ctx.roundRect) {
-    ctx.roundRect(headerX, headerY, headerWidth, headerHeight, 32);
+    ctx.roundRect(cardX, cardY, cardW, cardH, radius);
   } else {
-    ctx.rect(headerX, headerY, headerWidth, headerHeight);
+    ctx.rect(cardX, cardY, cardW, cardH);
+  }
+  ctx.clip();
+  ctx.clearRect(0, 0, width, height);
+  ctx.restore();
+
+  // Draw glowing Vice City neon border around the card
+  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+  borderGrad.addColorStop(0, '#00F0FF');   // Cyan glow at top-left
+  borderGrad.addColorStop(0.5, '#F72585'); // Neon Pink at center
+  borderGrad.addColorStop(1, '#FF8A00');   // Sunset Gold at bottom-right
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  } else {
+    ctx.rect(cardX, cardY, cardW, cardH);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // 3. Top Header: Aesthetic Frosted Glass Pill
+  const hW = 660;
+  const hH = 84;
+  const hX = (width - hW) / 2;
+  const hY = cardY - hH - 32;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(13, 2, 33, 0.88)';
+  ctx.shadowColor = 'rgba(0, 240, 255, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(hX, hY, hW, hH, 42);
+  } else {
+    ctx.rect(hX, hY, hW, hH);
   }
   ctx.fill();
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 26px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`@${cleanHandle} • ${typeLabel}`, width / 2, headerY + headerHeight / 2);
-
-  // 2. Bottom CTA Button
-  const ctaY = 1620;
-  const ctaWidth = 460;
-  const ctaHeight = 74;
-  const ctaX = (width - ctaWidth) / 2;
-
-  const grad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaWidth, ctaY);
-  grad.addColorStop(0, '#E1306C');
-  grad.addColorStop(0.5, '#FD1D1D');
-  grad.addColorStop(1, '#F77737');
-
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(ctaX, ctaY, ctaWidth, ctaHeight, 37);
-  } else {
-    ctx.rect(ctaX, ctaY, ctaWidth, ctaHeight);
-  }
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.strokeStyle = 'rgba(247, 37, 133, 0.55)';
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
 
+  // Top Header Text
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 28px Arial, sans-serif';
-  ctx.fillText('▶ Watch Full Reel', width / 2, ctaY + ctaHeight / 2);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`🌴 @${cleanHandle} • GTA VI 🎮`, width / 2, hY + 32);
+
+  ctx.fillStyle = '#FFB703';
+  ctx.font = 'bold 15px Arial, sans-serif';
+  ctx.fillText('OFFICIAL NEWS & VIRAL LEAKS', width / 2, hY + 60);
+
+  // 4. Bottom CTA Pill Button
+  const ctaW = 540;
+  const ctaH = 82;
+  const ctaX = (width - ctaW) / 2;
+  const ctaY = cardY + cardH + 32;
+
+  const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY);
+  ctaGrad.addColorStop(0, '#F72585');
+  ctaGrad.addColorStop(0.5, '#7209B7');
+  ctaGrad.addColorStop(1, '#FF6B35');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(255, 107, 53, 0.65)';
+  ctx.shadowBlur = 22;
+  ctx.fillStyle = ctaGrad;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 41);
+  } else {
+    ctx.rect(ctaX, ctaY, ctaW, ctaH);
+  }
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`🔥 ${typeLabel} • TAP TO WATCH ▶`, width / 2, ctaY + ctaH / 2);
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const genDir = path.join(publicDir, 'generated');
@@ -422,6 +496,121 @@ function generateStoryOverlay(handle, options = {}) {
   const overlayPath = path.join(genDir, `story_overlay_${cleanHandle || 'default'}.png`);
   fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
   return overlayPath;
+}
+
+/**
+ * Generates sleek GTA VI Identity Watermark Badge for Feed Reels/Posts
+ */
+function generateFeedWatermark(handle, options = {}) {
+  const { createCanvas } = require('@napi-rs/canvas');
+  const w = 340;
+  const h = 72;
+  const canvas = createCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+
+  const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(13, 2, 33, 0.78)';
+  ctx.shadowColor = 'rgba(247, 37, 133, 0.5)';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(0, 0, w, h, 36);
+  } else {
+    ctx.rect(0, 0, w, h);
+  }
+  ctx.fill();
+
+  const borderGrad = ctx.createLinearGradient(0, 0, w, h);
+  borderGrad.addColorStop(0, '#00F0FF');
+  borderGrad.addColorStop(0.5, '#F72585');
+  borderGrad.addColorStop(1, '#FF8A00');
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // GTA VI monogram
+  ctx.fillStyle = '#F72585';
+  ctx.font = '900 24px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('VI', 22, h / 2);
+
+  // Separator bar
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.fillRect(58, 16, 1.5, 40);
+
+  // Handle
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.fillText(`@${cleanHandle}`, 72, h / 2);
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  const genDir = path.join(publicDir, 'generated');
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  const watermarkPath = path.join(genDir, `feed_watermark_${cleanHandle || 'default'}.png`);
+  fs.writeFileSync(watermarkPath, canvas.toBuffer('image/png'));
+  return watermarkPath;
+}
+
+/**
+ * Applies subtle branded identity watermark to Feed Reel MP4
+ */
+async function applyBrandedFeedOverlay(inputVideoPath, options = {}) {
+  if (!inputVideoPath) throw new Error('No input video path for watermark');
+
+  let absPath = inputVideoPath;
+  if (!fs.existsSync(absPath)) {
+    const cleanRel = inputVideoPath.replace(/^[/\\]+/, '');
+    const candidate = path.join(__dirname, '..', '..', 'public', cleanRel);
+    if (fs.existsSync(candidate)) absPath = candidate;
+  }
+  if (!fs.existsSync(absPath)) throw new Error(`Video not found: ${absPath}`);
+
+  const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
+  const watermarkPngPath = generateFeedWatermark(handle, options);
+
+  const dir = path.dirname(absPath);
+  const ext = path.extname(absPath);
+  const base = path.basename(absPath, ext);
+  const brandedOutput = path.join(dir, `${base}_branded.mp4`);
+
+  return new Promise((resolve) => {
+    // Top-right corner with 40px padding
+    const args = [
+      '-y',
+      '-i', absPath,
+      '-i', watermarkPngPath,
+      '-filter_complex', '[0:v][1:v]overlay=main_w-overlay_w-40:80[outv]',
+      '-map', '[outv]',
+      '-map', '0:a?',
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-preset', 'fast',
+      '-crf', '18',
+      '-c:a', 'copy',
+      '-movflags', '+faststart',
+      brandedOutput
+    ];
+
+    const proc = spawn('ffmpeg', args);
+    proc.on('close', (code) => {
+      if (code === 0 && fs.existsSync(brandedOutput)) {
+        console.log(`[FFmpeg Helper] ✅ Branded Feed Reel generated: ${brandedOutput}`);
+        resolve(brandedOutput);
+      } else {
+        console.warn(`[FFmpeg Helper] ⚠️ Watermark overlay exited with code ${code}, falling back to original video`);
+        resolve(inputVideoPath);
+      }
+    });
+    proc.on('error', (err) => {
+      console.warn(`[FFmpeg Helper] Watermark overlay spawn error: ${err.message}, falling back to original`);
+      resolve(inputVideoPath);
+    });
+  });
 }
 
 /**
@@ -549,12 +738,25 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   const img = await loadImage(absPath);
 
-  // Draw blurred ambient background (using drawImage scaled with darken overlay)
+  // 1. Draw ambient blurred background with GTA 6 Vice City Sunset overlay
   ctx.drawImage(img, -width * 0.25, -height * 0.25, width * 1.5, height * 1.5);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, 'rgba(13, 2, 33, 0.70)');
+  bgGrad.addColorStop(0.4, 'rgba(45, 10, 78, 0.55)');
+  bgGrad.addColorStop(0.75, 'rgba(160, 26, 125, 0.50)');
+  bgGrad.addColorStop(1, 'rgba(255, 107, 53, 0.60)');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
 
-  // Compute centered card size in original aspect ratio
+  // Radial vignette
+  const vig = ctx.createRadialGradient(width / 2, height / 2, 400, width / 2, height / 2, 950);
+  vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vig.addColorStop(1, 'rgba(0, 0, 0, 0.65)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Compute centered card size in original aspect ratio
   const maxW = 860;
   const maxH = 1240;
   const imgRatio = img.width / img.height;
@@ -568,52 +770,94 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   const cardX = (width - cardW) / 2;
   const cardY = (height - cardH) / 2;
+  const radius = 24;
 
-  // Draw centered card
+  // Draw glowing Vice City neon border around the card
+  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+  borderGrad.addColorStop(0, '#00F0FF');
+  borderGrad.addColorStop(0.5, '#F72585');
+  borderGrad.addColorStop(1, '#FF8A00');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  else ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.stroke();
+  ctx.restore();
+
+  // Draw centered image inside card
+  ctx.save();
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+  else ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.clip();
   ctx.drawImage(img, cardX, cardY, cardW, cardH);
+  ctx.restore();
 
-  // Top header pill
-  const headerY = 220;
-  const headerWidth = 520;
-  const headerHeight = 64;
-  const headerX = (width - headerWidth) / 2;
+  // 3. Top header pill
+  const hW = 660;
+  const hH = 84;
+  const hX = (width - hW) / 2;
+  const hY = cardY - hH - 32;
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
+  ctx.save();
+  ctx.fillStyle = 'rgba(13, 2, 33, 0.88)';
+  ctx.shadowColor = 'rgba(0, 240, 255, 0.35)';
+  ctx.shadowBlur = 18;
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(headerX, headerY, headerWidth, headerHeight, 32);
-  else ctx.rect(headerX, headerY, headerWidth, headerHeight);
+  if (ctx.roundRect) ctx.roundRect(hX, hY, hW, hH, 42);
+  else ctx.rect(hX, hY, hW, hH);
   ctx.fill();
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 26px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`@${handle} • POST`, width / 2, headerY + headerHeight / 2);
-
-  // Bottom CTA
-  const ctaY = 1620;
-  const ctaWidth = 460;
-  const ctaHeight = 74;
-  const ctaX = (width - ctaWidth) / 2;
-
-  const grad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaWidth, ctaY);
-  grad.addColorStop(0, '#E1306C');
-  grad.addColorStop(0.5, '#FD1D1D');
-  grad.addColorStop(1, '#F77737');
-
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaWidth, ctaHeight, 37);
-  else ctx.rect(ctaX, ctaY, ctaWidth, ctaHeight);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.strokeStyle = 'rgba(247, 37, 133, 0.55)';
   ctx.lineWidth = 2;
   ctx.stroke();
+  ctx.restore();
 
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 28px Arial, sans-serif';
-  ctx.fillText('▶ View Post', width / 2, ctaY + ctaHeight / 2);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`🌴 @${cleanHandle} • GTA VI 🎮`, width / 2, hY + 32);
+
+  ctx.fillStyle = '#FFB703';
+  ctx.font = 'bold 15px Arial, sans-serif';
+  ctx.fillText('OFFICIAL NEWS & VIRAL LEAKS', width / 2, hY + 60);
+
+  // 4. Bottom CTA Button
+  const ctaW = 540;
+  const ctaH = 82;
+  const ctaX = (width - ctaW) / 2;
+  const ctaY = cardY + cardH + 32;
+
+  const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY);
+  ctaGrad.addColorStop(0, '#F72585');
+  ctaGrad.addColorStop(0.5, '#7209B7');
+  ctaGrad.addColorStop(1, '#FF6B35');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(255, 107, 53, 0.65)';
+  ctx.shadowBlur = 22;
+  ctx.fillStyle = ctaGrad;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 41);
+  else ctx.rect(ctaX, ctaY, ctaW, ctaH);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 30px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🔥 NEW POST • TAP TO VIEW ▶', width / 2, ctaY + ctaH / 2);
 
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);
@@ -689,6 +933,8 @@ module.exports = {
   prepareVideoForStory,
   prepareImageForStory,
   generateStoryOverlay,
+  generateFeedWatermark,
+  applyBrandedFeedOverlay,
   extractVideoCover
 };
 

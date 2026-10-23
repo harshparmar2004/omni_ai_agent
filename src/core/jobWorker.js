@@ -238,9 +238,29 @@ class JobWorkerPool {
 
       let pubResult = null;
       if (mediaType === 'reel') {
+        let feedVideoPath = mediaPaths[0];
+        const isWatermarkEnabled = page.watermark_enabled === 1 ||
+          page.watermark_enabled === true ||
+          process.env.WATERMARK_ENABLED === 'true' ||
+          process.env.WATERMARK_ENABLED === '1' ||
+          getSetting('watermark_enabled', 'false') === 'true';
+
+        if (isWatermarkEnabled) {
+          try {
+            const { applyBrandedFeedOverlay } = require('../utils/ffmpegHelper');
+            console.log(`[Job Worker] 🎨 Applying custom GTA 6 identity watermark to Reel for ${page.handle}...`);
+            const branded = await applyBrandedFeedOverlay(mediaPaths[0], { handle: page.handle });
+            if (branded && fs.existsSync(branded)) {
+              feedVideoPath = branded;
+            }
+          } catch (wmErr) {
+            console.warn(`[Job Worker] Watermark notice: ${wmErr.message}`);
+          }
+        }
+
         pubResult = await publishReel({
           page,
-          videoPath: mediaPaths[0],
+          videoPath: feedVideoPath,
           caption: finalCaption,
           coverPath: null,
           onProgress

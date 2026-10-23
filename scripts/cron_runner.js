@@ -60,7 +60,7 @@ async function main() {
       caption_template: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
       default_hashtags: '#gta6 #rockstargames #gtavi',
       attribution_enabled: 1,
-      watermark_enabled: 0,
+      watermark_enabled: 1,
       post_mode: 'auto',
       posts_per_cycle: 1,
       daily_quota: 5,
