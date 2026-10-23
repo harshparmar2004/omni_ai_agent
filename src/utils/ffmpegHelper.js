@@ -479,7 +479,8 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
     '[v1][1:v]overlay=0:0[outv]'
   ].join(';');
 
-  const clipLimit = duration > 60 ? '59.5' : String(Math.max(duration, 1));
+  // Ensure story video meets Meta's minimum 3.0s duration requirement and <= 59.5s max
+  const clipLimit = duration > 0 ? (duration > 60 ? '59.5' : String(Math.max(duration, 3.5))) : '59.5';
 
   return new Promise((resolve) => {
     const args = [

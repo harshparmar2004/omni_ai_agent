@@ -308,12 +308,6 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
     access_token: token
   };
 
-  // Attach interactive native profile tag aligned with the "Watch Full Reel" button (x: 0.5, y: 0.85)
-  if (cleanHandle) {
-    initParams.user_tags = JSON.stringify([
-      { username: cleanHandle, x: 0.5, y: 0.85 }
-    ]);
-  }
 
   if (isVideo) {
     initParams.video_url = publicMediaUrl;
