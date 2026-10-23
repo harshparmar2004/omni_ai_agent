@@ -221,81 +221,69 @@ class JobWorkerPool {
 
       job = updateJobProgress(jobId, 'ready', 'caption_ready', { caption: finalCaption });
 
-      // ── Step 3: Meta Graph API Publishing (Feed & Story in Parallel) ──
+      // ── Step 3: Meta Graph API Publishing (Feed first, then Story) ──
       job = updateJobProgress(jobId, 'publishing', 'meta_upload');
-      await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading Feed & Story containers to Instagram...', '⏳ Processing containers concurrently...'));
+      await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading Feed container to Instagram...', '⏳ Ingesting Reel video...'));
 
       const onProgress = (step, current, total) => {
         if (step === 'polling') {
           this.updateTelegramProgress(
             job,
-            renderStepperMsg(4, 'Processing media containers on Instagram...', `⏳ Verifying Meta container (${current}/${total})...`)
+            renderStepperMsg(4, 'Processing media container on Instagram...', `⏳ Verifying Meta container (${current}/${total})...`)
           ).catch(() => {});
         }
       };
 
       const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
 
-      const publishFeedPromise = (async () => {
-        if (mediaType === 'reel') {
-          const { extractVideoCover } = require('../utils/ffmpegHelper');
-          let reelCoverPath = null;
-          try {
-            const covRes = await extractVideoCover(mediaPaths[0], shortcode, 1.5);
-            if (covRes && covRes.absPath) {
-              reelCoverPath = covRes.absPath;
-            }
-          } catch (covErr) {
-            console.warn(`[Job Worker] Cover extraction note: ${covErr.message}`);
-          }
-
-          return publishReel({
-            page,
-            videoPath: mediaPaths[0],
-            caption: finalCaption,
-            coverPath: reelCoverPath,
-            onProgress
-          });
-        } else if (mediaType === 'carousel') {
-          return publishCarousel({
-            page,
-            imagePaths: mediaPaths,
-            caption: finalCaption,
-            onProgress
-          });
-        } else {
-          return publishImage({
-            page,
-            imagePath: mediaPaths[0],
-            caption: finalCaption,
-            onProgress
-          });
-        }
-      })();
-
-      const publishStoryPromise = (async () => {
-        if (autoPostStory && mediaPaths[0]) {
-          try {
-            console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
-            const sRes = await publishStory({
-              page,
-              videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
-              imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
-            });
-            console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${sRes.ig_media_id}`);
-            return sRes;
-          } catch (storyErr) {
-            console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
-            return null;
-          }
-        }
-        return null;
-      })();
-
-      const [pubResult, storyResult] = await Promise.all([publishFeedPromise, publishStoryPromise]);
+      let pubResult = null;
+      if (mediaType === 'reel') {
+        pubResult = await publishReel({
+          page,
+          videoPath: mediaPaths[0],
+          caption: finalCaption,
+          coverPath: null,
+          onProgress
+        });
+      } else if (mediaType === 'carousel') {
+        pubResult = await publishCarousel({
+          page,
+          imagePaths: mediaPaths,
+          caption: finalCaption,
+          onProgress
+        });
+      } else {
+        pubResult = await publishImage({
+          page,
+          imagePath: mediaPaths[0],
+          caption: finalCaption,
+          onProgress
+        });
+      }
 
       if (!pubResult || !pubResult.success || !pubResult.ig_media_id) {
         throw new Error(pubResult?.error || 'Publish did not return an Instagram media ID');
+      }
+
+      // ── Step 3b: Publish Instagram Story ──
+      let storyResult = null;
+      if (autoPostStory && mediaPaths[0]) {
+        try {
+          await this.updateTelegramProgress(
+            job,
+            renderStepperMsg(4, 'Feed published! Publishing Instagram Story...', '⏳ Creating Story card...')
+          ).catch(() => {});
+
+          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
+          storyResult = await publishStory({
+            page,
+            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
+          });
+          console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult?.ig_media_id}`);
+        } catch (storyErr) {
+          console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
+        }
       }
 
       // ── Step 4: Finalise Success (Single In-Place Telegram Message) ────

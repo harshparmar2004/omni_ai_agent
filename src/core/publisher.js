@@ -16,7 +16,7 @@ async function pollContainer(containerId, token, baseUrl, onProgress = null) {
   const maxAttempts = 45;
 
   while (!isReady && attempts < maxAttempts) {
-    const delay = attempts < 3 ? 1200 : 1800;
+    const delay = attempts < 3 ? 1500 : 2500;
     await new Promise(r => setTimeout(r, delay));
     attempts++;
 
@@ -24,21 +24,32 @@ async function pollContainer(containerId, token, baseUrl, onProgress = null) {
       onProgress('polling', attempts, maxAttempts);
     }
 
-    const res = await axios.get(`${baseUrl}/${containerId}`, {
-      params: { fields: 'status_code,status', access_token: token },
-      timeout: 10000
-    });
+    try {
+      const res = await axios.get(`${baseUrl}/${containerId}`, {
+        params: { fields: 'status_code,status', access_token: token },
+        timeout: 10000
+      });
 
-    const statusCode = res.data?.status_code;
-    const statusMsg = res.data?.status || '';
+      const statusCode = res.data?.status_code;
+      const statusMsg = res.data?.status || '';
 
-    console.log(`[Publisher] Container status (${attempts}/${maxAttempts}): ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
+      console.log(`[Publisher] Container status (${attempts}/${maxAttempts}): ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
 
-    if (statusCode === 'FINISHED') {
-      isReady = true;
-    } else if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
-      console.error(`[Publisher] Container failure payload:`, JSON.stringify(res.data));
-      throw new Error(`Meta container processing failed: ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
+      if (statusCode === 'FINISHED') {
+        isReady = true;
+      } else if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
+        console.error(`[Publisher] Container failure payload:`, JSON.stringify(res.data));
+        throw new Error(`Meta container processing failed: ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
+      }
+    } catch (pollErr) {
+      if (pollErr.message && pollErr.message.includes('Meta container processing failed')) {
+        throw pollErr;
+      }
+      console.warn(`[Publisher] Container status polling warning (${attempts}/${maxAttempts}):`, pollErr.response?.data || pollErr.message);
+      if (attempts >= maxAttempts) {
+        throw pollErr;
+      }
+      await new Promise(r => setTimeout(r, 2000));
     }
   }
 
@@ -339,10 +350,24 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
   if (onProgress) onProgress('uploading_story', 0, 1);
 
   // 1. Create Story Media Container
-  const initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-    params: initParams,
-    timeout: 35000
-  });
+  let initRes;
+  try {
+    initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+      params: initParams,
+      timeout: 35000
+    });
+  } catch (err) {
+    if (initParams.is_ai_generated !== undefined) {
+      console.warn(`[Publisher] Retrying story container creation without is_ai_generated tag: ${err.response?.data?.error?.message || err.message}`);
+      delete initParams.is_ai_generated;
+      initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+        params: initParams,
+        timeout: 35000
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const containerId = initRes.data?.id;
   if (!containerId) {
