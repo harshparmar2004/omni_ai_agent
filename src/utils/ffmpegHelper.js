@@ -902,7 +902,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       framedOutput
     ];
 
-    const proc = spawn('ffmpeg', args);
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'] });
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(framedOutput)) {
         console.log(`[FFmpeg Helper] ✅ GTA 6 Framed Feed Reel generated: ${framedOutput}`);
@@ -994,7 +994,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
       storyOutput
     ];
 
-    const proc = spawn('ffmpeg', args);
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'] });
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(storyOutput)) {
         console.log(`[FFmpeg Helper] ✅ Story Reel Card generated: ${storyOutput}`);

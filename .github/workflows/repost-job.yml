@@ -22,6 +22,11 @@ on:
         required: false
         default: ''
         type: string
+      force:
+        description: 'Force re-publish even if already in db'
+        required: false
+        default: 'false'
+        type: string
 
 permissions:
   contents: write
@@ -106,7 +111,8 @@ jobs:
           FEED_BRANDING_MODE: 'frame'
           NODE_ENV: production
         run: |
-          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}"
+          FORCE_FLAG="${{ inputs.force == 'true' && '--force' || '' }}"
+          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}" $FORCE_FLAG
 
       - name: 📢 Notify Telegram on Failure or Cancellation
         if: failure() || cancelled()

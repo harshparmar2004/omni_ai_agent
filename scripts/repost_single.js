@@ -166,18 +166,23 @@ async function main() {
     job.telegram_message_id = messageId;
   }
 
-  // Handle already published duplicate reels
-  if (enqueueResult.alreadyPublished && job.permalink) {
+  // Handle already published duplicate reels unless forced
+  const isForce = args.includes('--force') || process.env.FORCE_REPOST === 'true';
+  if (enqueueResult.alreadyPublished && job.permalink && !isForce) {
     console.log(`[Reposter Runner] ℹ️ Post #${enqueueResult.shortcode} was already published on ${job.published_at}.`);
     const notifier = require('../src/core/notifier');
-    await notifier.sendTelegramMessage(
-      chatId,
-      `ℹ️ <b>Already Published to Profile:</b>\n\n` +
-      `Reel #${enqueueResult.shortcode} was already published to <b>@gta6_updates_007</b>!\n\n` +
-      `🌐 <b>Live Instagram Post:</b> <a href="${job.permalink}">${job.permalink}</a>\n` +
-      (job.story_status === 'published' ? `👉 <a href="https://www.instagram.com/stories/gta6_updates_007/">View Story</a>` : '')
-    );
-    return;
+    try {
+      await notifier.sendTelegramMessage(
+        chatId,
+        `ℹ️ <b>Already Published to Profile:</b>\n\n` +
+        `Reel #${enqueueResult.shortcode} was already published to <b>@gta6_updates_007</b>!\n\n` +
+        `🌐 <b>Live Instagram Post:</b> <a href="${job.permalink}">${job.permalink}</a>\n` +
+        (job.story_status === 'published' ? `👉 <a href="https://www.instagram.com/stories/gta6_updates_007/">View Story</a>` : '')
+      );
+    } catch (e) {}
+    try { closeTunnel(); } catch (e) {}
+    await new Promise((resolve) => server.close(resolve));
+    process.exit(0);
   }
 
   // Ensure status is queued so processJob picks it up immediately
