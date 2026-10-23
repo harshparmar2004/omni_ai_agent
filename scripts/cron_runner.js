@@ -37,16 +37,74 @@ async function main() {
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
-  // 1b. Support environment overrides from GitHub Secrets
+  // 1b. Ensure destination Page #1 exists and support environment overrides from GitHub Secrets
+  let pages = getPages();
+  if (pages.length === 0) {
+    console.log('📄 No pages found in database, creating default Page #1 (@gta6_updates_007)...');
+    const { createPage } = require('../src/database');
+    createPage({
+      slug: 'gta6',
+      name: 'GTA 6 Updates 007',
+      handle: '@gta6_updates_007',
+      ig_user_id: '17841428668115319',
+      access_token: process.env.META_ACCESS_TOKEN || '',
+      caption_template: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
+      default_hashtags: '#gta6 #rockstargames #gtavi',
+      attribution_enabled: 1,
+      watermark_enabled: 0,
+      post_mode: 'auto',
+      posts_per_cycle: 1,
+      daily_quota: 5,
+      min_spacing_minutes: 120,
+      is_active: 1
+    });
+    pages = getPages();
+  }
+
   if (process.env.META_ACCESS_TOKEN) {
     console.log('🔑 Injecting META_ACCESS_TOKEN from environment into active pages...');
-    const pages = getPages();
     for (const p of pages) {
       if (p.is_active && (!p.access_token || p.access_token.length < 20)) {
         db.prepare('UPDATE pages SET access_token = ? WHERE id = ?').run(process.env.META_ACCESS_TOKEN, p.id);
       }
     }
   }
+
+  // 1c. Sync Competitor Accounts from config/competitors.json or COMPETITOR_ACCOUNTS env var
+  const { createSourceAccount } = require('../src/database');
+  const targetPageId = pages[0]?.id || 1;
+  let competitorList = [];
+
+  const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
+  if (fs.existsSync(competitorsJsonPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(competitorsJsonPath, 'utf8'));
+      if (Array.isArray(parsed)) competitorList.push(...parsed);
+    } catch (e) {
+      console.warn(`[Config Warning] Could not parse config/competitors.json: ${e.message}`);
+    }
+  }
+
+  if (process.env.COMPETITOR_ACCOUNTS) {
+    const fromEnv = process.env.COMPETITOR_ACCOUNTS.split(',').map(s => s.trim()).filter(Boolean);
+    competitorList.push(...fromEnv);
+  }
+
+  if (competitorList.length === 0) {
+    competitorList = ['rockstargames', 'grandtheftauto6'];
+  }
+
+  const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))];
+  for (const comp of uniqueCompetitors) {
+    if (comp) {
+      createSourceAccount({
+        username: comp,
+        page_id: targetPageId,
+        is_active: 1
+      });
+    }
+  }
+  console.log(`🎯 Active tracked competitors (${uniqueCompetitors.length}): ${uniqueCompetitors.map(c => '@' + c).join(', ')}`);
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
