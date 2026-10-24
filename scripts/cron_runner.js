@@ -73,6 +73,9 @@ async function main() {
   // Ensure daily_quota allows all 3 peak audience windows (15 reels/day)
   try {
     db.prepare('UPDATE pages SET daily_quota = 15 WHERE daily_quota < 15').run();
+    // Purge any stale image posts/legacy discoveries from cached DB
+    db.prepare("DELETE FROM discovered_posts WHERE author IN ('grandtheftauto6', 'gta6latest', 'gta6.only')").run();
+    db.prepare("UPDATE publish_jobs SET status = 'failed', error = 'Cancelled: candidate is static photo, not a video reel' WHERE status = 'queued' AND (source_url LIKE '%grandtheftauto6%' OR source_url LIKE '%gta6latest%' OR source_url LIKE '%gta6.only%')").run();
   } catch (e) {}
 
   if (process.env.META_ACCESS_TOKEN) {
@@ -105,7 +108,7 @@ async function main() {
   }
 
   if (competitorList.length === 0) {
-    competitorList = ['rockstargames', 'grandtheftauto6'];
+    competitorList = ['paradoks.plays', 'gtavi_insider'];
   }
 
   const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))];
@@ -171,14 +174,16 @@ async function main() {
 
   if (adminChatId) {
     const newCount = scanResult?.newPostsCount || 0;
-    notifier.sendTelegramMessage(
-      adminChatId,
-      `🛰️ <b>Watchtower Surveillance Scan Complete:</b>\n\n` +
-      `• Checked: <b>${scanResult?.sourcesChecked || uniqueCompetitors.length}</b> competitor accounts\n` +
-      `• Fresh Reels Indexed: <b>+${newCount}</b>\n` +
-      `• Time: <code>${new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} (IST)</code>\n\n` +
-      `<i>Evaluating engagement metrics for current audience window...</i>`
-    ).catch(() => {});
+    try {
+      await notifier.sendTelegramMessage(
+        adminChatId,
+        `🛰️ <b>Watchtower Surveillance Scan Complete:</b>\n\n` +
+        `• Checked: <b>${scanResult?.sourcesChecked || uniqueCompetitors.length}</b> competitor accounts\n` +
+        `• Fresh Reels Indexed: <b>+${newCount}</b>\n` +
+        `• Time: <code>${new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} (IST)</code>\n\n` +
+        `<i>Evaluating engagement metrics for current audience window...</i>`
+      );
+    } catch (e) {}
   }
 
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
@@ -189,22 +194,32 @@ async function main() {
 
   if (adminChatId && selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0) {
     const topW = selectedWinners[0].winners[0];
-    notifier.sendTelegramMessage(
-      adminChatId,
-      `🎯 <b>Top Viral Winner Selected:</b>\n\n` +
-      `• Source: <code>#${topW.shortcode}</code>\n` +
-      `• Virality Score: <b>${topW.compositeScore || 'High'}</b>\n` +
-      `• Destination: <b>@gta6_updates_007</b>\n\n` +
-      `🎬 <i>Rendering GTA 6 Vice City 1080p frame & Story card...</i>`
-    ).catch(() => {});
+    try {
+      await notifier.sendTelegramMessage(
+        adminChatId,
+        `🎯 <b>Top Viral Winner Selected:</b>\n\n` +
+        `• Source: <code>#${topW.shortcode}</code>\n` +
+        `• Virality Score: <b>${topW.compositeScore || 'High'}</b>\n` +
+        `• Destination: <b>@gta6_updates_007</b>\n\n` +
+        `🎬 <i>Rendering GTA 6 Vice City 1080p frame & Story card...</i>`
+      );
+    } catch (e) {}
   }
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)
   const jobWorkerPool = require('../src/core/jobWorker');
-  const queuedJobs = listPublishJobs({ status: 'queued', limit: 3 });
-  console.log(`\n[Cron Runner] 🚀 Step 3: Processing ${queuedJobs.length} queued publishing job(s)...`);
+  const queuedJobs = listPublishJobs({ status: 'queued', limit: 10 });
+  console.log(`\n[Cron Runner] 🚀 Step 3: Processing queued publishing job(s) (${queuedJobs.length} available)...`);
+
+  let publishedInCycle = 0;
+  const targetPerCycle = pages[0]?.posts_per_cycle || 1;
 
   for (const job of queuedJobs) {
+    if (publishedInCycle >= targetPerCycle) {
+      console.log(`[Cron Runner] 🎯 Target for this cycle reached (${publishedInCycle}/${targetPerCycle} reels published).`);
+      break;
+    }
+
     if (isDryRun) {
       console.log(`[Dry Run] Would process Job #${job.id} for page #${job.page_id} (${job.shortcode})`);
       continue;
@@ -213,7 +228,13 @@ async function main() {
     try {
       console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
       await jobWorkerPool.processJob(job.id, { forceInstant: true });
-      console.log(`[Cron Runner] ✅ Job #${job.id} completed!`);
+      const currentJob = getJob(job.id);
+      if (currentJob && currentJob.status === 'published') {
+        publishedInCycle++;
+        console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
+      } else {
+        console.log(`[Cron Runner] ℹ️ Job #${job.id} ended with status: ${currentJob?.status}`);
+      }
     } catch (err) {
       console.error(`[Cron Runner] ❌ Job #${job.id} failed: ${err.message}`);
     }
