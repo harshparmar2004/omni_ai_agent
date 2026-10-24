@@ -42,7 +42,7 @@ async function main() {
   console.log('======================================================\n');
 
   // 1. Initialize SQLite Database
-  const { getDb, getPages, listPublishJobs, getSetting, setSetting } = require('../src/database');
+  const { getDb, getPages, listPublishJobs, getSetting, setSetting, getPublishJobById } = require('../src/database');
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
@@ -228,7 +228,7 @@ async function main() {
     try {
       console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
       await jobWorkerPool.processJob(job.id, { forceInstant: true });
-      const currentJob = getJob(job.id);
+      const currentJob = getPublishJobById(job.id);
       if (currentJob && currentJob.status === 'published') {
         publishedInCycle++;
         console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
