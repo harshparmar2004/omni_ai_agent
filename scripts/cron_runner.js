@@ -63,12 +63,17 @@ async function main() {
       watermark_enabled: 1,
       post_mode: 'auto',
       posts_per_cycle: 1,
-      daily_quota: 5,
+      daily_quota: 15,
       min_spacing_minutes: 120,
       is_active: 1
     });
     pages = getPages();
   }
+
+  // Ensure daily_quota allows all 3 peak audience windows (15 reels/day)
+  try {
+    db.prepare('UPDATE pages SET daily_quota = 15 WHERE daily_quota < 15').run();
+  } catch (e) {}
 
   if (process.env.META_ACCESS_TOKEN) {
     console.log('🔑 Injecting META_ACCESS_TOKEN from environment into active pages...');
@@ -118,6 +123,10 @@ async function main() {
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
   }
+  const adminChatId = process.env.TELEGRAM_CHAT_ID || getSetting('telegram_chat_id') || '5443723531';
+  setSetting('telegram_chat_id', adminChatId);
+  console.log(`📱 Admin Telegram Chat ID configured: ${adminChatId}`);
+
   if (process.env.GEMINI_API_KEY) {
     setSetting('gemini_api_key', process.env.GEMINI_API_KEY);
   }
@@ -152,17 +161,43 @@ async function main() {
     }
   }
 
+  const notifier = require('../src/core/notifier');
+
   // 4. Run Watchtower Surveillance Scanner across competitor accounts
   const { scanAllSources } = require('../src/agents/watchtower/scanner');
   console.log('\n[Cron Runner] 🛰️ Step 1: Scanning monitored competitor accounts...');
   const scanResult = await scanAllSources({ limit: 6, quick: isDryRun });
   console.log(`[Cron Runner] ✓ Scan complete. Monitored sources checked.`);
 
+  if (adminChatId) {
+    const newCount = scanResult?.newPostsCount || 0;
+    notifier.sendTelegramMessage(
+      adminChatId,
+      `🛰️ <b>Watchtower Surveillance Scan Complete:</b>\n\n` +
+      `• Checked: <b>${scanResult?.sourcesChecked || uniqueCompetitors.length}</b> competitor accounts\n` +
+      `• Fresh Reels Indexed: <b>+${newCount}</b>\n` +
+      `• Time: <code>${new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} (IST)</code>\n\n` +
+      `<i>Evaluating engagement metrics for current audience window...</i>`
+    ).catch(() => {});
+  }
+
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
   const { evaluateAndSelectPosts } = require('../src/agents/watchtower/selector');
   console.log('\n[Cron Runner] 📊 Step 2: Evaluating virality scores & peak windows...');
   const selectedWinners = await evaluateAndSelectPosts({ force: true });
   console.log(`[Cron Runner] ✓ Content selection complete. Enqueued ${selectedWinners?.length || 0} winner(s).`);
+
+  if (adminChatId && selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0) {
+    const topW = selectedWinners[0].winners[0];
+    notifier.sendTelegramMessage(
+      adminChatId,
+      `🎯 <b>Top Viral Winner Selected:</b>\n\n` +
+      `• Source: <code>#${topW.shortcode}</code>\n` +
+      `• Virality Score: <b>${topW.compositeScore || 'High'}</b>\n` +
+      `• Destination: <b>@gta6_updates_007</b>\n\n` +
+      `🎬 <i>Rendering GTA 6 Vice City 1080p frame & Story card...</i>`
+    ).catch(() => {});
+  }
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)
   const jobWorkerPool = require('../src/core/jobWorker');

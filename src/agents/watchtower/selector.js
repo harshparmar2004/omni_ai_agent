@@ -162,11 +162,12 @@ async function evaluateAndSelectPosts(options = {}) {
       }
     }
 
-    // 3. Fetch 'new' discoveries mapped to this page's sources
-    const candidates = listDiscoveredPosts({
+    // 3. Fetch 'new' discoveries mapped to this page's sources (strictly video reels)
+    const rawCandidates = listDiscoveredPosts({
       pageId: page.id,
       status: 'new'
     });
+    const candidates = rawCandidates.filter(c => !c.media_type || c.media_type === 'reel');
 
     if (candidates.length === 0) {
       continue;
@@ -200,6 +201,7 @@ async function evaluateAndSelectPosts(options = {}) {
     const winners = scored.slice(0, takeCount);
     console.log(`[Watchtower Selector] 🎯 Selected ${winners.length} winner posts for ${page.handle} (Mode: ${page.post_mode.toUpperCase()})`);
 
+    const adminChatId = getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '5443723531';
     let enqueued = 0;
     let reviewCount = 0;
 
@@ -213,7 +215,8 @@ async function evaluateAndSelectPosts(options = {}) {
             shortcode: post.shortcode,
             sourceUrl: post.url,
             caption: '',
-            status: 'queued'
+            status: 'queued',
+            telegramChatId: adminChatId
           });
 
           updateDiscoveredPost(post.id, {
@@ -240,7 +243,8 @@ async function evaluateAndSelectPosts(options = {}) {
       mode: page.post_mode,
       evaluated: scored.length,
       enqueued,
-      reviewCount
+      reviewCount,
+      winners
     });
   }
 

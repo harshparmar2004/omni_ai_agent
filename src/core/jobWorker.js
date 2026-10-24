@@ -205,6 +205,18 @@ class JobWorkerPool {
         sourceUploader = dl.uploader;
         if (!rawCaption) rawCaption = dl.caption;
 
+        if (job.agent === 'watchtower' && mediaType !== 'reel') {
+          console.warn(`[Job Worker] ⚠️ Post #${job.shortcode} downloaded as '${mediaType}', not a video reel. Skipping for Watchtower.`);
+          updateJobProgress(jobId, 'failed', 'not_a_reel', { error: 'Candidate is not a video reel' });
+          if (job.discovered_post_id) {
+            updateDiscoveredPost(job.discovered_post_id, { status: 'skipped_not_reel' });
+          }
+          if (job.telegram_chat_id) {
+            notifier.sendTelegramMessage(job.telegram_chat_id, `⚠️ <b>Watchtower Notice:</b> Competitor post <code>#${job.shortcode}</code> was an image/carousel, not a video reel. Skipped to maintain 100% video feed quality. Next reel will be processed in the upcoming cycle.`).catch(() => {});
+          }
+          return;
+        }
+
         job = updateJobProgress(jobId, 'downloading', 'download_complete', {
           media_paths: mediaPaths,
           media_type: mediaType
