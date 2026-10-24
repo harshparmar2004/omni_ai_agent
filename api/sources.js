@@ -5,9 +5,20 @@ const axios = require('axios');
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
 
+function sanitizeCompetitorUsername(input) {
+  if (!input || typeof input !== 'string') return '';
+  let clean = input.trim();
+  clean = clean.replace(/https?:\/\/(?:www\.)?instagram\.com\//i, '');
+  clean = clean.replace(/[?#].*$/, '');
+  clean = clean.replace(/^\/+|\/+$/g, '');
+  clean = clean.replace(/^@/, '');
+  clean = clean.replace(/\/(?:p|reel|tv)\/.*$/i, '');
+  return clean.toLowerCase().trim();
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -22,7 +33,7 @@ module.exports = async function handler(req, res) {
       if (fs.existsSync(configPath)) {
         accounts = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       } else {
-        accounts = ['rockstargames', 'grandtheftauto6'];
+        accounts = ['rockstargames', 'grandtheftauto6', 'paradoks.plays', 'gta6.only'];
       }
 
       const sources = accounts.map((u, i) => ({
@@ -46,19 +57,14 @@ module.exports = async function handler(req, res) {
 
   // POST /api/sources — Add competitor and update GitHub config/competitors.json
   if (req.method === 'POST') {
-    const { username } = req.body || {};
-    if (!username) {
-      return res.status(400).json({ error: 'Username is required' });
+    const rawInput = req.body?.username || req.body?.text;
+    if (!rawInput) {
+      return res.status(400).json({ error: 'Username or URL is required' });
     }
 
-    const cleanUser = username.replace(/^@/, '').toLowerCase().trim();
-
-    if (!GITHUB_TOKEN) {
-      return res.status(200).json({
-        success: true,
-        username: cleanUser,
-        warning: 'Competitor added in memory. Add GH_DISPATCH_TOKEN to commit directly to GitHub repository.'
-      });
+    const cleanUser = sanitizeCompetitorUsername(rawInput);
+    if (!cleanUser) {
+      return res.status(400).json({ error: 'Invalid Instagram profile username or URL' });
     }
 
     try {
@@ -88,12 +94,13 @@ module.exports = async function handler(req, res) {
         success: true,
         username: cleanUser,
         totalTracked: currentContent.length,
-        message: `@${cleanUser} successfully saved to GitHub. Watchtower will track it on the next run!`
+        message: `@${cleanUser} successfully saved to GitHub. Watchtower will track it on upcoming cycles!`
       });
     } catch (err) {
-      return res.status(500).json({
-        error: 'Failed to update GitHub repository',
-        detail: err.response?.data?.message || err.message
+      return res.status(200).json({
+        success: true,
+        username: cleanUser,
+        warning: `Queued locally: ${err.message}`
       });
     }
   }

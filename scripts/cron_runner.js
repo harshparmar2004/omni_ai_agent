@@ -161,7 +161,7 @@ async function main() {
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
   const { evaluateAndSelectPosts } = require('../src/agents/watchtower/selector');
   console.log('\n[Cron Runner] 📊 Step 2: Evaluating virality scores & peak windows...');
-  const selectedWinners = await evaluateAndSelectPosts({ force: isDryRun });
+  const selectedWinners = await evaluateAndSelectPosts({ force: true });
   console.log(`[Cron Runner] ✓ Content selection complete. Enqueued ${selectedWinners?.length || 0} winner(s).`);
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)

@@ -71,10 +71,10 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
-      - name: 🌐 Install Playwright Chromium
+      - name: 🌐 Install Playwright Chromium with System Dependencies
         run: |
           pip install playwright
-          playwright install chromium
+          playwright install --with-deps chromium
 
       - name: 🚀 Run Autonomous Surveillance & Auto-Publish Cycle
         env:

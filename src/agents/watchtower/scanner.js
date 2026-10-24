@@ -52,6 +52,7 @@ async function scanAllSources(options = {}) {
       if (!res.success) {
         const failCount = (src.consecutive_failures || 0) + 1;
         const newHealth = failCount >= 5 ? 'warning' : 'retrying';
+        console.warn(`[Watchtower Scanner] ⚠️ @${src.username} check failed: ${res.error || 'Unknown error'}`);
         updateSourceAccount(src.id, {
           consecutive_failures: failCount,
           health: newHealth,
@@ -100,6 +101,8 @@ async function scanAllSources(options = {}) {
         srcNewCount++;
         newPostsCount++;
       }
+
+      console.log(`[Watchtower Scanner] ✓ @${src.username}: ${res.posts.length} posts inspected (+${srcNewCount} new)`);
 
       if (srcNewCount > 0) {
         updateSourceAccount(src.id, {
