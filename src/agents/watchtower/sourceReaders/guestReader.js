@@ -39,6 +39,7 @@ function readSourcePosts(username, limit = 6) {
       }
 
       const recentUrls = data.recent_post_urls || [];
+      console.log(`[Watchtower Guest Reader] @${cleanUser}: Scraper returned ${recentUrls.length} recent reels.`);
       const posts = [];
 
       for (const url of recentUrls.slice(0, limit)) {

@@ -179,63 +179,30 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            # Fast, non-blocking metadata and link extraction via evaluate
-            profile_data = await page.evaluate("""() => {
-                const metaDesc = document.querySelector('meta[property="og:description"]')?.content || document.querySelector('meta[name="description"]')?.content || '';
-                const metaImg = document.querySelector('meta[property="og:image"]')?.content || '';
-                const links = [];
+            # Reliable extraction from full raw HTML (embedded Relay/Polaris JSON state and links)
+            raw_html = await page.content()
+            meta_desc_match = re.search(r'<meta\s+(?:property|name)="(?:og:description|description)"\s+content="([^"]*)"', raw_html, re.I)
+            meta_desc = meta_desc_match.group(1) if meta_desc_match else ""
+            meta_img_match = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', raw_html, re.I)
+            meta_image = meta_img_match.group(1) if meta_img_match else ""
 
-                // 1. Direct href links from grid / reels
-                document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]').forEach(a => {
-                    if (a.href) links.push(a.href);
-                });
+            # Extract shortcodes from JSON state, hrefs, and graphql nodes
+            shortcodes_json = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', raw_html)
+            codes_json = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', raw_html)
+            urls_reels = re.findall(r'/(?:reel|p)/([A-Za-z0-9_-]{9,13})/?', raw_html)
 
-                // 2. Embedded Polaris / Relay JSON state
-                document.querySelectorAll('script').forEach(s => {
-                    const text = s.innerText || s.textContent || '';
-                    if (text.includes('shortcode') || text.includes('/reel/') || text.includes('/p/')) {
-                        const codeMatches = text.match(/"shortcode":"([A-Za-z0-9_-]+)"/g);
-                        if (codeMatches) {
-                            codeMatches.forEach(m => {
-                                const parts = m.split(':');
-                                if (parts.length > 1) {
-                                    const code = parts[1].replace(/["\\s]/g, '');
-                                    if (code && code.length >= 8) {
-                                        links.push('https://www.instagram.com/reel/' + code + '/');
-                                    }
-                                }
-                            });
-                        }
-                        const urlMatches = text.match(/(?:\\/p\\/|\\/reel\\/)([A-Za-z0-9_-]{10,13})/g);
-                        if (urlMatches) {
-                            urlMatches.forEach(u => {
-                                const code = u.split('/').pop();
-                                if (code) {
-                                    links.push('https://www.instagram.com/reel/' + code + '/');
-                                }
-                            });
-                        }
-                    }
-                });
+            excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy'}
+            clean_shortcodes = []
+            for c in (shortcodes_json + codes_json + urls_reels):
+                if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
+                    clean_shortcodes.append(c)
 
-                return {
-                    meta_desc: metaDesc,
-                    meta_image: metaImg,
-                    links: Array.from(new Set(links))
-                };
-            }""")
+            unique_posts = [f"https://www.instagram.com/reel/{sc}/" for sc in clean_shortcodes[:12]]
 
-            meta_desc = profile_data.get('meta_desc', '')
-            meta_image = profile_data.get('meta_image', '')
-            post_links = profile_data.get('links', [])
-
-            # Format: "406K Followers, 13 Following, 649 Posts - See Instagram photos and videos from GitHub (@github)"
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)
             posts_match = re.search(r'([\d,KkMm.]+)\s+Posts', meta_desc)
             bio_match = re.search(r':\s+"(.*)"', meta_desc, re.DOTALL)
-
-            unique_posts = list(dict.fromkeys(post_links))[:12]
 
             return {
                 "success": True,

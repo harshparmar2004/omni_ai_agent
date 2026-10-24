@@ -155,7 +155,7 @@ async function main() {
   // 4. Run Watchtower Surveillance Scanner across competitor accounts
   const { scanAllSources } = require('../src/agents/watchtower/scanner');
   console.log('\n[Cron Runner] 🛰️ Step 1: Scanning monitored competitor accounts...');
-  const scanResult = await scanAllSources({ limit: 4, quick: isDryRun });
+  const scanResult = await scanAllSources({ limit: 6, quick: isDryRun });
   console.log(`[Cron Runner] ✓ Scan complete. Monitored sources checked.`);
 
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
