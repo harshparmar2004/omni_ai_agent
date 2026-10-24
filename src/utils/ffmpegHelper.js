@@ -1035,7 +1035,7 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   }
 
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
-  const handle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
+  const cleanHandle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
 
   const width = 1080;
   const height = 1920;
