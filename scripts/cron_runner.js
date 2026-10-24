@@ -73,9 +73,8 @@ async function main() {
   // Ensure daily_quota allows all 3 peak audience windows (15 reels/day)
   try {
     db.prepare('UPDATE pages SET daily_quota = 15 WHERE daily_quota < 15').run();
-    // Purge any stale image posts/legacy discoveries from cached DB
-    db.prepare("DELETE FROM discovered_posts WHERE author IN ('grandtheftauto6', 'gta6latest', 'gta6.only')").run();
-    db.prepare("UPDATE publish_jobs SET status = 'failed', error = 'Cancelled: candidate is static photo, not a video reel' WHERE status = 'queued' AND (source_url LIKE '%grandtheftauto6%' OR source_url LIKE '%gta6latest%' OR source_url LIKE '%gta6.only%')").run();
+    // Purge any stale non-reel discoveries from cached DB
+    db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
   } catch (e) {}
 
   if (process.env.META_ACCESS_TOKEN) {
@@ -108,7 +107,7 @@ async function main() {
   }
 
   if (competitorList.length === 0) {
-    competitorList = ['paradoks.plays', 'gtavi_insider'];
+    competitorList = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gtavi_insider', 'gta6latest', 'gta6countdown', 'rockstargames'];
   }
 
   const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))];
@@ -232,6 +231,21 @@ async function main() {
       if (currentJob && currentJob.status === 'published') {
         publishedInCycle++;
         console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
+        // Instant Telegram notification to admin
+        try {
+          await notifier.sendTelegramMessage(
+            adminChatId,
+            `🚀 <b>LIVE ON INSTAGRAM!</b>\n\n` +
+            `📱 <b>Account:</b> @gta6_updates_007\n` +
+            `🌐 <b>Post URL:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
+            `🎬 <b>Competitor Source:</b> <code>#${currentJob.shortcode}</code>\n` +
+            `🆔 <b>Media ID:</b> <code>${currentJob.ig_media_id}</code>\n\n` +
+            `✨ <i>Published via Omni AI Autonomous Engine</i>`
+          );
+          console.log(`[Cron Runner] 📱 Admin Telegram alert sent to ${adminChatId}`);
+        } catch (tgErr) {
+          console.warn(`[Cron Runner] Telegram notification warning: ${tgErr.message}`);
+        }
       } else {
         console.log(`[Cron Runner] ℹ️ Job #${job.id} ended with status: ${currentJob?.status}`);
       }

@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
       if (fs.existsSync(configPath)) {
         accounts = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       } else {
-        accounts = ['rockstargames', 'grandtheftauto6', 'paradoks.plays', 'gta6.only'];
+        accounts = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gtavi_insider', 'gta6latest', 'gta6countdown', 'rockstargames'];
       }
 
       const sources = accounts.map((u, i) => ({

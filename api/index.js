@@ -32,7 +32,7 @@ function getCompetitors() {
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch (e) {}
-  return ['rockstargames', 'grandtheftauto6', 'paradoks.plays', 'gta6.only'];
+  return ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gtavi_insider', 'gta6latest', 'gta6countdown', 'rockstargames'];
 }
 
 // Helper: Normalize username or Instagram URL

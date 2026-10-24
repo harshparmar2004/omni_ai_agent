@@ -89,24 +89,26 @@ class JobWorkerPool {
   }
 
   async updateTelegramProgress(job, lines, replyMarkup = null) {
-    if (!job.telegram_chat_id) return;
+    const { getSetting } = require('../database');
+    const chatId = job.telegram_chat_id || getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '5443723531';
+    if (!chatId) return;
     const text = lines.join('\n');
     if (job.telegram_message_id) {
       try {
-        const res = await notifier.editTelegramMessage(job.telegram_chat_id, job.telegram_message_id, text, {
+        const res = await notifier.editTelegramMessage(chatId, job.telegram_message_id, text, {
           reply_markup: replyMarkup
         });
         if (res) return res;
       } catch (e) {}
     }
-    const res = await notifier.sendTelegramMessage(job.telegram_chat_id, text, {
+    const res = await notifier.sendTelegramMessage(chatId, text, {
       reply_markup: replyMarkup
     });
     if (res && res.message_id) {
       job.telegram_message_id = String(res.message_id);
       try {
         const { updatePublishJob } = require('../database');
-        updatePublishJob(job.id, { telegram_message_id: String(res.message_id) });
+        updatePublishJob(job.id, { telegram_message_id: String(res.message_id), telegram_chat_id: chatId });
       } catch (e) {}
     }
     return res;

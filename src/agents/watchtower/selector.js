@@ -169,8 +169,6 @@ async function evaluateAndSelectPosts(options = {}) {
     });
     const candidates = rawCandidates.filter(c => {
       if (c.media_type && c.media_type !== 'reel') return false;
-      const author = (c.author || '').toLowerCase();
-      if (['grandtheftauto6', 'gta6latest', 'gta6.only'].includes(author)) return false;
       return true;
     });
 
@@ -189,12 +187,6 @@ async function evaluateAndSelectPosts(options = {}) {
       const rawEngagement = (c.like_count || 0) + ((c.comment_count || 0) * 2);
       const baseEngagement = rawEngagement > 0 ? rawEngagement : 100;
       let compositeScore = Math.round(baseEngagement * freshnessDecay);
-
-      // Prioritize verified video reel creators
-      const author = (c.author || '').toLowerCase();
-      if (author === 'paradoks.plays' || c.url?.includes('paradoks') || author === 'gtavi_insider' || c.url?.includes('gtavi_insider')) {
-        compositeScore += 1000;
-      }
 
       return {
         ...c,
