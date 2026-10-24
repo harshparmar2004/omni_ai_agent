@@ -39,7 +39,15 @@ def parse_instagram_url(url):
 
 async def scrape_post(shortcode, url):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled"
+            ]
+        )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             viewport={"width": random.randint(1260, 1360), "height": random.randint(780, 880)},
@@ -125,7 +133,16 @@ async def scrape_post(shortcode, url):
 
 async def scrape_profile(username, url):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=IsolateOrigins,site-per-process"
+            ]
+        )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             viewport={"width": random.randint(1260, 1360), "height": random.randint(780, 880)},
@@ -141,19 +158,47 @@ async def scrape_profile(username, url):
                 "accept-language": "en-US,en;q=0.9"
             }
         )
+        # Pre-seed consent cookies
+        try:
+            await context.add_cookies([
+                {"name": "ig_nrcb", "value": "1", "domain": ".instagram.com", "path": "/"},
+                {"name": "ig_did", "value": "C8D5A1E2-F4B3-4A5C-9D8E-7B6A5C4D3E2F", "domain": ".instagram.com", "path": "/"}
+            ])
+        except Exception:
+            pass
+
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()
         try:
             target_url = f"https://www.instagram.com/{username}/"
-            await page.goto(target_url, timeout=20000, wait_until="domcontentloaded")
-            await page.wait_for_timeout(random.randint(1800, 3200))
-            await page.mouse.wheel(0, random.randint(250, 480))
-            await page.wait_for_timeout(random.randint(800, 1600))
+            sys.stderr.write(f"[Scraper] Navigating to {target_url}...\n")
+            await page.goto(target_url, timeout=25000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(random.randint(1800, 2800))
 
-            # Dismiss any login dialog overlays & unblock scrolling
+            # 1. Active European / Datacenter Cookie Consent Acceptor
+            cookie_btn_texts = [
+                "Allow all cookies", "Decline optional cookies",
+                "Allow essential and optional cookies", "Only allow essential cookies",
+                "Accept All", "Accept", "Allow"
+            ]
+            for btn_text in cookie_btn_texts:
+                try:
+                    btn = page.locator(f'button:has-text("{btn_text}")').first
+                    if await btn.is_visible(timeout=1000):
+                        sys.stderr.write(f"[Scraper] Found cookie consent button '{btn_text}', clicking...\n")
+                        await btn.click()
+                        await page.wait_for_timeout(1500)
+                        break
+                except Exception:
+                    pass
+
+            await page.mouse.wheel(0, random.randint(250, 480))
+            await page.wait_for_timeout(random.randint(800, 1500))
+
+            # 2. Dismiss any login dialog overlays & unblock scrolling
             try:
                 await page.keyboard.press("Escape")
-                await page.wait_for_timeout(350)
+                await page.wait_for_timeout(300)
                 await page.evaluate("""
                     () => {
                         try {
@@ -179,25 +224,51 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            # Reliable extraction from full raw HTML (embedded Relay/Polaris JSON state and links)
+            # Extract from raw HTML
             raw_html = await page.content()
-            meta_desc_match = re.search(r'<meta\s+(?:property|name)="(?:og:description|description)"\s+content="([^"]*)"', raw_html, re.I)
-            meta_desc = meta_desc_match.group(1) if meta_desc_match else ""
-            meta_img_match = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', raw_html, re.I)
-            meta_image = meta_img_match.group(1) if meta_img_match else ""
-
-            # Extract shortcodes from JSON state, hrefs, and graphql nodes
             shortcodes_json = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', raw_html)
             codes_json = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', raw_html)
             urls_reels = re.findall(r'/(?:reel|p)/([A-Za-z0-9_-]{9,13})/?', raw_html)
 
-            excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy'}
+            excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy', 'login'}
             clean_shortcodes = []
             for c in (shortcodes_json + codes_json + urls_reels):
                 if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
                     clean_shortcodes.append(c)
 
+            # 3. Fallback: If 0 shortcodes on main profile (or redirected to login), try /reels/ tab directly
+            if len(clean_shortcodes) == 0:
+                reels_target = f"https://www.instagram.com/{username}/reels/"
+                sys.stderr.write(f"[Scraper] 0 shortcodes on main profile. Attempting reels tab: {reels_target}...\n")
+                try:
+                    await page.goto(reels_target, timeout=20000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2500)
+                    for btn_text in cookie_btn_texts:
+                        try:
+                            btn = page.locator(f'button:has-text("{btn_text}")').first
+                            if await btn.is_visible(timeout=800):
+                                await btn.click()
+                                await page.wait_for_timeout(1000)
+                                break
+                        except Exception:
+                            pass
+                    reels_html = await page.content()
+                    sc_reels = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', reels_html)
+                    sc_json2 = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', reels_html)
+                    sc_href2 = re.findall(r'/(?:reel|p)/([A-Za-z0-9_-]{9,13})/?', reels_html)
+                    for c in (sc_reels + sc_json2 + sc_href2):
+                        if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
+                            clean_shortcodes.append(c)
+                except Exception as reels_err:
+                    sys.stderr.write(f"[Scraper] Reels tab attempt notice: {str(reels_err)}\n")
+
+            meta_desc_match = re.search(r'<meta\s+(?:property|name)="(?:og:description|description)"\s+content="([^"]*)"', raw_html, re.I)
+            meta_desc = meta_desc_match.group(1) if meta_desc_match else ""
+            meta_img_match = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', raw_html, re.I)
+            meta_image = meta_img_match.group(1) if meta_img_match else ""
+
             unique_posts = [f"https://www.instagram.com/reel/{sc}/" for sc in clean_shortcodes[:12]]
+            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels.\n")
 
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)
@@ -217,6 +288,7 @@ async def scrape_profile(username, url):
                 "recent_post_urls": unique_posts
             }
         except Exception as e:
+            sys.stderr.write(f"[Scraper Error] @{username}: {str(e)}\n")
             return {
                 "success": False,
                 "type": "profile",

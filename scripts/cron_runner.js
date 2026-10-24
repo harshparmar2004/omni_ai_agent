@@ -177,7 +177,7 @@ async function main() {
 
     try {
       console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
-      await jobWorkerPool.processJob(job.id);
+      await jobWorkerPool.processJob(job.id, { forceInstant: true });
       console.log(`[Cron Runner] ✅ Job #${job.id} completed!`);
     } catch (err) {
       console.error(`[Cron Runner] ❌ Job #${job.id} failed: ${err.message}`);

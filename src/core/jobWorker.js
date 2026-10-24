@@ -112,7 +112,7 @@ class JobWorkerPool {
     return res;
   }
 
-  async processJob(jobId) {
+  async processJob(jobId, options = {}) {
     let job = getJob(jobId);
     if (!job || job.status !== 'queued') return;
 
@@ -143,7 +143,7 @@ class JobWorkerPool {
 
     // Check min spacing between posts (Applies exclusively to Agent 2: Watchtower autonomous surveillance)
     // Agent 1 (Telegram / Reposter) publishes immediately on-demand without schedule delays
-    if (job.agent === 'watchtower' && page.min_spacing_minutes > 0 && !job.force_instant) {
+    if (job.agent === 'watchtower' && page.min_spacing_minutes > 0 && !job.force_instant && !options.forceInstant) {
       const lastPublishedAt = getLastPublishedTimestamp(page.id);
       if (lastPublishedAt) {
         const elapsedMin = (Date.now() - new Date(lastPublishedAt).getTime()) / (1000 * 60);
