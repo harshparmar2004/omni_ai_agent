@@ -63,16 +63,16 @@ async function main() {
       watermark_enabled: 1,
       post_mode: 'auto',
       posts_per_cycle: 1,
-      daily_quota: 15,
+      daily_quota: 7,
       min_spacing_minutes: 120,
       is_active: 1
     });
     pages = getPages();
   }
 
-  // Ensure daily_quota allows all 3 peak audience windows (15 reels/day)
+  // Ensure daily_quota is calibrated to 7 reels/day for human-like cadence
   try {
-    db.prepare('UPDATE pages SET daily_quota = 15 WHERE daily_quota < 15').run();
+    db.prepare('UPDATE pages SET daily_quota = 7').run();
     // Purge any stale non-reel discoveries from cached DB
     db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
   } catch (e) {}
@@ -186,9 +186,12 @@ async function main() {
   }
 
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
-  const { evaluateAndSelectPosts } = require('../src/agents/watchtower/selector');
-  console.log('\n[Cron Runner] 📊 Step 2: Evaluating virality scores & peak windows...');
-  const selectedWinners = await evaluateAndSelectPosts({ force: true });
+  const { evaluateAndSelectPosts, getPeakWindowStatus } = require('../src/agents/watchtower/selector');
+  const windowStatus = getPeakWindowStatus();
+  console.log(`\n[Cron Runner] 📊 Step 2: Evaluating virality scores & peak windows (${windowStatus.currentTime})...`);
+
+  const isForce = process.env.FORCE_PUBLISH === 'true';
+  const selectedWinners = await evaluateAndSelectPosts({ force: isForce });
   console.log(`[Cron Runner] ✓ Content selection complete. Enqueued ${selectedWinners?.length || 0} winner(s).`);
 
   if (adminChatId && selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0) {
@@ -206,51 +209,56 @@ async function main() {
   }
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)
-  const jobWorkerPool = require('../src/core/jobWorker');
-  const queuedJobs = listPublishJobs({ status: 'queued', limit: 10 });
-  console.log(`\n[Cron Runner] 🚀 Step 3: Processing queued publishing job(s) (${queuedJobs.length} available)...`);
+  // Night Blackout Protection: Zero publishing during Indian night hours (20:30 - 08:30 IST)
+  if (windowStatus.isNightBlackout && !isForce) {
+    console.log(`\n[Cron Runner] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Jobs remain safely staged for morning peak.`);
+  } else {
+    const jobWorkerPool = require('../src/core/jobWorker');
+    const queuedJobs = listPublishJobs({ status: 'queued', limit: 10 });
+    console.log(`\n[Cron Runner] 🚀 Step 3: Processing queued publishing job(s) (${queuedJobs.length} available)...`);
 
-  let publishedInCycle = 0;
-  const targetPerCycle = pages[0]?.posts_per_cycle || 1;
+    let publishedInCycle = 0;
+    const targetPerCycle = pages[0]?.posts_per_cycle || 1;
 
-  for (const job of queuedJobs) {
-    if (publishedInCycle >= targetPerCycle) {
-      console.log(`[Cron Runner] 🎯 Target for this cycle reached (${publishedInCycle}/${targetPerCycle} reels published).`);
-      break;
-    }
-
-    if (isDryRun) {
-      console.log(`[Dry Run] Would process Job #${job.id} for page #${job.page_id} (${job.shortcode})`);
-      continue;
-    }
-
-    try {
-      console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
-      await jobWorkerPool.processJob(job.id, { forceInstant: true });
-      const currentJob = getPublishJobById(job.id);
-      if (currentJob && currentJob.status === 'published') {
-        publishedInCycle++;
-        console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
-        // Instant Telegram notification to admin
-        try {
-          await notifier.sendTelegramMessage(
-            adminChatId,
-            `🚀 <b>LIVE ON INSTAGRAM!</b>\n\n` +
-            `📱 <b>Account:</b> @gta6_updates_007\n` +
-            `🌐 <b>Post URL:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
-            `🎬 <b>Competitor Source:</b> <code>#${currentJob.shortcode}</code>\n` +
-            `🆔 <b>Media ID:</b> <code>${currentJob.ig_media_id}</code>\n\n` +
-            `✨ <i>Published via Omni AI Autonomous Engine</i>`
-          );
-          console.log(`[Cron Runner] 📱 Admin Telegram alert sent to ${adminChatId}`);
-        } catch (tgErr) {
-          console.warn(`[Cron Runner] Telegram notification warning: ${tgErr.message}`);
-        }
-      } else {
-        console.log(`[Cron Runner] ℹ️ Job #${job.id} ended with status: ${currentJob?.status}`);
+    for (const job of queuedJobs) {
+      if (publishedInCycle >= targetPerCycle) {
+        console.log(`[Cron Runner] 🎯 Target for this cycle reached (${publishedInCycle}/${targetPerCycle} reels published).`);
+        break;
       }
-    } catch (err) {
-      console.error(`[Cron Runner] ❌ Job #${job.id} failed: ${err.message}`);
+
+      if (isDryRun) {
+        console.log(`[Dry Run] Would process Job #${job.id} for page #${job.page_id} (${job.shortcode})`);
+        continue;
+      }
+
+      try {
+        console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
+        await jobWorkerPool.processJob(job.id, { forceInstant: true });
+        const currentJob = getPublishJobById(job.id);
+        if (currentJob && currentJob.status === 'published') {
+          publishedInCycle++;
+          console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
+          // Instant Telegram notification to admin
+          try {
+            await notifier.sendTelegramMessage(
+              adminChatId,
+              `🚀 <b>LIVE ON INSTAGRAM!</b>\n\n` +
+              `📱 <b>Account:</b> @gta6_updates_007\n` +
+              `🌐 <b>Post URL:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
+              `🎬 <b>Competitor Source:</b> <code>#${currentJob.shortcode}</code>\n` +
+              `🆔 <b>Media ID:</b> <code>${currentJob.ig_media_id}</code>\n\n` +
+              `✨ <i>Published via Omni AI Autonomous Engine</i>`
+            );
+            console.log(`[Cron Runner] 📱 Admin Telegram alert sent to ${adminChatId}`);
+          } catch (tgErr) {
+            console.warn(`[Cron Runner] Telegram notification warning: ${tgErr.message}`);
+          }
+        } else {
+          console.log(`[Cron Runner] ℹ️ Job #${job.id} ended with status: ${currentJob?.status}`);
+        }
+      } catch (err) {
+        console.error(`[Cron Runner] ❌ Job #${job.id} failed: ${err.message}`);
+      }
     }
   }
 

@@ -224,7 +224,20 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            # Extract from raw HTML
+            # 1. Extract shortcodes in exact visual grid order (top-left is strictly the LATEST reel)
+            dom_shortcodes = await page.evaluate("""() => {
+                const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
+                const results = [];
+                for (const a of links) {
+                    const m = (a.getAttribute('href') || '').match(/\/(?:reel|p)\/([A-Za-z0-9_-]{9,13})/);
+                    if (m && !results.includes(m[1])) {
+                        results.push(m[1]);
+                    }
+                }
+                return results;
+            }""")
+
+            # 2. Extract from raw HTML regex fallback
             raw_html = await page.content()
             shortcodes_json = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', raw_html)
             codes_json = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', raw_html)
@@ -232,33 +245,33 @@ async def scrape_profile(username, url):
 
             excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy', 'login'}
             clean_shortcodes = []
+            
+            # Prioritize DOM elements as they are strictly in visual reverse-chronological order
+            for sc in dom_shortcodes:
+                if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
+                    clean_shortcodes.append(sc)
+
             for c in (shortcodes_json + codes_json + urls_reels):
                 if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
                     clean_shortcodes.append(c)
 
-            # 3. Fallback: If 0 shortcodes on main profile (or redirected to login), try /reels/ tab directly
+            # 3. Fallback: If 0 shortcodes on main profile, try /reels/ tab directly
             if len(clean_shortcodes) == 0:
                 reels_target = f"https://www.instagram.com/{username}/reels/"
                 sys.stderr.write(f"[Scraper] 0 shortcodes on main profile. Attempting reels tab: {reels_target}...\n")
                 try:
                     await page.goto(reels_target, timeout=20000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2500)
-                    for btn_text in cookie_btn_texts:
-                        try:
-                            btn = page.locator(f'button:has-text("{btn_text}")').first
-                            if await btn.is_visible(timeout=800):
-                                await btn.click()
-                                await page.wait_for_timeout(1000)
-                                break
-                        except Exception:
-                            pass
-                    reels_html = await page.content()
-                    sc_reels = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', reels_html)
-                    sc_json2 = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', reels_html)
-                    sc_href2 = re.findall(r'/(?:reel|p)/([A-Za-z0-9_-]{9,13})/?', reels_html)
-                    for c in (sc_reels + sc_json2 + sc_href2):
-                        if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
-                            clean_shortcodes.append(c)
+                    reels_dom = await page.evaluate("""() => {
+                        const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
+                        return links.map(a => {
+                            const m = (a.getAttribute('href') || '').match(/\/(?:reel|p)\/([A-Za-z0-9_-]{9,13})/);
+                            return m ? m[1] : null;
+                        }).filter(Boolean);
+                    }""")
+                    for sc in reels_dom:
+                        if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
+                            clean_shortcodes.append(sc)
                 except Exception as reels_err:
                     sys.stderr.write(f"[Scraper] Reels tab attempt notice: {str(reels_err)}\n")
 
@@ -267,8 +280,9 @@ async def scrape_profile(username, url):
             meta_img_match = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', raw_html, re.I)
             meta_image = meta_img_match.group(1) if meta_img_match else ""
 
-            unique_posts = [f"https://www.instagram.com/reel/{sc}/" for sc in clean_shortcodes[:12]]
-            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels.\n")
+            # Keep top shortcodes in chronological order (clean_shortcodes[0] is the newest reel)
+            unique_posts = [f"https://www.instagram.com/reel/{sc}/" for sc in clean_shortcodes[:8]]
+            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels (newest first).\n")
 
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)

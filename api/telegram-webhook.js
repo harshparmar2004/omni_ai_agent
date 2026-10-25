@@ -97,13 +97,13 @@ module.exports = async function handler(req, res) {
   // Send Single In-Place Stepper Message
   const initialMsg = await sendTelegram(
     chatId,
-    `⚡ <b>OmniStudio Pipeline:</b> <code>#${shortcode}</code>\n` +
-    `📱 <b>Target Page:</b> <code>@gta6_updates_007</code>\n\n` +
+    `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>\n` +
+    `📱 <b>Destination:</b> <code>@gta6_updates_007</code>\n\n` +
     `⏳ <b>1. Ingest:</b> Cloud runner initializing...\n` +
     `⚪ <b>2. Download:</b> Waiting\n` +
-    `⚪ <b>3. AI Copy:</b> Waiting\n` +
-    `⚪ <b>4. Publishing:</b> Waiting (Feed & Story)\n\n` +
-    `<i>Status: Spawning GitHub Actions runner...</i>`
+    `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
+    `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
+    `<i>Status: Spawning GitHub Actions cloud runner...</i>`
   );
 
   const messageId = initialMsg?.message_id ? String(initialMsg.message_id) : '';

@@ -54,60 +54,49 @@ function getPeakWindowStatus(customTimezone = null) {
   const z = getZonedTime(timezone);
   const t = z.timeDecimal;
 
-  // Peak window definitions
+  // Peak window definitions: Morning (8:30 - 11:30 IST) & Evening (17:00 - 20:30 IST)
+  // Night blackout: 20:30 PM to 08:30 AM IST (ZERO POSTING)
   const windows = [
     {
       id: 'morning',
-      name: 'Morning Audience Wave',
-      rangeStr: '08:00 – 11:00',
-      startHour: 8.0,
-      endHour: 11.0,
+      name: 'Morning Peak Audience Wave',
+      rangeStr: '08:30 – 11:30 IST',
+      startHour: 8.5,
+      endHour: 11.5,
       target: 3
     },
     {
       id: 'evening',
       name: 'Evening Prime-Time Viral Surge',
-      rangeStr: '17:00 – 21:00',
+      rangeStr: '17:00 – 20:30 IST',
       startHour: 17.0,
-      endHour: 21.0,
-      target: 5
-    },
-    {
-      id: 'midnight',
-      name: 'Midnight Night-Owl Wave',
-      rangeStr: '23:00 – 01:00',
-      startHour: 23.0,
-      endHour: 1.0,
+      endHour: 20.5,
       target: 4
     }
   ];
 
   let activeWindow = null;
+  const isNightBlackout = (t >= 20.5 || t < 8.5);
 
-  if (t >= 8.0 && t < 11.0) {
+  if (t >= 8.5 && t < 11.5) {
     activeWindow = windows[0];
-  } else if (t >= 17.0 && t < 21.0) {
+  } else if (t >= 17.0 && t < 20.5) {
     activeWindow = windows[1];
-  } else if (t >= 23.0 || t < 1.0) {
-    activeWindow = windows[2];
   }
 
   let nextWindow = null;
   if (!activeWindow) {
-    if (t < 8.0) nextWindow = { ...windows[0], countdown: 'Starts at 08:00' };
-    else if (t < 17.0) nextWindow = { ...windows[1], countdown: 'Starts at 17:00' };
-    else if (t < 23.0) nextWindow = { ...windows[2], countdown: 'Starts at 23:00' };
-    else nextWindow = { ...windows[0], countdown: 'Starts at 08:00 tomorrow' };
+    if (t < 8.5) nextWindow = { ...windows[0], countdown: 'Starts at 08:30 AM IST' };
+    else if (t < 17.0) nextWindow = { ...windows[1], countdown: 'Starts at 05:00 PM IST' };
+    else nextWindow = { ...windows[0], countdown: 'Starts at 08:30 AM IST tomorrow' };
   }
 
   let windowStartIso = null;
   if (activeWindow) {
     const startH = Math.floor(activeWindow.startHour);
+    const startM = Math.round((activeWindow.startHour - startH) * 60);
     const d = new Date();
-    if (activeWindow.id === 'midnight' && z.hour < 1) {
-      d.setDate(d.getDate() - 1);
-    }
-    d.setHours(startH, 0, 0, 0);
+    d.setHours(startH, startM, 0, 0);
     windowStartIso = d.toISOString();
   }
 
@@ -118,7 +107,8 @@ function getPeakWindowStatus(customTimezone = null) {
     activeWindow,
     nextWindow,
     windowStartIso,
-    dailyTargetTotal: 12
+    isNightBlackout,
+    dailyTargetTotal: 7
   };
 }
 
@@ -142,6 +132,12 @@ async function evaluateAndSelectPosts(options = {}) {
 
     // 2. Determine allowed post count for this cycle
     let allowedCount = page.posts_per_cycle || 1;
+
+    // Strict Night Blackout Enforcement (20:30 PM to 08:30 AM IST)
+    if (windowStatus.isNightBlackout && !options.allowNight) {
+      console.log(`[Watchtower Selector] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Staging reels for morning peak.`);
+      continue;
+    }
 
     if (windowStatus.enabled) {
       if (windowStatus.activeWindow) {
@@ -167,8 +163,18 @@ async function evaluateAndSelectPosts(options = {}) {
       pageId: page.id,
       status: 'new'
     });
+
+    const now = Date.now();
+    const MAX_AGE_HOURS = 48; // Strictly reject stale posts older than 48 hours
+
     const candidates = rawCandidates.filter(c => {
       if (c.media_type && c.media_type !== 'reel') return false;
+      const postedAtMs = c.posted_at ? new Date(c.posted_at).getTime() : now;
+      const ageHours = (now - postedAtMs) / (1000 * 60 * 60);
+      if (ageHours > MAX_AGE_HOURS) {
+        try { updateDiscoveredPost(c.id, { status: 'stale_rejected' }); } catch (e) {}
+        return false;
+      }
       return true;
     });
 
@@ -176,25 +182,27 @@ async function evaluateAndSelectPosts(options = {}) {
       continue;
     }
 
-    // 4. Score candidate posts by real engagement & freshness decay (48h window)
-    const now = Date.now();
+    // 4. Score candidate posts prioritizing RECENCY (Newest reel first)
     const scored = candidates.map(c => {
       const postedAtMs = c.posted_at ? new Date(c.posted_at).getTime() : now;
       const ageHours = Math.max(0, (now - postedAtMs) / (1000 * 60 * 60));
-      const freshnessDecay = Math.max(0.2, 1 - (ageHours / 48));
-
-      // Engagement: likes + 2*comments
+      
+      // Aggressive recency decay: reels <6h get ~1.0, <12h get 0.8, <24h get 0.5, >24h get 0.1
+      const freshnessBoost = Math.max(0.1, 1 - (ageHours / 24));
+      
       const rawEngagement = (c.like_count || 0) + ((c.comment_count || 0) * 2);
-      const baseEngagement = rawEngagement > 0 ? rawEngagement : 100;
-      let compositeScore = Math.round(baseEngagement * freshnessDecay);
+      // Recency base priority: higher ID is more recently discovered
+      const baseRecency = 10000 + (c.id * 10);
+      const compositeScore = Math.round((baseRecency + rawEngagement) * freshnessBoost);
 
       return {
         ...c,
+        ageHours: Math.round(ageHours),
         compositeScore
       };
     });
 
-    // Sort descending by composite virality score
+    // Sort descending by compositeScore (strictly newest/freshest first)
     scored.sort((a, b) => b.compositeScore - a.compositeScore);
 
     // Take up to allowedCount
