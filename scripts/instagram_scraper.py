@@ -3,7 +3,30 @@ import re
 import json
 import asyncio
 import random
+import datetime
 from playwright.async_api import async_playwright
+
+def shortcode_to_snowflake(sc):
+    """
+    Decodes an Instagram base64 shortcode into a 64-bit Snowflake Media ID
+    and calculates the exact UTC post publication timestamp to the millisecond.
+    Instagram epoch: 1314220021721 (Aug 24, 2011)
+    """
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+    media_id = 0
+    for char in sc:
+        idx = alphabet.find(char)
+        if idx == -1:
+            return 0, None
+        media_id = (media_id * 64) + idx
+    
+    # 41-bit millisecond timestamp offset
+    ms = (media_id >> 23) + 1314220021721
+    try:
+        dt = datetime.datetime.fromtimestamp(ms / 1000.0, datetime.timezone.utc)
+        return media_id, dt
+    except Exception:
+        return media_id, None
 
 STEALTH_JS = """
 Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
@@ -107,10 +130,13 @@ async def scrape_post(shortcode, url):
             tech_match = re.search(r'\b(python|langchain|docker|fastapi|react|next\.?js|rust|kubernetes|k8s|sql|dsa|ai|ml|pytorch|tensorflow|bun|mojo|go|golang|redis|aws)\b', caption, re.I)
             detected_topic = tech_match.group(1).title() if tech_match else hook[:40]
 
+            mid, dt = shortcode_to_snowflake(shortcode)
             return {
                 "success": True,
                 "type": "post",
                 "shortcode": shortcode,
+                "media_id": str(mid) if mid else None,
+                "posted_at": dt.isoformat() if dt else None,
                 "url": target_url,
                 "owner": owner,
                 "caption": caption,
@@ -225,7 +251,7 @@ async def scrape_profile(username, url):
                 pass
 
             # 1. Extract shortcodes in exact visual grid order (top-left is strictly the LATEST reel)
-            dom_shortcodes = await page.evaluate("""() => {
+            dom_shortcodes = await page.evaluate(r"""() => {
                 const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
                 const results = [];
                 for (const a of links) {
@@ -262,7 +288,7 @@ async def scrape_profile(username, url):
                 try:
                     await page.goto(reels_target, timeout=20000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2500)
-                    reels_dom = await page.evaluate("""() => {
+                    reels_dom = await page.evaluate(r"""() => {
                         const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
                         return links.map(a => {
                             const m = (a.getAttribute('href') || '').match(/\/(?:reel|p)\/([A-Za-z0-9_-]{9,13})/);
@@ -280,9 +306,41 @@ async def scrape_profile(username, url):
             meta_img_match = re.search(r'<meta\s+property="og:image"\s+content="([^"]*)"', raw_html, re.I)
             meta_image = meta_img_match.group(1) if meta_img_match else ""
 
-            # Keep top shortcodes in chronological order (clean_shortcodes[0] is the newest reel)
-            unique_posts = [f"https://www.instagram.com/reel/{sc}/" for sc in clean_shortcodes[:8]]
-            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels (newest first).\n")
+            # Decode and sort all candidates strictly by 64-bit Snowflake Media ID (Newest timestamp first)
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            enriched_candidates = []
+            for sc in clean_shortcodes:
+                mid, dt = shortcode_to_snowflake(sc)
+                if mid > 0 and dt:
+                    age_hours = (now_utc - dt).total_seconds() / 3600.0
+                    enriched_candidates.append({
+                        "shortcode": sc,
+                        "media_id": mid,
+                        "posted_at": dt.isoformat(),
+                        "age_hours": age_hours
+                    })
+
+            # Sort descending by media_id (highest media_id is strictly the newest reel)
+            enriched_candidates.sort(key=lambda x: x["media_id"], reverse=True)
+
+            # Filter: Exclude posts older than 48 hours to eliminate pinned posts from months ago.
+            # If all are older than 48h, keep the newest available.
+            fresh_candidates = [c for c in enriched_candidates if c["age_hours"] <= 48.0]
+            if not fresh_candidates:
+                fresh_candidates = enriched_candidates
+
+            unique_posts = [f"https://www.instagram.com/reel/{c['shortcode']}/" for c in fresh_candidates[:8]]
+            detailed_posts = [
+                {
+                    "shortcode": c["shortcode"],
+                    "url": f"https://www.instagram.com/reel/{c['shortcode']}/",
+                    "posted_at": c["posted_at"],
+                    "age_hours": round(c["age_hours"], 1),
+                    "media_id": str(c["media_id"])
+                }
+                for c in fresh_candidates[:8]
+            ]
+            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels (newest first, top: {fresh_candidates[0]['shortcode'] if fresh_candidates else 'None'}).\n")
 
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)
@@ -299,7 +357,8 @@ async def scrape_profile(username, url):
                 "posts_count": posts_match.group(1) if posts_match else "N/A",
                 "bio": bio_match.group(1) if bio_match else meta_desc,
                 "profile_pic": meta_image,
-                "recent_post_urls": unique_posts
+                "recent_post_urls": unique_posts,
+                "posts": detailed_posts
             }
         except Exception as e:
             sys.stderr.write(f"[Scraper Error] @{username}: {str(e)}\n")

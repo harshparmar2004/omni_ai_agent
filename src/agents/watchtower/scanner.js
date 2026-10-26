@@ -83,6 +83,10 @@ async function scanAllSources(options = {}) {
         }
 
         // Fresh post discovered!
+        const postedAtDate = p.postedAt ? new Date(p.postedAt) : new Date();
+        const ageHours = (Date.now() - postedAtDate.getTime()) / (1000 * 60 * 60);
+        const postStatus = ageHours > 36 ? 'stale' : 'new';
+
         createDiscoveredPost({
           source_account_id: src.id,
           run_id: options.runId || null,
@@ -93,13 +97,15 @@ async function scanAllSources(options = {}) {
           like_count: p.likes || 0,
           comment_count: p.comments || 0,
           view_count: p.views || 0,
-          posted_at: p.postedAt || new Date().toISOString(),
+          posted_at: postedAtDate.toISOString(),
           score: 1.0,
-          status: 'new'
+          status: postStatus
         });
 
-        srcNewCount++;
-        newPostsCount++;
+        if (postStatus === 'new') {
+          srcNewCount++;
+          newPostsCount++;
+        }
       }
 
       console.log(`[Watchtower Scanner] ✓ @${src.username}: ${res.posts.length} posts inspected (+${srcNewCount} new)`);

@@ -8,6 +8,7 @@ const {
 } = require('../../database');
 const { enqueueJob } = require('../../core/jobQueue');
 const notifier = require('../../core/notifier');
+const { shortcodeToTimestamp } = require('./sourceReaders/guestReader');
 
 /**
  * OmniStudio v7 — Watchtower Content Selector & Peak Traffic Windows Engine
@@ -165,12 +166,13 @@ async function evaluateAndSelectPosts(options = {}) {
     });
 
     const now = Date.now();
-    const MAX_AGE_HOURS = 48; // Strictly reject stale posts older than 48 hours
+    const MAX_AGE_HOURS = 24; // Strictly reject candidate reels older than 24 hours
 
     const candidates = rawCandidates.filter(c => {
       if (c.media_type && c.media_type !== 'reel') return false;
-      const postedAtMs = c.posted_at ? new Date(c.posted_at).getTime() : now;
-      const ageHours = (now - postedAtMs) / (1000 * 60 * 60);
+      const parsed = shortcodeToTimestamp(c.shortcode);
+      const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
+      const ageHours = (now - postDate.getTime()) / (1000 * 60 * 60);
       if (ageHours > MAX_AGE_HOURS) {
         try { updateDiscoveredPost(c.id, { status: 'stale_rejected' }); } catch (e) {}
         return false;
@@ -184,26 +186,33 @@ async function evaluateAndSelectPosts(options = {}) {
 
     // 4. Score candidate posts prioritizing RECENCY (Newest reel first)
     const scored = candidates.map(c => {
-      const postedAtMs = c.posted_at ? new Date(c.posted_at).getTime() : now;
-      const ageHours = Math.max(0, (now - postedAtMs) / (1000 * 60 * 60));
+      const parsed = shortcodeToTimestamp(c.shortcode);
+      const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
+      const postTimeMs = postDate.getTime();
+      const ageHours = Math.max(0, (now - postTimeMs) / (1000 * 60 * 60));
       
-      // Aggressive recency decay: reels <6h get ~1.0, <12h get 0.8, <24h get 0.5, >24h get 0.1
-      const freshnessBoost = Math.max(0.1, 1 - (ageHours / 24));
-      
+      // Hyper-focused recency multiplier:
+      // < 6h: 1.0 (Fresh)
+      // 6h - 12h: 0.8
+      // 12h - 24h: 0.4
+      let freshnessMultiplier = 1.0;
+      if (ageHours > 12) freshnessMultiplier = 0.4;
+      else if (ageHours > 6) freshnessMultiplier = 0.8;
+
       const rawEngagement = (c.like_count || 0) + ((c.comment_count || 0) * 2);
-      // Recency base priority: higher ID is more recently discovered
-      const baseRecency = 10000 + (c.id * 10);
-      const compositeScore = Math.round((baseRecency + rawEngagement) * freshnessBoost);
+      const compositeScore = Math.round((1000000 + (postTimeMs / 1000000) + rawEngagement) * freshnessMultiplier);
 
       return {
         ...c,
-        ageHours: Math.round(ageHours),
+        postDate,
+        postTimeMs,
+        ageHours: Math.round(ageHours * 10) / 10,
         compositeScore
       };
     });
 
-    // Sort descending by compositeScore (strictly newest/freshest first)
-    scored.sort((a, b) => b.compositeScore - a.compositeScore);
+    // Sort descending by true post publication time (absolute freshest reel first)
+    scored.sort((a, b) => b.postTimeMs - a.postTimeMs);
 
     // Take up to allowedCount
     const takeCount = Math.min(allowedCount, scored.length);

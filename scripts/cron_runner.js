@@ -75,7 +75,16 @@ async function main() {
     db.prepare('UPDATE pages SET daily_quota = 7').run();
     // Purge any stale non-reel discoveries from cached DB
     db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
-  } catch (e) {}
+    // Expire any queued jobs older than 12 hours so stale backlog NEVER blocks or runs
+    const expiredJobs = db.prepare("UPDATE publish_jobs SET status = 'failed', error = 'Expired: stale queued job (>12h old)' WHERE status = 'queued' AND created_at < datetime('now', '-12 hours')").run();
+    if (expiredJobs.changes > 0) {
+      console.log(`[Database Cleanup] 🧹 Purged ${expiredJobs.changes} stale queued jobs older than 12 hours.`);
+    }
+    // Expire old discovered posts
+    db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
+  } catch (e) {
+    console.warn(`[Database Cleanup Warning] ${e.message}`);
+  }
 
   if (process.env.META_ACCESS_TOKEN) {
     console.log('🔑 Injecting META_ACCESS_TOKEN from environment into active pages...');
@@ -214,6 +223,7 @@ async function main() {
     console.log(`\n[Cron Runner] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Jobs remain safely staged for morning peak.`);
   } else {
     const jobWorkerPool = require('../src/core/jobWorker');
+    const { shortcodeToTimestamp } = require('../src/agents/watchtower/sourceReaders/guestReader');
     const queuedJobs = listPublishJobs({ status: 'queued', limit: 10 });
     console.log(`\n[Cron Runner] 🚀 Step 3: Processing queued publishing job(s) (${queuedJobs.length} available)...`);
 
@@ -224,6 +234,19 @@ async function main() {
       if (publishedInCycle >= targetPerCycle) {
         console.log(`[Cron Runner] 🎯 Target for this cycle reached (${publishedInCycle}/${targetPerCycle} reels published).`);
         break;
+      }
+
+      // Source reel freshness validation: ensure competitor post was published within 24 hours
+      const parsed = shortcodeToTimestamp(job.shortcode);
+      if (parsed?.date) {
+        const ageHours = (Date.now() - parsed.date.getTime()) / (1000 * 60 * 60);
+        if (ageHours > 24) {
+          console.log(`[Cron Runner] ⏭️ Skipping stale Job #${job.id} [${job.shortcode}]: Source reel was published ${Math.round(ageHours)}h ago (>24h limit).`);
+          try {
+            db.prepare("UPDATE publish_jobs SET status = 'failed', error = ? WHERE id = ?").run(`Expired: Source reel is ${Math.round(ageHours)}h old`, job.id);
+          } catch (e) {}
+          continue;
+        }
       }
 
       if (isDryRun) {
