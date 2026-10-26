@@ -42,7 +42,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     });
 
     assert.ok(built, 'Should generate caption');
-    assert.ok(built.includes('@rockstargames'), 'Should include proper credit attribution');
+    assert.ok(!built.includes('@rockstargames'), 'Zero Credits Rule: Should not include external attribution');
     assert.ok(!built.toLowerCase().includes('comment link'), 'Should strip spam comment CTA');
     assert.ok(!built.toLowerCase().includes('dm me now'), 'Should strip spam DM CTA');
     assert.ok(built.includes('#gta6'), 'Should preserve relevant hashtags');

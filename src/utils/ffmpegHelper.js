@@ -144,6 +144,31 @@ function fallbackMinimalReel(outputPath, duration = 6) {
 }
 
 /**
+ * Quick non-blocking validation of whether a video already meets Meta requirements
+ * (H.264 video codec + YUV color + stereo audio track)
+ */
+function isMetaCompliantVideo(inputVideoPath) {
+  if (!fs.existsSync(inputVideoPath)) return false;
+  try {
+    const { execSync } = require('child_process');
+    const probeRaw = execSync(
+      `ffprobe -v error -show_entries stream=codec_type,codec_name,pix_fmt -of json "${inputVideoPath}"`,
+      { timeout: 8000 }
+    ).toString();
+    const probeData = JSON.parse(probeRaw);
+    const streams = probeData?.streams || [];
+    const videoStream = streams.find(s => s.codec_type === 'video');
+    const audioStream = streams.find(s => s.codec_type === 'audio');
+    const isH264 = videoStream?.codec_name === 'h264';
+    const isYuv = !videoStream?.pix_fmt || videoStream.pix_fmt.includes('yuv420');
+    const hasAudio = Boolean(audioStream);
+    return Boolean(isH264 && isYuv && hasAudio);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
  * Universal Meta Graph API v21.0 Video Codec Validator & Transcoder
  * Guarantees video has h264 video, yuv420p pixel format, aac stereo audio, and faststart.
  * Transcodes vp9, av1, hevc, prores, webm, or silent video into pristine Meta-compliant MP4.
@@ -175,16 +200,18 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
     const hasAudio = Boolean(audioStream);
     const finalDest = targetOutputPath || inputVideoPath;
 
-    console.log(`[FFmpeg Helper] 🎨 Applying Studio Audio Normalization & Meta Transcode... (audio:${hasAudio ? 'yes' : 'none'})`);
+    // Fast-path bypass: if already H.264 with audio and target is same as input
+    if (isH264 && hasAudio && (!targetOutputPath || targetOutputPath === inputVideoPath)) {
+      console.log(`[FFmpeg Helper] ⚡ Video is already Meta-compliant H.264/Audio. Fast bypass enabled.`);
+      return resolve({ success: true, outputPath: inputVideoPath, transcoded: false });
+    }
+
+    console.log(`[FFmpeg Helper] 🎨 Applying Fast Meta Transcode... (audio:${hasAudio ? 'yes' : 'none'})`);
 
     const tempOut = path.join(path.dirname(finalDest), `transcode_temp_${Date.now()}.mp4`);
 
     let ffmpegArgs = [];
     if (hasAudio) {
-      // High-fidelity natural video + studio dynamic audio mastering:
-      // 1. Natural 1.0x tempo & original colors (eliminates synthetic AI media flags)
-      // 2. Dynamic Audio Normalizer (dynaudnorm) lifts quiet GTA background songs by up to +18dB while leveling loud sounds
-      // 3. Studio-grade 256k AAC stereo
       ffmpegArgs = [
         '-y',
         '-i', inputVideoPath,
@@ -194,10 +221,10 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         '-map', '[a]',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
-        '-preset', 'fast',
-        '-crf', '18',
+        '-preset', 'veryfast',
+        '-crf', '20',
         '-c:a', 'aac',
-        '-b:a', '256k',
+        '-b:a', '192k',
         '-ar', '44100',
         '-ac', '2',
         '-movflags', '+faststart',
@@ -216,10 +243,10 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         '-map', '1:a',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
-        '-preset', 'fast',
-        '-crf', '18',
+        '-preset', 'veryfast',
+        '-crf', '20',
         '-c:a', 'aac',
-        '-b:a', '256k',
+        '-b:a', '192k',
         '-shortest',
         '-movflags', '+faststart',
         tempOut
@@ -821,18 +848,22 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
 
-  // 1. Detect aspect ratio via ffprobe
+  // 1. Detect aspect ratio and audio via ffprobe
   const { execSync } = require('child_process');
   let inW = 1080;
   let inH = 1920;
+  let hasAudio = false;
   try {
     const raw = execSync(
-      `ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json "${absPath}"`,
+      `ffprobe -v error -show_entries stream=width,height,codec_type -of json "${absPath}"`,
       { timeout: 10000 }
     ).toString();
     const data = JSON.parse(raw);
-    inW = data?.streams?.[0]?.width || 1080;
-    inH = data?.streams?.[0]?.height || 1920;
+    const vStream = data?.streams?.find(s => s.codec_type === 'video');
+    const aStream = data?.streams?.find(s => s.codec_type === 'audio');
+    inW = vStream?.width || 1080;
+    inH = vStream?.height || 1920;
+    hasAudio = Boolean(aStream);
   } catch (e) {
     console.warn(`[FFmpeg Helper] ffprobe dimension warning: ${e.message}`);
   }
@@ -840,7 +871,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const aspect = inW / inH;
   const isVertical = aspect <= 0.65; // ~9:16 vertical
 
-  let cardW, cardH, cardX, cardY, filter;
+  let cardW, cardH, cardX, cardY, videoFilter;
 
   if (isVertical) {
     // 9:16 Full Screen Immersion with narrow boundaries
@@ -849,7 +880,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     cardX = 24;
     cardY = 24;
 
-    filter = [
+    videoFilter = [
       '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
       '[v1][1:v]overlay=0:0[outv]'
     ].join(';');
@@ -867,7 +898,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     cardX = Math.round((1080 - cardW) / 2);
     cardY = Math.round((1920 - cardH) / 2);
 
-    filter = [
+    videoFilter = [
       '[0:v]split=2[bg_raw][fg_raw]',
       '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
       `[fg_raw]scale=${cardW}:${cardH}[card]`,
@@ -885,19 +916,25 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   console.log(`[FFmpeg Helper] 🎨 Composing GTA 6 Vice City Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
+  // Build filter graph combining video framing and audio normalization in ONE pass
+  const fullFilter = hasAudio
+    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15[outa]`
+    : videoFilter;
+
   return new Promise((resolve) => {
     const args = [
       '-y',
       '-i', absPath,
       '-i', overlayPngPath,
-      '-filter_complex', filter,
+      '-filter_complex', fullFilter,
       '-map', '[outv]',
-      '-map', '0:a?',
+      ...(hasAudio ? ['-map', '[outa]'] : ['-map', '0:a?']),
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'fast',
-      '-crf', '18',
-      '-c:a', 'copy',
+      '-preset', 'veryfast',
+      '-crf', '20',
+      '-c:a', 'aac',
+      '-b:a', '192k',
       '-movflags', '+faststart',
       framedOutput
     ];
@@ -989,7 +1026,10 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
       '-map', '0:a?',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
+      '-preset', 'veryfast',
+      '-crf', '20',
       '-c:a', 'aac',
+      '-b:a', '192k',
       '-movflags', '+faststart',
       storyOutput
     ];
@@ -1234,6 +1274,7 @@ function extractVideoCover(inputVideoPath, shortcode = 'reel', offsetSec = 1.5) 
 
 module.exports = {
   renderReelVideo,
+  isMetaCompliantVideo,
   ensureMetaCompliantVideo,
   ensureMetaCompliantImage,
   prepareVideoForStory,

@@ -1,7 +1,7 @@
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const { ensureMetaCompliantVideo, ensureMetaCompliantImage } = require('../utils/ffmpegHelper');
+const { ensureMetaCompliantVideo, ensureMetaCompliantImage, isMetaCompliantVideo } = require('../utils/ffmpegHelper');
 
 /**
  * OmniStudio v7 — Downloader Service
@@ -78,7 +78,11 @@ function downloadInstagramMedia(url) {
         if (isVideo && mediaPaths.length > 0) {
           const absVideoPath = path.join(publicDir, mediaPaths[0].replace(/^\//, ''));
           if (fs.existsSync(absVideoPath)) {
-            await ensureMetaCompliantVideo(absVideoPath);
+            if (isMetaCompliantVideo(absVideoPath)) {
+              console.log('[Downloader] ⚡ Video is already Meta-compliant H.264/AAC. Skipping redundant transcode pass.');
+            } else {
+              await ensureMetaCompliantVideo(absVideoPath);
+            }
           }
         } else if (mediaPaths.length > 0) {
           for (let i = 0; i < mediaPaths.length; i++) {

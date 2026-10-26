@@ -316,36 +316,12 @@ class JobWorkerPool {
         throw new Error(pubResult?.error || 'Publish did not return an Instagram media ID');
       }
 
-      // ── Step 3b: Publish Instagram Story ──
-      let storyResult = null;
-      if (autoPostStory && mediaPaths[0]) {
-        try {
-          await this.updateTelegramProgress(
-            job,
-            renderStepperMsg(4, 'Feed published! Publishing Instagram Story...', '⏳ Creating Story card...')
-          ).catch(() => {});
-
-          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
-          storyResult = await publishStory({
-            page,
-            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
-          });
-          console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult?.ig_media_id}`);
-        } catch (storyErr) {
-          console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
-        }
-      }
-
-      // ── Step 4: Finalise Success (Single In-Place Telegram Message) ────
+      // ── Step 3b: Immediate Telegram Announcement for Feed Reel ────
       const publishedAt = pubResult.published_at || new Date().toISOString();
       job = updateJobProgress(jobId, 'published', 'live', {
         ig_media_id: pubResult.ig_media_id,
         permalink: pubResult.permalink,
         published_at: publishedAt,
-        story_ig_media_id: storyResult?.ig_media_id || '',
-        story_published_at: storyResult?.published_at || null,
-        story_status: storyResult?.success ? 'published' : 'idle',
         error: ''
       });
 
@@ -356,27 +332,68 @@ class JobWorkerPool {
         } catch (e) {}
       }
 
-      // Telegram success announcement with clickable live links, creator attribution, full caption, and story ID
-      const successLines = [
+      const initialSuccessLines = [
         `🎉 <b>Published Live to Instagram!</b>`,
         `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
         `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
         `✅ <b>Feed Reel Published Live</b>`,
-        storyResult?.success ? `✅ <b>Instagram Story Published Live</b>` : '',
+        autoPostStory ? `⏳ <i>Publishing companion Instagram Story...</i>` : '',
         ``,
         `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
-        storyResult?.success ? `🌟 <b>Story:</b> <a href="${storyResult.story_url}">View on Instagram Story</a>` : '',
         ``,
         `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`,
-        storyResult?.success ? `🆔 <b>Story ID:</b> <code>${storyResult.ig_media_id}</code>` : '',
-        sourceUploader && sourceUploader !== 'instagram' ? `🙌 <b>Original Creator:</b> @${sourceUploader}` : '',
         ``,
         `📝 <b>Instagram Post Caption:</b>`,
         `<blockquote>${escapeHtml(finalCaption)}</blockquote>`
       ].filter(Boolean);
 
-      await this.updateTelegramProgress(job, successLines);
+      await this.updateTelegramProgress(job, initialSuccessLines);
+      console.log(`[Job Worker] ✅ Feed Reel live at: ${pubResult.permalink}`);
+
+      // ── Step 3c: Publish Instagram Story ──
+      let storyResult = null;
+      if (autoPostStory && mediaPaths[0]) {
+        try {
+          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
+          storyResult = await publishStory({
+            page,
+            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
+          });
+          console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult?.ig_media_id}`);
+
+          if (storyResult?.success) {
+            job = updateJobProgress(jobId, 'published', 'live', {
+              story_ig_media_id: storyResult.ig_media_id || '',
+              story_published_at: storyResult.published_at || null,
+              story_status: 'published'
+            });
+
+            const finalSuccessLines = [
+              `🎉 <b>Published Live to Instagram!</b>`,
+              `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+              `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
+              ``,
+              `✅ <b>Feed Reel Published Live</b>`,
+              `✅ <b>Instagram Story Published Live</b>`,
+              ``,
+              `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
+              `🌟 <b>Story:</b> <a href="${storyResult.story_url}">View on Instagram Story</a>`,
+              ``,
+              `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`,
+              `🆔 <b>Story ID:</b> <code>${storyResult.ig_media_id}</code>`,
+              ``,
+              `📝 <b>Instagram Post Caption:</b>`,
+              `<blockquote>${escapeHtml(finalCaption)}</blockquote>`
+            ].filter(Boolean);
+
+            await this.updateTelegramProgress(job, finalSuccessLines);
+          }
+        } catch (storyErr) {
+          console.warn(`[Job Worker] ⚠️ Instagram Story publishing notice: ${storyErr.message}`);
+        }
+      }
 
       console.log(`[Job Worker] ✅ Job #${job.id} completed! Live at: ${pubResult.permalink}`);
 

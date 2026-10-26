@@ -16,7 +16,7 @@ async function pollContainer(containerId, token, baseUrl, onProgress = null) {
   const maxAttempts = 45;
 
   while (!isReady && attempts < maxAttempts) {
-    const delay = attempts < 3 ? 1500 : 2500;
+    const delay = attempts < 3 ? 1000 : 2000;
     await new Promise(r => setTimeout(r, delay));
     attempts++;
 
