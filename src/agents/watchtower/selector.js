@@ -55,40 +55,51 @@ function getPeakWindowStatus(customTimezone = null) {
   const z = getZonedTime(timezone);
   const t = z.timeDecimal;
 
-  // Peak window definitions: Morning (8:30 - 11:30 IST) & Evening (17:00 - 20:30 IST)
-  // Night blackout: 20:30 PM to 08:30 AM IST (ZERO POSTING)
+  // Peak window definitions: Morning (08:30 - 11:30 IST), Lunch (12:30 - 16:30 IST), Evening (17:00 - 21:30 IST)
+  // Night blackout: 21:30 PM to 08:30 AM IST (ZERO POSTING to prevent bot flags)
   const windows = [
     {
       id: 'morning',
-      name: 'Morning Peak Audience Wave',
+      name: 'Morning Audience Wave',
       rangeStr: '08:30 – 11:30 IST',
       startHour: 8.5,
       endHour: 11.5,
-      target: 3
+      target: 2
+    },
+    {
+      id: 'lunch',
+      name: 'Lunchtime & Afternoon Surge',
+      rangeStr: '12:30 – 16:30 IST',
+      startHour: 12.5,
+      endHour: 16.5,
+      target: 2
     },
     {
       id: 'evening',
-      name: 'Evening Prime-Time Viral Surge',
-      rangeStr: '17:00 – 20:30 IST',
+      name: 'Evening Prime-Time Viral Peak',
+      rangeStr: '17:00 – 21:30 IST',
       startHour: 17.0,
-      endHour: 20.5,
-      target: 4
+      endHour: 21.5,
+      target: 3
     }
   ];
 
   let activeWindow = null;
-  const isNightBlackout = (t >= 20.5 || t < 8.5);
+  const isNightBlackout = (t >= 21.5 || t < 8.5);
 
   if (t >= 8.5 && t < 11.5) {
     activeWindow = windows[0];
-  } else if (t >= 17.0 && t < 20.5) {
+  } else if (t >= 12.5 && t < 16.5) {
     activeWindow = windows[1];
+  } else if (t >= 17.0 && t < 21.5) {
+    activeWindow = windows[2];
   }
 
   let nextWindow = null;
   if (!activeWindow) {
     if (t < 8.5) nextWindow = { ...windows[0], countdown: 'Starts at 08:30 AM IST' };
-    else if (t < 17.0) nextWindow = { ...windows[1], countdown: 'Starts at 05:00 PM IST' };
+    else if (t < 12.5) nextWindow = { ...windows[1], countdown: 'Starts at 12:30 PM IST' };
+    else if (t < 17.0) nextWindow = { ...windows[2], countdown: 'Starts at 05:00 PM IST' };
     else nextWindow = { ...windows[0], countdown: 'Starts at 08:30 AM IST tomorrow' };
   }
 

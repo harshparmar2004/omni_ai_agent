@@ -165,14 +165,14 @@ const DEFAULT_PAGE = {
   ig_user_id: IG_USER_ID,
   access_token_masked: 'IGAAYJ...eaB',
   has_valid_token: true,
-  caption_template: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
-  default_hashtags: '#gta6 #rockstargames #gtavi',
-  attribution_enabled: 1,
+  caption_template: '{caption}\n\n{hashtags}',
+  default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
+  attribution_enabled: 0,
   watermark_enabled: 0,
   post_mode: 'auto',
   posts_per_cycle: 1,
-  daily_quota: 5,
-  min_spacing_minutes: 120,
+  daily_quota: 7,
+  min_spacing_minutes: 90,
   is_active: 1
 };
 

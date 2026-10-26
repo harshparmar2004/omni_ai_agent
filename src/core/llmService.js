@@ -136,18 +136,17 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const cleanedSource = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
-  const prompt = `You are the lead content creator and hype copywriter for an Instagram page dedicated to "${pageName}".
-Analyze the following source reel description and rewrite it into an exciting, high-energy, viral breakdown for our followers:
+  const prompt = `You are an elite, viral Instagram Reels copywriter managing "${pageName}" (${handle}).
+Rewrite the following gaming clip description into an ultra-viral, scroll-stopping Instagram Reel caption for GTA 6 fans.
 
-Rules:
-1. Start with an irresistible, punchy 1-2 line hook with emojis (e.g. 🚨 BREAKING: ..., 🔥 NEW DETAILS REVEALED: ..., 🤯 LOOK AT THIS: ...).
-2. Buff and expand the breakdown: explain the feature, leak, mechanic, or storyline clearly in 2 to 3 engaging bullet points.
-3. Include an interactive debate or engagement question at the end (e.g. "What do you think about this? Drop your thoughts below 👇" or "Save this reel so you don't lose it! 💾").
-4. Make it feel authoritative, immersive, and thrilling for fans.
-5. DO NOT write any shout-out or follow CTA lines (these are automatically appended).
-6. DO NOT include hashtags (these are automatically appended).
-7. DO NOT include fake URLs, links in bio, or spam comments.
-8. Length: 60-120 words maximum.
+Rules for Maximum Virality:
+1. PUNCHY HOOK: Start with an irresistible 1-line hook using emojis that creates intense curiosity or excitement (e.g. 🚨 WAIT UNTIL YOU SEE THIS DETAIL IN GTA 6..., 🤯 ROCKSTAR GAMES REALLY OUTDID THEMSELVES HERE..., 🔥 NEW VICE CITY LEAK CHANGES EVERYTHING...).
+2. CRISP BREAKDOWN: Explain the visual, mechanics, physics, or story detail in 2 short, thrilling sentences with strong gaming keywords (Vice City, Rockstar Games, Lucia, Jason, PS5 Graphics, physics).
+3. COMMENT DEBATE PROMPT: Ask a polarizing, high-engagement question that forces viewers to comment (e.g. "What do you think: Masterpiece or overhyped? Drop your thoughts below 👇", "Will this be the greatest game in history? 👇").
+4. SAVE CALL-TO-ACTION: Include a quick save trigger ("💾 Save this reel so you don't lose it!").
+5. DO NOT mention any credits, creator handles, or sources.
+6. DO NOT include hashtags or follow CTAs (they are added automatically).
+7. Length: 50-90 words maximum. Clean, high energy, no fluff.
 
 Source Content:
 """
@@ -197,25 +196,19 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
   if (!aiBreakdown) {
     console.log('[LLM Service] ℹ️ Using deterministic caption transformer fallback.');
     if (cleanedSource) {
-      aiBreakdown = `🔥 LATEST UPDATE:\n\n${cleanedSource}\n\n💬 What are your thoughts on this? Drop your reaction below 👇`;
+      aiBreakdown = `🚨 NEW GTA 6 BREAKDOWN:\n\n${cleanedSource}\n\n💬 What are your thoughts on this? Drop your reaction below 👇\n\n💾 Save this reel so you don't lose it!`;
     } else {
-      aiBreakdown = `🔥 Exclusive look at the latest ${pageName} breakdown! The graphics, mechanics, and realism are taking this to an unprecedented level.\n\n💬 What are your thoughts on this? Drop your reaction below 👇`;
+      aiBreakdown = `🚨 Insane new look at GTA 6 in action! Rockstar Games is taking Vice City realism, AI mechanics, and world detail to a whole new level.\n\n💬 Will GTA 6 live up to the massive hype? Let us know below 👇\n\n💾 Save this reel so you don't lose it!`;
     }
   }
 
-  // ── Construct Structured Components ──────────────────────
-  // 1. Clean Attribution line
-  let shoutoutLine = '';
-  if (page.attribution_enabled !== 0 && sourceUsername && sourceUsername.toLowerCase() !== 'instagram' && !sourceUsername.toLowerCase().includes(page.slug || 'none')) {
-    shoutoutLine = `🎥 Credit: @${sourceUsername}`;
-  }
+  // ── Construct Structured Components (STRICTLY NO ATTRIBUTION / CREDITS) ──
+  // 1. High-converting Follow CTA line
+  const followLine = `🔥 Follow ${handle} for daily ${pageName} leaks, secrets & official news!`;
 
-  // 2. High-converting Follow CTA line
-  const followLine = `👉 Follow ${handle} for daily ${pageName} leaks & updates!`;
-
-  // 3. Deduplicate and collect hashtags (Strict 4-5 high-impact niche tags)
+  // 2. Deduplicate and collect hashtags (Strict 4-5 high-impact niche tags)
   const originalTags = extractHashtags(rawCaption);
-  const defaultTags = extractHashtags(page.default_hashtags || '');
+  const defaultTags = extractHashtags(page.default_hashtags || '#gta6 #gtavi #rockstargames #vicecity #gta6leaks');
   const nicheTags = (page.slug && page.slug.includes('gta')) ? DEFAULT_GTA6_TAGS : [];
 
   const tagSet = new Set();
@@ -231,10 +224,8 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
 
   const hashtagBlock = mergedTags.join(' ');
 
-  // 4. Assemble final caption
-  const parts = [aiBreakdown.trim()];
-  if (shoutoutLine) parts.push(shoutoutLine);
-  if (followLine) parts.push(followLine);
+  // 3. Assemble final caption without any third-party credit
+  const parts = [aiBreakdown.trim(), followLine];
   if (hashtagBlock) parts.push(hashtagBlock);
 
   let finalCaption = parts.join('\n\n').trim();
@@ -243,9 +234,7 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
   if (finalCaption.length > 2180) {
     const overage = finalCaption.length - 2150;
     const truncatedBreakdown = aiBreakdown.substring(0, Math.max(80, aiBreakdown.length - overage)) + '...';
-    const trimmedParts = [truncatedBreakdown];
-    if (shoutoutLine) trimmedParts.push(shoutoutLine);
-    if (followLine) trimmedParts.push(followLine);
+    const trimmedParts = [truncatedBreakdown, followLine];
     if (hashtagBlock) trimmedParts.push(hashtagBlock);
     finalCaption = trimmedParts.join('\n\n').trim();
   }

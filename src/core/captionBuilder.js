@@ -6,31 +6,31 @@
  */
 
 const CTA_PATTERNS = [
+  /(?:credit|credits|cr|via|source|repost|original|video\s+by|clip\s+by)\s*:?\s*@?[a-zA-Z0-9_.-]+/gi,
   /comment\s+["'“‘]?[a-zA-Z0-9_-]+["'”’]?\s+(?:below|to\s+get|for\s+the\s+link|and\s+I['’]?ll\s+dm|to\s+receive)[^\n.]*/gi,
   /(?:drop\s+a\s+comment|type)\s+["'“‘]?[a-zA-Z0-9_-]+["'”’]?[^\n.]*/gi,
   /link\s+in\s+bio[^\n.]*/gi,
   /check\s+(?:the\s+)?link\s+in\s+(?:my\s+)?bio[^\n.]*/gi,
   /(?:dm|message)\s+(?:me|us)\s+["'“‘]?[a-zA-Z0-9_-]+["'”’]?[^\n.]*/gi,
   /save\s+this\s+reel\s+(?:for\s+later|and\s+share)[^\n.]*/gi,
-  /follow\s+@[\w._-]+\s+for\s+more[^\n.]*/gi
+  /follow\s+@[\w._-]+\s+for\s+more[^\n.]*/gi,
+  /follow\s+us\s+for\s+more[^\n.]*/gi
 ];
 
 function cleanRawCaption(rawCaption, competitorHandles = []) {
   if (!rawCaption) return '';
   let text = rawCaption;
 
-  // 1. Remove competitor @handles mentioned in competitorHandles list
-  for (const h of competitorHandles) {
-    if (!h) continue;
-    const cleanH = h.replace(/^@/, '');
-    const reg = new RegExp(`@${cleanH}\\b`, 'gi');
-    text = text.replace(reg, '');
-  }
-
-  // 2. Strip spam CTA lines
+  // 1. Strip third-party credit / source / repost lines
   for (const pattern of CTA_PATTERNS) {
     text = text.replace(pattern, '');
   }
+
+  // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
+  text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
+    if (match.toLowerCase() === '@gta6_updates_007') return match;
+    return '';
+  });
 
   // 3. Normalise multiple empty newlines
   text = text.replace(/\n{3,}/g, '\n\n').trim();
@@ -79,60 +79,47 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const bodyWithoutHashtags = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
-  // Attribution & Viral Follow CTA
-  let attribution = '';
-  if (page.attribution_enabled && sourceUsername && sourceUsername !== 'instagram') {
-    attribution = `🎥 Credit: @${sourceUsername}`;
-  }
-
-  const handle = page.handle || `@${page.slug || 'our_page'}`;
+  const handle = page.handle || `@${page.slug || 'gta6_updates_007'}`;
   const pageName = page.name || 'GTA 6';
-  const followCta = `👉 Follow ${handle} for daily ${pageName} leaks & updates!`;
+  const followCta = `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`;
 
-  // Dynamic interactive prompt to trigger comments, saves, and shares
+  // Dynamic interactive prompt to trigger comments, saves, and shares (high algorithmic weighting)
   const promptIdx = Math.abs(simpleHash(bodyWithoutHashtags || 'default')) % ENGAGEMENT_PROMPTS.length;
   const engagementPrompt = ENGAGEMENT_PROMPTS[promptIdx];
+  const saveShareCta = '💾 Save & share this reel with a friend who is waiting for GTA 6!';
 
-  // Collect and deduplicate hashtags (Meta Reels Algorithm 2025/2026: 3-5 hyper-relevant tags)
+  // Collect and deduplicate hashtags (Meta Reels Algorithm: 4-5 hyper-relevant tags)
   const originalTags = extractHashtags(rawCaption);
-  const defaultTags = extractHashtags(page.default_hashtags || '');
+  const defaultTags = extractHashtags(page.default_hashtags || '#gta6 #gtavi #rockstargames #vicecity #gta6leaks');
 
   const tagSet = new Set();
   const mergedTags = [];
 
   for (const tag of [...defaultTags, ...originalTags]) {
     const lower = tag.toLowerCase();
-    if (!tagSet.has(lower)) {
+    if (!tagSet.has(lower) && tagSet.size < 5) {
       tagSet.add(lower);
       mergedTags.push(tag);
     }
   }
 
-  // Hard cap at 5 hashtags max to avoid spam dampening
-  const finalTags = mergedTags.slice(0, 5);
-  const hashtagBlock = finalTags.join(' ');
+  const hashtagBlock = mergedTags.join(' ');
 
-  // Assemble caption parts cleanly
+  // Assemble caption parts cleanly (STRICTLY ZERO CREDITS OR ATTRIBUTION)
   const sections = [];
   if (bodyWithoutHashtags) sections.push(bodyWithoutHashtags);
   if (engagementPrompt) sections.push(engagementPrompt);
-  if (attribution) sections.push(attribution);
-  if (followCta) sections.push(followCta);
+  sections.push(saveShareCta);
+  sections.push(followCta);
   if (hashtagBlock) sections.push(hashtagBlock);
 
   let finalCaption = sections.join('\n\n').trim();
 
   // Meta Instagram limits: Max 2,200 characters
   if (finalCaption.length > 2200) {
-    const overage = finalCaption.length - 2190;
-    // Truncate the body portion safely
+    const overage = finalCaption.length - 2150;
     const truncatedBody = bodyWithoutHashtags.substring(0, Math.max(100, bodyWithoutHashtags.length - overage - 10)) + '...';
-    finalCaption = template
-      .replace('{caption}', truncatedBody)
-      .replace('{attribution}', attribution)
-      .replace('{hashtags}', hashtagBlock)
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+    finalCaption = `${truncatedBody}\n\n${engagementPrompt}\n\n${saveShareCta}\n\n${followCta}\n\n${hashtagBlock}`.trim();
 
     if (finalCaption.length > 2200) {
       finalCaption = finalCaption.substring(0, 2197) + '...';

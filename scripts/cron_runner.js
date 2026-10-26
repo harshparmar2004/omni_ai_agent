@@ -57,9 +57,9 @@ async function main() {
       handle: '@gta6_updates_007',
       ig_user_id: '17841428668115319',
       access_token: process.env.META_ACCESS_TOKEN || '',
-      caption_template: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
-      default_hashtags: '#gta6 #rockstargames #gtavi',
-      attribution_enabled: 1,
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
+      attribution_enabled: 0,
       watermark_enabled: 1,
       post_mode: 'auto',
       posts_per_cycle: 1,
@@ -70,9 +70,9 @@ async function main() {
     pages = getPages();
   }
 
-  // Ensure daily_quota is calibrated to 7 reels/day for human-like cadence
+  // Ensure daily_quota is calibrated to 7 reels/day and attribution is disabled for original brand feel
   try {
-    db.prepare('UPDATE pages SET daily_quota = 7').run();
+    db.prepare("UPDATE pages SET daily_quota = 7, attribution_enabled = 0, caption_template = '{caption}\\n\\n{hashtags}', default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks'").run();
     // Purge any stale non-reel discoveries from cached DB
     db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
     // Expire any queued jobs older than 12 hours so stale backlog NEVER blocks or runs
