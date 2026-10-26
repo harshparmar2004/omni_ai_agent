@@ -82,9 +82,9 @@ async function main() {
       handle: '@gta6_updates_007',
       ig_user_id: '17841428668115319',
       access_token: process.env.META_ACCESS_TOKEN || '',
-      caption_template: '🎮 Source: @{author} | Follow @gta6_updates_007 for daily GTA 6 leaks & official news! #gta6 #rockstargames',
-      default_hashtags: '#gta6 #rockstargames #gtavi',
-      attribution_enabled: 1,
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
+      attribution_enabled: 0,
       watermark_enabled: 1,
       post_mode: 'auto',
       posts_per_cycle: 1,
@@ -94,6 +94,10 @@ async function main() {
     });
     pages = getPages();
   }
+
+  try {
+    db.prepare("UPDATE pages SET attribution_enabled = 0, caption_template = '{caption}\\n\\n{hashtags}', default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks'").run();
+  } catch (e) {}
 
   // Inject Environment Secrets
   if (process.env.META_ACCESS_TOKEN) {

@@ -76,10 +76,19 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
-      - name: 🌐 Install Playwright Chromium with System Dependencies
+      - name: 💾 Cache Playwright Chromium
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-v1
+
+      - name: 🌐 Install Playwright Chromium
         run: |
           pip install playwright
-          playwright install --with-deps chromium
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            playwright install chromium
+          fi
 
       - name: 🚀 Run Autonomous Surveillance & Auto-Publish Cycle
         env:
