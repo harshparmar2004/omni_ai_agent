@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8887232624:AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
 module.exports = async function handler(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host;

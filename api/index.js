@@ -10,8 +10,8 @@ app.use(express.json());
 
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8887232624:AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk';
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpwTUZABblM3SnFCUWN0bWtES0F5b3ZA3RXpnemdwaWlsd1ZA3T1BnaGZAyeU5HWEZAwOTI3VHFEc2hPcTBWbFVXOHNnOVhaUHREMHR0eERQOXE2VExnMUVZAZAnJ1clo2c3BkejFxaTVuWmVB';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
 const IG_USER_ID = process.env.IG_USER_ID || '17841428668115319';
 
 // Path normalization middleware for Vercel Serverless rewrites
