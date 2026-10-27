@@ -89,6 +89,10 @@ class JobWorkerPool {
   }
 
   async updateTelegramProgress(job, lines, replyMarkup = null) {
+    // Agent 2 (Watchtower) uses the dedicated 2-message lifecycle (Selection -> Published) in cron_runner.js
+    if (job.agent === 'watchtower') {
+      return null;
+    }
     const { getSetting } = require('../database');
     const chatId = job.telegram_chat_id || getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '5443723531';
     if (!chatId) return;

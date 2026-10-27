@@ -193,20 +193,6 @@ async function main() {
   const scanResult = await scanAllSources({ limit: 6, quick: isDryRun });
   console.log(`[Cron Runner] ✓ Scan complete. Monitored sources checked.`);
 
-  if (adminChatId) {
-    const newCount = scanResult?.newPostsCount || 0;
-    try {
-      await notifier.sendTelegramMessage(
-        adminChatId,
-        `🛰️ <b>Watchtower Surveillance Scan Complete:</b>\n\n` +
-        `• Checked: <b>${scanResult?.sourcesChecked || uniqueCompetitors.length}</b> competitor accounts\n` +
-        `• Fresh Reels Indexed: <b>+${newCount}</b>\n` +
-        `• Time: <code>${new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata' })} (IST)</code>\n\n` +
-        `<i>Evaluating engagement metrics for current audience window...</i>`
-      );
-    } catch (e) {}
-  }
-
   // 5. Evaluate and Select Candidate Posts (Virality Scoring)
   const { evaluateAndSelectPosts, getPeakWindowStatus } = require('../src/agents/watchtower/selector');
   const windowStatus = getPeakWindowStatus();
@@ -216,18 +202,43 @@ async function main() {
   const selectedWinners = await evaluateAndSelectPosts({ force: isForce });
   console.log(`[Cron Runner] ✓ Content selection complete. Enqueued ${selectedWinners?.length || 0} winner(s).`);
 
-  if (adminChatId && selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0) {
-    const topW = selectedWinners[0].winners[0];
-    try {
-      await notifier.sendTelegramMessage(
-        adminChatId,
-        `🎯 <b>Top Viral Winner Selected:</b>\n\n` +
-        `• Source: <code>#${topW.shortcode}</code>\n` +
-        `• Virality Score: <b>${topW.compositeScore || 'High'}</b>\n` +
-        `• Destination: <b>@gta6_updates_007</b>\n\n` +
-        `🎬 <i>Rendering GTA 6 Vice City 1080p frame & Story card...</i>`
-      );
-    } catch (e) {}
+  const sourcesCount = scanResult?.sourcesChecked || uniqueCompetitors.length;
+  const newReelsCount = scanResult?.newPostsCount || 0;
+  const hasWinner = selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0;
+  const topW = hasWinner ? selectedWinners[0].winners[0] : null;
+
+  // Single Clean Message 1: Scan Summary + Finalized Reel to Post
+  if (adminChatId) {
+    if (topW) {
+      try {
+        await notifier.sendTelegramMessage(
+          adminChatId,
+          `🛰️ <b>Agent 2: Watchtower Pipeline Engaged</b>\n\n` +
+          `📊 <b>Surveillance Summary:</b>\n` +
+          `• Monitored Sources Checked: <b>${sourcesCount} accounts</b>\n` +
+          `• Fresh Reels Ingested: <b>+${newReelsCount} reels</b>\n` +
+          `• Target Audience Window: <b>${windowStatus.activeWindow ? windowStatus.activeWindow.name : 'Peak Wave'}</b>\n\n` +
+          `🎯 <b>Finalized Reel to Post:</b>\n` +
+          `• Source Reel: <a href="https://www.instagram.com/reel/${topW.shortcode}/">https://www.instagram.com/reel/${topW.shortcode}/</a>\n` +
+          `• Source ID: <code>#${topW.shortcode}</code>\n` +
+          `• Virality Composite Score: <b>${topW.compositeScore || 'High'}</b>\n` +
+          `• Destination: <b>@gta6_updates_007</b>\n\n` +
+          `⏳ <i>Pipeline active: Transcoding 1080p Vice City frame, generating AI hook, and publishing to Feed + Story...</i>`
+        );
+      } catch (e) {
+        console.warn(`[Cron Runner] Telegram Message 1 error: ${e.message}`);
+      }
+    } else {
+      try {
+        await notifier.sendTelegramMessage(
+          adminChatId,
+          `🛰️ <b>Agent 2: Surveillance Scan Complete</b>\n\n` +
+          `• Sources Monitored: <b>${sourcesCount} accounts</b>\n` +
+          `• Fresh Reels Ingested: <b>+${newReelsCount} reels</b>\n` +
+          `• Status: <i>${windowStatus.isNightBlackout ? '🌙 Night Blackout Active (Zero overnight posting to prevent bot flags)' : 'Window quota already reached. Waiting for next peak slot.'}</i>`
+        );
+      } catch (e) {}
+    }
   }
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)
@@ -274,18 +285,22 @@ async function main() {
         if (currentJob && currentJob.status === 'published') {
           publishedInCycle++;
           console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
-          // Instant Telegram notification to admin
+          // Message 2: Live Publishing Confirmation (Clean single notification)
           try {
+            const captionSnippet = currentJob.caption
+              ? currentJob.caption.split('\n').filter(Boolean).slice(0, 2).join('\n')
+              : '';
             await notifier.sendTelegramMessage(
               adminChatId,
               `🚀 <b>LIVE ON INSTAGRAM!</b>\n\n` +
               `📱 <b>Account:</b> @gta6_updates_007\n` +
-              `🌐 <b>Post URL:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
-              `🎬 <b>Competitor Source:</b> <code>#${currentJob.shortcode}</code>\n` +
+              `🌐 <b>Live Reel:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
+              `🎬 <b>Source Reel:</b> <a href="https://www.instagram.com/reel/${currentJob.shortcode}/">https://www.instagram.com/reel/${currentJob.shortcode}/</a>\n` +
               `🆔 <b>Media ID:</b> <code>${currentJob.ig_media_id}</code>\n\n` +
-              `✨ <i>Published via Omni AI Autonomous Engine</i>`
+              (captionSnippet ? `📝 <b>Caption Hook:</b>\n<blockquote>${captionSnippet}</blockquote>\n\n` : '') +
+              `✨ <i>Published successfully to Feed & Story via Omni AI Engine</i>`
             );
-            console.log(`[Cron Runner] 📱 Admin Telegram alert sent to ${adminChatId}`);
+            console.log(`[Cron Runner] 📱 Live confirmation sent to ${adminChatId}`);
           } catch (tgErr) {
             console.warn(`[Cron Runner] Telegram notification warning: ${tgErr.message}`);
           }
