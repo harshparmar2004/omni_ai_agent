@@ -2,7 +2,6 @@ const axios = require('axios');
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8887232624:AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk';
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
-const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
 const ALLOWED_CHATS = (process.env.ALLOWED_CHAT_IDS || '5443723531').split(',').map(s => s.trim());
 
 async function sendTelegram(chatId, text, extra = {}) {
@@ -22,6 +21,7 @@ async function sendTelegram(chatId, text, extra = {}) {
 }
 
 module.exports = async function handler(req, res) {
+  const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
   if (req.method === 'GET') {
     return res.status(200).json({ status: 'active', service: 'OmniStudio Telegram Webhook Bridge v7' });
   }
@@ -55,15 +55,15 @@ module.exports = async function handler(req, res) {
   if (text.startsWith('/start') || text.startsWith('/help')) {
     await sendTelegram(
       chatId,
-      `👋 <b>Welcome to OmniStudio v7 24/7 Cloud Bot!</b>\n\n` +
-      `You can share any Instagram Reel or Post link here.\n` +
-      `Our cloud agent will automatically:\n` +
-      `• Download the highest-quality media\n` +
-      `• Generate Groq Llama 3.3 viral copy & hooks\n` +
-      `• Transcode with anti-duplicate signature\n` +
-      `• Publish the Reel to your Instagram Feed\n` +
-      `• Publish the original-aspect Story Reel Card to your Instagram Story\n\n` +
-      `<i>Tip: Just paste any Instagram link to test right now!</i>`
+      `👋 <b>Welcome to OmniStudio v7 Autonomous Cloud Agent!</b>\n\n` +
+      `<b>⚡ Agent 1 (On-Demand Reposter):</b>\n` +
+      `• Share any Instagram Reel or Post link here.\n` +
+      `• Auto-downloads media, writes viral hook, transcodes & publishes to Feed + Story in <50s.\n\n` +
+      `<b>🛰️ Agent 2 (Watchtower 24/7 Surveillance):</b>\n` +
+      `• <code>/post</code> — Trigger autonomous competitor scan & publish viral winner immediately\n` +
+      `• <code>/post force</code> — Force publish immediately even if outside peak window\n` +
+      `• <code>/status</code> — View system health, quota, and peak schedule\n\n` +
+      `<i>Tip: Just tap /post or share any Instagram Reel link!</i>`
     );
     return res.status(200).json({ ok: true });
   }
@@ -71,12 +71,70 @@ module.exports = async function handler(req, res) {
   if (text.startsWith('/status')) {
     await sendTelegram(
       chatId,
-      `🛰️ <b>OmniStudio Cloud Status</b>\n\n` +
-      `🟢 <b>Serverless Webhook:</b> Online on Vercel\n` +
-      `🛰️ <b>Watchtower Surveillance:</b> 24/7 Scheduled on GitHub Actions\n` +
-      `📱 <b>Target Page:</b> @gta6_updates_007 (GTA 6 Updates 007)\n` +
-      `⚡ <b>AI Engine:</b> Groq Llama 3.3 70B (High-Speed)`
+      `🛰️ <b>OmniStudio v7 Cloud Engine Status</b>\n\n` +
+      `🟢 <b>Serverless Gateway:</b> Active on Vercel\n` +
+      `📱 <b>Target Page:</b> <code>@gta6_updates_007</code>\n` +
+      `🎯 <b>Daily Quota:</b> 7 High-Virality Reels / Day\n` +
+      `🚫 <b>Zero Creator Credits:</b> Active (100% Brand Native)\n` +
+      `⚡ <b>AI Engine:</b> Groq Llama 3.3 70B (High-Speed)\n\n` +
+      `📅 <b>Automated IST Posting Schedule:</b>\n` +
+      `• 🌅 <b>Morning (08:30 - 11:30 IST):</b> 09:00 AM & 10:30 AM\n` +
+      `• 🥪 <b>Lunch (12:30 - 16:30 IST):</b> 01:30 PM & 03:30 PM\n` +
+      `• 🌆 <b>Evening (17:00 - 21:30 IST):</b> 06:30 PM, 08:00 PM & 09:15 PM\n` +
+      `• 🌙 <b>Night Blackout:</b> 21:30 - 08:30 IST (Zero overnight posting to prevent bot flags)\n\n` +
+      `💡 <i>Send <code>/post</code> anytime to trigger a Watchtower cycle instantly!</i>`
     );
+    return res.status(200).json({ ok: true });
+  }
+
+  if (text.startsWith('/post') || text.startsWith('/scan') || text.startsWith('/watchtower')) {
+    if (!GITHUB_TOKEN) {
+      await sendTelegram(
+        chatId,
+        `⚠️ <b>GitHub Token Required</b>\n` +
+        `<code>GH_DISPATCH_TOKEN</code> is not set in your Vercel project environment variables.\n` +
+        `Please add it with 'repo' scope at https://vercel.com.`
+      );
+      return res.status(200).json({ ok: true });
+    }
+
+    const isForce = text.includes('force');
+    await sendTelegram(
+      chatId,
+      `🛰️ <b>Agent 2 (Watchtower 24/7) Engaged!</b>\n\n` +
+      `🔍 <b>Task:</b> Scanning 7 competitor accounts for fresh viral reels\n` +
+      `📱 <b>Target:</b> <code>@gta6_updates_007</code>\n` +
+      `⚙️ <b>Mode:</b> ${isForce ? 'Force Instant Publish (Blackout Bypassed)' : 'Peak Virality Scoring'}\n\n` +
+      `<i>Cloud runner dispatched. As soon as the winning reel is transcoded & published, you will receive the live Instagram link here!</i>`
+    );
+
+    try {
+      const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/watchtower-cron.yml/dispatches`;
+      const dispatchPayload = { ref: 'main' };
+      if (isForce) {
+        dispatchPayload.inputs = { force: 'true' };
+      }
+      await axios.post(
+        dispatchUrl,
+        dispatchPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'OmniStudio-Telegram-Bridge'
+          },
+          timeout: 15000
+        }
+      );
+      console.log(`[Telegram Webhook] Watchtower workflow dispatched successfully (Force: ${isForce})`);
+    } catch (err) {
+      console.error('[Watchtower Telegram Dispatch Error]:', err.response?.data || err.message);
+      const detail = err.response?.data?.message || err.message;
+      await sendTelegram(
+        chatId,
+        `❌ <b>Watchtower Dispatch Failed:</b> ${detail}\nPlease check your GitHub token permissions.`
+      );
+    }
     return res.status(200).json({ ok: true });
   }
 
@@ -84,7 +142,7 @@ module.exports = async function handler(req, res) {
   const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
   if (!match) {
     if (text.startsWith('/')) {
-      await sendTelegram(chatId, `ℹ️ Unknown command. Paste an Instagram link to publish.`);
+      await sendTelegram(chatId, `ℹ️ Unknown command. Send <code>/post</code> to scan competitors or paste an Instagram link.`);
     }
     return res.status(200).json({ ok: true });
   }

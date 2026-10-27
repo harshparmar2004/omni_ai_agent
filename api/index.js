@@ -660,6 +660,13 @@ try {
   router.all('/set-webhook', (req, res) => setWebhook(req, res));
 } catch (e) {}
 
+try {
+  const cronTrigger = require('./cron-trigger');
+  router.all('/cron-trigger', (req, res) => cronTrigger(req, res));
+  router.all('/watchtower/trigger', (req, res) => cronTrigger(req, res));
+  router.post('/watchtower/scan', (req, res) => cronTrigger(req, res));
+} catch (e) {}
+
 // Mount router on both /api and / so all route paths match regardless of rewrite prefix handling
 app.use('/api', router);
 app.use('/', router);

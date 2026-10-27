@@ -107,9 +107,11 @@ function getPeakWindowStatus(customTimezone = null) {
   if (activeWindow) {
     const startH = Math.floor(activeWindow.startHour);
     const startM = Math.round((activeWindow.startHour - startH) * 60);
-    const d = new Date();
-    d.setHours(startH, startM, 0, 0);
-    windowStartIso = d.toISOString();
+    // In IST (UTC + 5:30), offset is +330 minutes
+    const offsetMs = 330 * 60 * 1000;
+    const istMidnightUtc = Date.UTC(z.year, z.month, z.day, 0, 0, 0) - offsetMs;
+    const windowStartMs = istMidnightUtc + (startH * 60 + startM) * 60 * 1000;
+    windowStartIso = new Date(windowStartMs).toISOString();
   }
 
   return {
