@@ -116,18 +116,31 @@ async function main() {
   }
 
   if (competitorList.length === 0) {
-    competitorList = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gtavi_insider', 'gta6latest', 'gta6countdown', 'rockstargames'];
+    competitorList = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'];
   }
 
-  const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))];
-  for (const comp of uniqueCompetitors) {
-    if (comp) {
-      createSourceAccount({
-        username: comp,
-        page_id: targetPageId,
-        is_active: 1
-      });
+  const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+
+  // Synchronize database state strictly with active competitor list:
+  // Deactivate any source account previously cached that was removed from dashboard/config
+  try {
+    if (uniqueCompetitors.length > 0) {
+      const placeholders = uniqueCompetitors.map(() => '?').join(',');
+      db.prepare(`UPDATE source_accounts SET is_active = 0 WHERE username NOT IN (${placeholders})`).run(...uniqueCompetitors);
     }
+  } catch (e) {
+    console.warn(`[Sync Warning] Could not prune inactive sources: ${e.message}`);
+  }
+
+  for (const comp of uniqueCompetitors) {
+    createSourceAccount({
+      username: comp,
+      page_id: targetPageId,
+      is_active: 1
+    });
+    try {
+      db.prepare('UPDATE source_accounts SET is_active = 1 WHERE username = ?').run(comp);
+    } catch (e) {}
   }
   console.log(`🎯 Active tracked competitors (${uniqueCompetitors.length}): ${uniqueCompetitors.map(c => '@' + c).join(', ')}`);
 

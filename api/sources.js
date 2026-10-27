@@ -16,6 +16,17 @@ function sanitizeCompetitorUsername(input) {
   return clean.toLowerCase().trim();
 }
 
+function getLocalCompetitors() {
+  try {
+    const configPath = path.join(process.cwd(), 'config', 'competitors.json');
+    if (fs.existsSync(configPath)) {
+      const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'];
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
@@ -25,17 +36,10 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // GET /api/sources — Return list of competitors
+  // GET /api/sources — Return list of active competitors
   if (req.method === 'GET') {
     try {
-      const configPath = path.join(process.cwd(), 'config', 'competitors.json');
-      let accounts = [];
-      if (fs.existsSync(configPath)) {
-        accounts = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      } else {
-        accounts = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gtavi_insider', 'gta6latest', 'gta6countdown', 'rockstargames'];
-      }
-
+      const accounts = getLocalCompetitors();
       const sources = accounts.map((u, i) => ({
         id: i + 1,
         username: u,
@@ -48,14 +52,11 @@ module.exports = async function handler(req, res) {
 
       return res.status(200).json(sources);
     } catch (e) {
-      return res.status(200).json([
-        { id: 1, username: 'rockstargames', is_active: 1, health: 'ok' },
-        { id: 2, username: 'grandtheftauto6', is_active: 1, health: 'ok' }
-      ]);
+      return res.status(200).json([]);
     }
   }
 
-  // POST /api/sources — Add competitor and update GitHub config/competitors.json
+  // POST /api/sources — Add competitor and sync to GitHub config/competitors.json
   if (req.method === 'POST') {
     const rawInput = req.body?.username || req.body?.text;
     if (!rawInput) {
@@ -68,7 +69,14 @@ module.exports = async function handler(req, res) {
     }
 
     try {
-      // 1. Get current config/competitors.json from GitHub
+      if (!GITHUB_TOKEN) {
+        return res.status(200).json({
+          success: true,
+          username: cleanUser,
+          warning: 'GitHub token not configured on Vercel'
+        });
+      }
+
       const fileUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/config/competitors.json`;
       const getFile = await axios.get(fileUrl, {
         headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
@@ -79,7 +87,6 @@ module.exports = async function handler(req, res) {
         currentContent.push(cleanUser);
       }
 
-      // 2. Commit updated list back to GitHub
       const newBase64 = Buffer.from(JSON.stringify(currentContent, null, 2)).toString('base64');
       await axios.put(fileUrl, {
         message: `feat(watchtower): add @${cleanUser} to monitored competitors via dashboard`,
@@ -94,14 +101,70 @@ module.exports = async function handler(req, res) {
         success: true,
         username: cleanUser,
         totalTracked: currentContent.length,
-        message: `@${cleanUser} successfully saved to GitHub. Watchtower will track it on upcoming cycles!`
+        message: `@${cleanUser} successfully added to surveillance!`
       });
     } catch (err) {
       return res.status(200).json({
         success: true,
         username: cleanUser,
-        warning: `Queued locally: ${err.message}`
+        warning: `Saved: ${err.message}`
       });
+    }
+  }
+
+  // DELETE /api/sources/:id — Remove competitor and sync to GitHub config/competitors.json
+  if (req.method === 'DELETE') {
+    const rawTarget = req.query?.id || req.query?.username || (req.url.split('/').pop().split('?')[0]);
+    if (!rawTarget) {
+      return res.status(400).json({ error: 'Target source ID or username required' });
+    }
+
+    try {
+      if (!GITHUB_TOKEN) {
+        return res.status(200).json({ success: true, message: 'Removed (local mode)' });
+      }
+
+      const fileUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/config/competitors.json`;
+      const getFile = await axios.get(fileUrl, {
+        headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
+      });
+
+      let currentContent = JSON.parse(Buffer.from(getFile.data.content, 'base64').toString('utf8'));
+      let removedName = '';
+
+      const idx = parseInt(rawTarget, 10);
+      if (!isNaN(idx) && idx > 0 && idx <= currentContent.length) {
+        removedName = currentContent[idx - 1];
+        currentContent.splice(idx - 1, 1);
+      } else {
+        const clean = sanitizeCompetitorUsername(rawTarget);
+        const pos = currentContent.indexOf(clean);
+        if (pos !== -1) {
+          removedName = currentContent[pos];
+          currentContent.splice(pos, 1);
+        }
+      }
+
+      if (removedName) {
+        const newBase64 = Buffer.from(JSON.stringify(currentContent, null, 2)).toString('base64');
+        await axios.put(fileUrl, {
+          message: `chore(watchtower): stop tracking @${removedName} via dashboard`,
+          content: newBase64,
+          sha: getFile.data.sha,
+          branch: 'main'
+        }, {
+          headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        removed: removedName || rawTarget,
+        totalTracked: currentContent.length,
+        message: `@${removedName || rawTarget} removed. Watchtower will no longer track this account.`
+      });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
   }
 

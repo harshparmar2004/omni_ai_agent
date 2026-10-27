@@ -102,7 +102,7 @@ module.exports = async function handler(req, res) {
     await sendTelegram(
       chatId,
       `🛰️ <b>Agent 2 (Watchtower 24/7) Engaged!</b>\n\n` +
-      `🔍 <b>Task:</b> Scanning 7 competitor accounts for fresh viral reels\n` +
+      `🔍 <b>Task:</b> Scanning your active competitor accounts for fresh viral reels\n` +
       `📱 <b>Target:</b> <code>@gta6_updates_007</code>\n` +
       `⚙️ <b>Mode:</b> ${isForce ? 'Force Instant Publish (Blackout Bypassed)' : 'Peak Virality Scoring'}\n\n` +
       `<i>Cloud runner dispatched. As soon as the winning reel is transcoded & published, you will receive the live Instagram link here!</i>`
