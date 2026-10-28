@@ -95,10 +95,18 @@ async function main() {
     }
   }
 
-  // 1c. Sync Competitor Accounts from config/competitors.json or COMPETITOR_ACCOUNTS env var
+  // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
   const { createSourceAccount } = require('../src/database');
   const targetPageId = pages[0]?.id || 1;
   let competitorList = [];
+
+  // Read existing active sources configured in the database / dashboard first
+  try {
+    const dbActiveSources = db.prepare('SELECT username FROM source_accounts WHERE is_active = 1 AND (page_id = ? OR page_id IS NULL)').all(targetPageId);
+    for (const s of dbActiveSources) {
+      if (s.username) competitorList.push(s.username);
+    }
+  } catch (e) {}
 
   const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
   if (fs.existsSync(competitorsJsonPath)) {
@@ -120,17 +128,6 @@ async function main() {
   }
 
   const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-
-  // Synchronize database state strictly with active competitor list:
-  // Deactivate any source account previously cached that was removed from dashboard/config
-  try {
-    if (uniqueCompetitors.length > 0) {
-      const placeholders = uniqueCompetitors.map(() => '?').join(',');
-      db.prepare(`UPDATE source_accounts SET is_active = 0 WHERE username NOT IN (${placeholders})`).run(...uniqueCompetitors);
-    }
-  } catch (e) {
-    console.warn(`[Sync Warning] Could not prune inactive sources: ${e.message}`);
-  }
 
   for (const comp of uniqueCompetitors) {
     createSourceAccount({

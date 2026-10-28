@@ -98,9 +98,9 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-v1
 
-      - name: 🌐 Install Playwright Chromium
+      - name: 🌐 Install Dependencies & Playwright Chromium
         run: |
-          pip install playwright
+          pip install playwright yt-dlp requests
           if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
             playwright install chromium
           fi

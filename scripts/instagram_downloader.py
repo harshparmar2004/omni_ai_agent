@@ -21,7 +21,7 @@ def find_post_by_shortcode(obj, code):
     """Recursively search for the exact media node corresponding to target shortcode."""
     if isinstance(obj, dict):
         if obj.get("code") == code or obj.get("shortcode") == code:
-            if "if_not_gated_logged_out" in obj or "carousel_media" in obj or "image_versions2" in obj:
+            if "if_not_gated_logged_out" in obj or "carousel_media" in obj or "image_versions2" in obj or "video_versions" in obj or "video_url" in obj or "display_url" in obj:
                 return obj
         for k, v in obj.items():
             res = find_post_by_shortcode(v, code)
@@ -69,11 +69,26 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
             ),
             viewport={"width": 1280, "height": 900}
         )
+        await context.add_cookies([
+            {"name": "ig_nrcb", "value": "1", "domain": ".instagram.com", "path": "/"},
+            {"name": "ig_did", "value": "F8354A92-C9FD-4A73-A33D-8A0091FF31B3", "domain": ".instagram.com", "path": "/"}
+        ])
         page = await context.new_page()
 
         print(f"[Downloader] Navigating to Instagram post {shortcode}...", file=sys.stderr)
         await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(2000)
+
+        # Attempt to dismiss cookie consent dialogs if present
+        try:
+            for btn_txt in ["Allow all cookies", "Accept", "Only allow essential cookies", "Decline optional cookies"]:
+                b = page.locator(f"button:has-text('{btn_txt}')").first
+                if await b.is_visible(timeout=1000):
+                    await b.click()
+                    await page.wait_for_timeout(800)
+                    break
+        except Exception:
+            pass
 
         # ── 1. STRATEGY A: Direct Server State Extraction (Ground Truth) ────────
         scripts_data = await page.evaluate('''() => {
@@ -118,6 +133,12 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
 
             carousel_items = media_info.get("carousel_media")
             video_versions = media_info.get("video_versions")
+            vid_url = None
+            if video_versions and isinstance(video_versions, list) and len(video_versions) > 0:
+                vid_url = video_versions[0].get("url")
+            elif media_info.get("video_url"):
+                vid_url = media_info.get("video_url")
+
             if carousel_items and isinstance(carousel_items, list):
                 # ── MULTI-IMAGE CAROUSEL ──────────────────────────────────────
                 total_slides = len(carousel_items)
@@ -151,40 +172,38 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
                             print(f"[Downloader] ✓ Saved Slide {slide_num}/{total_slides} ({len(body)//1024} KB)", file=sys.stderr)
                     except Exception as err:
                         print(f"[Downloader] Failed to download slide {slide_num}: {err}", file=sys.stderr)
-            elif video_versions and isinstance(video_versions, list) and len(video_versions) > 0:
+            elif vid_url:
                 # ── VIDEO REEL POST ───────────────────────────────────────────
                 print(f"[Downloader] Detected Video Reel Post.", file=sys.stderr)
-                vid_url = video_versions[0].get("url")
-                if vid_url:
-                    try:
-                        resp = await context.request.get(vid_url, timeout=40000)
-                        if resp.status == 200:
-                            body = await resp.body()
-                            filename = f"reel_{shortcode}.mp4"
-                            filepath = os.path.join(output_dir, filename)
-                            with open(filepath, "wb") as f:
-                                f.write(body)
-                            rel_path = f"/generated/downloads/{filename}"
-                            print(f"[Downloader] ✓ Saved Reel Video ({len(body)//1024} KB)", file=sys.stderr)
-                            await browser.close()
-                            return {
-                                "success": True,
-                                "type": "reel",
-                                "id": shortcode,
-                                "title": caption[:80] if caption else f"Instagram Reel {shortcode}",
-                                "caption": caption,
-                                "uploader": owner,
-                                "owner": owner,
-                                "duration": media_info.get("video_duration", 0),
-                                "local_file": filename,
-                                "relative_url": rel_path,
-                                "is_video": True,
-                                "is_carousel": False,
-                                "slides_count": 0,
-                                "slides": []
-                            }
-                    except Exception as err:
-                        print(f"[Downloader] Failed to download video stream: {err}", file=sys.stderr)
+                try:
+                    resp = await context.request.get(vid_url, timeout=40000)
+                    if resp.status == 200:
+                        body = await resp.body()
+                        filename = f"reel_{shortcode}.mp4"
+                        filepath = os.path.join(output_dir, filename)
+                        with open(filepath, "wb") as f:
+                            f.write(body)
+                        rel_path = f"/generated/downloads/{filename}"
+                        print(f"[Downloader] ✓ Saved Reel Video ({len(body)//1024} KB)", file=sys.stderr)
+                        await browser.close()
+                        return {
+                            "success": True,
+                            "type": "reel",
+                            "id": shortcode,
+                            "title": caption[:80] if caption else f"Instagram Reel {shortcode}",
+                            "caption": caption,
+                            "uploader": owner,
+                            "owner": owner,
+                            "duration": media_info.get("video_duration", 0),
+                            "local_file": filename,
+                            "relative_url": rel_path,
+                            "is_video": True,
+                            "is_carousel": False,
+                            "slides_count": 0,
+                            "slides": []
+                        }
+                except Exception as err:
+                    print(f"[Downloader] Failed to download video stream: {err}", file=sys.stderr)
             else:
                 # ── SINGLE PHOTO POST ─────────────────────────────────────────
                 print(f"[Downloader] Detected Single Photo Post.", file=sys.stderr)
@@ -220,6 +239,16 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
                 const v = document.querySelector('video');
                 return v ? (v.src || v.querySelector('source')?.src) : null;
             }''')
+            if not curr_video_src or curr_video_src.startswith('blob:'):
+                curr_video_src = await page.evaluate('''() => {
+                    const m = document.querySelector('meta[property="og:video"], meta[property="og:video:secure_url"]');
+                    return m ? m.content : null;
+                }''')
+            if not caption:
+                caption = await page.evaluate('''() => {
+                    const m = document.querySelector('meta[property="og:title"], meta[property="og:description"]');
+                    return m ? m.content : '';
+                }''') or ""
             if curr_video_src and not curr_video_src.startswith('blob:'):
                 try:
                     resp = await context.request.get(curr_video_src, timeout=30000)
@@ -321,11 +350,78 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
             "is_video": False
         }
 
+def download_via_embed(shortcode, output_dir):
+    """Ultra-fast direct stream extraction via Instagram embed (sub-second, bypasses login walls)."""
+    try:
+        import requests
+        embed_url = f"https://www.instagram.com/p/{shortcode}/embed/captioned/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+        r = requests.get(embed_url, headers=headers, timeout=12)
+        if r.status_code == 200:
+            html = r.text
+            # Look for video_url in embed payload
+            m = re.search(r'video_url[\\"]+:[\\"]+(https:.*?\.(?:mp4|webm)[^"\'\s]*?)(?=[\\"]{1,4}[,}])', html)
+            if m:
+                raw_url = m.group(1)
+                clean_url = raw_url.replace(r'\/', '/').replace('\\', '')
+                
+                m_owner = re.search(r'username[\\"]+:[\\"]+([^\\"]+)', html)
+                owner = m_owner.group(1) if m_owner else "instagram"
+                
+                m_cap = re.search(r'class="Caption"[^>]*>(.*?)</div>', html, re.DOTALL)
+                caption = ""
+                if m_cap:
+                    caption = re.sub(r'<[^>]+>', '', m_cap.group(1)).strip()
+                    if caption.startswith(owner):
+                        caption = caption[len(owner):].strip()
+                        
+                filename = f"reel_{shortcode}.mp4"
+                filepath = os.path.join(output_dir, filename)
+                
+                stream = requests.get(clean_url, headers={"User-Agent": "Mozilla/5.0"}, stream=True, timeout=35)
+                if stream.status_code == 200:
+                    with open(filepath, "wb") as f:
+                        for chunk in stream.iter_content(chunk_size=65536):
+                            if chunk:
+                                f.write(chunk)
+                                
+                    if os.path.exists(filepath) and os.path.getsize(filepath) > 1000:
+                        print(f"[Downloader] ✓ Fast-path extracted video via Instagram Embed ({os.path.getsize(filepath)//1024} KB)", file=sys.stderr)
+                        return {
+                            "success": True,
+                            "type": "reel",
+                            "id": shortcode,
+                            "title": caption[:80] if caption else f"Instagram Reel {shortcode}",
+                            "caption": caption,
+                            "uploader": owner,
+                            "owner": owner,
+                            "duration": 0,
+                            "local_file": filename,
+                            "relative_url": f"/generated/downloads/{filename}",
+                            "is_video": True,
+                            "is_carousel": False,
+                            "slides_count": 0,
+                            "slides": []
+                        }
+    except Exception as e:
+        print(f"[Downloader embed fast path notice: {e}]", file=sys.stderr)
+    return None
+
 def download_instagram_media(url, output_dir):
     os.makedirs(output_dir, exist_ok=True)
     shortcode = extract_shortcode(url)
 
-    # ── 1. Fast Path: Single-Pass yt-dlp Stream Extractor (< 5 seconds) ────────
+    # ── 1. Ultra-Fast Path: Direct Instagram Embed Extraction (< 1 second) ────
+    try:
+        embed_result = download_via_embed(shortcode, output_dir)
+        if embed_result and embed_result.get("success"):
+            return embed_result
+    except Exception as embed_err:
+        print(f"[Embed notice: {embed_err}]", file=sys.stderr)
+
+    # ── 2. Fast Path: Single-Pass yt-dlp Stream Extractor (< 5 seconds) ────────
     output_template = os.path.join(output_dir, f"{shortcode}.%(ext)s")
     try:
         cmd = [
