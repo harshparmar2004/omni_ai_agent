@@ -82,6 +82,8 @@ async function main() {
     }
     // Expire old discovered posts
     db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
+    db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
+    db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
   } catch (e) {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
@@ -95,12 +97,9 @@ async function main() {
       }
     }
   }
-  if (process.env.MOVIE_META_ACCESS_TOKEN) {
-    db.prepare('UPDATE pages SET access_token = ? WHERE id = 2').run(process.env.MOVIE_META_ACCESS_TOKEN);
-  }
-  if (process.env.MOVIE_IG_USER_ID) {
-    db.prepare('UPDATE pages SET ig_user_id = ? WHERE id = 2').run(process.env.MOVIE_IG_USER_ID);
-  }
+  const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD';
+  const movieIgId = process.env.MOVIE_IG_USER_ID || '29048404444808513';
+  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
   pages = getPages();
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
