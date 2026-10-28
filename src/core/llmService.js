@@ -131,10 +131,57 @@ async function callOllama(prompt) {
  * @returns {Promise<{ caption: string, provider: string, model: string }>}
  */
 async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
-  const pageName = page.name || 'GTA 6 Updates';
-  const handle = page.handle || `@${page.slug || 'gta6_updates_007'}`;
+  const isMovie = (page.slug && page.slug.includes('movie')) ||
+                  (page.handle && page.handle.includes('movie')) ||
+                  (page.name && /movie|series|film|cinema/i.test(page.name)) ||
+                  page.id === 2;
+
+  const handle = page.handle || `@${page.slug || (isMovie ? 'movie_series_365' : 'gta6_updates_007')}`;
+  const pageName = page.name || (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates');
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const cleanedSource = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
+
+  // ── Dedicated Movie & Cinema Caption Engine ──
+  // Preserves original scraped reel info (title, year, IMDb, synopsis, comments)
+  // and cleanly appends movie engagement, follow CTA, and curated hashtags at the bottom.
+  if (isMovie) {
+    console.log('[LLM Service] 🍿 Movie Account detected: Preserving original reel caption & appending cinema footer.');
+    const movieBody = cleanedSource || '🍿 MUST-WATCH CINEMA RECOMMENDATION 🎬';
+
+    const movieEngagement = [
+      "💬 What's your thoughts on this? Drop your reaction below 👇",
+      "💾 Save this reel so you don't lose it!"
+    ].join('\n');
+
+    const movieFollowLine = `🍿 Follow ${handle} for daily movie & series recommendations!`;
+
+    const originalTags = extractHashtags(rawCaption);
+    const defaultTags = extractHashtags(page.default_hashtags || '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies');
+    const nicheMovieTags = ['#movies', '#movierecommendations', '#filmtok', '#cinema', '#mustwatch', '#365movies'];
+
+    const tagSet = new Set();
+    const mergedTags = [];
+    for (const tag of [...nicheMovieTags, ...defaultTags, ...originalTags]) {
+      const lower = tag.toLowerCase();
+      if (!tagSet.has(lower) && tagSet.size < 6) {
+        tagSet.add(lower);
+        mergedTags.push(tag);
+      }
+    }
+    const hashtagBlock = mergedTags.join(' ');
+
+    const finalMovieCaption = [movieBody, movieEngagement, movieFollowLine, hashtagBlock]
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+
+    return {
+      caption: finalMovieCaption,
+      provider: 'original_curated_movie',
+      model: 'none',
+      breakdown: movieBody
+    };
+  }
 
   const prompt = `You are an elite, viral Instagram Reels copywriter managing "${pageName}" (${handle}).
 Rewrite the following gaming clip description into an ultra-viral, scroll-stopping Instagram Reel caption for GTA 6 fans.

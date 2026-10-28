@@ -258,12 +258,14 @@ class JobWorkerPool {
       if (mediaType === 'reel') {
         let feedVideoPath = mediaPaths[0];
         const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode', 'frame');
+        const isMoviePage = page.slug === 'movies' || page.id === 2 || (page.handle && page.handle.includes('movie'));
+        const pageTheme = isMoviePage ? 'movies' : 'gta6';
 
         if (brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
-            console.log(`[Job Worker] 🎨 Applying GTA 6 Vice City Framed Template to Feed Reel for ${page.handle}...`);
-            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle });
+            console.log(`[Job Worker] 🎨 Applying ${isMoviePage ? 'Cinematic Movie' : 'GTA 6 Vice City'} Framed Template to Feed Reel for ${page.handle}...`);
+            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle, page, theme: pageTheme });
             if (framed) {
               const absCandidate = (path.isAbsolute(framed) && fs.existsSync(framed))
                 ? framed

@@ -319,13 +319,16 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
   const isVideo = Boolean(videoPath);
   let publicMediaUrl = '';
 
+  const isMoviePage = page.slug === 'movies' || page.id === 2 || (page.handle && page.handle.includes('movie'));
+  const pageTheme = isMoviePage ? 'movies' : 'gta6';
+
   if (isVideo) {
     const { prepareVideoForStory } = require('../utils/ffmpegHelper');
-    const safeVideoPath = await prepareVideoForStory(videoPath, { handle: page.handle });
+    const safeVideoPath = await prepareVideoForStory(videoPath, { handle: page.handle, page, theme: pageTheme });
     publicMediaUrl = await getPublicUrlForMedia(safeVideoPath);
   } else {
     const { prepareImageForStory } = require('../utils/ffmpegHelper');
-    const safeImagePath = await prepareImageForStory(imagePath, { handle: page.handle });
+    const safeImagePath = await prepareImageForStory(imagePath, { handle: page.handle, page, theme: pageTheme });
     publicMediaUrl = await getPublicUrlForMedia(safeImagePath);
   }
 

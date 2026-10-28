@@ -12,9 +12,11 @@ const CTA_PATTERNS = [
   /link\s+in\s+bio[^\n.]*/gi,
   /check\s+(?:the\s+)?link\s+in\s+(?:my\s+)?bio[^\n.]*/gi,
   /(?:dm|message)\s+(?:me|us)\s+["'“‘]?[a-zA-Z0-9_-]+["'”’]?[^\n.]*/gi,
+  /(?:check\s+out|follow)\s+(?:our\s+page\s+)?@?[\w._-]*\s*(?:for\s+more[^\n.]*)?/gi,
   /save\s+this\s+reel\s+(?:for\s+later|and\s+share)[^\n.]*/gi,
   /follow\s+@[\w._-]+\s+for\s+more[^\n.]*/gi,
-  /follow\s+us\s+for\s+more[^\n.]*/gi
+  /follow\s+us\s+for\s+more[^\n.]*/gi,
+  /check\s+out\s+for\s+more[^\n.]*/gi
 ];
 
 function cleanRawCaption(rawCaption, competitorHandles = []) {
@@ -28,11 +30,15 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
 
   // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
   text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
-    if (match.toLowerCase() === '@gta6_updates_007') return match;
+    const lower = match.toLowerCase();
+    if (lower === '@gta6_updates_007' || lower === '@movie_series_365') return match;
     return '';
   });
 
-  // 3. Normalise multiple empty newlines
+  // 3. Normalise multiple empty newlines & clean dangling punctuation
+  text = text.replace(/([!?:;])\s*\./g, '$1');
+  text = text.replace(/\s+([.,;:])/g, '$1');
+  text = text.replace(/^\s*[.,;:–-]+\s*$/gm, '');
   text = text.replace(/\n{3,}/g, '\n\n').trim();
 
   return text;
@@ -79,18 +85,31 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const bodyWithoutHashtags = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
-  const handle = page.handle || `@${page.slug || 'gta6_updates_007'}`;
-  const pageName = page.name || 'GTA 6';
-  const followCta = `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`;
+  const isMovie = (page.slug && page.slug.includes('movie')) ||
+                  (page.handle && page.handle.includes('movie')) ||
+                  (page.name && /movie|series|film|cinema/i.test(page.name)) ||
+                  page.id === 2;
+
+  const handle = page.handle || `@${page.slug || (isMovie ? 'movie_series_365' : 'gta6_updates_007')}`;
+  const pageName = page.name || (isMovie ? 'Movie Recommendations' : 'GTA 6');
+  const followCta = isMovie
+    ? `🍿 Follow ${handle} for daily movie & series recommendations!`
+    : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`;
 
   // Dynamic interactive prompt to trigger comments, saves, and shares (high algorithmic weighting)
   const promptIdx = Math.abs(simpleHash(bodyWithoutHashtags || 'default')) % ENGAGEMENT_PROMPTS.length;
-  const engagementPrompt = ENGAGEMENT_PROMPTS[promptIdx];
-  const saveShareCta = '💾 Save & share this reel with a friend who is waiting for GTA 6!';
+  const engagementPrompt = isMovie
+    ? "💬 What's your thoughts on this? Drop your reaction below 👇"
+    : ENGAGEMENT_PROMPTS[promptIdx];
+  const saveShareCta = isMovie
+    ? "💾 Save this reel so you don't lose it!"
+    : '💾 Save & share this reel with a friend who is waiting for GTA 6!';
 
   // Collect and deduplicate hashtags (Meta Reels Algorithm: 4-5 hyper-relevant tags)
   const originalTags = extractHashtags(rawCaption);
-  const defaultTags = extractHashtags(page.default_hashtags || '#gta6 #gtavi #rockstargames #vicecity #gta6leaks');
+  const defaultMovieTags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies';
+  const defaultGtaTags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks';
+  const defaultTags = extractHashtags(page.default_hashtags || (isMovie ? defaultMovieTags : defaultGtaTags));
 
   const tagSet = new Set();
   const mergedTags = [];
