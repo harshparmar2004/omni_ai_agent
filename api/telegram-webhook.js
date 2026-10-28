@@ -20,6 +20,47 @@ async function sendTelegram(chatId, text, extra = {}) {
   }
 }
 
+async function editTelegram(chatId, messageId, text, extra = {}) {
+  try {
+    const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/editMessageText`, {
+      chat_id: chatId,
+      message_id: parseInt(messageId, 10),
+      text: text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: false,
+      ...extra
+    }, { timeout: 10000 });
+    return res.data?.result;
+  } catch (err) {
+    console.error('[Telegram Edit Error]:', err.response?.data || err.message);
+    return null;
+  }
+}
+
+async function answerCallbackQuery(queryId, text = '') {
+  try {
+    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
+      callback_query_id: queryId,
+      text: text
+    }, { timeout: 5000 });
+  } catch (err) {}
+}
+
+function getPagesList() {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const cfgPath = path.join(process.cwd(), 'config', 'pages.json');
+    if (fs.existsSync(cfgPath)) {
+      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    }
+  } catch (e) {}
+  return [
+    { id: '1', slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', icon: '🎮' },
+    { id: '2', slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', icon: '🍿' }
+  ];
+}
+
 module.exports = async function handler(req, res) {
   const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
   if (req.method === 'GET') {
@@ -48,6 +89,93 @@ module.exports = async function handler(req, res) {
   // Security Gate
   if (!ALLOWED_CHATS.includes(String(chatId))) {
     await sendTelegram(chatId, `⛔ <b>Access Denied</b>\nChat ID <code>${chatId}</code> is not authorized.`);
+    return res.status(200).json({ ok: true });
+  }
+
+  // Handle Callback Queries (Button Clicks)
+  if (update.callback_query) {
+    const cb = update.callback_query;
+    const queryId = cb.id;
+    const messageId = cb.message?.message_id;
+    const data = (cb.data || '').trim();
+
+    await answerCallbackQuery(queryId);
+
+    const parts = data.split(':');
+    const action = parts[0];
+
+    if (action === 'cancel') {
+      await editTelegram(chatId, messageId, '✖ <i>Repost cancelled.</i>');
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'post') {
+      const pageId = parts[1];
+      const shortcode = parts[2];
+      const pages = getPagesList();
+      const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };
+
+      // Update message with in-place stepper
+      await editTelegram(
+        chatId,
+        messageId,
+        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>\n` +
+        `📱 <b>Destination:</b> <code>${targetPage.handle}</code> (${targetPage.name})\n\n` +
+        `⏳ <b>1. Ingest:</b> Cloud runner initializing...\n` +
+        `⚪ <b>2. Download:</b> Waiting\n` +
+        `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
+        `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
+        `<i>Status: Spawning GitHub Actions cloud runner...</i>`
+      );
+
+      // Trigger GitHub Actions Workflow
+      if (!GITHUB_TOKEN) {
+        await sendTelegram(
+          chatId,
+          `⚠️ <b>GitHub Token Required</b>\n` +
+          `To allow Vercel to trigger GitHub Actions, please add <code>GH_DISPATCH_TOKEN</code> in your Vercel project environment variables.\n` +
+          `Generate a free token at https://github.com/settings/tokens with 'repo' scope.`
+        );
+        return res.status(200).json({ ok: true });
+      }
+
+      try {
+        const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`;
+        await axios.post(
+          dispatchUrl,
+          {
+            ref: 'main',
+            inputs: {
+              url: `https://www.instagram.com/reel/${shortcode}/`,
+              chat_id: String(chatId),
+              page_id: String(pageId),
+              message_id: String(messageId)
+            }
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${GITHUB_TOKEN}`,
+              Accept: 'application/vnd.github.v3+json',
+              'User-Agent': 'OmniStudio-Vercel-Bridge'
+            },
+            timeout: 15000
+          }
+        );
+
+        console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} on Page #${pageId} (Message ID: ${messageId})`);
+      } catch (err) {
+        console.error('[Webhook Dispatch Error]:', err.response?.data || err.message);
+        const detail = err.response?.data?.message || err.message;
+        await editTelegram(
+          chatId,
+          messageId,
+          `❌ <b>Cloud Dispatch Failed:</b> ${detail}\nPlease check your GitHub token permissions.`
+        );
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
     return res.status(200).json({ ok: true });
   }
 
@@ -152,63 +280,30 @@ module.exports = async function handler(req, res) {
 
   console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
 
-  // Send Single In-Place Stepper Message
-  const initialMsg = await sendTelegram(
+  // Build Interactive Destination Page Selection Keyboard
+  const pages = getPagesList();
+  const keyboard = [];
+  for (const p of pages) {
+    keyboard.push([
+      { text: `${p.icon || '📱'} Post to ${p.name} (${p.handle})`, callback_data: `post:${p.id}:${shortcode}` }
+    ]);
+  }
+  keyboard.push([
+    { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
+  ]);
+
+  await sendTelegram(
     chatId,
-    `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>\n` +
-    `📱 <b>Destination:</b> <code>@gta6_updates_007</code>\n\n` +
-    `⏳ <b>1. Ingest:</b> Cloud runner initializing...\n` +
-    `⚪ <b>2. Download:</b> Waiting\n` +
-    `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
-    `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
-    `<i>Status: Spawning GitHub Actions cloud runner...</i>`
-  );
-
-  const messageId = initialMsg?.message_id ? String(initialMsg.message_id) : '';
-
-  // Trigger GitHub Actions Workflow
-  if (!GITHUB_TOKEN) {
-    await sendTelegram(
-      chatId,
-      `⚠️ <b>GitHub Token Required</b>\n` +
-      `To allow Vercel to trigger GitHub Actions, please add <code>GH_DISPATCH_TOKEN</code> in your Vercel project environment variables.\n` +
-      `Generate a free token at https://github.com/settings/tokens with 'repo' scope.`
-    );
-    return res.status(200).json({ ok: true });
-  }
-
-  try {
-    const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`;
-    await axios.post(
-      dispatchUrl,
-      {
-        ref: 'main',
-        inputs: {
-          url: reelUrl,
-          chat_id: String(chatId),
-          page_id: '1',
-          message_id: messageId
-        }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          Accept: 'application/vnd.github.v3+json',
-          'User-Agent': 'OmniStudio-Vercel-Bridge'
-        },
-        timeout: 15000
+    `📥 <b>Instagram Reel Received!</b>\n\n` +
+    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n` +
+    `🎬 <b>Source:</b> <a href="${reelUrl}">${reelUrl}</a>\n\n` +
+    `👉 <b>On which account would you like to post this reel?</b>`,
+    {
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    );
-
-    console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} (Message ID: ${messageId})`);
-  } catch (err) {
-    console.error('[Webhook Dispatch Error]:', err.response?.data || err.message);
-    const detail = err.response?.data?.message || err.message;
-    await sendTelegram(
-      chatId,
-      `❌ <b>Cloud Dispatch Failed:</b> ${detail}\nPlease check your GitHub token permissions.`
-    );
-  }
+    }
+  );
 
   return res.status(200).json({ ok: true });
 };

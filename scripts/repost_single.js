@@ -72,10 +72,11 @@ async function main() {
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
-  // Ensure Page #1 exists
+  // Ensure Page #1 (GTA 6 Updates 007) and Page #2 (Movie Recommendations) exist
   let pages = getPages();
-  if (pages.length === 0) {
-    console.log('📄 Creating default Page #1 (@gta6_updates_007)...');
+  const hasGtaPage = pages.some(p => p.id === 1 || p.slug === 'gta6');
+  if (!hasGtaPage) {
+    console.log('📄 Creating Page #1 (@gta6_updates_007)...');
     createPage({
       slug: 'gta6',
       name: 'GTA 6 Updates 007',
@@ -85,18 +86,41 @@ async function main() {
       caption_template: '{caption}\n\n{hashtags}',
       default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
       attribution_enabled: 0,
-      watermark_enabled: 1,
+      watermark_enabled: 0,
       post_mode: 'auto',
       posts_per_cycle: 1,
       daily_quota: 10,
       min_spacing_minutes: 0,
       is_active: 1
     });
-    pages = getPages();
   }
 
+  const hasMoviePage = pages.some(p => p.id === 2 || p.slug === 'movies');
+  if (!hasMoviePage) {
+    console.log('🎬 Creating Page #2 (@movie_series_365)...');
+    createPage({
+      slug: 'movies',
+      name: 'Movie Recommendations',
+      handle: '@movie_series_365',
+      ig_user_id: process.env.MOVIE_IG_USER_ID || '',
+      access_token: process.env.MOVIE_META_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '',
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies',
+      attribution_enabled: 0,
+      watermark_enabled: 0,
+      post_mode: 'auto',
+      posts_per_cycle: 1,
+      daily_quota: 10,
+      min_spacing_minutes: 0,
+      is_active: 1
+    });
+  }
+  pages = getPages();
+
   try {
-    db.prepare("UPDATE pages SET attribution_enabled = 0, caption_template = '{caption}\\n\\n{hashtags}', default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks'").run();
+    db.prepare("UPDATE pages SET attribution_enabled = 0, watermark_enabled = 0 WHERE id = 1").run();
+    db.prepare("UPDATE pages SET default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
+    db.prepare("UPDATE pages SET default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies' WHERE id = 2").run();
   } catch (e) {}
 
   // Inject Environment Secrets
@@ -174,14 +198,15 @@ async function main() {
   const isForce = args.includes('--force') || process.env.FORCE_REPOST === 'true';
   if (enqueueResult.alreadyPublished && job.permalink && !isForce) {
     console.log(`[Reposter Runner] ℹ️ Post #${enqueueResult.shortcode} was already published on ${job.published_at}.`);
-    const notifier = require('../src/core/notifier');
+    const selectedPage = pages.find(p => p.id === pageId) || pages[0];
+    const pageHandleClean = selectedPage?.handle ? selectedPage.handle.replace(/^@/, '') : 'gta6_updates_007';
     try {
       await notifier.sendTelegramMessage(
         chatId,
         `ℹ️ <b>Already Published to Profile:</b>\n\n` +
-        `Reel #${enqueueResult.shortcode} was already published to <b>@gta6_updates_007</b>!\n\n` +
+        `Reel #${enqueueResult.shortcode} was already published to <b>@${pageHandleClean}</b>!\n\n` +
         `🌐 <b>Live Instagram Post:</b> <a href="${job.permalink}">${job.permalink}</a>\n` +
-        (job.story_status === 'published' ? `👉 <a href="https://www.instagram.com/stories/gta6_updates_007/">View Story</a>` : '')
+        (job.story_status === 'published' ? `👉 <a href="https://www.instagram.com/stories/${pageHandleClean}/">View Story</a>` : '')
       );
     } catch (e) {}
     try { closeTunnel(); } catch (e) {}
