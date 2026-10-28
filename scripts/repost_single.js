@@ -125,12 +125,20 @@ async function main() {
 
   // Inject Environment Secrets
   if (process.env.META_ACCESS_TOKEN) {
+    db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(process.env.META_ACCESS_TOKEN);
     for (const p of pages) {
       if (p.is_active && (!p.access_token || p.access_token.length < 20)) {
         db.prepare('UPDATE pages SET access_token = ? WHERE id = ?').run(process.env.META_ACCESS_TOKEN, p.id);
       }
     }
   }
+  if (process.env.MOVIE_META_ACCESS_TOKEN) {
+    db.prepare('UPDATE pages SET access_token = ? WHERE id = 2').run(process.env.MOVIE_META_ACCESS_TOKEN);
+  }
+  if (process.env.MOVIE_IG_USER_ID) {
+    db.prepare('UPDATE pages SET ig_user_id = ? WHERE id = 2').run(process.env.MOVIE_IG_USER_ID);
+  }
+  pages = getPages();
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
   }
