@@ -33,18 +33,18 @@ function getCompetitorsConfig() {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed)) {
-          return { gta6: parsed, movies: ['letterboxd', 'rottentomatoes', 'cinephile.club', 'imdb'] };
+          return { gta6: parsed, movies: [] };
         }
         return {
-          gta6: parsed.gta6 || ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
-          movies: parsed.movies || ['letterboxd', 'rottentomatoes', 'cinephile.club', 'imdb']
+          gta6: Array.isArray(parsed.gta6) ? parsed.gta6 : ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
+          movies: Array.isArray(parsed.movies) ? parsed.movies : []
         };
       }
     }
   } catch (e) {}
   return {
     gta6: ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
-    movies: ['letterboxd', 'rottentomatoes', 'cinephile.club', 'imdb']
+    movies: []
   };
 }
 
@@ -67,23 +67,33 @@ function sanitizeCompetitorUsername(input) {
   return clean.toLowerCase().trim();
 }
 
-// Helper: Save competitor list to GitHub config/competitors.json
+// Helper: Save competitor list to GitHub config/competitors.json and local file
 async function saveCompetitorsToGitHub(competitorsConfig, commitMessage) {
+  try {
+    const configPath = path.join(process.cwd(), 'config', 'competitors.json');
+    fs.writeFileSync(configPath, JSON.stringify(competitorsConfig, null, 2), 'utf8');
+  } catch (e) {}
+
   if (!GITHUB_TOKEN) return false;
-  const fileUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/config/competitors.json`;
-  const getFile = await axios.get(fileUrl, {
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
-  });
-  const newBase64 = Buffer.from(JSON.stringify(competitorsConfig, null, 2)).toString('base64');
-  await axios.put(fileUrl, {
-    message: commitMessage,
-    content: newBase64,
-    sha: getFile.data.sha,
-    branch: 'main'
-  }, {
-    headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
-  });
-  return true;
+  try {
+    const fileUrl = `https://api.github.com/repos/${GITHUB_REPO}/contents/config/competitors.json`;
+    const getFile = await axios.get(fileUrl, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
+    });
+    const newBase64 = Buffer.from(JSON.stringify(competitorsConfig, null, 2)).toString('base64');
+    await axios.put(fileUrl, {
+      message: commitMessage,
+      content: newBase64,
+      sha: getFile.data.sha,
+      branch: 'main'
+    }, {
+      headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Vercel' }
+    });
+    return true;
+  } catch (e) {
+    console.warn(`[Competitors] GitHub sync warning: ${e.message}`);
+    return false;
+  }
 }
 
 // Live Cache for Meta Graph API Media per page (1 minute TTL)

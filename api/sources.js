@@ -22,6 +22,7 @@ function getLocalCompetitors() {
     if (fs.existsSync(configPath)) {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.gta6)) return parsed.gta6;
     }
   } catch (e) {}
   return ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'];

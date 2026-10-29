@@ -118,7 +118,7 @@ async function main() {
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
   const { createSourceAccount } = require('../src/database');
   let gtaCompetitors = ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'];
-  let movieCompetitors = ['letterboxd', 'rottentomatoes', 'cinephile.club', 'imdb'];
+  let movieCompetitors = [];
 
   const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
   if (fs.existsSync(competitorsJsonPath)) {
@@ -142,6 +142,10 @@ async function main() {
 
   // Register GTA 6 sources for Page 1
   const cleanGta = [...new Set(gtaCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+  try {
+    const placeholders = cleanGta.map(() => '?').join(',');
+    db.prepare(`DELETE FROM source_accounts WHERE page_id = 1 AND username NOT IN (${placeholders})`).run(...cleanGta);
+  } catch (e) {}
   for (const comp of cleanGta) {
     createSourceAccount({ username: comp, page_id: 1, is_active: 1 });
     try { db.prepare('UPDATE source_accounts SET page_id = 1, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
@@ -149,9 +153,17 @@ async function main() {
 
   // Register Movie sources for Page 2
   const cleanMovies = [...new Set(movieCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-  for (const comp of cleanMovies) {
-    createSourceAccount({ username: comp, page_id: 2, is_active: 1 });
-    try { db.prepare('UPDATE source_accounts SET page_id = 2, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
+  if (cleanMovies.length === 0) {
+    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 2').run(); } catch (e) {}
+  } else {
+    try {
+      const placeholders = cleanMovies.map(() => '?').join(',');
+      db.prepare(`DELETE FROM source_accounts WHERE page_id = 2 AND username NOT IN (${placeholders})`).run(...cleanMovies);
+    } catch (e) {}
+    for (const comp of cleanMovies) {
+      createSourceAccount({ username: comp, page_id: 2, is_active: 1 });
+      try { db.prepare('UPDATE source_accounts SET page_id = 2, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
+    }
   }
 
   const allActiveSources = [...cleanGta, ...cleanMovies];

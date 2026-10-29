@@ -6,10 +6,5 @@
     "gta6latest",
     "rockstargames"
   ],
-  "movies": [
-    "letterboxd",
-    "rottentomatoes",
-    "cinephile.club",
-    "imdb"
-  ]
+  "movies": []
 }
