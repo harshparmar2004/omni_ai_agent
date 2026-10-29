@@ -2,12 +2,9 @@ name: OmniStudio Watchtower 24/7 Autonomous Cron
 
 on:
   schedule:
-    # 7 high-virality slots daily calibrated for Indian Standard Time (IST = UTC + 5:30)
-    # Morning:   03:30 UTC (09:00 IST), 05:00 UTC (10:30 IST)
-    # Lunchtime: 07:30 UTC (01:00 IST), 10:00 UTC (03:30 IST)
-    # Evening:   12:30 UTC (06:00 IST), 14:00 UTC (07:30 IST), 15:30 UTC (09:00 IST)
-    # Night Blackout: 21:30 - 08:30 IST (ZERO POSTING overnight)
-    - cron: '30 3,7,12,15 * * *'
+    # Triggers every 30 minutes during Indian active hours (03:00 UTC / 08:30 AM IST to 16:00 UTC / 09:30 PM IST)
+    # Automatically respected by Watchtower Audience Window Pacing & Night Blackout Engine
+    - cron: '*/30 3-15 * * *'
   workflow_dispatch: # Allows manual 1-click trigger from GitHub web UI, Vercel cron, or Telegram
     inputs:
       force:
