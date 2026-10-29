@@ -75,17 +75,7 @@ async def scrape_post(shortcode, url):
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             viewport={"width": random.randint(1260, 1360), "height": random.randint(780, 880)},
-            locale="en-US",
-            extra_http_headers={
-                "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-fetch-dest": "document",
-                "sec-fetch-mode": "navigate",
-                "sec-fetch-site": "none",
-                "sec-fetch-user": "?1",
-                "accept-language": "en-US,en;q=0.9"
-            }
+            locale="en-US"
         )
         # Pre-seed consent & Scout Account session cookies
         try:
@@ -186,17 +176,8 @@ async def scrape_profile(username, url):
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             viewport={"width": random.randint(1260, 1360), "height": random.randint(780, 880)},
-            locale="en-US",
-            extra_http_headers={
-                "sec-ch-ua": '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
-                "sec-fetch-dest": "document",
-                "sec-fetch-mode": "navigate",
-                "sec-fetch-site": "none",
-                "sec-fetch-user": "?1",
-                "accept-language": "en-US,en;q=0.9"
-            }
+            locale="en-US"
+        )
         # Pre-seed consent & Scout Account session cookies
         try:
             profile_cookies = [
@@ -215,10 +196,11 @@ async def scrape_profile(username, url):
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()
         try:
-            target_url = f"https://www.instagram.com/{username}/"
+            # Primary target: /{username}/reels/ to guarantee 100% video reels (and ignore photo carousels)
+            target_url = f"https://www.instagram.com/{username}/reels/"
             sys.stderr.write(f"[Scraper] Navigating to {target_url}...\n")
             await page.goto(target_url, timeout=25000, wait_until="domcontentloaded")
-            await page.wait_for_timeout(random.randint(1800, 2800))
+            await page.wait_for_timeout(random.randint(2000, 3000))
 
             # 1. Active European / Datacenter Cookie Consent Acceptor
             cookie_btn_texts = [
@@ -269,12 +251,13 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            # 1. Extract shortcodes in exact visual grid order (top-left is strictly the LATEST reel)
+            # 1. Extract shortcodes strictly from /reel/ elements in visual reverse-chronological order
             dom_shortcodes = await page.evaluate(r"""() => {
-                const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
+                const links = Array.from(document.querySelectorAll('a[href*="/reel/"]'));
                 const results = [];
                 for (const a of links) {
-                    const m = (a.getAttribute('href') || '').match(/\/(?:reel|p)\/([A-Za-z0-9_-]{9,13})/);
+                    const href = a.getAttribute('href') || '';
+                    const m = href.match(/\/(?:[A-Za-z0-9_.-]+\/)?reel\/([A-Za-z0-9_-]{9,13})/);
                     if (m && !results.includes(m[1])) {
                         results.push(m[1]);
                     }
@@ -282,11 +265,9 @@ async def scrape_profile(username, url):
                 return results;
             }""")
 
-            # 2. Extract from raw HTML regex fallback
+            # 2. Extract from raw HTML regex fallback (strictly /reel/)
             raw_html = await page.content()
-            shortcodes_json = re.findall(r'"shortcode":"([A-Za-z0-9_-]{9,13})"', raw_html)
-            codes_json = re.findall(r'"code":"([A-Za-z0-9_-]{9,13})"', raw_html)
-            urls_reels = re.findall(r'/(?:reel|p)/([A-Za-z0-9_-]{9,13})/?', raw_html)
+            urls_reels = re.findall(r'/(?:[A-Za-z0-9_.-]+/)?reel/([A-Za-z0-9_-]{9,13})', raw_html)
 
             excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy', 'login'}
             clean_shortcodes = []
@@ -296,29 +277,29 @@ async def scrape_profile(username, url):
                 if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
                     clean_shortcodes.append(sc)
 
-            for c in (shortcodes_json + codes_json + urls_reels):
+            for c in urls_reels:
                 if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
                     clean_shortcodes.append(c)
 
-            # 3. Fallback: If 0 shortcodes on main profile, try /reels/ tab directly
+            # 3. Fallback: If 0 reels found on /reels/ tab, try main profile root
             if len(clean_shortcodes) == 0:
-                reels_target = f"https://www.instagram.com/{username}/reels/"
-                sys.stderr.write(f"[Scraper] 0 shortcodes on main profile. Attempting reels tab: {reels_target}...\n")
+                profile_target = f"https://www.instagram.com/{username}/"
+                sys.stderr.write(f"[Scraper] 0 reels on /reels/ tab. Checking main profile: {profile_target}...\n")
                 try:
-                    await page.goto(reels_target, timeout=20000, wait_until="domcontentloaded")
+                    await page.goto(profile_target, timeout=20000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2500)
-                    reels_dom = await page.evaluate(r"""() => {
-                        const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
+                    profile_dom = await page.evaluate(r"""() => {
+                        const links = Array.from(document.querySelectorAll('a[href*="/reel/"]'));
                         return links.map(a => {
-                            const m = (a.getAttribute('href') || '').match(/\/(?:reel|p)\/([A-Za-z0-9_-]{9,13})/);
+                            const m = (a.getAttribute('href') || '').match(/\/(?:[A-Za-z0-9_.-]+\/)?reel\/([A-Za-z0-9_-]{9,13})/);
                             return m ? m[1] : null;
                         }).filter(Boolean);
                     }""")
-                    for sc in reels_dom:
+                    for sc in profile_dom:
                         if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
                             clean_shortcodes.append(sc)
-                except Exception as reels_err:
-                    sys.stderr.write(f"[Scraper] Reels tab attempt notice: {str(reels_err)}\n")
+                except Exception as p_err:
+                    sys.stderr.write(f"[Scraper] Profile fallback notice: {str(p_err)}\n")
 
             meta_desc_match = re.search(r'<meta\s+(?:property|name)="(?:og:description|description)"\s+content="([^"]*)"', raw_html, re.I)
             meta_desc = meta_desc_match.group(1) if meta_desc_match else ""
