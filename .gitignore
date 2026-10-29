@@ -25,6 +25,9 @@ public/generated/carousels/
 public/generated/images/
 public/generated/diagrams/
 public/generated/thumbnails/
+public/generated/*.jpg
+public/generated/*.mp4
+public/generated/*.png
 !public/generated/assets/
 !public/generated/assets/**
 
