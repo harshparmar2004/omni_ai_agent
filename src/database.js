@@ -1068,9 +1068,9 @@ function getPostsCountInWindow(pageId, windowStartIso) {
   const row = getDb().prepare(`
     SELECT count(*) as c FROM publish_jobs
     WHERE page_id = ? AND agent = 'watchtower'
-      AND status IN ('published', 'publishing', 'queued', 'ready', 'downloading')
-      AND created_at >= ?
-  `).get(pageId, windowStartIso);
+      AND status IN ('published', 'publishing')
+      AND (published_at >= ? OR created_at >= ?)
+  `).get(pageId, windowStartIso, windowStartIso);
   return row ? row.c : 0;
 }
 
