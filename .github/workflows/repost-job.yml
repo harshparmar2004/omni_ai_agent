@@ -117,6 +117,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
           TARGET_PAGE_ID: ${{ inputs.page_id }}
           TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+          INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
           FEED_BRANDING_MODE: 'frame'
           NODE_ENV: production
         run: |

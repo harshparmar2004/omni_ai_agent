@@ -1,7 +1,15 @@
-[
-  "grandtheftauto6",
-  "paradoks.plays",
-  "gta6.only",
-  "gta6latest",
-  "rockstargames"
-]
+{
+  "gta6": [
+    "grandtheftauto6",
+    "gta6.only",
+    "paradoks.plays",
+    "gta6latest",
+    "rockstargames"
+  ],
+  "movies": [
+    "letterboxd",
+    "rottentomatoes",
+    "cinephile.club",
+    "imdb"
+  ]
+}

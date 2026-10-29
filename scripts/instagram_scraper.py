@@ -1,4 +1,5 @@
 import sys
+import os
 import re
 import json
 import asyncio
@@ -86,6 +87,19 @@ async def scrape_post(shortcode, url):
                 "accept-language": "en-US,en;q=0.9"
             }
         )
+        # Pre-seed consent & Scout Account session cookies
+        try:
+            post_cookies = [
+                {"name": "ig_nrcb", "value": "1", "domain": ".instagram.com", "path": "/"},
+                {"name": "ig_did", "value": "C8D5A1E2-F4B3-4A5C-9D8E-7B6A5C4D3E2F", "domain": ".instagram.com", "path": "/"}
+            ]
+            scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
+            if scout_session:
+                post_cookies.append({"name": "sessionid", "value": scout_session.strip().strip('"').strip("'"), "domain": ".instagram.com", "path": "/"})
+            await context.add_cookies(post_cookies)
+        except Exception:
+            pass
+
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()
         try:
@@ -183,15 +197,20 @@ async def scrape_profile(username, url):
                 "sec-fetch-user": "?1",
                 "accept-language": "en-US,en;q=0.9"
             }
-        )
-        # Pre-seed consent cookies
+        # Pre-seed consent & Scout Account session cookies
         try:
-            await context.add_cookies([
+            profile_cookies = [
                 {"name": "ig_nrcb", "value": "1", "domain": ".instagram.com", "path": "/"},
                 {"name": "ig_did", "value": "C8D5A1E2-F4B3-4A5C-9D8E-7B6A5C4D3E2F", "domain": ".instagram.com", "path": "/"}
-            ])
-        except Exception:
-            pass
+            ]
+            scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
+            if scout_session:
+                scout_clean = scout_session.strip().strip('"').strip("'")
+                profile_cookies.append({"name": "sessionid", "value": scout_clean, "domain": ".instagram.com", "path": "/"})
+                sys.stderr.write("[Scraper] 🔑 Authenticated Scout Account session loaded.\n")
+            await context.add_cookies(profile_cookies)
+        except Exception as ce:
+            sys.stderr.write(f"[Scraper] Cookie setup note: {str(ce)}\n")
 
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()

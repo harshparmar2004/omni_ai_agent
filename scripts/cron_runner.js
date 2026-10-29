@@ -46,33 +46,52 @@ async function main() {
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
-  // 1b. Ensure destination Page #1 exists and support environment overrides from GitHub Secrets
-  let pages = getPages();
-  if (pages.length === 0) {
-    console.log('📄 No pages found in database, creating default Page #1 (@gta6_updates_007)...');
-    const { createPage } = require('../src/database');
+  // 1b. Ensure destination Page #1 (@gta6_updates_007) and Page #2 (@movie_series_365) exist in database
+  const { createPage } = require('../src/database');
+  let page1 = db.prepare('SELECT * FROM pages WHERE id = 1').get();
+  if (!page1) {
+    console.log('📄 Creating default Page #1 (@gta6_updates_007)...');
     createPage({
       slug: 'gta6',
       name: 'GTA 6 Updates 007',
       handle: '@gta6_updates_007',
-      ig_user_id: '17841428668115319',
+      ig_user_id: process.env.IG_USER_ID || '17841428668115319',
       access_token: process.env.META_ACCESS_TOKEN || '',
       caption_template: '{caption}\n\n{hashtags}',
       default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
       attribution_enabled: 0,
-      watermark_enabled: 1,
+      watermark_enabled: 0,
       post_mode: 'auto',
       posts_per_cycle: 1,
       daily_quota: 7,
-      min_spacing_minutes: 120,
+      min_spacing_minutes: 90,
       is_active: 1
     });
-    pages = getPages();
   }
 
-  // Ensure daily_quota is calibrated to 7 reels/day and attribution is disabled for original brand feel
+  let page2 = db.prepare('SELECT * FROM pages WHERE id = 2').get();
+  if (!page2) {
+    console.log('📄 Creating default Page #2 (@movie_series_365)...');
+    createPage({
+      slug: 'movies',
+      name: 'Movie Recommendations',
+      handle: '@movie_series_365',
+      ig_user_id: process.env.MOVIE_IG_USER_ID || '29048404444808513',
+      access_token: process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD',
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies',
+      attribution_enabled: 0,
+      watermark_enabled: 0,
+      post_mode: 'auto',
+      posts_per_cycle: 1,
+      daily_quota: 7,
+      min_spacing_minutes: 90,
+      is_active: 1
+    });
+  }
+
+  // Force both pages to 100% autonomous mode & verified credentials
   try {
-    db.prepare("UPDATE pages SET daily_quota = 7, attribution_enabled = 0, caption_template = '{caption}\\n\\n{hashtags}', default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks'").run();
     // Purge any stale non-reel discoveries from cached DB
     db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
     // Expire any queued jobs older than 12 hours so stale backlog NEVER blocks or runs
@@ -82,44 +101,35 @@ async function main() {
     }
     // Expire old discovered posts
     db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
-    db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
-    db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
+    db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks', is_active = 1 WHERE id = 1").run();
+    db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
   } catch (e) {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
 
   if (process.env.META_ACCESS_TOKEN) {
-    console.log('🔑 Injecting META_ACCESS_TOKEN from environment into active pages...');
     db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(process.env.META_ACCESS_TOKEN);
-    for (const p of pages) {
-      if (p.is_active && (!p.access_token || p.access_token.length < 20)) {
-        db.prepare('UPDATE pages SET access_token = ? WHERE id = ?').run(process.env.META_ACCESS_TOKEN, p.id);
-      }
-    }
   }
   const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD';
   const movieIgId = process.env.MOVIE_IG_USER_ID || '29048404444808513';
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
-  pages = getPages();
+  let pages = getPages({ isActiveOnly: true });
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
   const { createSourceAccount } = require('../src/database');
-  const targetPageId = pages[0]?.id || 1;
-  let competitorList = [];
-
-  // Read existing active sources configured in the database / dashboard first
-  try {
-    const dbActiveSources = db.prepare('SELECT username FROM source_accounts WHERE is_active = 1 AND (page_id = ? OR page_id IS NULL)').all(targetPageId);
-    for (const s of dbActiveSources) {
-      if (s.username) competitorList.push(s.username);
-    }
-  } catch (e) {}
+  let gtaCompetitors = ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'];
+  let movieCompetitors = ['letterboxd', 'rottentomatoes', 'cinephile.club', 'imdb'];
 
   const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
   if (fs.existsSync(competitorsJsonPath)) {
     try {
       const parsed = JSON.parse(fs.readFileSync(competitorsJsonPath, 'utf8'));
-      if (Array.isArray(parsed)) competitorList.push(...parsed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (parsed.gta6 && Array.isArray(parsed.gta6)) gtaCompetitors = parsed.gta6;
+        if (parsed.movies && Array.isArray(parsed.movies)) movieCompetitors = parsed.movies;
+      } else if (Array.isArray(parsed)) {
+        gtaCompetitors = parsed;
+      }
     } catch (e) {
       console.warn(`[Config Warning] Could not parse config/competitors.json: ${e.message}`);
     }
@@ -127,26 +137,25 @@ async function main() {
 
   if (process.env.COMPETITOR_ACCOUNTS) {
     const fromEnv = process.env.COMPETITOR_ACCOUNTS.split(',').map(s => s.trim()).filter(Boolean);
-    competitorList.push(...fromEnv);
+    gtaCompetitors.push(...fromEnv);
   }
 
-  if (competitorList.length === 0) {
-    competitorList = ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'];
+  // Register GTA 6 sources for Page 1
+  const cleanGta = [...new Set(gtaCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+  for (const comp of cleanGta) {
+    createSourceAccount({ username: comp, page_id: 1, is_active: 1 });
+    try { db.prepare('UPDATE source_accounts SET page_id = 1, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
   }
 
-  const uniqueCompetitors = [...new Set(competitorList.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-
-  for (const comp of uniqueCompetitors) {
-    createSourceAccount({
-      username: comp,
-      page_id: targetPageId,
-      is_active: 1
-    });
-    try {
-      db.prepare('UPDATE source_accounts SET is_active = 1 WHERE username = ?').run(comp);
-    } catch (e) {}
+  // Register Movie sources for Page 2
+  const cleanMovies = [...new Set(movieCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+  for (const comp of cleanMovies) {
+    createSourceAccount({ username: comp, page_id: 2, is_active: 1 });
+    try { db.prepare('UPDATE source_accounts SET page_id = 2, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
   }
-  console.log(`🎯 Active tracked competitors (${uniqueCompetitors.length}): ${uniqueCompetitors.map(c => '@' + c).join(', ')}`);
+
+  const allActiveSources = [...cleanGta, ...cleanMovies];
+  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}]`);
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
@@ -206,31 +215,34 @@ async function main() {
   const selectedWinners = await evaluateAndSelectPosts({ force: isForce });
   console.log(`[Cron Runner] ✓ Content selection complete. Enqueued ${selectedWinners?.length || 0} winner(s).`);
 
-  const sourcesCount = scanResult?.sourcesChecked || uniqueCompetitors.length;
+  const sourcesCount = scanResult?.sourcesChecked || allActiveSources.length;
   const newReelsCount = scanResult?.newPostsCount || 0;
-  const hasWinner = selectedWinners && selectedWinners.length > 0 && selectedWinners[0].winners?.length > 0;
-  const topW = hasWinner ? selectedWinners[0].winners[0] : null;
+  const winnersByPage = (selectedWinners || []).filter(w => w.winners && w.winners.length > 0);
 
-  // Single Clean Message 1: Scan Summary + Finalized Reel to Post
+  // Single Clean Message 1: Scan Summary + Finalized Reel to Post per target page
   if (adminChatId) {
-    if (topW) {
-      try {
-        await notifier.sendTelegramMessage(
-          adminChatId,
-          `🛰️ <b>Agent 2: Watchtower Pipeline Engaged</b>\n\n` +
-          `📊 <b>Surveillance Summary:</b>\n` +
-          `• Monitored Sources Checked: <b>${sourcesCount} accounts</b>\n` +
-          `• Fresh Reels Ingested: <b>+${newReelsCount} reels</b>\n` +
-          `• Target Audience Window: <b>${windowStatus.activeWindow ? windowStatus.activeWindow.name : 'Peak Wave'}</b>\n\n` +
-          `🎯 <b>Finalized Reel to Post:</b>\n` +
-          `• Source Reel: <a href="https://www.instagram.com/reel/${topW.shortcode}/">https://www.instagram.com/reel/${topW.shortcode}/</a>\n` +
-          `• Source ID: <code>#${topW.shortcode}</code>\n` +
-          `• Virality Composite Score: <b>${topW.compositeScore || 'High'}</b>\n` +
-          `• Destination: <b>@gta6_updates_007</b>\n\n` +
-          `⏳ <i>Pipeline active: Transcoding 1080p Vice City frame, generating AI hook, and publishing to Feed + Story...</i>`
-        );
-      } catch (e) {
-        console.warn(`[Cron Runner] Telegram Message 1 error: ${e.message}`);
+    if (winnersByPage.length > 0) {
+      for (const wp of winnersByPage) {
+        const topW = wp.winners[0];
+        const pageObj = pages.find(p => p.id === wp.pageId) || { handle: wp.handle, name: 'Connected Channel' };
+        try {
+          await notifier.sendTelegramMessage(
+            adminChatId,
+            `🛰️ <b>Agent 2: Watchtower Pipeline Engaged</b>\n\n` +
+            `📊 <b>Surveillance Summary:</b>\n` +
+            `• Monitored Sources Checked: <b>${sourcesCount} accounts</b>\n` +
+            `• Fresh Reels Ingested: <b>+${newReelsCount} reels</b>\n` +
+            `• Target Audience Window: <b>${windowStatus.activeWindow ? windowStatus.activeWindow.name : 'Peak Wave'}</b>\n\n` +
+            `🎯 <b>Finalized Reel to Post:</b>\n` +
+            `• Destination: <b>${pageObj.handle}</b> (${pageObj.name})\n` +
+            `• Source Reel: <a href="https://www.instagram.com/reel/${topW.shortcode}/">https://www.instagram.com/reel/${topW.shortcode}/</a>\n` +
+            `• Source ID: <code>#${topW.shortcode}</code>\n` +
+            `• Virality Composite Score: <b>${topW.compositeScore || 'High'}</b>\n\n` +
+            `⏳ <i>Pipeline active: Applying bespoke template, generating AI hook, and publishing to Feed + Story...</i>`
+          );
+        } catch (e) {
+          console.warn(`[Cron Runner] Telegram Message 1 error: ${e.message}`);
+        }
       }
     } else {
       try {
@@ -252,24 +264,30 @@ async function main() {
   } else {
     const jobWorkerPool = require('../src/core/jobWorker');
     const { shortcodeToTimestamp } = require('../src/agents/watchtower/sourceReaders/guestReader');
-    const queuedJobs = listPublishJobs({ status: 'queued', limit: 10 });
+    const queuedJobs = listPublishJobs({ status: 'queued', limit: 20 });
     console.log(`\n[Cron Runner] 🚀 Step 3: Processing queued publishing job(s) (${queuedJobs.length} available)...`);
 
-    let publishedInCycle = 0;
-    const targetPerCycle = pages[0]?.posts_per_cycle || 1;
+    const publishedByPage = {};
+    for (const p of pages) {
+      publishedByPage[p.id] = 0;
+    }
 
     for (const job of queuedJobs) {
-      if (publishedInCycle >= targetPerCycle) {
-        console.log(`[Cron Runner] 🎯 Target for this cycle reached (${publishedInCycle}/${targetPerCycle} reels published).`);
-        break;
+      const page = pages.find(p => p.id === job.page_id) || getPageById(job.page_id);
+      const targetPerCycle = page?.posts_per_cycle || 1;
+      const currentCount = publishedByPage[job.page_id] || 0;
+
+      if (currentCount >= targetPerCycle) {
+        console.log(`[Cron Runner] 🎯 Target for ${page?.handle || job.page_id} reached (${currentCount}/${targetPerCycle} reels published).`);
+        continue;
       }
 
-      // Source reel freshness validation: ensure competitor post was published within 24 hours
+      // Source reel freshness validation: ensure competitor post was published within 48 hours
       const parsed = shortcodeToTimestamp(job.shortcode);
       if (parsed?.date) {
         const ageHours = (Date.now() - parsed.date.getTime()) / (1000 * 60 * 60);
-        if (ageHours > 24) {
-          console.log(`[Cron Runner] ⏭️ Skipping stale Job #${job.id} [${job.shortcode}]: Source reel was published ${Math.round(ageHours)}h ago (>24h limit).`);
+        if (ageHours > 48) {
+          console.log(`[Cron Runner] ⏭️ Skipping stale Job #${job.id} [${job.shortcode}]: Source reel was published ${Math.round(ageHours)}h ago (>48h limit).`);
           try {
             db.prepare("UPDATE publish_jobs SET status = 'failed', error = ? WHERE id = ?").run(`Expired: Source reel is ${Math.round(ageHours)}h old`, job.id);
           } catch (e) {}
@@ -278,17 +296,18 @@ async function main() {
       }
 
       if (isDryRun) {
-        console.log(`[Dry Run] Would process Job #${job.id} for page #${job.page_id} (${job.shortcode})`);
+        console.log(`[Dry Run] Would process Job #${job.id} for page #${job.page_id} (${page?.handle || 'Page'}) [${job.shortcode}]`);
+        publishedByPage[job.page_id] = (publishedByPage[job.page_id] || 0) + 1;
         continue;
       }
 
       try {
-        console.log(`[Cron Runner] 🎬 Executing Job #${job.id} [${job.shortcode}]...`);
+        console.log(`[Cron Runner] 🎬 Executing Job #${job.id} for ${page?.handle} [${job.shortcode}]...`);
         await jobWorkerPool.processJob(job.id, { forceInstant: true });
         const currentJob = getPublishJobById(job.id);
         if (currentJob && currentJob.status === 'published') {
-          publishedInCycle++;
-          console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram! (${publishedInCycle}/${targetPerCycle})`);
+          publishedByPage[job.page_id] = (publishedByPage[job.page_id] || 0) + 1;
+          console.log(`[Cron Runner] ✅ Job #${job.id} published live to Instagram for ${page?.handle}!`);
           // Message 2: Live Publishing Confirmation (Clean single notification)
           try {
             const captionSnippet = currentJob.caption
@@ -297,7 +316,7 @@ async function main() {
             await notifier.sendTelegramMessage(
               adminChatId,
               `🚀 <b>LIVE ON INSTAGRAM!</b>\n\n` +
-              `📱 <b>Account:</b> @gta6_updates_007\n` +
+              `📱 <b>Account:</b> ${page?.handle || '@' + currentJob.page_slug} (${page?.name || 'Omni Channel'})\n` +
               `🌐 <b>Live Reel:</b> <a href="${currentJob.permalink}">${currentJob.permalink}</a>\n` +
               `🎬 <b>Source Reel:</b> <a href="https://www.instagram.com/reel/${currentJob.shortcode}/">https://www.instagram.com/reel/${currentJob.shortcode}/</a>\n` +
               `🆔 <b>Media ID:</b> <code>${currentJob.ig_media_id}</code>\n\n` +
