@@ -764,59 +764,71 @@ function generateFeedPostOverlay(handle, options = {}) {
     ctx.restore();
   }
 
-  // 2. Boundaries (Refined 2.5px hairline gradient for cinema, bold neon for GTA 6)
+  // 2. Bolder Boundaries (8px multi-stop gradient border)
   ctx.save();
   const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
   if (isMovie) {
-    bGrad.addColorStop(0, 'rgba(255, 215, 120, 0.90)');  // Warm Gold
-    bGrad.addColorStop(0.35, 'rgba(212, 175, 55, 0.50)'); // Amber Gold
-    bGrad.addColorStop(0.70, 'rgba(193, 18, 31, 0.70)');  // Velvet Crimson
-    bGrad.addColorStop(1, 'rgba(255, 183, 3, 0.90)');   // Burnished Gold
-    ctx.shadowColor = 'rgba(212, 175, 55, 0.35)';
-    ctx.shadowBlur = 12;
-    ctx.strokeStyle = bGrad;
-    ctx.lineWidth = 2.5;
+    bGrad.addColorStop(0, '#FFD166');
+    bGrad.addColorStop(0.35, '#FFB703');
+    bGrad.addColorStop(0.70, '#C1121F');
+    bGrad.addColorStop(1, '#E5A93C');
+    ctx.shadowColor = 'rgba(255, 183, 3, 0.70)';
   } else {
     bGrad.addColorStop(0, '#00F0FF');
     bGrad.addColorStop(0.3, '#7209B7');
     bGrad.addColorStop(0.65, '#F72585');
     bGrad.addColorStop(1, '#FF8A00');
     ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
-    ctx.shadowBlur = 22;
-    ctx.strokeStyle = bGrad;
-    ctx.lineWidth = 8;
   }
 
+  ctx.shadowBlur = 22;
+  ctx.strokeStyle = bGrad;
+  ctx.lineWidth = 8;
   ctx.beginPath();
-  ctx.roundRect(cardX, cardY, cardW, cardH, 20);
+  ctx.roundRect(cardX, cardY, cardW, cardH, 18);
   ctx.stroke();
 
-  // Inner accent rail for GTA 6
-  if (!isMovie) {
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
-    ctx.stroke();
-  }
+  // Inner accent rail
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = isMovie ? 'rgba(255, 209, 102, 0.40)' : 'rgba(0, 240, 255, 0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
+  ctx.stroke();
 
-  // 3. Corner Brackets (Registration Marks)
-  const bLen = isMovie ? 32 : 42;
-  ctx.lineWidth = isMovie ? 3.5 : 5;
+  // 3. Prominent Corner Brackets (Registration Marks)
+  const bLen = 42;
+  ctx.lineWidth = 5;
 
   if (isMovie) {
+    // TL (Champagne Gold)
     ctx.strokeStyle = '#FFD166';
-    ctx.shadowColor = 'rgba(255, 209, 102, 0.6)';
-    ctx.shadowBlur = 8;
-    // TL
-    ctx.beginPath(); ctx.moveTo(cardX + 6, cardY + 6 + bLen); ctx.lineTo(cardX + 6, cardY + 6); ctx.lineTo(cardX + 6 + bLen, cardY + 6); ctx.stroke();
-    // TR
-    ctx.beginPath(); ctx.moveTo(cardX + cardW - 6 - bLen, cardY + 6); ctx.lineTo(cardX + cardW - 6, cardY + 6); ctx.lineTo(cardX + cardW - 6, cardY + 6 + bLen); ctx.stroke();
-    // BL
-    ctx.beginPath(); ctx.moveTo(cardX + 6, cardY + cardH - 6 - bLen); ctx.lineTo(cardX + 6, cardY + cardH - 6); ctx.lineTo(cardX + 6 + bLen, cardY + cardH - 6); ctx.stroke();
-    // BR
-    ctx.beginPath(); ctx.moveTo(cardX + cardW - 6 - bLen, cardY + cardH - 6); ctx.lineTo(cardX + cardW - 6, cardY + cardH - 6); ctx.lineTo(cardX + cardW - 6, cardY + cardH - 6 - bLen); ctx.stroke();
+    ctx.shadowColor = '#FFD166';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+    ctx.stroke();
+
+    // TR (Amber Gold)
+    ctx.strokeStyle = '#FFB703';
+    ctx.shadowColor = '#FFB703';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.stroke();
+
+    // BL (Amber Gold)
+    ctx.strokeStyle = '#FFB703';
+    ctx.shadowColor = '#FFB703';
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+    ctx.stroke();
+
+    // BR (Burnished Gold)
+    ctx.strokeStyle = '#E5A93C';
+    ctx.shadowColor = '#E5A93C';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH - bLen);
+    ctx.stroke();
   } else {
     // TL (Cyan)
     ctx.strokeStyle = '#00F0FF';
@@ -848,36 +860,21 @@ function generateFeedPostOverlay(handle, options = {}) {
     ctx.stroke();
   }
 
-  // 4. Bottom CTA Pill
-  const botBarW = isMovie ? Math.min(500, cardW - 60) : Math.min(680, cardW - 80);
-  const botBarH = isMovie ? 50 : 8;
+  // 4. Bottom Boundary Theme Bar
+  const botBarW = Math.min(680, cardW - 80);
   const botBarX = cardX + (cardW - botBarW) / 2;
-  const botBarY = isMovie ? (cardY + cardH - 74) : (cardY + cardH - 12);
+  const botBarY = cardY + cardH - 12;
 
+  const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
   if (isMovie) {
-    const ctaGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY + botBarH);
-    ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
-    ctaGrad.addColorStop(0.5, 'rgba(120, 0, 0, 0.90)');
-    ctaGrad.addColorStop(1, 'rgba(212, 175, 55, 0.90)');
-    ctx.fillStyle = ctaGrad;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.roundRect(botBarX, botBarY, botBarW, botBarH, 25);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 16px "Helvetica Neue", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillText('DAILY MUST-WATCH  •  SAVE REEL', cardX + cardW / 2, botBarY + botBarH / 2);
+    botGrad.addColorStop(0, 'rgba(255, 209, 102, 0)');
+    botGrad.addColorStop(0.2, '#FFD166');
+    botGrad.addColorStop(0.5, '#FFB703');
+    botGrad.addColorStop(0.8, '#C1121F');
+    botGrad.addColorStop(1, 'rgba(193, 18, 31, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(255, 183, 3, 0.85)';
   } else {
-    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
     botGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
     botGrad.addColorStop(0.15, '#00F0FF');
     botGrad.addColorStop(0.5, '#F72585');
@@ -885,93 +882,81 @@ function generateFeedPostOverlay(handle, options = {}) {
     botGrad.addColorStop(1, 'rgba(255, 138, 0, 0)');
     ctx.fillStyle = botGrad;
     ctx.shadowColor = 'rgba(255, 138, 0, 0.9)';
-    ctx.shadowBlur = 16;
-    ctx.beginPath();
-    ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
-    ctx.fill();
+  }
 
-    ctx.font = '900 13px Impact, Arial Black, sans-serif';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 6;
+  ctx.shadowBlur = 16;
+  ctx.beginPath();
+  ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
+  ctx.fill();
+
+  ctx.font = isMovie ? 'bold 12px "Helvetica Neue", Arial, sans-serif' : '900 13px Impact, Arial Black, sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 6;
+  if (isMovie) {
+    ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
+  } else {
     ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
   }
   ctx.restore();
 
   // 5. Top Account Badge
+  const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
+  const text = isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase();
+
+  ctx.save();
+  ctx.font = isMovie ? 'bold 20px "Helvetica Neue", Arial, sans-serif' : '900 24px Impact, Arial Black, sans-serif';
+  const textMetrics = ctx.measureText(text);
+  const padX = 28;
+  const boxW = textMetrics.width + padX * 2;
+  const boxH = 50;
+  const boxX = (width - boxW) / 2;
+  const boxY = badgeY - boxH / 2;
+  const radius = 6;
+
+  // Outer glow
+  ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)';
+  ctx.shadowBlur = 18;
+
+  // Dark glass background
+  ctx.fillStyle = isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)';
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+  ctx.fill();
+
+  // Border (3.5px)
+  const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
   if (isMovie) {
-    const hW = Math.min(560, cardW - 40);
-    const hH = 62;
-    const hX = (width - hW) / 2;
-    const hY = isVertical ? 64 : Math.max(70, cardY - hH - 18);
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(12, 10, 16, 0.90)';
-    ctx.strokeStyle = 'rgba(255, 215, 120, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 16;
-    ctx.beginPath();
-    ctx.roundRect(hX, hY, hW, hH, 31);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`@${cleanHandle.toLowerCase()}  |  CINEMA ARCHIVE`, width / 2, hY + 22);
-
-    ctx.fillStyle = '#FFD166';
-    ctx.font = 'bold 11px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText('DAILY RECOMMENDATION  •  4K ULTRA HD', width / 2, hY + 44);
-    ctx.restore();
+    boxGrad.addColorStop(0, '#FFD166');
+    boxGrad.addColorStop(0.5, '#FFB703');
+    boxGrad.addColorStop(1, '#E5A93C');
   } else {
-    const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
-    const text = '@' + cleanHandle.toLowerCase();
-
-    ctx.save();
-    ctx.font = '900 24px Impact, Arial Black, sans-serif';
-    const textMetrics = ctx.measureText(text);
-    const padX = 28;
-    const boxW = textMetrics.width + padX * 2;
-    const boxH = 50;
-    const boxX = (width - boxW) / 2;
-    const boxY = badgeY - boxH / 2;
-    const radius = 6;
-
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.7)';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = 'rgba(10, 3, 24, 0.94)';
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, radius);
-    ctx.fill();
-
-    const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
     boxGrad.addColorStop(0, '#00F0FF');
     boxGrad.addColorStop(0.5, '#F72585');
     boxGrad.addColorStop(1, '#FF8A00');
-    ctx.strokeStyle = boxGrad;
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 5;
-    ctx.fillText(text, width / 2, badgeY);
-    ctx.restore();
   }
+  ctx.strokeStyle = boxGrad;
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  // Inner subtle accent
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
+  ctx.stroke();
+
+  // Account text
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 5;
+  ctx.fillText(text, width / 2, badgeY);
+  ctx.restore();
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const genDir = path.join(publicDir, 'generated');
