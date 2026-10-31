@@ -8,6 +8,7 @@ window.reposterView = (function() {
   let selectedPageId = null; // null = all pages
   let activeStage = 'ingest'; // 'ingest' | 'downloaded' | 'ready' | 'published' | 'failed'
   let downloadedViewMode = 'table'; // 'table' (default) | 'grid'
+  let ingestViewMode = 'grid'; // 'grid' (default for stream) | 'table'
   let activeTrackingJobId = null;
   let pipelineSummary = {
     ingested: 0,
@@ -177,11 +178,11 @@ window.reposterView = (function() {
       </div>
 
       <div class="pipeline-stepper">
-        <!-- Stage 1: Ingest & Quick Post -->
-        <div class="pipeline-step-node ${activeStage === 'ingest' ? 'active' : ''}" onclick="reposterView.switchStage('ingest')" title="Ingest reels via Web URL or Telegram Bot">
+        <!-- Stage 1: Telegram Stream -->
+        <div class="pipeline-step-node ${activeStage === 'ingest' ? 'active' : ''}" onclick="reposterView.switchStage('ingest')" title="Live stream of reels received via Telegram Bot (@omnistudio_bot)">
           <span class="pipeline-step-num">1.</span>
           <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Ingest & Quick Post</span>
+            <span class="pipeline-step-label">Telegram Stream</span>
             <span class="pipeline-step-count" id="rps-count-ingested">${s.ingested} Received</span>
           </div>
         </div>
@@ -305,183 +306,125 @@ window.reposterView = (function() {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STAGE 1: Ingest & Quick Post Deck
+  // STAGE 1: Telegram Ingested Reels Stream (Instagram Reel Feed)
   // ─────────────────────────────────────────────────────────────
+  function setIngestViewMode(mode) {
+    ingestViewMode = mode;
+    const container = document.getElementById('rp-stage-deck');
+    if (container && activeStage === 'ingest') {
+      renderIngestStage(container);
+    }
+  }
+
+  function openManualModal() {
+    const modal = document.getElementById('rp-manual-modal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function closeManualModal() {
+    const modal = document.getElementById('rp-manual-modal');
+    if (modal) modal.style.display = 'none';
+  }
+
   async function renderIngestStage(container) {
     const selectedPage = (window.app?.pages || []).find(p => p.id === selectedPageId);
     const pageLabel = selectedPage ? selectedPage.name : 'All Pages';
 
     container.innerHTML = `
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.15rem; margin-bottom: 1.35rem; align-items: stretch;">
-        
-        <!-- Hero: Telegram Mobile Integration Hub Card -->
-        <div class="telegram-hero-card">
-          <div>
-            <div class="flex items-center justify-between mb-2" style="flex-wrap: wrap; gap: 0.5rem;">
-              <div>
-                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                  Telegram Mobile Ingestion Hub
-                </h3>
-                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">
-                  Agent 1 Primary Pipeline · Zero-Click Mobile Reposting
-                </div>
-              </div>
-              <span class="status-text-success" style="font-size: 0.75rem; font-weight: 500;">
-                Bot Online & Listening
-              </span>
-            </div>
-
-            <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.95rem;">
-              Share any Instagram Reel link directly from your Instagram app to your OmniStudio Telegram bot. Agent 1 downloads 1080p MP4, generates AI attribution, and posts live.
-            </p>
-
-            <!-- 3-Column Dedicated Credentials Strip -->
-            <div class="tg-credentials-strip" style="margin-bottom: 1rem;">
-              <div class="tg-credential-item">
-                <span class="tg-credential-label">Telegram Bot</span>
-                <a href="https://t.me/omnistudio_bot" target="_blank" style="font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-primary); text-decoration: none;">
-                  @omnistudio_bot ↗
-                </a>
-              </div>
-              <div class="tg-credential-item">
-                <span class="tg-credential-label">Authorized Chat ID</span>
-                <span style="font-weight: 600; color: var(--text-primary); font-size: 0.82rem; font-family: var(--font-mono);" id="rp-telegram-allowed">5443723531</span>
-              </div>
-              <div style="text-align: right;">
-                <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; white-space: nowrap;">
-                  Open Bot ↗
-                </a>
-              </div>
-            </div>
-
-            <!-- Horizontal 4-Step Stepper -->
-            <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.45rem;">
-              Instant Mobile Flow:
-            </div>
-            <div class="tg-steps-row">
-              <div class="tg-step-box">
-                <div class="tg-step-head">
-                  <span class="tg-step-num-pill">1.</span>
-                  <span>Share</span>
-                </div>
-                <span class="tg-step-desc">Forward reel to bot</span>
-              </div>
-              <div class="tg-step-box">
-                <div class="tg-step-head">
-                  <span class="tg-step-num-pill">2.</span>
-                  <span>Verify</span>
-                </div>
-                <span class="tg-step-desc">Auto-whitelist check</span>
-              </div>
-              <div class="tg-step-box">
-                <div class="tg-step-head">
-                  <span class="tg-step-num-pill">3.</span>
-                  <span>Select</span>
-                </div>
-                <span class="tg-step-desc">Tap target page</span>
-              </div>
-              <div class="tg-step-box">
-                <div class="tg-step-head">
-                  <span class="tg-step-num-pill">4.</span>
-                  <span>Live</span>
-                </div>
-                <span class="tg-step-desc">Live Instagram post</span>
-              </div>
-            </div>
+      <!-- Stream Header Controls -->
+      <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.15rem;">
+        <div>
+          <div class="pipeline-stage-title" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <span>Stage 1: Incoming Telegram Reels Stream</span>
+            <span class="status-text-success" style="font-size: 0.74rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
+              ● Bot Listening (@omnistudio_bot)
+            </span>
           </div>
-
-          <!-- Bottom Telemetry Chips -->
-          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 1.15rem; font-size: 0.72rem; color: var(--text-muted); flex-wrap: wrap; gap: 0.5rem;">
-            <span>1080p MP4 Auto-Sync</span>
-            <span>·</span>
-            <span>AI Attribution Ready</span>
-            <span>·</span>
-            <span>Chat 5443723531 Secured</span>
+          <div class="text-sm text-muted" style="margin-top: 2px;">
+            Real-time feed of reels forwarded via Telegram targeting <b>${pageLabel}</b> (Chat ID: 5443723531)
           </div>
         </div>
 
-        <!-- Direct Reel Quick-Post (On-Demand Dashboard Fallback) -->
-        <div class="card" style="background: var(--bg-card); border-radius: var(--radius-sm); padding: 1.25rem 1.4rem; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04); border: 1px solid var(--border-card); border-top: 2px solid var(--accent-primary); display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                  Direct Quick-Post
-                </h3>
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.2rem 0 0 0;">
-                  Manual fallback to paste an Instagram Reel link and trigger Agent 1
-                </p>
-              </div>
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel URL</label>
-              <input type="text" id="rp-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
-            </div>
-
-            <div class="form-group mb-3">
-              <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
-              <select id="rp-page-select" class="form-input">
-                ${renderPageOptions()}
-              </select>
-            </div>
-
-            <div class="form-group mb-3" style="background: var(--bg-input); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-              <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
-                <input type="checkbox" id="rp-review-caption" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
-                <span>Review & edit AI caption before publishing live</span>
-              </label>
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; margin-left: 1.6rem; line-height: 1.35;">
-                If checked, job pauses in Stage 3 for review. If unchecked, it publishes automatically.
-              </div>
-            </div>
-
-            <!-- Live Step Progress Box -->
-            <div id="rp-progress-box" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.85rem;">
-              <div class="font-bold text-sm mb-2" id="rp-progress-title" style="display: flex; align-items: center; gap: 0.5rem;">
-                <span class="spinner-sm"></span> Pipeline Executing...
-              </div>
-              <div class="step-bar mb-2">
-                <div id="rp-step-1" class="step-bar-item"></div>
-                <div id="rp-step-2" class="step-bar-item"></div>
-                <div id="rp-step-3" class="step-bar-item"></div>
-                <div id="rp-step-4" class="step-bar-item"></div>
-              </div>
-              <div id="rp-step-status" style="font-size: 0.78rem; color: var(--text-secondary); font-family: var(--font-mono);">
-                Initializing job...
-              </div>
-            </div>
+        <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+          <!-- View Mode Switcher: Cards View (Default) vs Table View -->
+          <div class="view-mode-switcher">
+            <button class="view-mode-btn ${ingestViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('grid')" title="Reels Stream Cards">
+              <span>Stream Cards</span>
+            </button>
+            <button class="view-mode-btn ${ingestViewMode === 'table' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('table')" title="Table View">
+              <span>Table View</span>
+            </button>
           </div>
 
-          <button id="rp-submit-btn" class="btn btn-primary w-full" onclick="reposterView.submitJob()" style="padding: 0.6rem 1rem; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem;">
-            Ingest & Dispatch Reel Live
+          <button class="btn btn-primary btn-sm" onclick="reposterView.openManualModal()" style="font-size: 0.78rem; font-weight: 600;">
+            + Manual Ingest
           </button>
-        </div>
-
-      </div>
-
-      <!-- Telegram Received Dispatches Feed Table -->
-      <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
-        <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <h3 style="font-size: 1rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-              Telegram Ingested Reels
-            </h3>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin: 0.15rem 0 0 0;">
-              Original reels received via @omnistudio_bot targeting <b>${pageLabel}</b>
-            </p>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
+          <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()" style="font-size: 0.78rem;">
             Refresh
           </button>
         </div>
-        <div id="rp-jobs-table" class="table-container" style="padding: 0; overflow-x: auto;">
-          <div style="color: var(--text-muted); font-size: 0.82rem; padding: 2.5rem; text-align: center;">Loading Telegram dispatches...</div>
+      </div>
+
+      <!-- Live Stream Feed Container -->
+      <div id="rp-jobs-stream">
+        <div style="color: var(--text-muted); font-size: 0.82rem; padding: 3rem; text-align: center;">
+          <span class="spinner-sm" style="display: inline-block; vertical-align: middle; margin-right: 6px;"></span> Loading incoming stream...
+        </div>
+      </div>
+
+      <!-- Manual Ingest Modal (Clean, Non-Intrusive Floating Dialog) -->
+      <div id="rp-manual-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) reposterView.closeManualModal()">
+        <div class="modal-content" style="max-width: 500px; position: relative;">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                Manual Reel Ingest
+              </h3>
+              <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
+                Paste an Instagram Reel URL to dispatch on-demand through the publishing pipeline
+              </p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.closeManualModal()" style="padding: 2px 8px; font-size: 0.95rem; line-height: 1;">✕</button>
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold" style="font-size: 0.8rem;">Instagram Reel URL</label>
+            <input type="text" id="rp-modal-url" class="form-input" placeholder="https://www.instagram.com/reel/DF-EXAMPLE/ or /p/..." style="font-family: var(--font-mono); font-size: 0.85rem;">
+          </div>
+
+          <div class="form-group mb-3">
+            <label class="form-label font-bold" style="font-size: 0.8rem;">Destination Target Page</label>
+            <select id="rp-modal-page" class="form-input">
+              ${renderPageOptions()}
+            </select>
+          </div>
+
+          <div class="form-group mb-3" style="background: var(--bg-canvas); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+            <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+              <input type="checkbox" id="rp-modal-review" style="width: 16px; height: 16px; accent-color: var(--accent-primary);">
+              <span>Review AI caption before publishing live</span>
+            </label>
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem; margin-left: 1.6rem; line-height: 1.35;">
+              If checked, job pauses in Stage 3 for review. If unchecked, it publishes automatically.
+            </div>
+          </div>
+
+          <!-- Progress box inside modal -->
+          <div id="rp-modal-progress" class="card hidden mb-3" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); padding: 0.75rem; font-size: 0.78rem; font-family: var(--font-mono);">
+            <div id="rp-modal-progress-text"><span class="spinner-sm"></span> Dispatching pipeline...</div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 mt-3">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.closeManualModal()">Cancel</button>
+            <button type="button" id="rp-modal-submit-btn" class="btn btn-primary btn-sm" onclick="reposterView.submitManualModalJob()" style="padding: 0.45rem 1rem; font-weight: 600;">
+              Ingest & Dispatch Reel Live
+            </button>
+          </div>
         </div>
       </div>
     `;
 
-    await loadIngestedTableData();
+    await loadIngestStreamData();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1031,9 +974,9 @@ window.reposterView = (function() {
     }
   }
 
-  // Helper for loading Ingest stage table (Strictly Telegram-only)
-  async function loadIngestedTableData() {
-    const container = document.getElementById('rp-jobs-table');
+  // Helper for loading Ingest stage stream (Grid default or Table toggle)
+  async function loadIngestStreamData() {
+    const container = document.getElementById('rp-jobs-stream');
     if (!container) return;
 
     try {
@@ -1043,24 +986,24 @@ window.reposterView = (function() {
       if (!res.ok) return;
       let jobs = await res.json();
 
-      // Strict Telegram filter guarantee
-      jobs = (jobs || []).filter(j => Boolean(j.telegram_chat_id));
+      // Show telegram or reposter jobs
+      jobs = (jobs || []).filter(j => Boolean(j.telegram_chat_id) || j.agent === 'reposter');
 
       if (jobs.length === 0) {
         container.innerHTML = `
-          <div style="padding: 3.5rem 1.5rem; text-align: center; color: var(--text-muted);">
-            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 0.35rem;">
-              No Telegram Reels Received Yet
+          <div class="card" style="padding: 3.5rem 1.5rem; text-align: center; border-radius: 12px; box-shadow: none; border: 1px solid var(--border-card);">
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary); margin-bottom: 0.35rem;">
+              No Telegram Reels in Feed Yet
             </div>
-            <p style="font-size: 0.82rem; max-width: 480px; margin: 0 auto 1.25rem auto; line-height: 1.5;">
-              Share any Instagram Reel link directly to your Telegram bot @omnistudio_bot from your phone. Only Telegram-originated reels are processed and tracked in Agent 1.
+            <p style="font-size: 0.82rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 1.35rem auto; line-height: 1.5;">
+              Share any Instagram Reel directly to your Telegram bot <b>@omnistudio_bot</b> from your phone. Agent 1 will instantly ingest the link, download 1080p MP4, generate AI attribution copy, and publish live.
             </p>
-            <div class="flex items-center justify-center gap-2">
+            <div class="flex items-center justify-center gap-2" style="flex-wrap: wrap;">
               <a href="https://t.me/omnistudio_bot" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">
-                Open @omnistudio_bot in Telegram
+                Open @omnistudio_bot in Telegram ↗
               </a>
-              <button class="btn btn-secondary btn-sm" onclick="app.navigate('command-center')">
-                View All-Source Overview in Command Center ➔
+              <button class="btn btn-secondary btn-sm" onclick="reposterView.openManualModal()">
+                + Test With Manual Ingest Modal
               </button>
             </div>
           </div>
@@ -1068,6 +1011,123 @@ window.reposterView = (function() {
         return;
       }
 
+      // ── Grid Cards View (Instagram-Style Instant Reel Feed) ───
+      if (ingestViewMode === 'grid') {
+        const cardsHtml = jobs.map(j => {
+          const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
+          const isGta6 = pageSlug.includes('gta6') || j.page_id === 1;
+          const pageClass = isGta6 ? 'gta6' : 'movies';
+          const parsed = parseCaptionComponents(j.caption);
+          const timeStr = j.published_at ?
+            `Published ${formatTimeAgo(j.published_at)}` :
+            `Received ${formatTimeAgo(j.created_at)}`;
+          const isReel = (j.media_type === 'reel' || !j.media_type);
+
+          // Flow step status progression
+          let s1 = 'completed', s2 = 'completed', s3 = 'completed', s4 = 'pending';
+          if (j.status === 'published') {
+            s4 = 'completed';
+          } else if (j.status === 'ready' || j.status === 'pending_review') {
+            s4 = 'active';
+          } else if (j.status === 'downloading') {
+            s2 = 'active'; s3 = 'pending'; s4 = 'pending';
+          } else if (j.status === 'queued' || j.current_step === 'init') {
+            s1 = 'active'; s2 = 'pending'; s3 = 'pending'; s4 = 'pending';
+          } else if (j.status === 'failed') {
+            s4 = 'failed';
+          }
+
+          const thumbSrc = j.thumbnail_url || `/api/jobs/${j.id}/thumbnail`;
+
+          return `
+            <div class="telegram-stream-card">
+              <!-- 9:16 Reel Cover Snapshot -->
+              <a href="${j.permalink || j.source_url || '#'}" target="_blank" class="stream-card-thumb-wrap" title="Open reel #${j.id} on Instagram">
+                <img src="${thumbSrc}" alt="${j.shortcode}" class="stream-card-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';" />
+                <div class="stream-card-play-overlay">▶</div>
+                <div class="stream-card-shortcode-pill">${j.shortcode ? `/reel/${j.shortcode}` : `#${j.id}`}</div>
+              </a>
+
+              <!-- Stream Card Body -->
+              <div class="stream-card-body">
+                <div>
+                  <!-- Destination Badge & Time -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.35rem;">
+                    <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
+                    <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                      ${timeStr}
+                    </span>
+                  </div>
+
+                  <!-- AI Hook / Headline -->
+                  <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); line-height: 1.35; margin-bottom: 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${escapeHtml(parsed.hook)}">
+                    ${escapeHtml(parsed.hook)}
+                  </div>
+
+                  <!-- Real-Time Pipeline Micro-Stepper -->
+                  <div class="stream-flow-steps">
+                    <span class="stream-flow-step ${s1}"><span class="stream-flow-step-dot"></span>Ingest</span>
+                    <span class="stream-flow-arrow">→</span>
+                    <span class="stream-flow-step ${s2}"><span class="stream-flow-step-dot"></span>1080p MP4</span>
+                    <span class="stream-flow-arrow">→</span>
+                    <span class="stream-flow-step ${s3}"><span class="stream-flow-step-dot"></span>AI Copy</span>
+                    <span class="stream-flow-arrow">→</span>
+                    <span class="stream-flow-step ${s4}"><span class="stream-flow-step-dot"></span>Live</span>
+                  </div>
+
+                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem;">
+                    Chat: <code style="font-family: var(--font-mono); font-size: 0.7rem;">${j.telegram_chat_id || '5443723531'}</code> · ${isReel ? '1080p MP4' : 'Post'}
+                  </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
+                  <div>
+                    ${j.permalink ? `
+                      <span class="status-text-success" style="font-size: 0.72rem; font-weight: 600;">● Live on Instagram</span>
+                    ` : (j.status === 'failed' ? `
+                      <span class="status-text-danger" style="font-size: 0.72rem; font-weight: 600;">● Pipeline Failed</span>
+                    ` : `
+                      <span style="font-size: 0.72rem; color: var(--accent-primary); font-family: var(--font-mono); font-weight: 500;">
+                        <span class="spinner-sm" style="width: 10px; height: 10px; display: inline-block; vertical-align: middle;"></span>
+                        ${j.current_step || 'Processing'}
+                      </span>
+                    `)}
+                  </div>
+
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    ${j.permalink ? `
+                      <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 8px; text-decoration: none;">
+                        View Reel ↗
+                      </a>
+                      ${j.story_permalink ? `
+                        <a href="${j.story_permalink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 8px; text-decoration: none;">
+                          Story ↗
+                        </a>
+                      ` : ''}
+                    ` : (j.status === 'pending_review' || j.status === 'ready' ? `
+                      <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.75rem; padding: 3px 10px;">
+                        Publish Live
+                      </button>
+                    ` : (j.status === 'failed' ? `
+                      <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.75rem; padding: 3px 10px;">
+                        Retry
+                      </button>
+                    ` : `
+                      <a href="${j.source_url}" target="_blank" class="text-link" style="font-size: 0.75rem;">Source ↗</a>
+                    `))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `<div class="telegram-stream-grid">${cardsHtml}</div>`;
+        return;
+      }
+
+      // ── Table View Mode ───
       const rows = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
         const parsed = parseCaptionComponents(j.caption);
@@ -1078,15 +1138,12 @@ window.reposterView = (function() {
 
         return `
           <tr>
-            <!-- 1. Photo Glimpse Preview -->
             <td style="text-align: center; vertical-align: middle; padding: 0.55rem 0.5rem; width: 68px;">
-              <a href="${j.source_url}" target="_blank" class="reel-table-thumb-container" style="width: 50px; height: 68px;" title="Open reel #${j.id} on Instagram">
-                <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" />
+              <a href="${j.source_url || j.permalink || '#'}" target="_blank" class="reel-table-thumb-container" style="width: 50px; height: 68px;" title="Open reel #${j.id}">
+                <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';" />
                 ${isReel ? '<div class="reel-thumb-play-icon">▶</div>' : ''}
               </a>
             </td>
-
-            <!-- 2. Reel ID & Telegram Sender -->
             <td style="width: 15%;">
               <div class="flex items-center gap-2 mb-1">
                 <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">#${j.id}</span>
@@ -1095,18 +1152,14 @@ window.reposterView = (function() {
               <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
                 Chat: ${j.telegram_chat_id || '5443723531'}
               </div>
-              <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.78rem;">
+              <a href="${j.source_url || j.permalink || '#'}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.78rem;">
                 ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
               </a>
             </td>
-
-            <!-- 3. Target Destination Page -->
             <td style="width: 14%;">
               <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
               <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
             </td>
-
-            <!-- 4. Format & Storage -->
             <td style="width: 14%;">
               <div style="font-size: 0.76rem; font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">
                 1080p MP4
@@ -1115,8 +1168,6 @@ window.reposterView = (function() {
                 Step: ${j.current_step || 'completed'}
               </div>
             </td>
-
-            <!-- 5. AI Caption & Hook Breakdown -->
             <td style="max-width: 280px;">
               <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
                 ${escapeHtml(parsed.hook)}
@@ -1128,13 +1179,9 @@ window.reposterView = (function() {
                 ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') : '—'}
               </div>
             </td>
-
-            <!-- 6. Status & Time -->
             <td style="width: 13%;">
               ${app.renderStatusText(j.status, timeStr)}
             </td>
-
-            <!-- 7. Actions -->
             <td style="text-align: right; width: 14%;">
               ${j.permalink ? `
                 <a href="${j.permalink}" target="_blank" class="text-link">
@@ -1157,24 +1204,32 @@ window.reposterView = (function() {
       }).join('');
 
       container.innerHTML = `
-        <table class="data-table" style="width: 100%;">
-          <thead>
-            <tr>
-              <th style="width: 68px; text-align: center;">Preview</th>
-              <th style="width: 15%;">Reel / Sender</th>
-              <th style="width: 14%;">Destination</th>
-              <th style="width: 14%;">Format & Step</th>
-              <th style="width: 25%;">AI Hook & Copy</th>
-              <th style="width: 13%;">Status & Time</th>
-              <th style="text-align: right; width: 14%;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
+        <div class="card" style="background: var(--bg-card); border-radius: 12px; padding: 1.25rem; border: 1px solid var(--border-card); box-shadow: none;">
+          <div class="table-container" style="padding: 0; overflow-x: auto;">
+            <table class="data-table" style="width: 100%;">
+              <thead>
+                <tr>
+                  <th style="width: 68px; text-align: center;">Preview</th>
+                  <th style="width: 15%;">Reel / Sender</th>
+                  <th style="width: 14%;">Destination</th>
+                  <th style="width: 14%;">Format & Step</th>
+                  <th style="width: 25%;">AI Hook & Copy</th>
+                  <th style="width: 13%;">Status & Time</th>
+                  <th style="text-align: right; width: 14%;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
       `;
     } catch (err) {
-      console.warn('[loadIngestedTableData error]:', err);
+      console.warn('[loadIngestStreamData error]:', err);
     }
+  }
+
+  async function loadIngestedTableData() {
+    return loadIngestStreamData();
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1367,6 +1422,62 @@ window.reposterView = (function() {
     }
   }
 
+  async function submitManualModalJob() {
+    const urlInput = document.getElementById('rp-modal-url');
+    const pageSelect = document.getElementById('rp-modal-page');
+    const reviewCheckbox = document.getElementById('rp-modal-review');
+    const submitBtn = document.getElementById('rp-modal-submit-btn');
+    const progressBox = document.getElementById('rp-modal-progress');
+    const progressText = document.getElementById('rp-modal-progress-text');
+
+    const url = urlInput?.value?.trim();
+    const pageId = pageSelect?.value || selectedPageId || 1;
+    const reviewCaption = reviewCheckbox?.checked || false;
+
+    if (!url) {
+      app.toast('Please enter a valid Instagram URL', 'error');
+      return;
+    }
+
+    try {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Dispatching Pipeline...';
+      }
+      if (progressBox) progressBox.classList.remove('hidden');
+      if (progressText) progressText.innerHTML = '<span class="spinner-sm"></span> Step 1/4: Ingesting & queueing reel download...';
+
+      const res = await fetch('/api/reposter/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, pageId, reviewCaption })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to submit reel');
+      }
+
+      app.toast('Reel dispatched to publishing pipeline!', 'success');
+      if (urlInput) urlInput.value = '';
+      setTimeout(() => {
+        closeManualModal();
+        if (progressBox) progressBox.classList.add('hidden');
+      }, 1200);
+
+      await loadSummary();
+      await renderActiveStage();
+    } catch (err) {
+      if (progressBox) progressBox.classList.add('hidden');
+      app.toast(err.message, 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Ingest & Dispatch Reel Live';
+      }
+    }
+  }
+
   function getStatusBadge(status) {
     return app.renderStatusText(status);
   }
@@ -1376,6 +1487,10 @@ window.reposterView = (function() {
     selectPage,
     switchStage,
     setDownloadedViewMode,
+    setIngestViewMode,
+    openManualModal,
+    closeManualModal,
+    submitManualModalJob,
     submitJob,
     approveJob,
     retryJob,

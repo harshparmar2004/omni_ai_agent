@@ -135,6 +135,7 @@ async function getLivePublishedMedia(pageId = 1) {
         likes: item.like_count || 0,
         comments: item.comments_count || 0,
         page_handle: pageHandle,
+        telegram_chat_id: '5443723531',
         agent: 'reposter'
       };
     });
@@ -157,11 +158,14 @@ function getFallbackMedia(pageId = 1) {
       permalink: isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/',
       story_permalink: isMovie ? 'https://www.instagram.com/stories/movie_series_365/' : 'https://www.instagram.com/stories/gta6_updates_007/',
       source_url: isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/',
+      caption: isMovie ? 'Top upcoming thriller trailer breakdown! Credit: @filmfeed #movies #cinema' : 'New GTA 6 physics & weather teaser! Credit: @rockstargames #gta6 #gaming',
       published_at: new Date().toISOString(),
       status: 'published',
       media_type: 'reel',
       likes: 1,
-      page_handle: isMovie ? '@movie_series_365' : '@gta6_updates_007'
+      page_handle: isMovie ? '@movie_series_365' : '@gta6_updates_007',
+      telegram_chat_id: '5443723531',
+      agent: 'reposter'
     }
   ];
 }
@@ -665,11 +669,12 @@ router.post('/discoveries/:id/skip', (req, res) => {
 
 // ── Jobs & Reposter Endpoints ────────────────────────────────
 async function handleGetJobs(req, res) {
-  const published = await getLivePublishedMedia();
+  const pId = req.query.pageId || req.query.page_id || 1;
+  const published = await getLivePublishedMedia(pId);
   const runs = await getLiveWorkflowRuns();
 
   const statusQuery = (req.query.status || '').toLowerCase();
-  const limit = parseInt(req.query.limit || '20', 10);
+  const limit = parseInt(req.query.limit || '30', 10);
   const offset = parseInt(req.query.offset || '0', 10);
 
   // Check for in-progress runners
@@ -680,10 +685,11 @@ async function handleGetJobs(req, res) {
     source_url: 'https://www.instagram.com/gta6_updates_007/',
     permalink: '',
     story_permalink: '',
-    page_handle: '@gta6_updates_007',
+    page_handle: pId === 2 || String(pId) === '2' ? '@movie_series_365' : '@gta6_updates_007',
     status: 'publishing',
     current_step: 'Cloud runner processing on GitHub Actions',
     created_at: r.created_at,
+    telegram_chat_id: '5443723531',
     agent: r.name.toLowerCase().includes('watchtower') ? 'watchtower' : 'reposter'
   }));
 
@@ -704,6 +710,24 @@ async function handleGetJobs(req, res) {
 
 router.get('/jobs', handleGetJobs);
 router.get('/reposter/jobs', handleGetJobs);
+
+router.get('/reposter/pipeline-summary', async (req, res) => {
+  try {
+    const pId = req.query.pageId ? parseInt(req.query.pageId, 10) : 1;
+    const published = await getLivePublishedMedia(pId);
+    const runs = await getLiveWorkflowRuns();
+    const activeRuns = runs.filter(r => r.status === 'in_progress' || r.status === 'queued');
+    res.json({
+      ingested: published.length + activeRuns.length,
+      downloaded: published.length,
+      ready: 0,
+      published: published.length,
+      failed: 0
+    });
+  } catch (err) {
+    res.json({ ingested: 0, downloaded: 0, ready: 0, published: 0, failed: 0 });
+  }
+});
 
 async function handleCreateRepostJob(req, res) {
   const url = req.body?.url;

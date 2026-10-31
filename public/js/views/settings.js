@@ -51,11 +51,36 @@ window.settingsView = (function() {
     const container = document.getElementById('view-settings');
     if (!container) return;
 
+    // Helper for rendering connected pages dropdown
+    function renderQuickPostPageOptions() {
+      const pages = window.app?.pages || [
+        { id: 1, name: 'GTA 6 Updates 007', handle: '@gta6_updates_007' },
+        { id: 2, name: 'Movie Recommendations', handle: '@movie_series_365' }
+      ];
+      return pages.map(p => `<option value="${p.id}">${p.name} (${p.handle || '@' + (p.slug || p.id)})</option>`).join('');
+    }
+
     // ── SECTION 01: Telegram Mobile Bot & Security ───────────────
     const section1Html = createSettingsSection({
       title: 'Telegram Mobile Bot & Security',
       description: 'Send reels from your phone via Telegram to post directly to your Instagram page.',
       content: [
+        createSettingRow({
+          title: 'Mobile Zero-Click Ingestion Hub',
+          description: 'Share any Instagram Reel from your phone directly to your bot. Agent 1 downloads 1080p MP4, generates AI copy, frames with Vice City template, and posts live.',
+          hint: 'Bot: <a href="https://t.me/omnistudio_bot" target="_blank" style="color: var(--accent-primary); font-weight: 600; text-decoration: none;">@omnistudio_bot ↗</a> · Whitelist: <code style="font-family: var(--font-mono); font-weight: 600;">5443723531</code>',
+          control: `
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <span class="stream-flow-step completed"><span class="stream-flow-step-dot"></span>1. Forward Reel</span>
+              <span class="stream-flow-arrow">→</span>
+              <span class="stream-flow-step completed"><span class="stream-flow-step-dot"></span>2. Chat Whitelist</span>
+              <span class="stream-flow-arrow">→</span>
+              <span class="stream-flow-step completed"><span class="stream-flow-step-dot"></span>3. Choose Page</span>
+              <span class="stream-flow-arrow">→</span>
+              <span class="stream-flow-step completed"><span class="stream-flow-step-dot"></span>4. Live Post</span>
+            </div>
+          `
+        }),
         createSettingRow({
           title: 'Bot Connection Token',
           description: 'Connects your private Telegram bot so the reposter agent can receive reel links you share. Stored encrypted locally.',
@@ -94,6 +119,59 @@ window.settingsView = (function() {
             <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
               <button type="button" class="settings-btn-outlined" id="st-btn-test-tg" onclick="settingsView.testTelegram()">Test Telegram Connection</button>
               <span id="st-tg-test-status" class="settings-status-muted"></span>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
+    // ── SECTION 01B: Manual On-Demand Dispatcher (Direct Quick-Post) ───
+    const sectionQuickPostHtml = createSettingsSection({
+      title: 'Manual On-Demand Dispatcher (Direct Quick-Post)',
+      description: 'Desktop fallback tool to manually paste an Instagram Reel URL and trigger the publishing pipeline on-demand.',
+      content: [
+        createSettingRow({
+          title: 'Instagram Reel URL',
+          description: 'Paste any Instagram Reel link to process manually without your mobile phone.',
+          hint: 'Example: https://www.instagram.com/reel/DF-EXAMPLE/',
+          control: `
+            <input type="text" id="st-qp-url" class="settings-input settings-input-mono" placeholder="https://www.instagram.com/reel/..." style="font-size: 13px;">
+          `
+        }),
+        createSettingRow({
+          title: 'Destination Target Page',
+          description: 'Select which connected Instagram account will publish this reel.',
+          hint: '',
+          control: `
+            <select id="st-qp-page" class="settings-input">
+              ${renderQuickPostPageOptions()}
+            </select>
+          `
+        }),
+        createSettingRow({
+          title: 'Caption Review Mode',
+          description: 'Review and edit AI caption before publishing live, or post automatically once framed.',
+          hint: 'Enabled: job pauses in Stage 3 for review. Disabled: auto-publishes immediately.',
+          control: `
+            <label class="settings-switch">
+              <input type="checkbox" id="st-qp-review">
+              <span class="settings-switch-slider"></span>
+            </label>
+          `
+        }),
+        createSettingRow({
+          title: 'Dispatch Reel Live',
+          description: 'Trigger Agent 1 pipeline (Download 1080p MP4 ➔ AI Copy ➔ Vice City Frame ➔ Instagram API).',
+          hint: '',
+          control: `
+            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <button type="button" class="btn btn-primary" id="st-qp-btn" onclick="settingsView.submitQuickPost()" style="height: 38px; padding: 0 16px; font-size: 13px; font-weight: 600;">
+                  Ingest & Dispatch Reel Live
+                </button>
+                <span id="st-qp-status" class="settings-status-muted"></span>
+              </div>
+              <div id="st-qp-progress-bar" style="display: none; font-size: 12px; color: var(--text-secondary); font-family: var(--font-mono); padding: 8px 12px; background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 6px;"></div>
             </div>
           `
         })
@@ -370,6 +448,7 @@ window.settingsView = (function() {
         </div>
 
         ${section1Html}
+        ${sectionQuickPostHtml}
         ${section2Html}
         ${section3Html}
         ${section4Html}
@@ -756,6 +835,66 @@ window.settingsView = (function() {
     }
   }
 
+  async function submitQuickPost() {
+    const urlInput = document.getElementById('st-qp-url');
+    const pageSelect = document.getElementById('st-qp-page');
+    const reviewCheckbox = document.getElementById('st-qp-review');
+    const btn = document.getElementById('st-qp-btn');
+    const statusSpan = document.getElementById('st-qp-status');
+    const progressBox = document.getElementById('st-qp-progress-bar');
+
+    const url = urlInput?.value?.trim();
+    const pageId = pageSelect?.value || '1';
+    const reviewCaption = reviewCheckbox?.checked || false;
+
+    if (!url) {
+      app.toast('Please enter a valid Instagram Reel URL', 'error');
+      return;
+    }
+
+    try {
+      if (btn) btn.disabled = true;
+      if (statusSpan) {
+        statusSpan.className = 'settings-status-muted';
+        statusSpan.textContent = 'Dispatching pipeline...';
+      }
+      if (progressBox) {
+        progressBox.style.display = 'block';
+        progressBox.textContent = 'Step 1/4: Ingesting & queueing reel download...';
+      }
+
+      const res = await fetch('/api/reposter/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, pageId, reviewCaption })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to dispatch reel');
+      }
+
+      if (statusSpan) {
+        statusSpan.className = 'settings-status-success';
+        statusSpan.textContent = 'Dispatched successfully!';
+        setTimeout(() => { if (statusSpan) statusSpan.textContent = ''; }, 5000);
+      }
+      if (progressBox) {
+        progressBox.textContent = `Job #${data.job?.id || data.id || 'Live'} queued! View real-time progress in Agent 1.`;
+      }
+      if (urlInput) urlInput.value = '';
+      app.toast('Reel dispatched to publishing pipeline!', 'success');
+    } catch (err) {
+      if (statusSpan) {
+        statusSpan.className = 'settings-status-danger';
+        statusSpan.textContent = err.message;
+      }
+      app.toast(err.message, 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   return {
     render,
     saveSettings,
@@ -769,6 +908,7 @@ window.settingsView = (function() {
     testTunnel,
     testTelegram,
     pruneMedia,
+    submitQuickPost,
     runDiagnostics,
     refresh: loadSettings
   };
