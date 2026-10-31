@@ -40,6 +40,29 @@ window.reposterView = (function() {
     return `${Math.floor(diff / 86400)}d ago`;
   }
 
+  function extractSourceCreator(job) {
+    if (job.source_account) return String(job.source_account).replace(/^@/, '');
+    if (job.creator) return String(job.creator).replace(/^@/, '');
+    if (job.caption) {
+      const match = job.caption.match(/(?:credit|via|source|by|shoutout)[:\s]*@([a-zA-Z0-9._]+)/i);
+      if (match) return match[1];
+    }
+    return 'Instagram Creator';
+  }
+
+  function formatReceiptDateTime(timestamp) {
+    if (!timestamp) return { date: 'Today', time: '--', relative: 'Just now' };
+    const d = new Date(timestamp);
+    if (isNaN(d.getTime())) return { date: 'Today', time: '--', relative: 'Just now' };
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    return {
+      date: dateStr,
+      time: timeStr,
+      relative: formatTimeAgo(timestamp)
+    };
+  }
+
   function parseCaptionComponents(caption = '') {
     if (!caption) {
       return {
@@ -335,21 +358,21 @@ window.reposterView = (function() {
       <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.15rem;">
         <div>
           <div class="pipeline-stage-title" style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-            <span>Stage 1: Incoming Telegram Reels Stream</span>
+            <span>Stage 1: Telegram Ingested Reels</span>
             <span class="status-text-success" style="font-size: 0.74rem; font-weight: 500; display: inline-flex; align-items: center; gap: 4px;">
               ● Bot Listening (@omnistudio_bot)
             </span>
           </div>
           <div class="text-sm text-muted" style="margin-top: 2px;">
-            Real-time feed of reels forwarded via Telegram targeting <b>${pageLabel}</b> (Chat ID: 5443723531)
+            Incoming reels forwarded via Telegram to <b>@omnistudio_bot</b> targeting <b>${pageLabel}</b> (Sender Chat: 5443723531)
           </div>
         </div>
 
         <div class="flex items-center gap-2" style="flex-wrap: wrap;">
-          <!-- View Mode Switcher: Cards View (Default) vs Table View -->
+          <!-- View Mode Switcher: Cards View vs Table View -->
           <div class="view-mode-switcher">
-            <button class="view-mode-btn ${ingestViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('grid')" title="Reels Stream Cards">
-              <span>Stream Cards</span>
+            <button class="view-mode-btn ${ingestViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('grid')" title="Cards View">
+              <span>Cards View</span>
             </button>
             <button class="view-mode-btn ${ingestViewMode === 'table' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('table')" title="Table View">
               <span>Table View</span>
@@ -1011,112 +1034,74 @@ window.reposterView = (function() {
         return;
       }
 
-      // ── Grid Cards View (Instagram-Style Instant Reel Feed) ───
+      // ── Grid Cards View (Focused Telegram Ingestion Receipt Cards) ───
       if (ingestViewMode === 'grid') {
         const cardsHtml = jobs.map(j => {
           const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
           const isGta6 = pageSlug.includes('gta6') || j.page_id === 1;
           const pageClass = isGta6 ? 'gta6' : 'movies';
-          const parsed = parseCaptionComponents(j.caption);
-          const timeStr = j.published_at ?
-            `Published ${formatTimeAgo(j.published_at)}` :
-            `Received ${formatTimeAgo(j.created_at)}`;
-          const isReel = (j.media_type === 'reel' || !j.media_type);
-
-          // Flow step status progression
-          let s1 = 'completed', s2 = 'completed', s3 = 'completed', s4 = 'pending';
-          if (j.status === 'published') {
-            s4 = 'completed';
-          } else if (j.status === 'ready' || j.status === 'pending_review') {
-            s4 = 'active';
-          } else if (j.status === 'downloading') {
-            s2 = 'active'; s3 = 'pending'; s4 = 'pending';
-          } else if (j.status === 'queued' || j.current_step === 'init') {
-            s1 = 'active'; s2 = 'pending'; s3 = 'pending'; s4 = 'pending';
-          } else if (j.status === 'failed') {
-            s4 = 'failed';
-          }
-
+          const sourceCreator = extractSourceCreator(j);
+          const dt = formatReceiptDateTime(j.created_at || j.published_at);
           const thumbSrc = j.thumbnail_url || `/api/jobs/${j.id}/thumbnail`;
+          const reelLink = j.source_url || (j.shortcode ? `https://www.instagram.com/reel/${j.shortcode}/` : '#');
 
           return `
-            <div class="telegram-stream-card">
+            <div class="telegram-stream-card" style="padding: 1.15rem; gap: 1.15rem; align-items: center;">
               <!-- 9:16 Reel Cover Snapshot -->
-              <a href="${j.permalink || j.source_url || '#'}" target="_blank" class="stream-card-thumb-wrap" title="Open reel #${j.id} on Instagram">
+              <a href="${reelLink}" target="_blank" class="stream-card-thumb-wrap" style="width: 105px; min-width: 105px; height: 165px;" title="Open original reel on Instagram">
                 <img src="${thumbSrc}" alt="${j.shortcode}" class="stream-card-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';" />
                 <div class="stream-card-play-overlay">▶</div>
                 <div class="stream-card-shortcode-pill">${j.shortcode ? `/reel/${j.shortcode}` : `#${j.id}`}</div>
               </a>
 
-              <!-- Stream Card Body -->
-              <div class="stream-card-body">
-                <div>
-                  <!-- Destination Badge & Time -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.35rem;">
-                    <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
-                    <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
-                      ${timeStr}
+              <!-- Stream Card Body: Focused Strictly on Telegram Ingest Receipt Info -->
+              <div class="stream-card-body" style="gap: 0.55rem;">
+                <!-- Destination Target Page Badge + Ingestion Source Tag -->
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="stream-badge-page ${pageClass}" title="Target Destination Account">${pageSlug}</span>
+                    <span style="font-size: 0.68rem; font-weight: 600; color: var(--agent-reposter); background: var(--agent-reposter-soft); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--agent-reposter-border);">
+                      Telegram Received
                     </span>
                   </div>
+                  <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                    ${dt.relative}
+                  </span>
+                </div>
 
-                  <!-- AI Hook / Headline -->
-                  <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); line-height: 1.35; margin-bottom: 0.25rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;" title="${escapeHtml(parsed.hook)}">
-                    ${escapeHtml(parsed.hook)}
+                <!-- Reel Shortcode / Source Link & Creator Account -->
+                <div>
+                  <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
+                    <a href="${reelLink}" target="_blank" style="color: var(--text-primary); text-decoration: none; font-family: var(--font-mono);">
+                      ${j.shortcode ? `/reel/${j.shortcode}` : 'Instagram Reel'} ↗
+                    </a>
                   </div>
-
-                  <!-- Real-Time Pipeline Micro-Stepper -->
-                  <div class="stream-flow-steps">
-                    <span class="stream-flow-step ${s1}"><span class="stream-flow-step-dot"></span>Ingest</span>
-                    <span class="stream-flow-arrow">→</span>
-                    <span class="stream-flow-step ${s2}"><span class="stream-flow-step-dot"></span>1080p MP4</span>
-                    <span class="stream-flow-arrow">→</span>
-                    <span class="stream-flow-step ${s3}"><span class="stream-flow-step-dot"></span>AI Copy</span>
-                    <span class="stream-flow-arrow">→</span>
-                    <span class="stream-flow-step ${s4}"><span class="stream-flow-step-dot"></span>Live</span>
-                  </div>
-
-                  <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem;">
-                    Chat: <code style="font-family: var(--font-mono); font-size: 0.7rem;">${j.telegram_chat_id || '5443723531'}</code> · ${isReel ? '1080p MP4' : 'Post'}
+                  <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <span>By Creator: <strong style="color: var(--text-primary); font-family: var(--font-mono);">@${sourceCreator}</strong></span>
+                    <span>·</span>
+                    <span>Telegram Chat: <code style="font-family: var(--font-mono); font-size: 0.72rem;">${j.telegram_chat_id || '5443723531'}</code></span>
                   </div>
                 </div>
 
-                <!-- Footer Actions -->
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
-                  <div>
-                    ${j.permalink ? `
-                      <span class="status-text-success" style="font-size: 0.72rem; font-weight: 600;">● Live on Instagram</span>
-                    ` : (j.status === 'failed' ? `
-                      <span class="status-text-danger" style="font-size: 0.72rem; font-weight: 600;">● Pipeline Failed</span>
-                    ` : `
-                      <span style="font-size: 0.72rem; color: var(--accent-primary); font-family: var(--font-mono); font-weight: 500;">
-                        <span class="spinner-sm" style="width: 10px; height: 10px; display: inline-block; vertical-align: middle;"></span>
-                        ${j.current_step || 'Processing'}
-                      </span>
-                    `)}
+                <!-- Exact Date & Time Sent -->
+                <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.5rem 0.75rem; font-size: 0.75rem;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                    <div>
+                      <span style="color: var(--text-muted); font-weight: 500;">Sent Date & Time:</span>
+                      <strong style="color: var(--text-primary); margin-left: 4px;">${dt.date}</strong> at <strong style="color: var(--text-primary);">${dt.time}</strong>
+                    </div>
+                    <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">${dt.relative}</span>
                   </div>
+                </div>
 
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    ${j.permalink ? `
-                      <a href="${j.permalink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 8px; text-decoration: none;">
-                        View Reel ↗
-                      </a>
-                      ${j.story_permalink ? `
-                        <a href="${j.story_permalink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 8px; text-decoration: none;">
-                          Story ↗
-                        </a>
-                      ` : ''}
-                    ` : (j.status === 'pending_review' || j.status === 'ready' ? `
-                      <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.75rem; padding: 3px 10px;">
-                        Publish Live
-                      </button>
-                    ` : (j.status === 'failed' ? `
-                      <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.75rem; padding: 3px 10px;">
-                        Retry
-                      </button>
-                    ` : `
-                      <a href="${j.source_url}" target="_blank" class="text-link" style="font-size: 0.75rem;">Source ↗</a>
-                    `))}
-                  </div>
+                <!-- Footer: Ingest Status & Direct Source Link -->
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.45rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
+                  <span style="font-size: 0.75rem; font-weight: 600; color: var(--agent-reposter); display: inline-flex; align-items: center; gap: 4px;">
+                    ● Ingested via Telegram
+                  </span>
+                  <a href="${reelLink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 10px; text-decoration: none;">
+                    Open Reel on Instagram ↗
+                  </a>
                 </div>
               </div>
             </div>
@@ -1127,77 +1112,82 @@ window.reposterView = (function() {
         return;
       }
 
-      // ── Table View Mode ───
+      // ── Table View Mode (Clean Telegram Ingestion Audit Log) ───
       const rows = jobs.map(j => {
         const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-        const parsed = parseCaptionComponents(j.caption);
-        const timeStr = j.published_at ?
-          `Published ${formatTimeAgo(j.published_at)}` :
-          `Received ${formatTimeAgo(j.created_at)}`;
-        const isReel = (j.media_type === 'reel' || !j.media_type);
+        const isGta6 = pageSlug.includes('gta6') || j.page_id === 1;
+        const pageClass = isGta6 ? 'gta6' : 'movies';
+        const sourceCreator = extractSourceCreator(j);
+        const dt = formatReceiptDateTime(j.created_at || j.published_at);
+        const thumbSrc = j.thumbnail_url || `/api/jobs/${j.id}/thumbnail`;
+        const reelLink = j.source_url || (j.shortcode ? `https://www.instagram.com/reel/${j.shortcode}/` : '#');
 
         return `
           <tr>
+            <!-- 1. Preview -->
             <td style="text-align: center; vertical-align: middle; padding: 0.55rem 0.5rem; width: 68px;">
-              <a href="${j.source_url || j.permalink || '#'}" target="_blank" class="reel-table-thumb-container" style="width: 50px; height: 68px;" title="Open reel #${j.id}">
-                <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';" />
-                ${isReel ? '<div class="reel-thumb-play-icon">▶</div>' : ''}
+              <a href="${reelLink}" target="_blank" class="reel-table-thumb-container" style="width: 50px; height: 68px;" title="Open original reel #${j.id}">
+                <img src="${thumbSrc}" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=300&auto=format&fit=crop&q=80';" />
+                <div class="reel-thumb-play-icon">▶</div>
               </a>
             </td>
-            <td style="width: 15%;">
-              <div class="flex items-center gap-2 mb-1">
-                <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">#${j.id}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">Telegram</span>
-              </div>
-              <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
-                Chat: ${j.telegram_chat_id || '5443723531'}
-              </div>
-              <a href="${j.source_url || j.permalink || '#'}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.78rem;">
-                ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
-              </a>
-            </td>
-            <td style="width: 14%;">
-              <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
-            </td>
-            <td style="width: 14%;">
-              <div style="font-size: 0.76rem; font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">
-                1080p MP4
-              </div>
-              <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
-                Step: ${j.current_step || 'completed'}
-              </div>
-            </td>
-            <td style="max-width: 280px;">
-              <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
-                ${escapeHtml(parsed.hook)}
-              </div>
-              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
-                Creator credit included
-              </div>
-              <div style="font-size: 0.68rem; color: var(--accent-primary); font-family: var(--font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') : '—'}
-              </div>
-            </td>
-            <td style="width: 13%;">
-              ${app.renderStatusText(j.status, timeStr)}
-            </td>
-            <td style="text-align: right; width: 14%;">
-              ${j.permalink ? `
-                <a href="${j.permalink}" target="_blank" class="text-link">
-                  Live on Feed ↗
+
+            <!-- 2. Reel Sent -->
+            <td style="width: 18%;">
+              <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.84rem; margin-bottom: 2px;">
+                <a href="${reelLink}" target="_blank" class="text-link" style="color: var(--text-primary); text-decoration: none;">
+                  ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Reel'} ↗
                 </a>
-              ` : (j.status === 'pending_review' || j.status === 'ready' ? `
-                <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-                  Publish Live
-                </button>
-              ` : (j.status === 'failed' ? `
-                <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-                  Retry
-                </button>
-              ` : `
-                <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
-              `))}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+                Job ID: #${j.id}
+              </div>
+            </td>
+
+            <!-- 3. Source Creator / Account -->
+            <td style="width: 16%;">
+              <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">
+                @${sourceCreator}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">Creator Account</div>
+            </td>
+
+            <!-- 4. Target Destination Account -->
+            <td style="width: 16%;">
+              <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
+              <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">${j.page_name || 'Target Account'}</div>
+            </td>
+
+            <!-- 5. Sender Telegram Chat -->
+            <td style="width: 14%;">
+              <div style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">
+                ${j.telegram_chat_id || '5443723531'}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">Telegram Chat ID</div>
+            </td>
+
+            <!-- 6. Date & Time Sent -->
+            <td style="width: 22%;">
+              <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">
+                ${dt.date} · ${dt.time}
+              </div>
+              <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+                ${dt.relative}
+              </div>
+            </td>
+
+            <!-- 7. Ingest Status -->
+            <td style="width: 14%;">
+              <span class="status-text-success" style="font-size: 0.76rem; font-weight: 600;">
+                ● Ingested
+              </span>
+            </td>
+
+            <!-- 8. Action -->
+            <td style="text-align: right; width: 12%;">
+              <a href="${reelLink}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 3px 10px; text-decoration: none; white-space: nowrap;">
+                Open Reel ↗
+              </a>
             </td>
           </tr>
         `;
@@ -1210,12 +1200,13 @@ window.reposterView = (function() {
               <thead>
                 <tr>
                   <th style="width: 68px; text-align: center;">Preview</th>
-                  <th style="width: 15%;">Reel / Sender</th>
-                  <th style="width: 14%;">Destination</th>
-                  <th style="width: 14%;">Format & Step</th>
-                  <th style="width: 25%;">AI Hook & Copy</th>
-                  <th style="width: 13%;">Status & Time</th>
-                  <th style="text-align: right; width: 14%;">Actions</th>
+                  <th style="width: 18%;">Reel Sent</th>
+                  <th style="width: 16%;">Source Creator</th>
+                  <th style="width: 16%;">Destination Account</th>
+                  <th style="width: 14%;">Telegram Chat</th>
+                  <th style="width: 22%;">Date & Time Sent</th>
+                  <th style="width: 14%;">Ingest Status</th>
+                  <th style="text-align: right; width: 12%;">Action</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
