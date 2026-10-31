@@ -67,12 +67,16 @@ function readSourcePosts(username, limit = 6) {
     const profileUrl = `https://www.instagram.com/${cleanUser}/`;
     const command = `python "${scriptPath}" "${profileUrl}"`;
 
-    console.log(`[Watchtower Guest Reader] 🔍 Inspecting @${cleanUser}...`);
-
     exec(command, { timeout: 75000 }, (error, stdout, stderr) => {
       let data = null;
+      if (error) {
+        console.warn(`[Watchtower Guest Reader] @${cleanUser} scraper error: ${error.message}`);
+      }
+      if (stderr && (stderr.includes('[Scraper') || stderr.includes('Finished'))) {
+        console.log(`[Watchtower Guest Reader] @${cleanUser} note: ${stderr.trim()}`);
+      }
       try {
-        const out = stdout.trim();
+        const out = (stdout || '').trim();
         const jsonStart = out.indexOf('{');
         if (jsonStart !== -1) {
           data = JSON.parse(out.slice(jsonStart));

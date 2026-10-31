@@ -179,9 +179,10 @@ async function evaluateAndSelectPosts(options = {}) {
     });
 
     const now = Date.now();
-    const MAX_AGE_HOURS = 24; // Strictly reject candidate reels older than 24 hours
+    const MAX_AGE_HOURS = 72; // Maximum age threshold for candidate reels (3 days)
 
-    const candidates = rawCandidates.filter(c => {
+    // Filter valid video reels within 72 hours
+    const validCandidates = rawCandidates.filter(c => {
       if (c.media_type && c.media_type !== 'reel') return false;
       const parsed = shortcodeToTimestamp(c.shortcode);
       const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
@@ -193,9 +194,19 @@ async function evaluateAndSelectPosts(options = {}) {
       return true;
     });
 
-    if (candidates.length === 0) {
+    if (validCandidates.length === 0) {
       continue;
     }
+
+    // Prefer fresh reels (< 24h) if any exist; otherwise fallback to recent available (up to 72h)
+    const freshOnly = validCandidates.filter(c => {
+      const parsed = shortcodeToTimestamp(c.shortcode);
+      const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
+      const ageHours = (now - postDate.getTime()) / (1000 * 60 * 60);
+      return ageHours <= 24;
+    });
+
+    const candidates = freshOnly.length > 0 ? freshOnly : validCandidates;
 
     // 4. Score candidate posts prioritizing RECENCY (Newest reel first)
     const scored = candidates.map(c => {
