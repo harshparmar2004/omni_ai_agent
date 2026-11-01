@@ -155,15 +155,22 @@
     </div>
   </div>
 
-  <!-- Video Preview Modal (iPhone 16 Pro 9:16 Mockup) -->
-  <div id="video-modal" class="modal-overlay hidden" onclick="if (event.target === this) app.closeVideoModal()">
-    <div class="modal-content" style="max-width: 360px; padding: 1.25rem; display: flex; flex-direction: column; align-items: center;">
-      <div class="flex items-center justify-between w-full mb-3">
-        <span class="font-bold text-sm" id="modal-video-title">Reel Preview (9:16)</span>
-        <button class="btn btn-secondary btn-sm" onclick="app.closeVideoModal()" style="padding: 2px 8px;">✕</button>
+  <!-- Video Preview Modal -->
+  <div id="video-modal" class="modal-overlay hidden" style="display: none;" onclick="if (event.target === this) app.closeVideoModal()">
+    <div class="modal-content" style="max-width: 380px; padding: 1.25rem; display: flex; flex-direction: column; align-items: center; border-radius: 16px; background: #161412; color: #FAF8F5; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8);">
+      <div class="flex items-center justify-between w-full mb-3" style="width: 100%;">
+        <div class="flex items-center gap-2">
+          <span class="video-modal-hd-tag">1080p HD</span>
+          <span class="font-bold text-sm" id="modal-video-title" style="color: #FAF8F5; font-family: var(--font-mono);">Live Reel Preview</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="app.closeVideoModal()" style="padding: 2px 8px; color: #FAF8F5; border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.08);">✕</button>
       </div>
-      <div class="phone-mockup">
-        <video id="modal-video-player" class="phone-video" controls autoplay loop playsinline></video>
+      <div class="phone-mockup" style="width: 100%; border-radius: 12px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; min-height: 480px; max-height: 520px; border: 1px solid rgba(255, 255, 255, 0.1);">
+        <video id="modal-video-player" class="phone-video" controls autoplay loop playsinline style="width: 100%; height: 100%; object-fit: contain; max-height: 520px; display: block;"></video>
+      </div>
+      <div class="flex items-center justify-between w-full mt-3" style="width: 100%; font-size: 0.74rem; color: rgba(255, 255, 255, 0.65);">
+        <span>1080p Stream • H.264 / AAC</span>
+        <button class="btn btn-secondary btn-sm" onclick="app.closeVideoModal()" style="padding: 3px 10px; color: #FAF8F5; border-color: rgba(255, 255, 255, 0.2);">Close</button>
       </div>
     </div>
   </div>

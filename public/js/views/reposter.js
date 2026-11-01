@@ -60,7 +60,7 @@ window.reposterView = (function() {
     const d = new Date(timestamp);
     if (isNaN(d.getTime())) return { date: 'Today', time: '--', relative: 'Just now' };
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     return {
       date: dateStr,
       time: timeStr,
@@ -1104,7 +1104,7 @@ window.reposterView = (function() {
             <table class="data-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th style="width: 95px; text-align: center;">Preview (9:16)</th>
+                  <th style="width: 85px; text-align: center;">Media Preview</th>
                   <th style="width: 17%;">Reel & ID</th>
                   <th style="width: 15%;">Destination Page</th>
                   <th style="width: 16%;">Format & Specs</th>
@@ -1148,94 +1148,102 @@ window.reposterView = (function() {
     const cleanedHook = cleanCaptionText(parsed.hook || j.caption || 'New Reel');
 
     const formatLabel = j.format || '1080p MP4';
-    const ratioLabel = j.aspect_ratio || '9:16 Vertical';
+    const ratioLabel = j.aspect_ratio || 'Adaptive Video';
     const dimLabel = j.dimensions || '1080 × 1920';
 
     return `
       <tr>
-        <!-- 1. Enlarged 9:16 Reel Cover Photo / Preview with Play Trigger -->
-        <td style="text-align: center; vertical-align: middle; padding: 0.65rem 0.5rem; width: 95px;">
-          <div class="downloaded-preview-wrap" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" title="Click to watch published reel in video player">
-            <span class="downloaded-hd-badge">1080p</span>
-            <img src="${thumbSrc}" alt="${j.shortcode}" class="downloaded-preview-img" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
-            <button type="button" class="downloaded-play-pill" title="Play Video">▶</button>
-            <span class="downloaded-ratio-badge">9:16</span>
+        <!-- 1. Media Preview (Adaptive Cover with Play Trigger) -->
+        <td style="text-align: center; vertical-align: middle; padding: 0.75rem 0.5rem; width: 85px;">
+          <div class="media-preview-box" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode || ''}')" title="Click to watch published reel">
+            <span class="media-hd-tag">1080p</span>
+            <img src="${thumbSrc}" alt="${j.shortcode || j.id}" class="media-preview-img" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
+            <button type="button" class="media-play-pill" title="Play Video">▶</button>
           </div>
         </td>
 
-        <!-- 2. Reel & reelId -->
-        <td style="width: 17%;">
-          <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; margin-bottom: 2px;">
-            <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="text-link" style="color: var(--text-primary); text-decoration: none;">
-              ${j.shortcode ? `/reel/${j.shortcode}` : 'Live Reel'} ↗
+        <!-- 2. Reel & ID (Structured Identity Cell) -->
+        <td style="width: 17%; vertical-align: middle;">
+          <div class="reel-identity-cell">
+            <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="reel-shortcode-link" title="Open reel on Instagram">
+              ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Reel'} ↗
             </a>
-          </div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
-            reelId: #${j.id}
-          </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
-            Telegram: ${j.telegram_chat_id || '5443723531'}
-          </div>
-        </td>
-
-        <!-- 3. Destination Page -->
-        <td style="width: 15%;">
-          <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
-            ${j.page_name || (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates 007')}
+            <div class="reel-id-chip">
+              reelId: #${j.id}
+            </div>
+            <div class="reel-origin-sub">
+              Telegram: ${j.telegram_chat_id || '5443723531'}
+            </div>
           </div>
         </td>
 
-        <!-- 4. Format & Specs -->
-        <td style="width: 16%;">
-          <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 3px;">
-            ${formatLabel}
-          </div>
-          <div style="display: inline-flex; align-items: center; gap: 4px; margin-bottom: 3px;">
-            <span style="font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; background: var(--bg-canvas); border: 1px solid var(--border-subtle); padding: 1px 5px; border-radius: 3px; color: var(--text-secondary);">${ratioLabel}</span>
-            <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">${dimLabel}</span>
-          </div>
-          <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
-            Meta Graph API v21.0
+        <!-- 3. Destination Page (Crisp Channel Block) -->
+        <td style="width: 15%; vertical-align: middle;">
+          <div class="destination-cell">
+            <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
+            <div class="destination-page-name">
+              ${j.page_name || (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates 007')}
+            </div>
+            <div class="destination-status-sub">
+              ● Meta Live Broadcast
+            </div>
           </div>
         </td>
 
-        <!-- 5. Caption Breakdown & Attribution -->
-        <td style="width: 22%;">
-          <div class="caption-snippet" title="${escapeHtml(cleanCaptionText(j.caption))}" style="margin-bottom: 4px;">
-            "${escapeHtml(cleanedHook)}"
+        <!-- 4. Format & Specs (Clean Organized Stack) -->
+        <td style="width: 16%; vertical-align: middle;">
+          <div class="specs-block">
+            <div class="specs-format-title">${formatLabel}</div>
+            <div class="specs-chip-row">
+              <span class="specs-badge">${ratioLabel}</span>
+              <span class="specs-badge">${dimLabel}</span>
+            </div>
+            <div class="specs-protocol-sub">
+              Meta Graph API v21.0
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span style="font-size: 0.68rem; color: var(--text-muted);">Creator credit included</span>
-            <button type="button" class="btn-inspect-copy" onclick="reposterView.openCaptionModal('${j.id}')">
-              Inspect Caption ↗
+        </td>
+
+        <!-- 5. Caption & Copy (Organized Quote Block) -->
+        <td style="width: 22%; vertical-align: middle;">
+          <div class="caption-card-block">
+            <div class="caption-hook-text" title="${escapeHtml(cleanCaptionText(j.caption))}">
+              "${escapeHtml(cleanedHook)}"
+            </div>
+            <div class="caption-meta-row">
+              <span>Creator credit included</span>
+              <button type="button" class="btn-inspect-link" onclick="reposterView.openCaptionModal('${j.id}')">
+                Inspect Copy ↗
+              </button>
+            </div>
+          </div>
+        </td>
+
+        <!-- 6. Broadcast Status & Time (Clean Date + Time) -->
+        <td style="width: 16%; vertical-align: middle;">
+          <div class="status-block-cell">
+            <div class="status-badge-published">
+              <span class="live-dot-indicator"></span> Live Published
+            </div>
+            <div class="status-datetime-line">
+              ${dt.date} · ${dt.time}
+            </div>
+            <div class="status-relative-line">
+              Broadcasted ${dt.relative}
+            </div>
+          </div>
+        </td>
+
+        <!-- 7. Actions (High-Visibility Live Reel & Watch Clip Buttons) -->
+        <td style="text-align: right; width: 14%; vertical-align: middle;">
+          <div class="actions-vertical-cell">
+            <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm action-btn-live" title="Open live reel on Instagram in new tab">
+              <span>Live Reel</span> ↗
+            </a>
+            <button type="button" class="btn btn-secondary btn-sm action-btn-watch" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode || ''}')" title="Watch full video clip in player">
+              <span>Watch Clip</span> ▶
             </button>
           </div>
-        </td>
-
-        <!-- 6. Broadcast Status & Time -->
-        <td style="width: 16%;">
-          <div style="margin-bottom: 4px;">
-            <span class="status-badge-ready" style="font-size: 0.74rem; font-weight: 600; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
-              ● Live Published
-            </span>
-          </div>
-          <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">
-            ${dt.date} · ${dt.time}
-          </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
-            Published ${dt.relative}
-          </div>
-        </td>
-
-        <!-- 7. Live Action (Live Reel button) -->
-        <td style="text-align: right; width: 14%;">
-          <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size: 0.75rem; white-space: nowrap; padding: 5px 12px; width: 100%; margin-bottom: 4px; justify-content: center; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;" title="Open reel on Instagram in new tab">
-            <span>Live Reel</span> ↗
-          </a>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" style="font-size: 0.74rem; white-space: nowrap; padding: 4px 10px; width: 100%; justify-content: center;" title="Watch 1080p clip in dashboard player">
-            Watch Clip ▶
-          </button>
         </td>
       </tr>
     `;
@@ -1259,24 +1267,23 @@ window.reposterView = (function() {
     const cleanedHook = cleanCaptionText(parsed.hook || j.caption || 'New Reel');
 
     const formatLabel = j.format || '1080p MP4';
-    const ratioLabel = j.aspect_ratio || '9:16 Vertical';
+    const ratioLabel = j.aspect_ratio || 'Adaptive Video';
     const dimLabel = j.dimensions || '1080 × 1920';
 
     return `
       <div class="downloaded-media-card">
         <div>
-          <!-- Large 9:16 Cover Preview -->
-          <div class="downloaded-card-preview-wrap" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" title="Click to watch 1080p published reel">
+          <!-- Large Cover Preview -->
+          <div class="downloaded-card-preview-wrap" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode || ''}')" title="Click to watch 1080p published reel">
             <span class="downloaded-hd-badge">1080p HD</span>
-            <img src="${thumbSrc}" alt="${j.shortcode}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
+            <img src="${thumbSrc}" alt="${j.shortcode || j.id}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
             <button type="button" class="downloaded-play-pill" style="width: 38px; height: 38px; font-size: 15px;" title="Play Video">▶</button>
-            <span class="downloaded-ratio-badge">${ratioLabel}</span>
           </div>
 
           <!-- Header Bar: ID & Destination -->
           <div class="flex items-center justify-between mb-2" style="flex-wrap: wrap; gap: 0.35rem;">
             <div class="flex items-center gap-2">
-              <span style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">reelId: #${j.id}</span>
+              <span class="reel-id-chip" style="font-weight: 700;">reelId: #${j.id}</span>
               <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
             </div>
             <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
@@ -1293,13 +1300,13 @@ window.reposterView = (function() {
           </div>
 
           <!-- Caption Snippet -->
-          <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.65rem 0.75rem; margin-bottom: 0.75rem;">
-            <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-bottom: 3px; line-height: 1.35;">
+          <div class="caption-card-block" style="margin-bottom: 0.75rem; max-width: 100%;">
+            <div class="caption-hook-text">
               "${escapeHtml(cleanedHook)}"
             </div>
-            <div class="flex items-center justify-between" style="font-size: 0.7rem; color: var(--text-muted);">
+            <div class="caption-meta-row">
               <span>${dimLabel} · Meta v21.0</span>
-              <button type="button" class="btn-inspect-copy" onclick="reposterView.openCaptionModal('${j.id}')">
+              <button type="button" class="btn-inspect-link" onclick="reposterView.openCaptionModal('${j.id}')">
                 Inspect ↗
               </button>
             </div>
@@ -1309,19 +1316,19 @@ window.reposterView = (function() {
         <!-- Footer: Status & Actions -->
         <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 0.25rem;">
           <div class="flex items-center justify-between mb-3">
-            <span class="status-badge-ready" style="font-size: 0.74rem; font-weight: 600; padding: 2px 7px; border-radius: 4px;">
-              ● Live Published
+            <span class="status-badge-published">
+              <span class="live-dot-indicator"></span> Live Published
             </span>
             <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
-              Published ${dt.relative}
+              ${dt.relative}
             </span>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" style="font-size: 0.75rem; justify-content: center;">
+            <button type="button" class="btn btn-secondary btn-sm action-btn-watch" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode || ''}')" style="justify-content: center;">
               Watch Clip ▶
             </button>
-            <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size: 0.75rem; justify-content: center; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+            <a href="${liveReelUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm action-btn-live" style="justify-content: center;">
               <span>Live Reel</span> ↗
             </a>
           </div>
@@ -1880,15 +1887,17 @@ window.reposterView = (function() {
   }
 
   function previewVideo(videoUrl, shortcode) {
+    const isVideo = videoUrl && (/\.mp4($|\?)/i.test(videoUrl) || videoUrl.includes('/video') || videoUrl.includes('storage.googleapis'));
+    const finalUrl = isVideo ? videoUrl : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+
     if (window.app && typeof window.app.openVideoModal === 'function') {
       const titleEl = document.getElementById('modal-video-title');
       if (titleEl) {
-        titleEl.textContent = shortcode ? `Downloaded Reel: /reel/${shortcode}` : 'Downloaded Reel Preview (9:16)';
+        titleEl.textContent = shortcode ? `/reel/${shortcode} — Video Preview` : 'Live Reel Video Preview';
       }
-      const finalUrl = videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
       window.app.openVideoModal(finalUrl);
     } else {
-      window.open(videoUrl || '#', '_blank');
+      window.open(finalUrl, '_blank');
     }
   }
 

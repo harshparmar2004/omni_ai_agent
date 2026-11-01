@@ -364,7 +364,14 @@ window.app = (function() {
 
     player.src = videoSrc;
     modal.classList.remove('hidden');
-    player.play().catch(() => {});
+    modal.style.display = 'flex';
+    player.load();
+    const playPromise = player.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((e) => {
+        console.log('[Video notice]: Autoplay paused until user interaction', e.message);
+      });
+    }
   }
 
   function closeVideoModal() {
@@ -374,7 +381,10 @@ window.app = (function() {
       player.pause();
       player.src = '';
     }
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
   }
 
   /**
