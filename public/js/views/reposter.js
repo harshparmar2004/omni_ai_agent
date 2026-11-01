@@ -368,169 +368,61 @@ window.reposterView = (function() {
 
     return `
       <div class="pipeline-stepper-header">
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <span class="pipeline-live-flow-dot"></span>
-          <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); letter-spacing: 0.05em;">
-            Publishing Pipeline Flow for <b style="color: var(--accent-primary);">${pageLabel}</b>
-          </div>
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+          <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.triggerPipelineFlowAnimation()" style="font-size: 0.72rem; padding: 2px 9px; font-weight: 600; gap: 4px;" title="Replay automated pipeline progression">
-            <span>⚡ Replay Flow</span>
-          </button>
-          <div style="font-size: 0.74rem; color: var(--text-muted);">
-            Agent 1: <strong>On-Demand Reposter & Downloader</strong>
-          </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          Agent 1: <strong>On-Demand Reposter & Downloader</strong>
         </div>
       </div>
 
       <div class="pipeline-stepper">
         <!-- Stage 1: Telegram Stream -->
         <div id="step-node-ingest" class="pipeline-step-node ${activeStage === 'ingest' ? 'active' : ''}" onclick="reposterView.switchStage('ingest')" title="Live stream of reels received via Telegram Bot (@omnistudio_bot)">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-ingest">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 1</div>
-              <div class="pipeline-step-title">Telegram Stream</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.ingested > 0 ? '#10B981' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="rps-count-ingested">${s.ingested} Received</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.ingested > 0 ? 'Active' : 'Listening'}
+          <span class="pipeline-step-num">1.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Telegram Stream</span>
+            <span class="pipeline-step-count" id="rps-count-ingested">${s.ingested} Received</span>
           </div>
         </div>
-
-        <!-- Connector 1 -->
-        <div class="pipeline-flow-connector" id="flow-arrow-1" title="Stream forwarded to downloader">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="flow-arrow-1">→</div>
 
         <!-- Stage 2: Downloaded Media -->
         <div id="step-node-downloaded" class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="reposterView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-downloaded">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 2</div>
-              <div class="pipeline-step-title">Downloaded Media</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="rps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded} Ready MP4</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.downloaded > 0 ? 'Ready' : 'Waiting'}
+          <span class="pipeline-step-num">2.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Downloaded Media</span>
+            <span class="pipeline-step-count" id="rps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded} Ready Files</span>
           </div>
         </div>
-
-        <!-- Connector 2 -->
-        <div class="pipeline-flow-connector" id="flow-arrow-2" title="Media passed to AI copywriter">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="flow-arrow-2">→</div>
 
         <!-- Stage 3: AI Copywriting & Review -->
         <div id="step-node-ready" class="pipeline-step-node ${activeStage === 'ready' ? 'active' : ''}" onclick="reposterView.switchStage('ready')" title="AI Copywritten, Attribution & Review">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-ready">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 3</div>
-              <div class="pipeline-step-title">AI Copywriting</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.ready > 0 ? '#7C3AED' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="rps-count-ready">${s.ready} Staged/Ready</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.ready > 0 ? 'Review' : 'Verified'}
+          <span class="pipeline-step-num">3.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">AI Copywriting</span>
+            <span class="pipeline-step-count" id="rps-count-ready">${s.ready} Staged/Ready</span>
           </div>
         </div>
-
-        <!-- Connector 3 -->
-        <div class="pipeline-flow-connector" id="flow-arrow-3" title="Approved reel dispatched live">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="flow-arrow-3">→</div>
 
         <!-- Stage 4: Live Published -->
         <div id="step-node-published" class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="reposterView.switchStage('published')" title="Live on Instagram Feed">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-published">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 4</div>
-              <div class="pipeline-step-title">Live Published</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.published > 0 ? '#059669' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="rps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.published > 0 ? 'Live IG' : 'Synced'}
+          <span class="pipeline-step-num">4.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Live Published</span>
+            <span class="pipeline-step-count" id="rps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
           </div>
         </div>
-
-        <!-- Connector 4 -->
-        <div class="pipeline-flow-connector" id="flow-arrow-4" title="Failover and retry monitoring">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="flow-arrow-4">→</div>
 
         <!-- Stage 5: Retries -->
         <div id="step-node-failed" class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="reposterView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-failed">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 5</div>
-              <div class="pipeline-step-title">Retries</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.failed > 0 ? '#DC2626' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="rps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.failed > 0 ? 'Action Req' : '0 Clean'}
+          <span class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'color: var(--danger);' : ''}">5.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Retries</span>
+            <span class="pipeline-step-count" id="rps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
           </div>
         </div>
       </div>

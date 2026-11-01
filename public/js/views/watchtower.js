@@ -290,263 +290,91 @@ window.watchtowerView = (function() {
 
     return `
       <div class="pipeline-stepper-header">
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <span class="pipeline-live-flow-dot"></span>
-          <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); letter-spacing: 0.05em;">
-            Publishing Pipeline Flow for <b style="color: var(--accent-primary);">${pageLabel}</b>
-          </div>
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+          <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="watchtowerView.triggerPipelineFlowAnimation()" style="font-size: 0.72rem; padding: 2px 9px; font-weight: 600; gap: 4px;" title="Replay automated pipeline progression">
-            <span>⚡ Replay Flow</span>
-          </button>
-          <div style="font-size: 0.74rem; color: var(--text-muted);">
-            Cadence: <strong>Every 3 Hours ± Jitter</strong>
-          </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          Cadence: <strong>Every 3 Hours ± Jitter</strong>
         </div>
       </div>
 
       <div class="pipeline-stepper">
         <!-- Stage 1: Tracking Accounts -->
         <div id="wt-step-sources" class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Tracked Competitor Accounts">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-sources">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 1</div>
-              <div class="pipeline-step-title">Tracking</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.sources > 0 ? '#2563EB' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-sources">${s.sources} Accounts</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.sources > 0 ? 'Active' : 'Empty'}
+          <span class="pipeline-step-num">1.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Tracking</span>
+            <span class="pipeline-step-count" id="ps-count-sources">${s.sources} Accounts</span>
           </div>
         </div>
-
-        <!-- Connector 1 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-1" title="Surveillance scan triggers reel discovery">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-1">→</div>
 
         <!-- Stage 2: Discovered -->
         <div id="wt-step-discovered" class="pipeline-step-node ${activeStage === 'discovered' ? 'active' : ''}" onclick="watchtowerView.switchStage('discovered')" title="Raw Discovered Reels">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-discovered">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 2</div>
-              <div class="pipeline-step-title">Discovered</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.discovered > 0 ? '#0284C7' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-discovered">${s.discovered} Ingested</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.discovered > 0 ? 'Scanned' : 'Idle'}
+          <span class="pipeline-step-num">2.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Discovered</span>
+            <span class="pipeline-step-count" id="ps-count-discovered">${s.discovered} Ingested</span>
           </div>
         </div>
-
-        <!-- Connector 2 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-2" title="Raw reels fed to AI viral scoring">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-2">→</div>
 
         <!-- Stage 3: AI Ranked -->
         <div id="wt-step-ranked" class="pipeline-step-node ${activeStage === 'ranked' ? 'active' : ''}" onclick="watchtowerView.switchStage('ranked')" title="Viral Scored Reels (≥70)">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-ranked">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 3</div>
-              <div class="pipeline-step-title">AI Ranked</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.ranked > 0 ? '#D97706' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-ranked">${s.ranked} Scored</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.ranked > 0 ? '≥70 Viral' : 'Waiting'}
+          <span class="pipeline-step-num">3.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">AI Ranked</span>
+            <span class="pipeline-step-count" id="ps-count-ranked">${s.ranked} Scored</span>
           </div>
         </div>
-
-        <!-- Connector 3 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-3" title="Top-scoring reels fetched by downloader">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-3">→</div>
 
         <!-- Stage 4: Downloaded Media -->
         <div id="wt-step-downloaded" class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="watchtowerView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-downloaded">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 4</div>
-              <div class="pipeline-step-title">Downloaded</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${(s.downloaded || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-downloaded" style="font-weight: 600; color: ${(s.downloaded || 0) > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready MP4</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${(s.downloaded || 0) > 0 ? 'Ready' : 'Waiting'}
+          <span class="pipeline-step-num">4.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Downloaded</span>
+            <span class="pipeline-step-count" id="ps-count-downloaded" style="font-weight: 600; color: ${(s.downloaded || 0) > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready Files</span>
           </div>
         </div>
-
-        <!-- Connector 4 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-4" title="Media passed to review & staging">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-4">→</div>
 
         <!-- Stage 5: Review & Staged -->
         <div id="wt-step-review" class="pipeline-step-node ${activeStage === 'review' ? 'active' : ''} ${s.review > 0 ? 'has-review' : ''}" onclick="watchtowerView.switchStage('review')" title="Staged Reels Awaiting Approval">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-review">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 5</div>
-              <div class="pipeline-step-title">Review / Staged</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.review > 0 ? 'var(--warning, #B45309)' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning, #B45309); font-weight: 700;' : ''}">${s.review} Needs Review</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.review > 0 ? 'Review' : 'Approved'}
+          <span class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'color: var(--warning);' : ''}">5.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Review / Staged</span>
+            <span class="pipeline-step-count" id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning); font-weight: 700;' : ''}">${s.review} Needs Review</span>
           </div>
         </div>
-
-        <!-- Connector 5 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-5" title="Approved jobs dispatched for upload">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-5">→</div>
 
         <!-- Stage 6: In-Flight -->
         <div id="wt-step-active" class="pipeline-step-node ${activeStage === 'active' ? 'active' : ''}" onclick="watchtowerView.switchStage('active')" title="Active Downloading & Meta Upload">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-active">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 6</div>
-              <div class="pipeline-step-title">In-Flight</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.active > 0 ? '#4F46E5' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-active">${s.active} Processing</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.active > 0 ? 'In-Flight' : 'Idle'}
+          <span class="pipeline-step-num">6.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">In-Flight</span>
+            <span class="pipeline-step-count" id="ps-count-active">${s.active} Processing</span>
           </div>
         </div>
-
-        <!-- Connector 6 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-6" title="Completed uploads confirmed on Meta Feed">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-6">→</div>
 
         <!-- Stage 7: Live Published -->
         <div id="wt-step-published" class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="watchtowerView.switchStage('published')" title="Live on Instagram">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-published">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 7</div>
-              <div class="pipeline-step-title">Live Posts</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.published > 0 ? '#059669' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.published > 0 ? 'Live IG' : 'Synced'}
+          <span class="pipeline-step-num">7.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Live Posts</span>
+            <span class="pipeline-step-count" id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
           </div>
         </div>
-
-        <!-- Connector 7 -->
-        <div class="pipeline-flow-connector" id="wt-flow-arrow-7" title="Error detection and automatic retry loop">
-          <div class="connector-track"><div class="connector-pulse"></div></div>
-          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-        </div>
+        <div class="pipeline-step-arrow" id="wt-flow-arrow-7">→</div>
 
         <!-- Stage 8: Retries -->
         <div id="wt-step-failed" class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="watchtowerView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-            <div class="pipeline-step-icon-wrap stage-failed">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-              </svg>
-            </div>
-            <div class="pipeline-step-info-col">
-              <div class="pipeline-step-super">Stage 8</div>
-              <div class="pipeline-step-title">Retries</div>
-              <div class="pipeline-step-metric-line">
-                <span style="color: ${s.failed > 0 ? '#DC2626' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
-                <span id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
-              </div>
-            </div>
-          </div>
-          <div class="pipeline-step-status-pill">
-            ${s.failed > 0 ? 'Action Req' : '0 Clean'}
+          <span class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'color: var(--danger);' : ''}">8.</span>
+          <div class="pipeline-step-info">
+            <span class="pipeline-step-label">Retries</span>
+            <span class="pipeline-step-count" id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
           </div>
         </div>
       </div>
