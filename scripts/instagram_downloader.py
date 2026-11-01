@@ -69,10 +69,16 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
             ),
             viewport={"width": 1280, "height": 900}
         )
-        await context.add_cookies([
+        cookies = [
             {"name": "ig_nrcb", "value": "1", "domain": ".instagram.com", "path": "/"},
             {"name": "ig_did", "value": "F8354A92-C9FD-4A73-A33D-8A0091FF31B3", "domain": ".instagram.com", "path": "/"}
-        ])
+        ]
+        scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
+        if scout_session:
+            clean_session = scout_session.strip().strip('"').strip("'")
+            cookies.append({"name": "sessionid", "value": clean_session, "domain": ".instagram.com", "path": "/"})
+            print(f"[Downloader] 🔑 Authenticated scout session cookie injected", file=sys.stderr)
+        await context.add_cookies(cookies)
         page = await context.new_page()
 
         print(f"[Downloader] Navigating to Instagram post {shortcode}...", file=sys.stderr)
@@ -89,6 +95,33 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
                     break
         except Exception:
             pass
+
+        # ── Check for Instagram Access / Age Restrictions ──
+        try:
+            body_text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+            if "People under 18 can't see this content" in body_text or "limits on who can see" in body_text:
+                print(f"[Downloader] ⚠️ Post {shortcode} is age-restricted (18+).", file=sys.stderr)
+                await browser.close()
+                return {
+                    "success": False,
+                    "error": "This Instagram Reel is age-restricted (18+) by the creator ('People under 18 can't see this content'). Instagram requires a logged-in adult account to view it."
+                }
+            if "This account is private" in body_text or "Follow to see their photos and videos" in body_text:
+                print(f"[Downloader] ⚠️ Post {shortcode} is from a private account.", file=sys.stderr)
+                await browser.close()
+                return {
+                    "success": False,
+                    "error": "This Instagram account is private. OmniStudio can only download and repost public reels."
+                }
+            if "Sorry, this page isn't available" in body_text or "link you followed may be broken" in body_text:
+                print(f"[Downloader] ⚠️ Post {shortcode} does not exist.", file=sys.stderr)
+                await browser.close()
+                return {
+                    "success": False,
+                    "error": "This Instagram post does not exist or has been removed."
+                }
+        except Exception as check_err:
+            print(f"[Downloader] Access check notice: {check_err}", file=sys.stderr)
 
         # ── 1. STRATEGY A: Direct Server State Extraction (Ground Truth) ────────
         scripts_data = await page.evaluate('''() => {
@@ -358,6 +391,9 @@ def download_via_embed(shortcode, output_dir):
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
+        scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
+        if scout_session:
+            headers["Cookie"] = f"sessionid={scout_session.strip().strip('\"').strip('\'')}"
         r = requests.get(embed_url, headers=headers, timeout=12)
         if r.status_code == 200:
             html = r.text
@@ -423,15 +459,19 @@ def download_instagram_media(url, output_dir):
 
     # ── 2. Fast Path: Single-Pass yt-dlp Stream Extractor (< 5 seconds) ────────
     output_template = os.path.join(output_dir, f"{shortcode}.%(ext)s")
+    scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
+    clean_session = scout_session.strip().strip('"').strip("'") if scout_session else None
     try:
         cmd = [
             sys.executable, "-m", "yt_dlp",
             "--format", "best[ext=mp4]/best",
             "-o", output_template,
             "--print-json",
-            "--no-playlist",
-            url
+            "--no-playlist"
         ]
+        if clean_session:
+            cmd.extend(["--add-header", f"Cookie: sessionid={clean_session}"])
+        cmd.append(url)
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
         if res.returncode == 0 and res.stdout.strip():
             # Find the JSON metadata line
@@ -477,9 +517,9 @@ def download_instagram_media(url, output_dir):
     # ── 2. Playwright Scoped Post Media Extractor ─────────────────────────────
     try:
         result = asyncio.run(download_scoped_instagram_media(url, output_dir, shortcode))
-        if result.get("success"):
+        if result and result.get("success"):
             return result
-        return {"success": False, "error": "Could not extract media for this Instagram URL."}
+        return {"success": False, "error": (result.get("error") if result else None) or "Could not extract media for this Instagram URL."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 

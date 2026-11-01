@@ -37,7 +37,7 @@ function downloadInstagramMedia(url) {
 
     console.log(`[Downloader] 📥 Downloading media for ${shortcode}...`);
 
-    exec(command, { timeout: 70000 }, async (error, stdout, stderr) => {
+    exec(command, { timeout: 70000, env: { ...process.env } }, async (error, stdout, stderr) => {
       let rawResult = null;
       try {
         const out = stdout.trim();

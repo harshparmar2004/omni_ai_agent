@@ -232,7 +232,16 @@ async function main() {
 
     const finalJob = db.prepare('SELECT * FROM publish_jobs WHERE id = ?').get(jobId);
     if (finalJob && finalJob.status === 'failed') {
-      throw new Error(`Job #${jobId} failed: ${finalJob.error}`);
+      try {
+        const dataDir = path.join(__dirname, '..', 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(path.join(dataDir, '.telegram_error_notified'), finalJob.error || 'Job failed');
+      } catch (e) {}
+
+      try { closeTunnel(); } catch (e) {}
+      try { await new Promise((resolve) => server.close(resolve)); } catch (e) {}
+      console.error(`[Reposter Runner] ❌ Job #${jobId} failed: ${finalJob.error}`);
+      process.exit(1);
     }
   } else {
     console.log(`[Dry Run] Simulated execution of Job #${jobId}`);
@@ -252,5 +261,10 @@ async function main() {
 
 main().catch((err) => {
   console.error('\n❌ Fatal Cloud Reposter Error:', err);
+  try {
+    const dataDir = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(path.join(dataDir, '.telegram_error_notified'), err.message || 'Fatal error');
+  } catch (e) {}
   process.exit(1);
 });

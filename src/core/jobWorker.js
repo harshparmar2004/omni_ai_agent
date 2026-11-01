@@ -420,12 +420,34 @@ class JobWorkerPool {
           error: err.message
         });
 
+        // Record notification flag so GitHub Actions failure step doesn't overwrite it
+        try {
+          const fs = require('fs');
+          const dataDir = path.join(__dirname, '..', '..', 'data');
+          if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+          fs.writeFileSync(path.join(dataDir, '.telegram_error_notified'), err.message || 'Error');
+        } catch (e) {}
+
+        const cleanErr = escapeHtml(err.message);
+        const isAgeRestricted = /age[- ]restricted|under 18|limits on who can see/i.test(err.message);
+        const isPrivate = /private/i.test(err.message);
+
+        let guidance = '';
+        if (isAgeRestricted) {
+          guidance = '\n\n🔞 <b>Age-Gated Content:</b> The creator has set an 18+ limit on this reel. Instagram requires an authenticated adult session to access it.';
+        } else if (isPrivate) {
+          guidance = '\n\n🔒 <b>Private Account:</b> Instagram blocks access to private accounts. OmniStudio only processes public reels.';
+        }
+
         // Surface exact failure in Telegram with Retry button
         await this.updateTelegramProgress(job, [
-          `❌ <b>Publishing Failed for ${page.handle}</b>`,
+          `❌ <b>Publishing Could Not Be Completed</b>`,
+          `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+          `🔗 <b>Reel:</b> <code>#${shortcode}</code>`,
           ``,
-          `⚠️ <b>Error:</b> <code>${escapeHtml(err.message)}</code>`,
-          `🔗 <b>Source:</b> <a href="${job.source_url}">${job.source_url}</a>`
+          `⚠️ <b>Reason:</b> ${cleanErr}${guidance}`,
+          ``,
+          `💡 <i>Tip: Try sharing a public unrestricted reel, or update your scout account session.</i>`
         ], {
           inline_keyboard: [
             [{ text: '🔁 Retry Now', callback_data: `retry_job:${job.id}` }]
