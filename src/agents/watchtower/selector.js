@@ -4,7 +4,8 @@ const {
   updateDiscoveredPost,
   getPublishedCountToday,
   getPostsCountInWindow,
-  getSetting
+  getSetting,
+  getDb
 } = require('../../database');
 const { enqueueJob } = require('../../core/jobQueue');
 const notifier = require('../../core/notifier');
@@ -172,22 +173,30 @@ async function evaluateAndSelectPosts(options = {}) {
       }
     }
 
-    // 3. Fetch 'new' discoveries mapped to this page's sources (strictly video reels)
+    // 3. Fetch candidate discoveries mapped to this page's sources (strictly video reels)
     const rawCandidates = listDiscoveredPosts({
-      pageId: page.id,
-      status: 'new'
-    });
+      pageId: page.id
+    }).filter(c => c.status === 'new' || c.status === 'reservoir_buffer');
+
+    // Strict Deduplication: Fetch all shortcodes that have already been queued or published for this page
+    const existingShortcodes = new Set();
+    try {
+      const rows = getDb().prepare("SELECT shortcode FROM publish_jobs WHERE page_id = ? AND status != 'failed'").all(page.id);
+      for (const r of rows) existingShortcodes.add(r.shortcode);
+    } catch (e) {}
 
     const now = Date.now();
-    const MAX_AGE_HOURS = 72; // Maximum age threshold for candidate reels (3 days)
+    const MAX_RESERVOIR_AGE_HOURS = 336; // 14 days backlog buffer for high-scoring evergreen reels
 
-    // Filter valid video reels within 72 hours
+    // Filter valid, unposted video reels within 14 days
     const validCandidates = rawCandidates.filter(c => {
       if (c.media_type && c.media_type !== 'reel') return false;
+      if (existingShortcodes.has(c.shortcode)) return false;
+
       const parsed = shortcodeToTimestamp(c.shortcode);
       const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
       const ageHours = (now - postDate.getTime()) / (1000 * 60 * 60);
-      if (ageHours > MAX_AGE_HOURS) {
+      if (ageHours > MAX_RESERVOIR_AGE_HOURS) {
         try { updateDiscoveredPost(c.id, { status: 'stale_rejected' }); } catch (e) {}
         return false;
       }
@@ -195,33 +204,24 @@ async function evaluateAndSelectPosts(options = {}) {
     });
 
     if (validCandidates.length === 0) {
+      console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} has no valid candidate reels in feed or reservoir.`);
       continue;
     }
 
-    // Prefer fresh reels (< 24h) if any exist; otherwise fallback to recent available (up to 72h)
-    const freshOnly = validCandidates.filter(c => {
-      const parsed = shortcodeToTimestamp(c.shortcode);
-      const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
-      const ageHours = (now - postDate.getTime()) / (1000 * 60 * 60);
-      return ageHours <= 24;
-    });
-
-    const candidates = freshOnly.length > 0 ? freshOnly : validCandidates;
-
-    // 4. Score candidate posts prioritizing RECENCY (Newest reel first)
-    const scored = candidates.map(c => {
+    // 4. Divide into 2 Tiers:
+    // Tier 1: Fresh Viral Candidates (< 24 hours old)
+    // Tier 2: Evergreen Fallback Reservoir (24h - 14d backlog buffer)
+    const scoredCandidates = validCandidates.map(c => {
       const parsed = shortcodeToTimestamp(c.shortcode);
       const postDate = parsed?.date || (c.posted_at ? new Date(c.posted_at) : new Date());
       const postTimeMs = postDate.getTime();
       const ageHours = Math.max(0, (now - postTimeMs) / (1000 * 60 * 60));
-      
-      // Hyper-focused recency multiplier:
-      // < 6h: 1.0 (Fresh)
-      // 6h - 12h: 0.8
-      // 12h - 24h: 0.4
+
       let freshnessMultiplier = 1.0;
-      if (ageHours > 12) freshnessMultiplier = 0.4;
-      else if (ageHours > 6) freshnessMultiplier = 0.8;
+      if (ageHours > 72) freshnessMultiplier = 0.35;
+      else if (ageHours > 24) freshnessMultiplier = 0.55;
+      else if (ageHours > 12) freshnessMultiplier = 0.75;
+      else if (ageHours > 6) freshnessMultiplier = 0.9;
 
       const rawEngagement = (c.like_count || 0) + ((c.comment_count || 0) * 2);
       const compositeScore = Math.round((1000000 + (postTimeMs / 1000000) + rawEngagement) * freshnessMultiplier);
@@ -231,19 +231,66 @@ async function evaluateAndSelectPosts(options = {}) {
         postDate,
         postTimeMs,
         ageHours: Math.round(ageHours * 10) / 10,
-        compositeScore
+        compositeScore,
+        isFresh: ageHours <= 24
       };
     });
 
-    // Sort descending by true post publication time (absolute freshest reel first)
-    scored.sort((a, b) => b.postTimeMs - a.postTimeMs);
+    const tier1Fresh = scoredCandidates.filter(c => c.isFresh);
+    const tier2Reservoir = scoredCandidates.filter(c => !c.isFresh);
 
-    // Take up to allowedCount
-    const takeCount = Math.min(allowedCount, scored.length);
-    if (takeCount === 0) continue;
+    // Sort Tier 1 descending by true post publication time (absolute freshest first)
+    tier1Fresh.sort((a, b) => b.postTimeMs - a.postTimeMs);
 
-    const winners = scored.slice(0, takeCount);
-    console.log(`[Watchtower Selector] 🎯 Selected ${winners.length} winner posts for ${page.handle} (Mode: ${page.post_mode.toUpperCase()})`);
+    // Sort Tier 2 descending by composite score (highest virality backlog first)
+    tier2Reservoir.sort((a, b) => b.compositeScore - a.compositeScore);
+
+    const winners = [];
+    const usedCreators = new Set();
+
+    // Step A: Pick top fresh reels from Tier 1 (with creator diversity)
+    for (const post of tier1Fresh) {
+      if (winners.length >= allowedCount) break;
+      const creator = (post.source_username || '').toLowerCase();
+      if (creator && usedCreators.has(creator) && tier1Fresh.length > allowedCount) {
+        continue; // Try to pick different creators
+      }
+      post.selection_tier = 'fresh';
+      winners.push(post);
+      if (creator) usedCreators.add(creator);
+    }
+
+    // Step B: If fewer than allowedCount, engage Tier 2 Reservoir Fallback (2nd/3rd ranked backlog)
+    if (winners.length < allowedCount && tier2Reservoir.length > 0) {
+      const needed = allowedCount - winners.length;
+      console.log(`[Watchtower Selector] 📦 Reservoir Fallback engaged for ${page.handle}: needed ${needed} reel(s) to hit on-time target.`);
+      
+      for (const post of tier2Reservoir) {
+        if (winners.length >= allowedCount) break;
+        const creator = (post.source_username || '').toLowerCase();
+        if (creator && usedCreators.has(creator) && tier2Reservoir.length > needed) {
+          continue; // Prioritize creators not already chosen in this window
+        }
+        post.selection_tier = 'reservoir_fallback';
+        winners.push(post);
+        if (creator) usedCreators.add(creator);
+        console.log(`[Watchtower Selector] 📦 Backlog Pick: @${post.source_username || 'creator'} #${post.shortcode} (Rank #2/3 unposted reel, age ${post.ageHours}h, score ${post.compositeScore})`);
+      }
+    }
+
+    // Fallback: If still under target and we skipped duplicate creators, relax creator diversity
+    if (winners.length < allowedCount) {
+      const remainingCandidates = scoredCandidates.filter(c => !winners.some(w => w.id === c.id));
+      for (const post of remainingCandidates) {
+        if (winners.length >= allowedCount) break;
+        post.selection_tier = post.isFresh ? 'fresh' : 'reservoir_fallback';
+        winners.push(post);
+      }
+    }
+
+    if (winners.length === 0) continue;
+
+    console.log(`[Watchtower Selector] 🎯 Finalized ${winners.length} winner posts for ${page.handle} (${winners.filter(w => w.selection_tier === 'fresh').length} fresh, ${winners.filter(w => w.selection_tier === 'reservoir_fallback').length} reservoir fallback)`);
 
     const adminChatId = getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '5443723531';
     let enqueued = 0;

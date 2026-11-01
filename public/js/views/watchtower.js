@@ -9,6 +9,9 @@ window.watchtowerView = (function() {
   let downloadedViewMode = 'table'; // 'table' (default) | 'grid'
   let stage2Page = 0; // 0-indexed page for Stage 2 discovered reels
   const STAGE2_PAGE_SIZE = 50;
+  let discoveredCreatorFilter = 'all'; // 'all' or creator username
+  let selectedDiscoveryIds = new Set();
+  let cachedDiscoveredPosts = [];
   let cachedStatus = null;
   let pipelineSummary = {
     sources: 0,
@@ -688,29 +691,47 @@ window.watchtowerView = (function() {
       const totalHeader = res.headers.get('x-total-count');
       const totalCount = totalHeader !== null ? parseInt(totalHeader, 10) : posts.length;
 
+      // Cache posts for fast, safe modal opening
+      cachedDiscoveredPosts = posts;
+
       // Handle edge-case: page out of bounds if items were dispatched/skipped
       if (posts.length === 0 && stage2Page > 0 && totalCount > 0) {
         stage2Page = Math.max(0, Math.ceil(totalCount / STAGE2_PAGE_SIZE) - 1);
         return renderDiscoveredStage(container);
       }
 
+      // Collect unique creators from all posts in feed
+      const creatorMap = {};
+      posts.forEach(p => {
+        if (p.source_username) {
+          creatorMap[p.source_username] = (creatorMap[p.source_username] || 0) + 1;
+        }
+      });
+      const uniqueCreators = Object.keys(creatorMap);
+
+      // Apply creator filter if active
+      const filteredPosts = (discoveredCreatorFilter === 'all')
+        ? posts
+        : posts.filter(p => p.source_username === discoveredCreatorFilter);
+
       const totalPages = Math.max(1, Math.ceil(totalCount / STAGE2_PAGE_SIZE));
       const startItem = totalCount === 0 ? 0 : offset + 1;
       const endItem = Math.min(offset + posts.length, totalCount);
       const hasPrev = stage2Page > 0;
       const hasNext = offset + posts.length < totalCount;
+      const allSelected = filteredPosts.length > 0 && filteredPosts.every(p => selectedDiscoveryIds.has(Number(p.id)));
 
       container.innerHTML = `
-        <div class="pipeline-deck-header" style="margin-bottom: 1.25rem;">
+        <div class="pipeline-deck-header" style="margin-bottom: 1rem;">
           <div>
             <div class="pipeline-stage-title">
               <span>Stage 2: Raw Discovered Reels</span>
               <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">
-                ${totalCount} ingested
+                ${totalCount} ingested across ${uniqueCreators.length} competitor sources
               </span>
             </div>
             <div class="text-sm text-muted">
-              Fresh candidate reels harvested across competitor surveillance feeds
+              Fresh viral reels & evergreen reservoir buffer harvested for 2-tier scheduled publishing
             </div>
           </div>
           <div class="flex items-center gap-2" style="flex-wrap: wrap;">
@@ -731,15 +752,58 @@ window.watchtowerView = (function() {
           </div>
         </div>
 
-        ${posts.length === 0 ? `
-          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
-            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Discovered Reels Yet</div>
-            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">
-              Execute a surveillance cycle to discover viral reels across your monitored accounts.
-            </p>
-            <button class="btn btn-primary btn-sm" onclick="watchtowerView.runCycle()">
-              Execute Surveillance Cycle Now
+        <!-- Creator Filter Tabs -->
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px;">
+          <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;">
+            Filter Creator:
+          </span>
+          <button class="btn btn-sm ${discoveredCreatorFilter === 'all' ? 'btn-primary' : 'btn-secondary'}" onclick="watchtowerView.filterDiscoveriesByCreator('all')" style="font-size: 0.74rem; padding: 3px 10px; border-radius: 9999px;">
+            All Sources (${posts.length})
+          </button>
+          ${uniqueCreators.map(c => `
+            <button class="btn btn-sm ${discoveredCreatorFilter === c ? 'btn-primary' : 'btn-secondary'}" onclick="watchtowerView.filterDiscoveriesByCreator('${escapeHtml(c)}')" style="font-size: 0.74rem; padding: 3px 10px; border-radius: 9999px;">
+              @${escapeHtml(c)} (${creatorMap[c]})
             </button>
+          `).join('')}
+        </div>
+
+        <!-- Batch Action Bar if any reels selected -->
+        ${selectedDiscoveryIds.size > 0 ? `
+          <div style="background: rgba(217, 119, 87, 0.08); border: 1px solid rgba(217, 119, 87, 0.25); border-radius: 8px; padding: 0.65rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-weight: 700; font-size: 0.86rem; color: var(--accent-primary);">
+                ${selectedDiscoveryIds.size} reel${selectedDiscoveryIds.size > 1 ? 's' : ''} selected
+              </span>
+              <span style="font-size: 0.76rem; color: var(--text-muted);">
+                Ready for batch dispatch into publishing pipeline
+              </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" onclick="watchtowerView.toggleSelectAllDiscoveries(false)" style="font-size: 0.76rem; padding: 4px 10px;">
+                Clear Selection
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="watchtowerView.dispatchBatchSelected()" style="font-size: 0.76rem; padding: 4px 12px; font-weight: 600;">
+                Dispatch ${selectedDiscoveryIds.size} Selected to Pipeline 🚀
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        ${filteredPosts.length === 0 ? `
+          <div class="card" style="padding: 3.5rem; text-align: center; border-radius: 10px; box-shadow: none;">
+            <div style="font-weight: 600; font-size: 1.05rem; margin-bottom: 0.25rem;">No Discovered Reels Found</div>
+            <p style="color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem 0;">
+              ${discoveredCreatorFilter !== 'all' ? `No reels found for creator @${escapeHtml(discoveredCreatorFilter)}. Try switching to 'All Sources'.` : 'Execute a surveillance cycle to discover viral reels across your monitored accounts.'}
+            </p>
+            ${discoveredCreatorFilter !== 'all' ? `
+              <button class="btn btn-secondary btn-sm" onclick="watchtowerView.filterDiscoveriesByCreator('all')">
+                View All Sources
+              </button>
+            ` : `
+              <button class="btn btn-primary btn-sm" onclick="watchtowerView.runCycle()">
+                Execute Surveillance Cycle Now
+              </button>
+            `}
           </div>
         ` : `
           <!-- Full-Width End-to-End Table Card -->
@@ -747,36 +811,46 @@ window.watchtowerView = (function() {
             <table class="data-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th style="width: 70px; text-align: center;">Preview</th>
+                  <th style="width: 40px; text-align: center;">
+                    <input type="checkbox" onchange="watchtowerView.toggleSelectAllDiscoveries(this.checked, [${filteredPosts.map(p => p.id).join(',')}])" ${allSelected ? 'checked' : ''} title="Select/Deselect all visible reels" />
+                  </th>
+                  <th style="width: 75px; text-align: center;">Preview</th>
                   <th style="width: 22%;">Reel & Creator</th>
-                  <th style="width: 16%;">Shared Target</th>
-                  <th style="width: 32%;">Content & Caption</th>
-                  <th style="width: 11%;">Virality</th>
-                  <th style="width: 19%; text-align: right;">Actions</th>
+                  <th style="width: 15%;">Target</th>
+                  <th style="width: 31%;">Content & Metrics</th>
+                  <th style="width: 14%;">Virality & Tier</th>
+                  <th style="width: 14%; text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                ${posts.map(p => {
+                ${filteredPosts.map(p => {
                   const reelUrl = p.url || `https://www.instagram.com/reel/${p.shortcode}/`;
                   const pageSlug = p.page_slug ? `@${p.page_slug}` : 'Auto / General';
                   const pubDate = formatPublishDate(p.posted_at || p.created_at);
                   const timeAgo = formatTimeAgo(p.posted_at || p.created_at);
                   const viralityScore = Math.round(p.score ? (p.score <= 1.0 ? p.score * 100 : p.score) : 70);
+                  const isFresh = p.tier === 'fresh' || (p.age_hours !== undefined && p.age_hours <= 24);
+                  const isChecked = selectedDiscoveryIds.has(Number(p.id));
 
                   return `
-                    <tr>
-                      <!-- 1. Thumbnail / Reel Preview -->
+                    <tr style="${isChecked ? 'background: rgba(217, 119, 87, 0.04);' : ''}">
+                      <!-- 0. Selection Checkbox -->
+                      <td style="text-align: center; vertical-align: middle;">
+                        <input type="checkbox" onchange="watchtowerView.toggleSelectDiscovery(${p.id})" ${isChecked ? 'checked' : ''} />
+                      </td>
+
+                      <!-- 1. Thumbnail / In-App Video Preview Trigger -->
                       <td style="text-align: center; vertical-align: middle; padding: 0.6rem 0.5rem;">
-                        <a href="${reelUrl}" target="_blank" class="reel-table-thumb-container" title="Open reel #${p.shortcode} on Instagram">
+                        <div onclick="watchtowerView.openReelPreview(${p.id})" class="reel-table-thumb-container" style="cursor: pointer;" title="Click to watch reel with video player in OmniStudio">
                           <img src="/api/discoveries/${p.id}/thumbnail" alt="${p.shortcode}" class="reel-table-thumb-img" loading="lazy" />
                           <div class="reel-thumb-play-icon">▶</div>
-                        </a>
+                        </div>
                       </td>
 
                       <!-- 2. Reel ID & Creator -->
                       <td>
-                        <div style="margin-bottom: 3px;">
-                          <a href="${reelUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="${reelUrl}">
+                        <div style="margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
+                          <a href="${reelUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="Open original reel on Instagram">
                             #${p.shortcode} ↗
                           </a>
                         </div>
@@ -790,7 +864,7 @@ window.watchtowerView = (function() {
                         </div>
                       </td>
 
-                      <!-- 3. Shared Target Destination -->
+                      <!-- 3. Target Destination -->
                       <td>
                         <div style="font-weight: 700; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">
                           ${pageSlug}
@@ -800,7 +874,7 @@ window.watchtowerView = (function() {
                         </div>
                       </td>
 
-                      <!-- 4. Content & Caption -->
+                      <!-- 4. Content & Engagement Metrics -->
                       <td>
                         <div style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; margin-bottom: 5px; max-width: 480px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;" title="${escapeHtml(p.caption || '')}">
                           ${escapeHtml(p.caption ? (p.caption.length > 140 ? p.caption.substring(0, 140) + '...' : p.caption) : 'Instagram Reel discovered via Watchtower surveillance')}
@@ -810,23 +884,33 @@ window.watchtowerView = (function() {
                         </div>
                       </td>
 
-                      <!-- 5. Virality Score -->
+                      <!-- 5. Virality & Selection Tier -->
                       <td>
-                        <div style="font-weight: 700; font-size: 0.86rem; color: var(--accent-primary); margin-bottom: 2px;">
-                          ${viralityScore}
+                        <div style="display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px;">
+                          <span style="font-weight: 800; font-size: 0.95rem; color: var(--accent-primary);">${viralityScore}</span>
+                          <span style="font-size: 0.7rem; color: var(--text-muted);">/100</span>
                         </div>
-                        <div style="font-size: 0.72rem; color: var(--text-muted);">
-                          Virality Score
+                        <div style="margin-bottom: 2px;">
+                          ${isFresh
+                            ? `<span style="background: rgba(16, 185, 129, 0.12); color: #059669; padding: 2px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700;">⚡ FRESH (&lt;24h)</span>`
+                            : `<span style="background: rgba(59, 130, 246, 0.12); color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700;">📦 RESERVOIR BUFFER</span>`
+                          }
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600;">
+                          ${escapeHtml(p.rank_tier || '')}
                         </div>
                       </td>
 
                       <!-- 6. Actions -->
                       <td style="text-align: right; white-space: nowrap;">
-                        <div style="display: inline-flex; align-items: center; gap: 8px;">
-                          <button class="btn btn-primary btn-sm" onclick="watchtowerView.postDiscovery(${p.id})" style="font-size: 0.78rem; padding: 4px 10px;">
-                            Dispatch to Pipeline
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                          <button class="btn btn-primary btn-sm" onclick="watchtowerView.postDiscovery(${p.id})" style="font-size: 0.76rem; padding: 4px 9px;">
+                            Dispatch
                           </button>
-                          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip this reel" style="font-size: 0.78rem; padding: 4px 8px; color: var(--text-muted);">
+                          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.openReelPreview(${p.id})" title="Preview reel video" style="font-size: 0.76rem; padding: 4px 8px;">
+                            ▶ Preview
+                          </button>
+                          <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip this reel" style="font-size: 0.76rem; padding: 4px 7px; color: var(--text-muted);">
                             ✕
                           </button>
                         </div>
@@ -1867,6 +1951,144 @@ window.watchtowerView = (function() {
     }
   }
 
+  function openReelPreview(idOrShortcode, maybeCreator, maybeCaption) {
+    const modal = document.getElementById('wt-reel-preview-modal');
+    if (!modal) return;
+
+    let post = cachedDiscoveredPosts.find(p => String(p.id) === String(idOrShortcode) || p.shortcode === String(idOrShortcode));
+    if (!post) {
+      post = {
+        id: idOrShortcode,
+        shortcode: idOrShortcode,
+        source_username: maybeCreator || 'creator',
+        caption: maybeCaption || '',
+        score: 85,
+        tier: 'fresh',
+        rank_tier: 'Ranked Candidate',
+        like_count: 0,
+        comment_count: 0,
+        view_count: 0
+      };
+    }
+
+    const shortcode = post.shortcode;
+    const creator = post.source_username || 'creator';
+    const viralityScore = Math.round(post.score ? (post.score <= 1.0 ? post.score * 100 : post.score) : 75);
+    const isFresh = post.tier === 'fresh' || (post.age_hours !== undefined && post.age_hours <= 24);
+    const reelUrl = post.url || `https://www.instagram.com/reel/${shortcode}/`;
+
+    const iframe = document.getElementById('wt-preview-iframe');
+    const creatorLink = document.getElementById('wt-preview-creator-link');
+    const rankTag = document.getElementById('wt-preview-rank-tag');
+    const shortcodeSpan = document.getElementById('wt-preview-shortcode');
+    const tierBadge = document.getElementById('wt-preview-tier-badge');
+    const scoreSpan = document.getElementById('wt-preview-score');
+    const likesDiv = document.getElementById('wt-preview-likes');
+    const commentsDiv = document.getElementById('wt-preview-comments');
+    const viewsDiv = document.getElementById('wt-preview-views');
+    const captionDiv = document.getElementById('wt-preview-caption');
+    const dispatchBtn = document.getElementById('wt-preview-dispatch-btn');
+    const externalLink = document.getElementById('wt-preview-external-link');
+
+    if (iframe) {
+      iframe.src = `https://www.instagram.com/reel/${shortcode}/embed/`;
+    }
+    if (creatorLink) {
+      creatorLink.innerText = `@${creator}`;
+      creatorLink.href = `https://instagram.com/${creator}`;
+    }
+    if (rankTag) {
+      rankTag.innerText = post.rank_tier || (isFresh ? 'Top Fresh Candidate' : 'Reservoir Buffer Pick');
+    }
+    if (shortcodeSpan) {
+      shortcodeSpan.innerText = `#${shortcode}`;
+    }
+    if (tierBadge) {
+      tierBadge.innerText = isFresh ? '⚡ FRESH (<24h)' : '📦 RESERVOIR BUFFER';
+      tierBadge.style.background = isFresh ? 'rgba(16, 185, 129, 0.12)' : 'rgba(59, 130, 246, 0.12)';
+      tierBadge.style.color = isFresh ? '#059669' : '#2563eb';
+    }
+    if (scoreSpan) {
+      scoreSpan.innerText = `${viralityScore} / 100`;
+    }
+    if (likesDiv) likesDiv.innerText = Number(post.like_count || post.likes || 0).toLocaleString();
+    if (commentsDiv) commentsDiv.innerText = Number(post.comment_count || post.comments || 0).toLocaleString();
+    if (viewsDiv) viewsDiv.innerText = Number(post.view_count || post.views || 0).toLocaleString();
+    if (captionDiv) captionDiv.innerText = post.caption || 'Instagram Reel discovered via Watchtower surveillance';
+
+    if (externalLink) {
+      externalLink.href = reelUrl;
+    }
+    if (dispatchBtn) {
+      dispatchBtn.onclick = async () => {
+        await postDiscovery(post.id);
+        closeReelPreview();
+      };
+    }
+
+    modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+
+  function closeReelPreview() {
+    const modal = document.getElementById('wt-reel-preview-modal');
+    const iframe = document.getElementById('wt-preview-iframe');
+    if (iframe) {
+      iframe.src = '';
+    }
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function toggleSelectDiscovery(id) {
+    const numId = Number(id);
+    if (selectedDiscoveryIds.has(numId)) {
+      selectedDiscoveryIds.delete(numId);
+    } else {
+      selectedDiscoveryIds.add(numId);
+    }
+    renderActiveStage();
+  }
+
+  function toggleSelectAllDiscoveries(checked, allIds = []) {
+    if (checked) {
+      for (const id of allIds) selectedDiscoveryIds.add(Number(id));
+    } else {
+      selectedDiscoveryIds.clear();
+    }
+    renderActiveStage();
+  }
+
+  async function dispatchBatchSelected() {
+    if (selectedDiscoveryIds.size === 0) return;
+    const ids = Array.from(selectedDiscoveryIds);
+    try {
+      const res = await fetch('/api/discoveries/batch-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.toast(data.message || `Dispatched ${ids.length} reel(s) to pipeline!`, 'success');
+        selectedDiscoveryIds.clear();
+        await loadPipelineSummary();
+        await renderActiveStage();
+      } else {
+        app.toast(data.error || 'Failed to dispatch selected reels', 'error');
+      }
+    } catch (err) {
+      app.toast(err.message, 'error');
+    }
+  }
+
+  function filterDiscoveriesByCreator(creator) {
+    discoveredCreatorFilter = creator;
+    renderActiveStage();
+  }
+
   function formatTimeAgo(timestamp) {
     if (!timestamp) return '--';
     const diff = (Date.now() - new Date(timestamp).getTime()) / 1000;
@@ -1998,6 +2220,7 @@ window.watchtowerView = (function() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         closePageSheet();
+        closeReelPreview();
       }
     });
   }
@@ -2021,6 +2244,12 @@ window.watchtowerView = (function() {
     skipDiscovery,
     nextDiscoveredPage,
     prevDiscoveredPage,
+    openReelPreview,
+    closeReelPreview,
+    toggleSelectDiscovery,
+    toggleSelectAllDiscoveries,
+    dispatchBatchSelected,
+    filterDiscoveriesByCreator,
     approveJob,
     deleteJob,
     retryJob,
