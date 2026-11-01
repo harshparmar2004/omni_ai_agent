@@ -2599,6 +2599,132 @@ table.data-table tr:hover td {
   border-color: var(--agent-watchtower-border);
 }
 
+/* Stage 2: Downloaded Media Library Enhancements */
+.downloaded-preview-wrap {
+  width: 78px;
+  height: 110px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-card);
+  display: inline-block;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.downloaded-preview-wrap:hover {
+  transform: scale(1.04);
+  border-color: var(--accent-primary);
+}
+
+.downloaded-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.downloaded-play-pill {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(30, 27, 24, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FAF8F5;
+  font-size: 11px;
+  padding-left: 2px;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  z-index: 2;
+}
+
+.downloaded-preview-wrap:hover .downloaded-play-pill {
+  background: var(--accent-primary);
+  transform: scale(1.1);
+}
+
+.downloaded-hd-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(30, 27, 24, 0.75);
+  backdrop-filter: blur(4px);
+  color: #FAF8F5;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  z-index: 2;
+}
+
+.downloaded-ratio-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(30, 27, 24, 0.75);
+  backdrop-filter: blur(4px);
+  color: #FAF8F5;
+  font-size: 0.58rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  z-index: 2;
+}
+
+.downloaded-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.downloaded-media-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.downloaded-media-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.downloaded-card-preview-wrap {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.85rem;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+
+.downloaded-card-preview-wrap:hover .downloaded-play-pill {
+  background: var(--accent-primary);
+  transform: scale(1.15);
+}
+
 
 
 

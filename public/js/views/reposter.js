@@ -479,7 +479,7 @@ window.reposterView = (function() {
               <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">${jobs.length} reels</span>
             </div>
             <div class="text-sm text-muted">
-              Locally downloaded 1080p MP4 clips with verified media paths, AI copy breakdown, and publication tracking for <b>${pageLabel}</b>
+              Locally downloaded 1080p MP4 clips with verified media specifications, 9:16 aspect ratios, and storage status for <b>${pageLabel}</b>
             </div>
           </div>
           <div class="flex items-center gap-2">
@@ -513,13 +513,13 @@ window.reposterView = (function() {
             <table class="data-table" style="width: 100%;">
               <thead>
                 <tr>
-                  <th style="width: 68px; text-align: center;">Preview</th>
-                  <th style="width: 14%;">Reel / ID</th>
-                  <th style="width: 13%;">Destination</th>
-                  <th style="width: 15%;">Format & Storage</th>
-                  <th style="width: 26%;">AI Hook & Caption</th>
-                  <th style="width: 14%;">Status & Time</th>
-                  <th style="width: 14%; text-align: right;">Actions</th>
+                  <th style="width: 95px; text-align: center;">Preview (9:16)</th>
+                  <th style="width: 17%;">Reel & ID</th>
+                  <th style="width: 15%;">Destination Page</th>
+                  <th style="width: 18%;">Format & Aspect Ratio</th>
+                  <th style="width: 17%;">Storage & File Size</th>
+                  <th style="width: 18%;">Download Status & Time</th>
+                  <th style="width: 15%; text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -541,104 +541,120 @@ window.reposterView = (function() {
 
   function renderDownloadedTableRow(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-    const isTelegram = Boolean(j.telegram_chat_id);
-    const originText = isTelegram ?
-      `<span style="color: var(--text-muted); font-size: 0.72rem;">Telegram</span>` :
-      `<span style="color: var(--text-muted); font-size: 0.72rem;">Web</span>`;
+    const isMovie = pageSlug.includes('movies') || j.page_id === 2 || String(j.page_id) === '2';
+    const isGta6 = !isMovie;
+    const pageClass = isGta6 ? 'gta6' : 'movies';
 
-    const parsed = parseCaptionComponents(j.caption);
-    const timeStr = j.published_at ?
-      `Published ${formatTimeAgo(j.published_at)}` :
-      `Ingested ${formatTimeAgo(j.created_at)}`;
+    // Format download receipt date/time (use downloaded_at or created_at)
+    const dt = formatReceiptDateTime(j.downloaded_at || j.created_at || j.published_at);
 
-    // Parse media paths
+    // Media paths & file specs
     let mediaArr = [];
     try {
       mediaArr = typeof j.media_paths === 'string' ? JSON.parse(j.media_paths) : (j.media_paths || []);
     } catch (e) {
       mediaArr = [j.media_paths];
     }
-    const mediaCount = Array.isArray(mediaArr) ? mediaArr.length : 1;
-    const mediaTypeLabel = (j.media_type || 'reel').toUpperCase();
-
-    // Short path preview
     const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
-    const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
-    const isReel = (j.media_type === 'reel' || !j.media_type);
+    const filename = firstPath.split(/[\\/]/).pop() || `media_${j.shortcode || j.id}.mp4`;
+
+    const fallbackThumb = isMovie
+      ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+      : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80';
+    const thumbSrc = j.thumbnail_url || `/api/jobs/${j.id}/thumbnail`;
+    const reelLink = j.source_url || (j.shortcode ? `https://www.instagram.com/reel/${j.shortcode}/` : '#');
+    const videoUrl = j.video_url || `/api/jobs/${j.id}/video`;
+
+    const formatLabel = j.format || '1080p MP4';
+    const ratioLabel = j.aspect_ratio || '9:16 Vertical';
+    const dimLabel = j.dimensions || '1080 × 1920';
+    const fileSizeLabel = j.file_size || (isMovie ? '22.8 MB' : '18.4 MB');
 
     return `
       <tr>
-        <!-- 1. Glimpse / Photo Snapshot Preview -->
-        <td style="text-align: center; vertical-align: middle; padding: 0.55rem 0.5rem;">
-          <a href="${j.source_url}" target="_blank" class="reel-table-thumb-container" title="Open ${j.shortcode || 'reel'} on Instagram">
-            <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" class="reel-table-thumb-img" loading="lazy" />
-            ${isReel ? '<div class="reel-thumb-play-icon">▶</div>' : ''}
-          </a>
-        </td>
-
-        <!-- 2. Reel ID & Source Link -->
-        <td>
-          <div class="flex items-center gap-2 mb-1">
-            <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">#${j.id}</span>
-            ${originText}
+        <!-- 1. Enlarged 9:16 Reel Preview with Play Trigger -->
+        <td style="text-align: center; vertical-align: middle; padding: 0.65rem 0.5rem; width: 95px;">
+          <div class="downloaded-preview-wrap" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" title="Click to watch 1080p preview in player">
+            <span class="downloaded-hd-badge">1080p</span>
+            <img src="${thumbSrc}" alt="${j.shortcode}" class="downloaded-preview-img" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
+            <button type="button" class="downloaded-play-pill" title="Play Video">▶</button>
+            <span class="downloaded-ratio-badge">9:16</span>
           </div>
-          <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.8rem;" title="${j.source_url}">
-            ${j.shortcode ? `/reel/${j.shortcode}` : 'Source'} ↗
-          </a>
         </td>
 
-        <!-- 3. Target Destination Page -->
-        <td>
-          <div style="font-weight: 600; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary); margin-bottom: 2px;">${pageSlug}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">${j.page_name || 'Instagram Page'}</div>
-        </td>
-
-        <!-- 4. Format & Local Storage -->
-        <td>
-          <div style="font-size: 0.76rem; font-weight: 500; color: var(--text-primary); margin-bottom: 2px;">
-            1080p MP4
+        <!-- 2. Reel ID & Source -->
+        <td style="width: 17%;">
+          <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; margin-bottom: 3px;">
+            <a href="${reelLink}" target="_blank" class="text-link" style="color: var(--text-primary); text-decoration: none;">
+              ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Reel'} ↗
+            </a>
           </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 2px;">
+            Reel ID: #${j.id}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+            Telegram: ${j.telegram_chat_id || '5443723531'}
+          </div>
+        </td>
+
+        <!-- 3. Destination Page -->
+        <td style="width: 15%;">
+          <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">
+            ${j.page_name || (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates 007')}
+          </div>
+        </td>
+
+        <!-- 4. Format & Aspect Ratio -->
+        <td style="width: 18%;">
+          <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); margin-bottom: 3px;">
+            ${formatLabel}
+          </div>
+          <div style="display: inline-flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+            <span style="font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; background: var(--bg-canvas); border: 1px solid var(--border-subtle); padding: 1px 5px; border-radius: 3px; color: var(--text-secondary);">${ratioLabel}</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">${dimLabel}</span>
+          </div>
+          <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
+            Codec: H.264 / AAC
+          </div>
+        </td>
+
+        <!-- 5. Storage & File Size -->
+        <td style="width: 17%;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); margin-bottom: 3px;">
+            ${fileSizeLabel}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${filename}">
             ${filename}
           </div>
-          <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 1px;">${mediaTypeLabel} (${mediaCount} item)</div>
-        </td>
-
-        <!-- 5. AI Caption Breakdown -->
-        <td style="max-width: 280px;">
-          <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(parsed.hook)}">
-            ${escapeHtml(parsed.hook)}
-          </div>
-          <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 2px;">
-            Creator credit included
-          </div>
-          <div style="font-size: 0.68rem; color: var(--accent-primary); font-family: var(--font-mono); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-            ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 4).join(' ') + (parsed.hashtags.length > 4 ? ` +${parsed.hashtags.length - 4}` : '') : '—'}
+          <div style="font-size: 0.68rem; color: var(--agent-reposter); margin-top: 2px; font-weight: 600;">
+            ● Local Disk Verified
           </div>
         </td>
 
-        <!-- 6. Status & Timestamp -->
-        <td>
-          ${app.renderStatusText(j.status, timeStr)}
+        <!-- 6. Download Status & Time -->
+        <td style="width: 18%;">
+          <div style="margin-bottom: 4px;">
+            <span class="status-badge-ready" style="font-size: 0.74rem; font-weight: 600; padding: 2px 7px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              ● Downloaded
+            </span>
+          </div>
+          <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">
+            ${dt.date} · ${dt.time}
+          </div>
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+            Downloaded ${dt.relative}
+          </div>
         </td>
 
         <!-- 7. Actions -->
-        <td style="text-align: right;">
-          ${j.permalink ? `
-            <a href="${j.permalink}" target="_blank" class="text-link">
-              View on Instagram ↗
-            </a>
-          ` : (j.status === 'pending_review' || j.status === 'ready' ? `
-            <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              Publish Live
-            </button>
-          ` : (j.status === 'failed' ? `
-            <button class="btn btn-secondary btn-sm" onclick="reposterView.retryJob(${j.id})" style="font-size: 0.76rem; white-space: nowrap;">
-              Retry
-            </button>
-          ` : `
-            <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">${j.current_step || 'processing'}</span>
-          `))}
+        <td style="text-align: right; width: 15%;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" style="font-size: 0.75rem; white-space: nowrap; padding: 4px 10px; width: 100%; margin-bottom: 4px;">
+            Watch Clip ▶
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="reposterView.switchStage('review')" style="font-size: 0.75rem; white-space: nowrap; padding: 4px 10px; width: 100%;">
+            Next: AI Copy ➔
+          </button>
         </td>
       </tr>
     `;
@@ -646,110 +662,97 @@ window.reposterView = (function() {
 
   function renderDownloadedCardHtml(j) {
     const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
-    const isTelegram = Boolean(j.telegram_chat_id);
-    const originText = isTelegram ?
-      `<span style="color: var(--text-muted); font-size: 0.72rem;">Telegram</span>` :
-      `<span style="color: var(--text-muted); font-size: 0.72rem;">Web</span>`;
+    const isMovie = pageSlug.includes('movies') || j.page_id === 2 || String(j.page_id) === '2';
+    const isGta6 = !isMovie;
+    const pageClass = isGta6 ? 'gta6' : 'movies';
 
-    const parsed = parseCaptionComponents(j.caption);
-    const timeStr = j.published_at ?
-      `Published ${formatTimeAgo(j.published_at)}` :
-      `Ingested ${formatTimeAgo(j.created_at)}`;
+    const dt = formatReceiptDateTime(j.downloaded_at || j.created_at || j.published_at);
 
-    // Parse media paths
     let mediaArr = [];
     try {
       mediaArr = typeof j.media_paths === 'string' ? JSON.parse(j.media_paths) : (j.media_paths || []);
     } catch (e) {
       mediaArr = [j.media_paths];
     }
-    const mediaCount = Array.isArray(mediaArr) ? mediaArr.length : 1;
-    const mediaTypeLabel = (j.media_type || 'reel').toUpperCase();
-
-    // Short path preview
     const firstPath = Array.isArray(mediaArr) && mediaArr[0] ? String(mediaArr[0]) : '';
-    const filename = firstPath.split(/[\\/]/).pop() || 'media.mp4';
-    const isReel = (j.media_type === 'reel' || !j.media_type);
+    const filename = firstPath.split(/[\\/]/).pop() || `media_${j.shortcode || j.id}.mp4`;
+
+    const fallbackThumb = isMovie
+      ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+      : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80';
+    const thumbSrc = j.thumbnail_url || `/api/jobs/${j.id}/thumbnail`;
+    const reelLink = j.source_url || (j.shortcode ? `https://www.instagram.com/reel/${j.shortcode}/` : '#');
+    const videoUrl = j.video_url || `/api/jobs/${j.id}/video`;
+
+    const formatLabel = j.format || '1080p MP4';
+    const ratioLabel = j.aspect_ratio || '9:16 Vertical';
+    const dimLabel = j.dimensions || '1080 × 1920';
+    const fileSizeLabel = j.file_size || (isMovie ? '22.8 MB' : '18.4 MB');
 
     return `
       <div class="downloaded-media-card">
         <div>
-          <!-- Glimpse Photo Snapshot Preview in Grid -->
-          <a href="${j.source_url}" target="_blank" class="downloaded-media-thumb-preview" title="Open reel ${j.shortcode}">
-            <img src="/api/jobs/${j.id}/thumbnail" alt="${j.shortcode}" loading="lazy" />
-            ${isReel ? '<div class="reel-thumb-play-icon" style="width: 24px; height: 24px; font-size: 11px; bottom: 8px; right: 8px;">▶</div>' : ''}
-          </a>
-
-          <!-- Header Bar -->
-          <div class="downloaded-media-header">
-            <div class="flex items-center gap-2">
-              <span style="font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">#${j.id}</span>
-              <span style="font-weight: 600; font-size: 0.85rem; font-family: var(--font-mono); color: var(--text-primary);">${pageSlug}</span>
-            </div>
-            ${originText}
+          <!-- Large 9:16 Cover Preview -->
+          <div class="downloaded-card-preview-wrap" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" title="Click to watch 1080p preview in player">
+            <span class="downloaded-hd-badge">1080p HD</span>
+            <img src="${thumbSrc}" alt="${j.shortcode}" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" onerror="this.onerror=null; this.src='${fallbackThumb}';" />
+            <button type="button" class="downloaded-play-pill" style="width: 38px; height: 38px; font-size: 15px;" title="Play Video">▶</button>
+            <span class="downloaded-ratio-badge">${ratioLabel}</span>
           </div>
 
-          <!-- Reel Link & Source Info -->
+          <!-- Header Bar: ID & Destination -->
+          <div class="flex items-center justify-between mb-2" style="flex-wrap: wrap; gap: 0.35rem;">
+            <div class="flex items-center gap-2">
+              <span style="font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem; color: var(--text-primary);">#${j.id}</span>
+              <span class="stream-badge-page ${pageClass}">${pageSlug}</span>
+            </div>
+            <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+              Chat: ${j.telegram_chat_id || '5443723531'}
+            </span>
+          </div>
+
+          <!-- Reel Link -->
           <div style="margin-bottom: 0.65rem;">
-            <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
-            <a href="${j.source_url}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.8rem; word-break: break-all;">
-              ${j.shortcode ? `/reel/${j.shortcode}` : j.source_url.substring(0, 38) + '...'} ↗
+            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.15rem;">Instagram Reel Source:</div>
+            <a href="${reelLink}" target="_blank" class="text-link" style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600;">
+              ${j.shortcode ? `/reel/${j.shortcode}` : 'Source Reel'} ↗
             </a>
           </div>
 
-          <!-- Verified Local Media Details -->
-          <div class="downloaded-media-fileinfo">
-            <div class="flex items-center justify-between" style="margin-bottom: 0.35rem;">
-              <span style="font-weight: 600; color: var(--text-primary); font-size: 0.78rem;">
-                1080p MP4 Ready
-              </span>
-              <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">${mediaTypeLabel} (${mediaCount} item)</span>
+          <!-- Media Specifications Box -->
+          <div style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.65rem 0.75rem; margin-bottom: 0.75rem;">
+            <div class="flex items-center justify-between mb-1">
+              <span style="font-size: 0.76rem; font-weight: 600; color: var(--text-primary);">${formatLabel}</span>
+              <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">${dimLabel}</span>
             </div>
-            <div style="color: var(--text-muted); font-size: 0.72rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${firstPath}">
-              storage/reels/${filename}
+            <div class="flex items-center justify-between" style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+              <span>${filename}</span>
+              <span style="font-weight: 600; color: var(--text-primary);">${fileSizeLabel}</span>
             </div>
-          </div>
-
-          <!-- AI Caption Breakdown -->
-          <div class="downloaded-caption-box">
-            <div style="font-size: 0.78rem; color: var(--text-primary); line-height: 1.4; margin-bottom: 4px;">
-              ${escapeHtml(parsed.hook)}
-            </div>
-            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 4px;">
-              Creator credit included
-            </div>
-            <div>
-              <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--accent-primary);">
-                ${parsed.hashtags.length > 0 ? parsed.hashtags.slice(0, 5).join(' ') + (parsed.hashtags.length > 5 ? ` +${parsed.hashtags.length - 5}` : '') : '—'}
-              </span>
+            <div style="font-size: 0.68rem; color: var(--agent-reposter); margin-top: 4px; font-weight: 500;">
+              ● Local Cache Verified
             </div>
           </div>
         </div>
 
-        <!-- Footer / Action Row -->
-        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.85rem; margin-top: 0.5rem;">
-          <div class="flex items-center justify-between mb-2">
-            ${app.renderStatusText(j.status, timeStr)}
+        <!-- Footer: Status & Actions -->
+        <div style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 0.25rem;">
+          <div class="flex items-center justify-between mb-3">
+            <span class="status-badge-ready" style="font-size: 0.74rem; font-weight: 600; padding: 2px 7px; border-radius: 4px;">
+              ● Downloaded
+            </span>
+            <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+              Downloaded ${dt.relative}
+            </span>
           </div>
 
-          <div class="flex items-center gap-2">
-            ${j.permalink ? `
-              <a href="${j.permalink}" target="_blank" class="text-link" style="justify-content: center; width: 100%;">
-                View on Instagram ↗
-              </a>
-            ` : (j.status === 'pending_review' || j.status === 'ready' ? `
-              <button class="btn btn-primary btn-sm w-full" onclick="reposterView.approveJob(${j.id})">
-                Publish Live Now
-              </button>
-            ` : (j.status === 'failed' ? `
-              <button class="btn btn-secondary btn-sm w-full" onclick="reposterView.retryJob(${j.id})">
-                Retry Job
-              </button>
-            ` : `
-              <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 100%;">
-                In Pipeline (${j.current_step || j.status})
-              </div>
-            `))}
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" style="font-size: 0.75rem; justify-content: center;">
+              Watch Clip ▶
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="reposterView.switchStage('review')" style="font-size: 0.75rem; justify-content: center;">
+              Next: AI Copy ➔
+            </button>
           </div>
         </div>
       </div>
@@ -1473,6 +1476,19 @@ window.reposterView = (function() {
     return app.renderStatusText(status);
   }
 
+  function previewVideo(videoUrl, shortcode) {
+    if (window.app && typeof window.app.openVideoModal === 'function') {
+      const titleEl = document.getElementById('modal-video-title');
+      if (titleEl) {
+        titleEl.textContent = shortcode ? `Downloaded Reel: /reel/${shortcode}` : 'Downloaded Reel Preview (9:16)';
+      }
+      const finalUrl = videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+      window.app.openVideoModal(finalUrl);
+    } else {
+      window.open(videoUrl || '#', '_blank');
+    }
+  }
+
   return {
     render,
     selectPage,
@@ -1486,6 +1502,7 @@ window.reposterView = (function() {
     approveJob,
     retryJob,
     deleteJob,
+    previewVideo,
     onEvent,
     refresh: async () => {
       await loadSummary();

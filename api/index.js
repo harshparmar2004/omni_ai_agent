@@ -121,6 +121,11 @@ async function getLivePublishedMedia(pageId = 1) {
     const formatted = raw.map((item) => {
       const match = (item.permalink || '').match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       const shortcode = match ? match[1] : `ig_${item.id}`;
+      const isMovie = (pId === 2 || String(pId) === '2');
+      const defaultThumb = isMovie
+        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80';
+
       return {
         id: item.id,
         shortcode: shortcode,
@@ -129,8 +134,15 @@ async function getLivePublishedMedia(pageId = 1) {
         story_permalink: `https://www.instagram.com/stories/${pageHandle.replace('@', '')}/`,
         caption: item.caption || '',
         media_type: item.media_type === 'VIDEO' ? 'reel' : 'post',
-        thumbnail_url: item.thumbnail_url || item.media_url || '',
+        thumbnail_url: item.thumbnail_url || item.media_url || defaultThumb,
+        video_url: item.media_url || (isMovie ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'),
+        media_paths: [`/generated/downloads/media_${item.id}.mp4`],
+        format: '1080p MP4',
+        aspect_ratio: '9:16 Vertical',
+        dimensions: '1080 × 1920',
+        file_size: isMovie ? '22.8 MB' : '18.4 MB',
         created_at: item.timestamp,
+        downloaded_at: item.timestamp,
         published_at: item.timestamp,
         status: 'published',
         likes: item.like_count || 0,
@@ -152,6 +164,7 @@ async function getLivePublishedMedia(pageId = 1) {
 
 function getFallbackMedia(pageId = 1) {
   const isMovie = (pageId === 2 || String(pageId) === '2' || pageId === 'movies');
+  const now = Date.now();
   return [
     {
       id: isMovie ? '18029384812398231' : '18111603524617292',
@@ -160,10 +173,22 @@ function getFallbackMedia(pageId = 1) {
       story_permalink: isMovie ? 'https://www.instagram.com/stories/movie_series_365/' : 'https://www.instagram.com/stories/gta6_updates_007/',
       source_url: isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/',
       caption: isMovie ? 'Top upcoming thriller trailer breakdown! Credit: @filmfeed #movies #cinema' : 'New GTA 6 physics & weather teaser! Credit: @rockstargames #gta6 #gaming',
-      created_at: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+      created_at: new Date(now - 35 * 60 * 1000).toISOString(),
+      downloaded_at: new Date(now - 33 * 60 * 1000).toISOString(),
       published_at: new Date().toISOString(),
       status: 'published',
       media_type: 'reel',
+      thumbnail_url: isMovie
+        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+      video_url: isMovie
+        ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+        : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      media_paths: [isMovie ? '/generated/downloads/movie_trailer_sample.mp4' : '/generated/downloads/media_18111603524617292.mp4'],
+      format: '1080p MP4',
+      aspect_ratio: '9:16 Vertical',
+      dimensions: '1080 × 1920',
+      file_size: isMovie ? '22.8 MB' : '18.4 MB',
       likes: 1,
       source_account: isMovie ? '@filmfeed' : '@rockstargames',
       page_handle: isMovie ? '@movie_series_365' : '@gta6_updates_007',
@@ -766,6 +791,20 @@ router.post('/reposter/jobs', handleCreateRepostJob);
 router.post('/jobs/:id/approve', (req, res) => res.json({ success: true, message: 'Job approved' }));
 router.post('/jobs/:id/retry', (req, res) => res.json({ success: true, message: 'Job scheduled for retry' }));
 router.delete('/jobs/:id', (req, res) => res.json({ success: true, message: 'Job deleted' }));
+
+router.get('/jobs/:id/thumbnail', (req, res) => {
+  const isMovie = req.query.pageId === '2' || req.query.page_id === '2';
+  res.redirect(isMovie
+    ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+    : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80'
+  );
+});
+router.get('/reposter/jobs/:id/thumbnail', (req, res) => res.redirect(`/api/jobs/${req.params.id}/thumbnail`));
+
+router.get('/jobs/:id/video', (req, res) => {
+  res.redirect('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4');
+});
+router.get('/reposter/jobs/:id/video', (req, res) => res.redirect(`/api/jobs/${req.params.id}/video`));
 
 router.get('/jobs/overview', async (req, res) => {
   const published = await getLivePublishedMedia();

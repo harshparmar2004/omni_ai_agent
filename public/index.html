@@ -156,7 +156,7 @@
   </div>
 
   <!-- Video Preview Modal (iPhone 16 Pro 9:16 Mockup) -->
-  <div id="video-modal" class="modal-overlay hidden">
+  <div id="video-modal" class="modal-overlay hidden" onclick="if (event.target === this) app.closeVideoModal()">
     <div class="modal-content" style="max-width: 360px; padding: 1.25rem; display: flex; flex-direction: column; align-items: center;">
       <div class="flex items-center justify-between w-full mb-3">
         <span class="font-bold text-sm" id="modal-video-title">Reel Preview (9:16)</span>
