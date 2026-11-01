@@ -125,22 +125,70 @@ window.reposterView = (function() {
     if (selectedPageId === null && pages.length > 0) {
       selectedPageId = pages[0].id;
     }
+    const selectedPage = pages.find(p => p.id === selectedPageId);
+    const activePageLabel = selectedPage ? escapeHtml(selectedPage.name) : 'All Connected Pages';
+    const activePageHandle = selectedPage ? (selectedPage.handle || '@' + selectedPage.slug) : `(${pages.length} pages)`;
 
     container.innerHTML = `
-      <!-- 1. Header Bar -->
+      <!-- 1. Header Bar with Clean Title & Scalable Multi-Page Selector Sheet -->
       <div class="mb-4 flex items-center justify-between" style="flex-wrap: wrap; gap: 1rem;">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-              Agent 1: Reposter & On-Demand Pipeline
-            </h2>
-            <span class="status-text-success" style="font-size: 0.75rem; font-weight: 500;">Ready</span>
-          </div>
-          <p class="text-sm text-muted" style="margin-top: 0.15rem; margin-bottom: 0;">
-            Direct single-reel ingestion via Telegram Bot (@omnistudio_bot) and Web Dashboard
-          </p>
-        </div>
         <div class="flex items-center gap-2">
+          <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+            Agent 1: Reposter & On-Demand Pipeline
+          </h2>
+          <span class="status-text-success" style="font-size: 0.75rem; font-weight: 500;">Ready</span>
+        </div>
+
+        <div class="flex items-center gap-2" style="position: relative;">
+          <!-- Scalable Multi-Account Selector Sheet Trigger -->
+          <div class="rp-page-selector-wrap">
+            <button id="rp-page-sheet-btn" class="btn btn-secondary btn-sm" onclick="reposterView.togglePageSheet(event)" style="display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.38rem 0.85rem; font-size: 0.82rem; border-radius: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; background: rgba(184, 91, 53, 0.12); color: var(--accent-primary); font-size: 0.72rem; font-weight: 700;">IG</span>
+              <span id="rp-page-sheet-label" style="font-weight: 600; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${activePageLabel}
+              </span>
+              <span id="rp-page-sheet-handle" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">
+                ${activePageHandle}
+              </span>
+              <svg id="rp-page-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity: 0.6; transition: transform 0.2s;"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <!-- Sheet Dropdown (Scalable for 50-60+ accounts with real-time search) -->
+            <div id="rp-page-sheet" class="rp-page-sheet hidden" onclick="event.stopPropagation()">
+              <div class="rp-page-sheet-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="font-weight: 700; font-size: 0.88rem;">Select Target Account</span>
+                  <span style="font-size: 0.7rem; font-weight: 600; background: rgba(184, 91, 53, 0.1); color: var(--accent-primary); padding: 1px 7px; border-radius: 10px;">
+                    ${pages.length} Pages
+                  </span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.closePageSheet()" style="padding: 1px 6px; font-size: 0.8rem; line-height: 1;">✕</button>
+              </div>
+
+              <!-- Real-time Filter Search for 50-60+ accounts -->
+              <div class="rp-page-sheet-search">
+                <div style="position: relative;">
+                  <input type="text" id="rp-page-search-input" placeholder="Search accounts, @handle..." class="form-input" style="font-size: 0.78rem; padding: 0.4rem 0.65rem 0.4rem 1.85rem; border-radius: 6px; width: 100%;" oninput="reposterView.filterPages(this.value)" />
+                  <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); opacity: 0.45; font-size: 0.8rem;">🔍</span>
+                </div>
+              </div>
+
+              <!-- Scrollable accounts list -->
+              <div class="rp-page-sheet-list" id="rp-page-sheet-items">
+                ${renderPageSheetHtml()}
+              </div>
+
+              <!-- Sheet Footer -->
+              <div class="rp-page-sheet-footer">
+                <span>Direct single-reel Telegram pipeline</span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.app?.navigateTo('pages'); reposterView.closePageSheet();" style="font-size: 0.72rem; padding: 2px 7px;">
+                  + Manage Pages
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Refresh Button -->
           <button class="btn btn-secondary btn-sm" onclick="reposterView.refresh()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
             Refresh
@@ -148,17 +196,12 @@ window.reposterView = (function() {
         </div>
       </div>
 
-      <!-- 2. Multi-Page Selector Bar -->
-      <div class="pipeline-page-switcher" id="rp-page-switcher">
-        ${renderPageSwitcherPills()}
-      </div>
-
-      <!-- 3. Top 5-Stage Visual Publishing Stepper -->
+      <!-- 2. Top 5-Stage Visual Publishing Stepper -->
       <div class="pipeline-stepper-container" id="rp-stepper-container">
         ${renderStepperHtml()}
       </div>
 
-      <!-- 4. Dynamic Active Stage Inspection Deck -->
+      <!-- 3. Dynamic Active Stage Inspection Deck -->
       <div id="rp-stage-deck">
         <div style="color: var(--text-muted); padding: 3rem; text-align: center;">Loading pipeline stage...</div>
       </div>
@@ -168,29 +211,111 @@ window.reposterView = (function() {
     await renderActiveStage();
   }
 
-  function renderPageSwitcherPills() {
+  function renderPageSheetHtml() {
     const pages = window.app?.pages || [];
     const isAll = selectedPageId === null;
 
-    let html = `
-      <button class="pipeline-page-pill ${isAll ? 'active' : ''}" onclick="reposterView.selectPage(null)">
-        <span>All Connected Pages</span>
+    let itemsHtml = `
+      <!-- All Connected Pages Option -->
+      <button type="button" class="rp-page-sheet-item ${isAll ? 'active' : ''}" onclick="reposterView.selectPage(null)">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(30, 26, 23, 0.06); display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+            🌐
+          </div>
+          <div style="text-align: left;">
+            <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">All Connected Pages</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Combined pipeline across all ${pages.length} accounts</div>
+          </div>
+        </div>
+        ${isAll ? `<span class="rp-page-selected-check">✓</span>` : ''}
       </button>
+      <div style="font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.06em; padding: 0.5rem 0.5rem 0.25rem 0.5rem; margin-top: 0.35rem;">
+        Instagram Accounts (${pages.length})
+      </div>
     `;
 
     pages.forEach(p => {
       const isActive = selectedPageId === p.id;
-      html += `
-        <button class="pipeline-page-pill ${isActive ? 'active' : ''}" onclick="reposterView.selectPage(${p.id})">
-          <span>${p.name}</span>
-          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-muted)'}; margin-left: 2px;">
-            ${p.handle || '@' + p.slug}
-          </span>
+      const isMovie = (p.slug || '').includes('movies') || p.id === 2;
+      const initial = (p.name || 'IG').charAt(0).toUpperCase();
+      const quotaStr = p.today_published_count !== undefined ? `${p.today_published_count}/${p.daily_quota || 3}` : '0/3';
+
+      itemsHtml += `
+        <button type="button" class="rp-page-sheet-item ${isActive ? 'active' : ''}" onclick="reposterView.selectPage(${p.id})" data-page-name="${escapeHtml(p.name || '').toLowerCase()}" data-page-handle="${escapeHtml(p.handle || p.slug || '').toLowerCase()}">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: ${isMovie ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'linear-gradient(135deg, #B85B35, #E17055)'}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;">
+              ${initial}
+            </div>
+            <div style="min-width: 0; text-align: left;">
+              <div style="font-weight: 600; font-size: 0.84rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(p.name)}
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+                <span>${p.handle || '@' + p.slug}</span>
+                <span>•</span>
+                <span style="color: ${isActive ? 'var(--accent-primary)' : 'inherit'};">Quota: ${quotaStr}</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-left: 0.5rem; flex-shrink: 0;">
+            ${isActive ? `<span class="rp-page-selected-check">✓</span>` : ''}
+          </div>
         </button>
       `;
     });
 
-    return html;
+    return itemsHtml;
+  }
+
+  function togglePageSheet(event) {
+    if (event) event.stopPropagation();
+    const sheet = document.getElementById('rp-page-sheet');
+    const caret = document.getElementById('rp-page-caret');
+    if (!sheet) return;
+
+    const isHidden = sheet.classList.contains('hidden');
+    if (isHidden) {
+      sheet.classList.remove('hidden');
+      sheet.style.display = 'flex';
+      if (caret) caret.style.transform = 'rotate(180deg)';
+      const searchInput = document.getElementById('rp-page-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        filterPages('');
+        setTimeout(() => searchInput.focus(), 60);
+      }
+    } else {
+      closePageSheet();
+    }
+  }
+
+  function closePageSheet() {
+    const sheet = document.getElementById('rp-page-sheet');
+    const caret = document.getElementById('rp-page-caret');
+    if (sheet) {
+      sheet.classList.add('hidden');
+      sheet.style.display = 'none';
+    }
+    if (caret) caret.style.transform = 'rotate(0deg)';
+  }
+
+  function filterPages(query) {
+    const q = (query || '').toLowerCase().trim();
+    const items = document.querySelectorAll('#rp-page-sheet-items .rp-page-sheet-item');
+    items.forEach(el => {
+      const name = el.getAttribute('data-page-name') || '';
+      const handle = el.getAttribute('data-page-handle') || '';
+      if (!name && !handle) {
+        // "All Connected Pages" option
+        el.style.display = (!q || 'all connected pages'.includes(q)) ? 'flex' : 'none';
+        return;
+      }
+      if (!q || name.includes(q) || handle.includes(q)) {
+        el.style.display = 'flex';
+      } else {
+        el.style.display = 'none';
+      }
+    });
   }
 
   function renderPageOptions() {
@@ -304,8 +429,21 @@ window.reposterView = (function() {
   async function selectPage(pageId) {
     selectedPageId = pageId;
 
-    const switcher = document.getElementById('rp-page-switcher');
-    if (switcher) switcher.innerHTML = renderPageSwitcherPills();
+    closePageSheet();
+
+    const pages = window.app?.pages || [];
+    const selectedPage = pages.find(p => p.id === selectedPageId);
+    const labelEl = document.getElementById('rp-page-sheet-label');
+    const handleEl = document.getElementById('rp-page-sheet-handle');
+    if (labelEl) {
+      labelEl.textContent = selectedPage ? selectedPage.name : 'All Connected Pages';
+    }
+    if (handleEl) {
+      handleEl.textContent = selectedPage ? (selectedPage.handle || '@' + selectedPage.slug) : `(${pages.length} pages)`;
+    }
+
+    const itemsContainer = document.getElementById('rp-page-sheet-items');
+    if (itemsContainer) itemsContainer.innerHTML = renderPageSheetHtml();
 
     const stepper = document.getElementById('rp-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
@@ -2018,10 +2156,31 @@ window.reposterView = (function() {
     renderActiveStage();
   }
 
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+      const sheet = document.getElementById('rp-page-sheet');
+      const btn = document.getElementById('rp-page-sheet-btn');
+      if (sheet && !sheet.classList.contains('hidden')) {
+        if (!sheet.contains(e.target) && !btn?.contains(e.target)) {
+          closePageSheet();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closePageSheet();
+      }
+    });
+  }
+
   return {
     render,
     selectPage,
     switchStage,
+    togglePageSheet,
+    closePageSheet,
+    filterPages,
     setDownloadedViewMode,
     setIngestViewMode,
     setPublishedViewMode,
@@ -2038,6 +2197,12 @@ window.reposterView = (function() {
     previewVideo,
     onEvent,
     refresh: async () => {
+      try {
+        const res = await fetch('/api/pages');
+        if (res.ok) window.app.pages = await res.json();
+      } catch (e) {}
+      const itemsContainer = document.getElementById('rp-page-sheet-items');
+      if (itemsContainer) itemsContainer.innerHTML = renderPageSheetHtml();
       await loadSummary();
       await renderActiveStage();
     }

@@ -3192,6 +3192,105 @@ table.data-table tr:hover td {
   white-space: nowrap;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Multi-Account Page Selector Sheet & Dropdown
+   ───────────────────────────────────────────────────────────── */
+.rp-page-selector-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.rp-page-sheet {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 380px;
+  max-width: 92vw;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-card, #E4DDD2);
+  border-radius: 12px;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.16);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.18s ease-out;
+}
+
+.rp-page-sheet.hidden {
+  display: none !important;
+}
+
+.rp-page-sheet-header {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-subtle, #EDE7DE);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-canvas, #FAF8F5);
+}
+
+.rp-page-sheet-search {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border-subtle, #EDE7DE);
+  background: var(--bg-card, #FFFFFF);
+}
+
+.rp-page-sheet-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 0.45rem;
+}
+
+.rp-page-sheet-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  margin-bottom: 2px;
+}
+
+.rp-page-sheet-item:hover {
+  background: var(--bg-canvas, #FAF8F5);
+  border-color: var(--border-subtle, #EDE7DE);
+}
+
+.rp-page-sheet-item.active {
+  background: rgba(184, 91, 53, 0.08);
+  border-color: rgba(184, 91, 53, 0.28);
+}
+
+.rp-page-selected-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary, #B85B35);
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.rp-page-sheet-footer {
+  padding: 0.65rem 1rem;
+  border-top: 1px solid var(--border-subtle, #EDE7DE);
+  background: var(--bg-canvas, #FAF8F5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 
 
 
