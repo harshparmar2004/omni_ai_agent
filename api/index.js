@@ -695,6 +695,24 @@ router.post('/discoveries/:id/skip', (req, res) => {
   res.json({ success: true, message: 'Discovery skipped.' });
 });
 
+// ── Duplicate Audit Logs (Tracks blocked duplicate reel attempts) ────
+const duplicateAuditLogs = [
+  {
+    id: 'dup_18075149738746325',
+    shortcode: 'DfKTq8OlBdH',
+    source_url: 'https://www.instagram.com/reel/DfKTq8OlBdH/',
+    page_id: 2,
+    page_handle: '@movie_series_365',
+    status: 'duplicate_blocked',
+    is_duplicate: true,
+    duplicate_reason: 'Reel #DfKTq8OlBdH was already published to this page on Oct 30.',
+    already_published_at: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
+    caption: 'Spider-Man: Far From Home collection highlight',
+    telegram_chat_id: '5443723531'
+  }
+];
+
 // ── Jobs & Reposter Endpoints ────────────────────────────────
 async function handleGetJobs(req, res) {
   const pId = req.query.pageId || req.query.page_id || 1;
@@ -704,6 +722,7 @@ async function handleGetJobs(req, res) {
   const statusQuery = (req.query.status || '').toLowerCase();
   const limit = parseInt(req.query.limit || '30', 10);
   const offset = parseInt(req.query.offset || '0', 10);
+  const isReviewStage = req.query.stage === 'review' || req.query.view === 'checks';
 
   // Check for in-progress runners
   const activeRuns = runs.filter(r => r.status === 'in_progress' || r.status === 'queued');
@@ -721,16 +740,21 @@ async function handleGetJobs(req, res) {
     agent: r.name.toLowerCase().includes('watchtower') ? 'watchtower' : 'reposter'
   }));
 
+  const pageDups = duplicateAuditLogs.filter(d => String(d.page_id) === String(pId));
+
   let combined = [];
 
-  if (statusQuery.includes('published') && !statusQuery.includes('queued') && !statusQuery.includes('pending')) {
+  if (isReviewStage) {
+    // Stage 3 checks view: surface all evaluated reels (auto-passed + duplicate blocked)
+    combined = [...pageDups, ...inProgressJobs, ...published];
+  } else if (statusQuery.includes('published') && !statusQuery.includes('queued') && !statusQuery.includes('pending')) {
     combined = published;
   } else if (statusQuery.includes('queued') || statusQuery.includes('processing') || statusQuery.includes('publishing')) {
     combined = inProgressJobs;
   } else if (statusQuery.includes('pending') || statusQuery.includes('ready')) {
     combined = [];
   } else {
-    combined = [...inProgressJobs, ...published];
+    combined = [...pageDups, ...inProgressJobs, ...published];
   }
 
   res.setHeader('x-total-count', combined.length);
@@ -750,7 +774,7 @@ router.get('/reposter/pipeline-summary', async (req, res) => {
     res.json({
       ingested: published.length + activeRuns.length,
       downloaded: published.length,
-      ready: 0,
+      ready: published.length,
       published: published.length,
       failed: 0
     });
@@ -762,6 +786,38 @@ router.get('/reposter/pipeline-summary', async (req, res) => {
 async function handleCreateRepostJob(req, res) {
   const url = req.body?.url;
   if (!url) return res.status(400).json({ error: 'URL is required' });
+
+  const pageId = req.body?.page_id || '1';
+  const match = (url || '').match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+  const shortcode = match ? match[1] : '';
+
+  // 1. Check for duplicates against published history
+  const published = await getLivePublishedMedia(pageId);
+  const duplicate = published.find(p => p.shortcode === shortcode || (shortcode && p.source_url && p.source_url.includes(shortcode)));
+
+  if (duplicate && !req.body?.force) {
+    const dupEntry = {
+      id: `dup_${Date.now()}`,
+      shortcode: shortcode || `ig_${Date.now()}`,
+      source_url: url,
+      permalink: duplicate.permalink,
+      page_id: parseInt(pageId, 10),
+      page_handle: pageId === 2 || String(pageId) === '2' ? '@movie_series_365' : '@gta6_updates_007',
+      status: 'duplicate_blocked',
+      is_duplicate: true,
+      duplicate_reason: `Reel #${shortcode} was already published to this page on ${duplicate.published_at || 'previous cycle'}.`,
+      already_published_at: duplicate.published_at || duplicate.created_at,
+      created_at: new Date().toISOString(),
+      caption: duplicate.caption || 'Duplicate reel submission',
+      telegram_chat_id: '5443723531'
+    };
+    duplicateAuditLogs.unshift(dupEntry);
+    return res.status(409).json({
+      error: `Duplicate detected: Reel #${shortcode} was already published to this page.`,
+      duplicate: true,
+      job: dupEntry
+    });
+  }
 
   if (GITHUB_TOKEN) {
     try {

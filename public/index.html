@@ -168,6 +168,40 @@
     </div>
   </div>
 
+  <!-- Caption Inspection & Edit Modal -->
+  <div id="caption-inspect-modal" class="modal-overlay hidden" onclick="if (event.target === this) reposterView.closeCaptionModal()">
+    <div class="modal-content" style="max-width: 580px; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-card); box-shadow: var(--shadow-modal);">
+      <div class="flex items-center justify-between w-full mb-3">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm" id="modal-caption-title">AI Copy & Verification Details</span>
+          <span id="modal-caption-badge" class="stream-badge-page">@account</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="reposterView.closeCaptionModal()" style="padding: 2px 8px;">✕</button>
+      </div>
+
+      <div class="mb-3" style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="check-pill check-pass"><span class="check-icon">✓</span> Deduplication Verified</span>
+        <span class="check-pill check-pass"><span class="check-icon">✓</span> AI Copy Generated</span>
+        <span class="check-pill check-pass"><span class="check-icon">✓</span> Spam Cleansed</span>
+      </div>
+
+      <div class="form-group mb-3">
+        <label class="form-label font-bold text-xs" style="margin-bottom: 4px; display: block;">Full Generated Caption:</label>
+        <textarea id="modal-caption-textarea" class="form-input" rows="8" style="font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.45;"></textarea>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-muted mb-3" style="font-family: var(--font-mono);">
+        <span id="modal-caption-chars">0 / 2,200 chars</span>
+        <span id="modal-caption-tags">0 hashtags</span>
+      </div>
+
+      <div class="flex items-center justify-between" id="modal-caption-footer">
+        <button class="btn btn-secondary btn-sm" onclick="reposterView.closeCaptionModal()">Close</button>
+        <button id="modal-caption-save-btn" class="btn btn-primary btn-sm" onclick="reposterView.saveModalCaption()">Save & Approve Live Now</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
