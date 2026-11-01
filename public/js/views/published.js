@@ -355,10 +355,13 @@ window.publishedView = (function() {
 
           <!-- 2. Reel & Target Destination Page -->
           <td style="vertical-align: middle; width: 20%;">
-            <div style="margin-bottom: 3px;">
-              <a href="${directUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="View reel #${j.shortcode}">
-                #${j.shortcode} ↗
+            <div style="margin-bottom: 2px;">
+              <a href="${directUrl}" target="_blank" rel="noopener noreferrer" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="View reel #${j.shortcode}">
+                ${j.shortcode ? `/reel/${j.shortcode}` : 'Live Reel'} ↗
               </a>
+            </div>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 3px;">
+              reelId: #${j.id}
             </div>
             <div style="font-size: 0.8rem; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-bottom: 2px;">
               ${escapeHtml(pageHandle)}
@@ -389,7 +392,7 @@ window.publishedView = (function() {
               ${escapeHtml(captionClean)}
             </div>
             <div style="font-size: 0.72rem; color: var(--text-muted);">
-              <a href="${j.source_url}" target="_blank" style="color: var(--accent-primary); text-decoration: none;">
+              <a href="${j.source_url}" target="_blank" rel="noopener noreferrer" style="color: var(--accent-primary); text-decoration: none;">
                 Original Source ↗
               </a>
             </div>
@@ -398,7 +401,7 @@ window.publishedView = (function() {
           <!-- 5. Meta Media ID & Date -->
           <td style="vertical-align: middle; width: 18%;">
             <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-bottom: 2px;">
-              ID: ${escapeHtml(j.ig_media_id || 'Meta v21.0')}
+              ID: ${escapeHtml(j.ig_media_id || j.id || 'Meta v21.0')}
             </div>
             <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">
               ${pubDateStr}
@@ -413,11 +416,11 @@ window.publishedView = (function() {
             <div style="display: inline-flex; align-items: center; gap: 6px;">
               ${videoWebUrl ? `
                 <button class="btn btn-secondary btn-sm" onclick="app.openVideoModal('${videoWebUrl}')" style="font-size: 0.75rem; padding: 4px 8px;">
-                  Preview
+                  Clip ▶
                 </button>
               ` : ''}
-              <a href="${directUrl}" target="_blank" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 4px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                View on IG ↗
+              <a href="${directUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 4px 10px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                <span>Live Reel</span> ↗
               </a>
             </div>
           </td>
@@ -556,7 +559,8 @@ window.publishedView = (function() {
    */
   function formatTimeAgo(timestamp) {
     if (!timestamp) return '--';
-    const diff = (Date.now() - new Date(timestamp).getTime()) / 1000;
+    const diff = Math.max(0, (Date.now() - new Date(timestamp).getTime()) / 1000);
+    if (diff < 15) return 'Just now';
     if (diff < 60) return `${Math.floor(diff)}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
