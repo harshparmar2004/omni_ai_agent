@@ -252,11 +252,19 @@ window.app = (function() {
     if (progressBox) progressBox.classList.add('hidden');
 
     state.activeModalJobId = null;
-    document.getElementById('repost-modal')?.classList.remove('hidden');
+    const modal = document.getElementById('repost-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+    }
   }
 
   function closeRepostModal() {
-    document.getElementById('repost-modal')?.classList.add('hidden');
+    const modal = document.getElementById('repost-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
     state.activeModalJobId = null;
   }
 
@@ -364,7 +372,7 @@ window.app = (function() {
 
     player.src = videoSrc;
     modal.classList.remove('hidden');
-    modal.style.display = 'flex';
+    modal.style.setProperty('display', 'flex', 'important');
     player.load();
     const playPromise = player.play();
     if (playPromise !== undefined) {
@@ -383,7 +391,7 @@ window.app = (function() {
     }
     if (modal) {
       modal.classList.add('hidden');
-      modal.style.display = 'none';
+      modal.style.setProperty('display', 'none', 'important');
     }
   }
 

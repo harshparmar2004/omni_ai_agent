@@ -361,12 +361,18 @@ window.reposterView = (function() {
 
   function openManualModal() {
     const modal = document.getElementById('rp-manual-modal');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+    }
   }
 
   function closeManualModal() {
     const modal = document.getElementById('rp-manual-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
   }
 
   async function renderIngestStage(container) {
@@ -416,7 +422,7 @@ window.reposterView = (function() {
       </div>
 
       <!-- Manual Ingest Modal (Clean, Non-Intrusive Floating Dialog) -->
-      <div id="rp-manual-modal" class="modal-overlay" style="display: none;" onclick="if(event.target === this) reposterView.closeManualModal()">
+      <div id="rp-manual-modal" class="modal-overlay hidden" style="display: none;" onclick="if(event.target === this) reposterView.closeManualModal()">
         <div class="modal-content" style="max-width: 500px; position: relative;">
           <div class="flex items-center justify-between mb-3">
             <div>
@@ -1953,6 +1959,7 @@ window.reposterView = (function() {
     }
 
     modal.classList.remove('hidden');
+    modal.style.setProperty('display', 'flex', 'important');
   }
 
   function updateModalCaptionCounters(text) {
@@ -1972,7 +1979,10 @@ window.reposterView = (function() {
 
   function closeCaptionModal() {
     const modal = document.getElementById('caption-inspect-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
     currentCaptionModalJob = null;
   }
 

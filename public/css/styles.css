@@ -2839,26 +2839,30 @@ table.data-table tr:hover td {
 /* ─────────────────────────────────────────────────────────────
    Modal & Video Player Core Styles
    ───────────────────────────────────────────────────────────── */
-.hidden {
+.hidden,
+.modal-overlay.hidden,
+.modal-overlay[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.modal-overlay[style*="display: none"],
+.modal-overlay[style*="display:none"] {
   display: none !important;
 }
 
 .modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  background-color: rgba(18, 16, 14, 0.72) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  z-index: 10000 !important;
-  padding: 1.5rem !important;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(18, 16, 14, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1.5rem;
   animation: fadeIn 0.2s ease-out;
-}
-
-.modal-overlay.hidden {
-  display: none !important;
 }
 
 .modal-content {

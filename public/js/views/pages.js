@@ -62,7 +62,7 @@ window.pagesView = (function() {
         </div>
 
         <!-- Edit / Connect Page Modal -->
-        <div id="page-edit-modal" class="modal-overlay hidden">
+        <div id="page-edit-modal" class="modal-overlay hidden" style="display: none;" onclick="if (event.target === this) pagesView.closeEditModal()">
           <div class="modal-content" style="max-width: 500px; border-radius: 12px; border: 1px solid var(--border-card); box-shadow: none;">
             <div class="flex items-center justify-between mb-4">
               <div>
@@ -770,7 +770,11 @@ window.pagesView = (function() {
     document.getElementById('pem-hashtags').value = page.default_hashtags || '';
     document.getElementById('pem-post-mode').value = page.post_mode || 'review';
 
-    document.getElementById('page-edit-modal')?.classList.remove('hidden');
+    const modal = document.getElementById('page-edit-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+    }
   }
 
   function openAddModal() {
@@ -784,11 +788,19 @@ window.pagesView = (function() {
     document.getElementById('pem-hashtags').value = '';
     document.getElementById('pem-post-mode').value = 'review';
 
-    document.getElementById('page-edit-modal')?.classList.remove('hidden');
+    const modal = document.getElementById('page-edit-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+    }
   }
 
   function closeEditModal() {
-    document.getElementById('page-edit-modal')?.classList.add('hidden');
+    const modal = document.getElementById('page-edit-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
   }
 
   async function saveEditModal() {

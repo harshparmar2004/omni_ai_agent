@@ -106,7 +106,7 @@
   </div>
 
   <!-- Repost Modal -->
-  <div id="repost-modal" class="modal-overlay hidden">
+  <div id="repost-modal" class="modal-overlay hidden" style="display: none;" onclick="if (event.target === this) app.closeRepostModal()">
     <div class="modal-content" style="max-width: 520px;">
       <div class="flex items-center justify-between mb-4">
         <h3 style="margin: 0; font-size: 1.15rem;">Repost Reel to Instagram</h3>
@@ -176,7 +176,7 @@
   </div>
 
   <!-- Caption Inspection & Edit Modal -->
-  <div id="caption-inspect-modal" class="modal-overlay hidden" onclick="if (event.target === this) reposterView.closeCaptionModal()">
+  <div id="caption-inspect-modal" class="modal-overlay hidden" style="display: none;" onclick="if (event.target === this) reposterView.closeCaptionModal()">
     <div class="modal-content" style="max-width: 580px; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-card); box-shadow: var(--shadow-modal);">
       <div class="flex items-center justify-between w-full mb-3">
         <div class="flex items-center gap-2">
