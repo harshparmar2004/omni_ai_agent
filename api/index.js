@@ -608,16 +608,90 @@ router.get('/system/health', (req, res) => {
   });
 });
 
+let watchtowerPausedState = false;
+
 router.get('/watchtower/status', async (req, res) => {
   const runs = await getLiveWorkflowRuns();
   const activeRun = runs.find(r => r.status === 'in_progress' || r.status === 'queued');
 
   res.json({
     active: true,
-    paused: false,
+    paused: watchtowerPausedState,
+    isPaused: watchtowerPausedState,
     isScanning: !!activeRun,
-    nextRunFormatted: activeRun ? 'Running Now on GitHub Actions...' : 'Scheduled in GitHub Actions (every 3h)',
+    nextRunFormatted: activeRun ? 'Running Now on GitHub Actions...' : (watchtowerPausedState ? 'Paused' : 'Scheduled in GitHub Actions (every 3h)'),
     interval_hours: 3
+  });
+});
+
+router.post('/watchtower/pause', (req, res) => {
+  watchtowerPausedState = true;
+  res.json({ success: true, paused: true, message: 'Watchtower surveillance paused' });
+});
+
+router.post('/watchtower/resume', (req, res) => {
+  watchtowerPausedState = false;
+  res.json({ success: true, paused: false, message: 'Watchtower surveillance resumed' });
+});
+
+router.get('/watchtower/peak-windows', async (req, res) => {
+  const pageFilter = req.query.pageId ? parseInt(req.query.pageId, 10) : 1;
+  const published = await getLivePublishedMedia(pageFilter);
+
+  // Compute Indian Standard Time (IST)
+  const now = new Date();
+  const istFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour12: true,
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+  const istTimeStr = istFormatter.format(now) + ' IST';
+
+  // Compute current hour in decimal for window matching
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata',
+    hour12: false,
+    hour: 'numeric',
+    minute: 'numeric'
+  }).formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '12', 10);
+  const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+  const t = hour + (minute / 60);
+
+  const windows = [
+    { id: 'morning', name: 'Morning Audience Wave', rangeStr: '08:30 – 11:30 IST', startHour: 8.5, endHour: 11.5, target: 2 },
+    { id: 'lunch', name: 'Lunchtime & Afternoon Surge', rangeStr: '12:30 – 16:30 IST', startHour: 12.5, endHour: 16.5, target: 2 },
+    { id: 'evening', name: 'Evening Prime-Time Viral Peak', rangeStr: '17:00 – 21:30 IST', startHour: 17.0, endHour: 21.5, target: 3 }
+  ];
+
+  let activeWindow = null;
+  let nextWindow = windows[0];
+
+  for (let i = 0; i < windows.length; i++) {
+    const w = windows[i];
+    if (t >= w.startHour && t < w.endHour) {
+      activeWindow = w;
+      nextWindow = windows[(i + 1) % windows.length];
+      break;
+    }
+    if (t < w.startHour) {
+      nextWindow = w;
+      break;
+    }
+  }
+
+  res.json({
+    activeWindow,
+    nextWindow: nextWindow ? {
+      ...nextWindow,
+      countdown: `Starts at ${nextWindow.rangeStr.split('–')[0].trim()}`
+    } : null,
+    currentTime: istTimeStr,
+    publishedToday: published.length,
+    dailyTarget: 7,
+    metaLimit: 25,
+    safeSpacingMin: 25
   });
 });
 

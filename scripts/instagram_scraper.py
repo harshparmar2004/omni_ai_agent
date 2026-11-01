@@ -372,11 +372,12 @@ async def scrape_profile(username, url):
             await browser.close()
 
 async def main():
-    if len(sys.argv) < 2:
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    if not args:
         print(json.dumps({"success": False, "error": "No URL or username provided"}))
         return
 
-    raw_input = sys.argv[1]
+    raw_input = args[0]
     parsed = parse_instagram_url(raw_input)
 
     if parsed['type'] == 'post':
