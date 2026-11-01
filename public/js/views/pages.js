@@ -88,6 +88,12 @@ window.pagesView = (function() {
             </div>
 
             <div class="form-group mb-3">
+              <label class="form-label font-bold" style="font-size: 0.8rem; font-weight: 600;">Instagram Account ID (User ID)</label>
+              <input type="text" id="pem-ig-user-id" class="form-input" placeholder="e.g. 17841434441251009" style="font-family: var(--font-mono); border-radius: 8px;">
+              <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Found in Meta for Developers under <i>2. Generate access tokens</i> (e.g. <code>17841434441251009</code>).</div>
+            </div>
+
+            <div class="form-group mb-3">
               <label class="form-label font-bold" style="font-size: 0.8rem; font-weight: 600;">Meta Graph API User Token</label>
               <input type="password" id="pem-token" class="form-input" placeholder="Leave empty to keep existing token" style="border-radius: 8px;">
               <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Requires <code>instagram_content_publish</code> scope from Meta for Developers.</div>
@@ -765,6 +771,7 @@ window.pagesView = (function() {
     document.getElementById('pem-name').value = page.name || '';
     document.getElementById('pem-slug').value = page.slug || '';
     document.getElementById('pem-username').value = page.handle || page.username || '';
+    document.getElementById('pem-ig-user-id').value = page.ig_user_id || '';
     document.getElementById('pem-token').value = '';
     document.getElementById('pem-quota').value = page.daily_quota || 3;
     document.getElementById('pem-hashtags').value = page.default_hashtags || '';
@@ -783,6 +790,7 @@ window.pagesView = (function() {
     document.getElementById('pem-name').value = '';
     document.getElementById('pem-slug').value = '';
     document.getElementById('pem-username').value = '';
+    document.getElementById('pem-ig-user-id').value = '';
     document.getElementById('pem-token').value = '';
     document.getElementById('pem-quota').value = 3;
     document.getElementById('pem-hashtags').value = '';
@@ -807,6 +815,7 @@ window.pagesView = (function() {
     const name = document.getElementById('pem-name')?.value?.trim();
     const slug = document.getElementById('pem-slug')?.value?.trim();
     const handle = document.getElementById('pem-username')?.value?.trim();
+    const igUserId = document.getElementById('pem-ig-user-id')?.value?.trim();
     const token = document.getElementById('pem-token')?.value?.trim();
     const quota = parseInt(document.getElementById('pem-quota')?.value || 3, 10);
     const hashtags = document.getElementById('pem-hashtags')?.value?.trim();
@@ -825,6 +834,10 @@ window.pagesView = (function() {
       default_hashtags: hashtags,
       post_mode: postMode
     };
+
+    if (igUserId) {
+      payload.ig_user_id = igUserId;
+    }
 
     if (token) {
       payload.access_token = token;

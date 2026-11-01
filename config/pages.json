@@ -12,5 +12,13 @@
     "name": "Movie Recommendations",
     "handle": "@movie_series_365",
     "icon": "🍿"
+  },
+  {
+    "id": "3",
+    "slug": "techguy",
+    "name": "Tech Guy Harsh Parmar",
+    "handle": "@techguyharshparmar",
+    "ig_user_id": "17841434441251009",
+    "icon": "💻"
   }
 ]

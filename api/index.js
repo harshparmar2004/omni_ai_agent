@@ -15,6 +15,8 @@ const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || '';
 const IG_USER_ID = process.env.IG_USER_ID || '17841428668115319';
 const MOVIE_META_ACCESS_TOKEN = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD';
 const MOVIE_IG_USER_ID = process.env.MOVIE_IG_USER_ID || '29048404444808513';
+const TECH_META_ACCESS_TOKEN = process.env.TECH_META_ACCESS_TOKEN || process.env.HARSH_META_ACCESS_TOKEN || '';
+const TECH_IG_USER_ID = process.env.TECH_IG_USER_ID || '17841434441251009';
 
 // Path normalization middleware for Vercel Serverless rewrites
 app.use((req, res, next) => {
@@ -37,14 +39,16 @@ function getCompetitorsConfig() {
         }
         return {
           gta6: Array.isArray(parsed.gta6) ? parsed.gta6 : ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
-          movies: Array.isArray(parsed.movies) ? parsed.movies : []
+          movies: Array.isArray(parsed.movies) ? parsed.movies : [],
+          techguy: Array.isArray(parsed.techguy) ? parsed.techguy : []
         };
       }
     }
   } catch (e) {}
   return {
     gta6: ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
-    movies: []
+    movies: [],
+    techguy: []
   };
 }
 
@@ -52,7 +56,8 @@ function getCompetitors(targetPage = null) {
   const cfg = getCompetitorsConfig();
   if (targetPage === 1 || targetPage === '1' || targetPage === 'gta6') return cfg.gta6;
   if (targetPage === 2 || targetPage === '2' || targetPage === 'movies') return cfg.movies;
-  return [...cfg.gta6, ...cfg.movies];
+  if (targetPage === 3 || targetPage === '3' || targetPage === 'techguy') return cfg.techguy || [];
+  return [...cfg.gta6, ...cfg.movies, ...(cfg.techguy || [])];
 }
 
 // Helper: Normalize username or Instagram URL
@@ -231,7 +236,8 @@ const PAGE_GTA6 = {
   name: 'GTA 6 Updates 007',
   handle: '@gta6_updates_007',
   ig_user_id: IG_USER_ID,
-  access_token_masked: 'IGAAYJ...eaB',
+  access_token: META_ACCESS_TOKEN,
+  access_token_masked: META_ACCESS_TOKEN ? `${META_ACCESS_TOKEN.substring(0, 6)}...${META_ACCESS_TOKEN.slice(-4)}` : 'IGAAYJ...eaB',
   has_valid_token: true,
   caption_template: '{caption}\n\n{hashtags}',
   default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
@@ -250,7 +256,8 @@ const PAGE_MOVIES = {
   name: 'Movie Recommendations',
   handle: '@movie_series_365',
   ig_user_id: MOVIE_IG_USER_ID,
-  access_token_masked: 'IGAAYJ...9zkZDZD',
+  access_token: MOVIE_META_ACCESS_TOKEN,
+  access_token_masked: MOVIE_META_ACCESS_TOKEN ? `${MOVIE_META_ACCESS_TOKEN.substring(0, 6)}...${MOVIE_META_ACCESS_TOKEN.slice(-4)}` : 'IGAAYJ...9zkZDZD',
   has_valid_token: true,
   caption_template: '{caption}\n\n{hashtags}',
   default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies',
@@ -263,8 +270,30 @@ const PAGE_MOVIES = {
   is_active: 1
 };
 
+const PAGE_TECH = {
+  id: 3,
+  slug: 'techguy',
+  name: 'Tech Guy Harsh Parmar',
+  handle: '@techguyharshparmar',
+  ig_user_id: TECH_IG_USER_ID,
+  access_token: TECH_META_ACCESS_TOKEN,
+  access_token_masked: TECH_META_ACCESS_TOKEN ? `${TECH_META_ACCESS_TOKEN.substring(0, 6)}...${TECH_META_ACCESS_TOKEN.slice(-4)}` : '',
+  has_valid_token: Boolean(TECH_META_ACCESS_TOKEN && TECH_META_ACCESS_TOKEN.length > 20),
+  caption_template: '{caption}\n\n{hashtags}',
+  default_hashtags: '#tech #technology #gadgets #ai #techguyharshparmar',
+  attribution_enabled: 0,
+  watermark_enabled: 0,
+  post_mode: 'auto',
+  posts_per_cycle: 1,
+  daily_quota: 5,
+  min_spacing_minutes: 90,
+  is_active: 1
+};
+
+let dynamicPages = [PAGE_GTA6, PAGE_MOVIES, PAGE_TECH];
+
 function getPagesList() {
-  return [PAGE_GTA6, PAGE_MOVIES];
+  return dynamicPages;
 }
 
 function getPage(idOrSlug) {
@@ -286,35 +315,97 @@ router.get('/pages/:id', (req, res) => {
   res.json(getPage(req.params.id));
 });
 
+// ── POST /pages ─────────────────────────────────────────────
+router.post('/pages', (req, res) => {
+  const { name, slug, handle, access_token, ig_user_id, daily_quota, default_hashtags, post_mode } = req.body || {};
+  const nextId = dynamicPages.length > 0 ? Math.max(...dynamicPages.map(p => Number(p.id) || 0)) + 1 : 1;
+  const newPage = {
+    id: nextId,
+    slug: slug || `page${nextId}`,
+    name: name || `Page #${nextId}`,
+    handle: handle ? (handle.startsWith('@') ? handle : `@${handle}`) : `@page_${nextId}`,
+    ig_user_id: ig_user_id || '',
+    access_token: access_token || '',
+    access_token_masked: access_token ? `${access_token.substring(0, 6)}...${access_token.slice(-4)}` : '',
+    has_valid_token: Boolean(access_token && access_token.length > 20),
+    caption_template: '{caption}\n\n{hashtags}',
+    default_hashtags: default_hashtags || '#instagram #reels',
+    attribution_enabled: 0,
+    watermark_enabled: 0,
+    post_mode: post_mode || 'auto',
+    posts_per_cycle: 1,
+    daily_quota: daily_quota || 5,
+    min_spacing_minutes: 90,
+    is_active: 1
+  };
+  dynamicPages.push(newPage);
+  res.json({ success: true, page: newPage });
+});
+
 // ── PUT /pages/:id ──────────────────────────────────────────
 router.put('/pages/:id', (req, res) => {
   const target = getPage(req.params.id);
-  res.json({ success: true, page: { ...target, ...req.body } });
+  if (!target) return res.status(404).json({ error: 'Page not found' });
+
+  const { name, slug, handle, access_token, ig_user_id, daily_quota, default_hashtags, post_mode } = req.body || {};
+  if (name) target.name = name;
+  if (slug) target.slug = slug;
+  if (handle) target.handle = handle.startsWith('@') ? handle : `@${handle}`;
+  if (ig_user_id) target.ig_user_id = ig_user_id;
+  if (daily_quota) target.daily_quota = daily_quota;
+  if (default_hashtags) target.default_hashtags = default_hashtags;
+  if (post_mode) target.post_mode = post_mode;
+
+  if (access_token) {
+    target.access_token = access_token;
+    target.access_token_masked = `${access_token.substring(0, 6)}...${access_token.slice(-4)}`;
+    target.has_valid_token = true;
+  }
+
+  res.json({ success: true, page: target });
 });
 
 // ── DELETE /pages/:id ───────────────────────────────────────
 router.delete('/pages/:id', (req, res) => {
+  const id = req.params.id;
+  dynamicPages = dynamicPages.filter(p => String(p.id) !== String(id) && p.slug !== String(id).toLowerCase());
   res.json({ success: true, message: 'Page deleted' });
 });
 
 // ── POST /pages/:id/test ────────────────────────────────────
 router.post('/pages/:id/test', async (req, res) => {
   const target = getPage(req.params.id);
-  const isMovie = target.id === 2;
-  const token = isMovie ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN;
-  const igId = isMovie ? MOVIE_IG_USER_ID : IG_USER_ID;
+  const token = req.body?.access_token || target.access_token || (target.id === 2 ? MOVIE_META_ACCESS_TOKEN : (target.id === 3 ? TECH_META_ACCESS_TOKEN : META_ACCESS_TOKEN));
+  const igId = req.body?.ig_user_id || target.ig_user_id || (target.id === 2 ? MOVIE_IG_USER_ID : (target.id === 3 ? TECH_IG_USER_ID : IG_USER_ID));
+
+  if (!token) {
+    return res.json({
+      success: false,
+      valid: false,
+      error: 'No Meta Graph API access token configured. Please paste your token in the page configuration and save.'
+    });
+  }
 
   try {
-    const check = await axios.get(
-      `https://graph.instagram.com/v21.0/${igId}?fields=id,username,name&access_token=${token}`,
-      { timeout: 8000 }
-    );
+    const endpoint = (igId && igId !== 'undefined' && String(igId).length > 5)
+      ? `https://graph.instagram.com/v21.0/${igId}?fields=id,username,name&access_token=${token}`
+      : `https://graph.instagram.com/v21.0/me?fields=id,username,name&access_token=${token}`;
+
+    const check = await axios.get(endpoint, { timeout: 8000 });
+    const verifiedUsername = check.data.username || target.handle.replace('@', '');
+    const verifiedId = check.data.id || igId;
+
+    target.has_valid_token = true;
+    target.ig_user_id = verifiedId;
+    target.access_token_masked = `${token.substring(0, 6)}...${token.slice(-4)}`;
+
     res.json({
       success: true,
       valid: true,
-      username: check.data.username || target.handle.replace('@', ''),
-      accountType: 'BUSINESS',
-      message: `Meta Graph API token is active and valid for ${target.handle}.`
+      username: verifiedUsername,
+      ig_user_id: verifiedId,
+      accountType: 'CREATOR / BUSINESS',
+      message: `Meta Graph API token is active and valid for @${verifiedUsername} (ID: ${verifiedId}).`
     });
   } catch (err) {
     res.json({

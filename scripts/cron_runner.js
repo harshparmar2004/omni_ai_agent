@@ -90,7 +90,28 @@ async function main() {
     });
   }
 
-  // Force both pages to 100% autonomous mode & verified credentials
+  let page3 = db.prepare('SELECT * FROM pages WHERE id = 3 OR slug = "techguy"').get();
+  if (!page3) {
+    console.log('💻 Creating default Page #3 (@techguyharshparmar)...');
+    createPage({
+      slug: 'techguy',
+      name: 'Tech Guy Harsh Parmar',
+      handle: '@techguyharshparmar',
+      ig_user_id: process.env.TECH_IG_USER_ID || '17841434441251009',
+      access_token: process.env.TECH_META_ACCESS_TOKEN || '',
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#tech #technology #gadgets #ai #techguyharshparmar',
+      attribution_enabled: 0,
+      watermark_enabled: 0,
+      post_mode: 'auto',
+      posts_per_cycle: 1,
+      daily_quota: 7,
+      min_spacing_minutes: 90,
+      is_active: 1
+    });
+  }
+
+  // Force pages to 100% autonomous mode & verified credentials
   try {
     // Purge any stale non-reel discoveries from cached DB
     db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
@@ -103,6 +124,7 @@ async function main() {
     db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
     db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks', is_active = 1 WHERE id = 1").run();
     db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
+    db.prepare("UPDATE pages SET slug = 'techguy', name = 'Tech Guy Harsh Parmar', handle = '@techguyharshparmar', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#tech #technology #gadgets #ai #techguyharshparmar', is_active = 1 WHERE id = 3").run();
   } catch (e) {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
@@ -113,6 +135,11 @@ async function main() {
   const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD';
   const movieIgId = process.env.MOVIE_IG_USER_ID || '29048404444808513';
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
+
+  if (process.env.TECH_META_ACCESS_TOKEN) {
+    const techId = process.env.TECH_IG_USER_ID || '17841434441251009';
+    db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "techguy"').run(process.env.TECH_META_ACCESS_TOKEN, techId);
+  }
   let pages = getPages({ isActiveOnly: true });
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
