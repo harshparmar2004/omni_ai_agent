@@ -3099,6 +3099,228 @@ table.data-table tr:hover td {
   margin-top: 2px;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Stage 4: Interactive Template Studio with Figma & Aspect Ratio
+   ───────────────────────────────────────────────────────────── */
+.template-tab-bar {
+  display: flex;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
+  margin-bottom: 0.85rem;
+}
+
+.template-tab-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.template-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.template-tab-btn.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.aspect-ratio-selector-bar {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.aspect-ratio-pill {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-canvas);
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.aspect-ratio-pill:hover,
+.aspect-ratio-pill.active {
+  border-color: var(--accent-primary);
+  background: rgba(184, 91, 53, 0.08);
+  color: var(--accent-primary);
+}
+
+.ambient-blur-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 440px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ambient-blur-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.65);
+  transform: scale(1.15);
+  pointer-events: none;
+}
+
+.ambient-inner-video {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.ambient-inner-video.ratio-16-9 {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.ambient-inner-video.ratio-1-1 {
+  width: 88%;
+  aspect-ratio: 1 / 1;
+}
+
+.ambient-inner-video.ratio-4-5 {
+  width: 88%;
+  aspect-ratio: 4 / 5;
+}
+
+.ambient-inner-video.ratio-9-16 {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+}
+
+.middle-template-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.figma-upload-zone {
+  border: 2px dashed var(--border-card);
+  border-radius: 8px;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  background: var(--bg-canvas);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: 0.75rem;
+}
+
+.figma-upload-zone:hover,
+.figma-upload-zone.dragging {
+  border-color: var(--accent-primary);
+  background: rgba(184, 91, 53, 0.04);
+}
+
+.figma-upload-icon {
+  font-size: 1.6rem;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+.figma-preview-thumb {
+  width: 100%;
+  height: 90px;
+  object-fit: contain;
+  background: #111;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.5rem;
+}
+
+.template-logo-picker {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.template-logo-option {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card);
+  background: var(--bg-canvas);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.template-logo-option:hover,
+.template-logo-option.active {
+  border-color: var(--accent-primary);
+  background: rgba(184, 91, 53, 0.12);
+  transform: scale(1.1);
+}
+
+.pass-reel-btn {
+  background: linear-gradient(135deg, var(--accent-primary), #9B421E);
+  color: #FFF;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(184, 91, 53, 0.28);
+  transition: all var(--transition-fast);
+  width: 100%;
+  margin-top: auto;
+}
+
+.pass-reel-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(184, 91, 53, 0.35);
+}
+
+
 
 
 

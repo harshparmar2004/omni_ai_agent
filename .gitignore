@@ -25,6 +25,8 @@ public/generated/carousels/
 public/generated/images/
 public/generated/diagrams/
 public/generated/thumbnails/
+public/generated/templates/*.png
+!public/generated/templates/.gitkeep
 public/generated/*.jpg
 public/generated/*.mp4
 public/generated/*.png

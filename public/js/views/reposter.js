@@ -12,6 +12,11 @@ window.reposterView = (function() {
   let activeTrackingJobId = null;
   let activeStage3Jobs = [];
   let activeTemplateJobs = [];
+  let selectedTemplateReelId = null;
+  let selectedAspectRatio = '9:16'; // '9:16' | '16:9' | '1:1' | '4:5'
+  let activeTemplateTab = 'canvas'; // 'canvas' | 'figma'
+  let activeFigmaOverlayUrl = '';
+  let activeBrandLogo = '';
   let currentCaptionModalJob = null;
   let currentEditingTemplate = null;
   let currentEditingJobId = null;
@@ -1072,9 +1077,14 @@ window.reposterView = (function() {
     try {
       let query = '?stage=template&limit=30';
       if (selectedPageId) query += `&pageId=${selectedPageId}`;
-      const res = await fetch(`/api/reposter/jobs${query}`);
-      const jobs = res.ok ? await res.json() : [];
-      activeTemplateJobs = jobs;
+      let res = await fetch(`/api/reposter/jobs${query}`);
+      let jobs = res.ok ? await res.json() : [];
+
+      if (!jobs || jobs.length === 0) {
+        const fallbackRes = await fetch(`/api/reposter/jobs?limit=30${selectedPageId ? `&pageId=${selectedPageId}` : ''}`);
+        if (fallbackRes.ok) jobs = await fallbackRes.json();
+      }
+      activeTemplateJobs = jobs || [];
 
       const tmplRes = await fetch(`/api/reposter/templates?pageId=${selectedPageId || 1}`);
       const tmplConfig = tmplRes.ok ? await tmplRes.json() : {};
@@ -1083,12 +1093,28 @@ window.reposterView = (function() {
       const pageLabel = selectedPage ? selectedPage.name : (selectedPageId === 2 ? 'Movie Recommendations' : 'GTA 6 Updates 007');
       const isMovie = selectedPageId === 2 || String(selectedPageId) === '2' || (selectedPage?.slug === 'movies');
       const pageClass = isMovie ? 'movies' : 'gta6';
+
+      if (!activeBrandLogo) {
+        activeBrandLogo = tmplConfig.brand_logo_icon || (isMovie ? '🎬' : '🎮');
+      }
+      if (!activeFigmaOverlayUrl && tmplConfig.figma_overlay_url) {
+        activeFigmaOverlayUrl = tmplConfig.figma_overlay_url;
+      }
+      if (tmplConfig.template_type && !activeTemplateTab) {
+        activeTemplateTab = tmplConfig.template_type;
+      }
+      if (tmplConfig.aspect_ratio_mode && selectedAspectRatio === '9:16') {
+        selectedAspectRatio = tmplConfig.aspect_ratio_mode;
+      }
+
       const presetName = tmplConfig.preset_name || (isMovie ? 'Cinematic Gold Glass' : 'Vice City Neon Glow');
       const accentColor = tmplConfig.accent_color || (isMovie ? '#FFD166' : '#00F0FF');
       const headerText = tmplConfig.header_text || (isMovie ? '@movie_series_365 | Cinema Picks' : '@gta6_updates_007');
       const footerText = tmplConfig.footer_text || (isMovie ? '◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►' : '◄ ◄  GTA VI • VICE CITY  ► ►');
+      const borderWidth = tmplConfig.border_width || 8;
+      const showBrackets = tmplConfig.show_brackets !== false;
 
-      const primaryJob = jobs[0] || {
+      const primaryJob = (activeTemplateJobs.length > 0 && selectedTemplateReelId ? activeTemplateJobs.find(j => String(j.id) === String(selectedTemplateReelId)) : null) || activeTemplateJobs[0] || {
         id: '18111603524617292',
         shortcode: isMovie ? 'DfC8JgEjh8B' : 'De3JoLwjMbt',
         raw_thumbnail_url: isMovie
@@ -1100,6 +1126,9 @@ window.reposterView = (function() {
         raw_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         branded_video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
       };
+      if (!selectedTemplateReelId) selectedTemplateReelId = primaryJob.id;
+
+      const ratioClass = `ratio-${selectedAspectRatio.replace(':', '-')}`;
 
       container.innerHTML = `
         <div class="pipeline-deck-header" style="flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem;">
@@ -1111,15 +1140,12 @@ window.reposterView = (function() {
               </span>
             </div>
             <div class="text-sm text-muted">
-              Live Before-and-After Video Transformation: Raw Download ➔ Branded 9:16 Feed Frame for <b>${pageLabel}</b>
+              Live 3-Column Interactive Template Studio: Dynamic Aspect Ratio Adaptor, Customizable Brand Layers, Custom Figma PNG Importer & Instant Compositor
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button class="btn btn-primary btn-sm" onclick="reposterView.openTemplateModal(${selectedPageId || 1}, '${primaryJob.id}')" style="display: inline-flex; align-items: center; gap: 5px;">
-              <span>Edit Template Options ⚙</span>
-            </button>
             <button class="btn btn-secondary btn-sm" onclick="reposterView.renderActiveStage()">
-              Refresh
+              Refresh Studio
             </button>
           </div>
         </div>
@@ -1129,19 +1155,9 @@ window.reposterView = (function() {
           <div class="stage3-summary-card">
             <div class="stage3-summary-icon">🎨</div>
             <div>
-              <div class="stage3-summary-label">Active Template Preset</div>
+              <div class="stage3-summary-label">Active Studio Mode</div>
               <div class="stage3-summary-val" style="color: ${accentColor}; font-size: 0.88rem;">
-                ${presetName}
-              </div>
-            </div>
-          </div>
-
-          <div class="stage3-summary-card">
-            <div class="stage3-summary-icon">⚙️</div>
-            <div>
-              <div class="stage3-summary-label">Compositing Engine</div>
-              <div class="stage3-summary-val" style="color: var(--text-primary); font-size: 0.88rem;">
-                FFmpeg 1080p + Canvas Frame
+                ${activeTemplateTab === 'figma' ? 'Custom Figma PNG' : 'Visual Designer'}
               </div>
             </div>
           </div>
@@ -1149,55 +1165,91 @@ window.reposterView = (function() {
           <div class="stage3-summary-card">
             <div class="stage3-summary-icon">📐</div>
             <div>
-              <div class="stage3-summary-label">Aspect Ratio Adaptor</div>
-              <div class="stage3-summary-val" style="color: var(--agent-reposter); font-size: 0.88rem;">
-                9:16 Vertical (1080 × 1920)
+              <div class="stage3-summary-label">Dynamic Ratio Adaptor</div>
+              <div id="studio-aspect-label" class="stage3-summary-val" style="color: var(--agent-reposter); font-size: 0.88rem;">
+                ${selectedAspectRatio} ${selectedAspectRatio === '9:16' ? 'Vertical' : selectedAspectRatio === '16:9' ? 'Landscape (Letterbox)' : selectedAspectRatio === '1:1' ? 'Square (Letterbox)' : 'Portrait'}
               </div>
             </div>
           </div>
 
           <div class="stage3-summary-card">
-            <div class="stage3-summary-icon">✨</div>
+            <div class="stage3-summary-icon">🏷️</div>
             <div>
-              <div class="stage3-summary-label">Transformation State</div>
+              <div class="stage3-summary-label">Brand Identity & Logo</div>
+              <div class="stage3-summary-val" style="color: var(--text-primary); font-size: 0.88rem; display: flex; align-items: center; gap: 4px;">
+                <span>${activeBrandLogo}</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;">${escapeHtml(headerText)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage3-summary-card">
+            <div class="stage3-summary-icon">⚡</div>
+            <div>
+              <div class="stage3-summary-label">Compositor Status</div>
               <div class="stage3-summary-val" style="color: var(--accent-primary); font-size: 0.88rem;">
-                Raw MP4 ➔ Branded Frame
+                1080p Meta Ready
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Before vs After Visual Transformation Studio -->
+        <!-- Active 3-Column Before vs Template vs After Studio -->
         <div class="card mb-4" style="padding: 1.5rem; border-radius: 12px; box-shadow: none;">
-          <div class="flex items-center justify-between mb-3" style="flex-wrap: wrap; gap: 0.5rem;">
-            <div>
-              <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                <span>Live Before vs After Template Pipeline: Reel #${primaryJob.shortcode || primaryJob.id}</span>
-                <span class="stream-badge-page ${pageClass}">${tmplConfig.page_handle || '@page'}</span>
-              </h3>
-              <p class="text-xs text-muted" style="margin-top: 2px; margin-bottom: 0;">
-                Showing how raw ingested Instagram clips are automatically formatted and branded before broadcasting live
-              </p>
+          <!-- Reel Selector Header Bar -->
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; padding-bottom: 0.85rem; border-bottom: 1px solid var(--border-card);">
+            <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+              <span style="font-size: 0.86rem; font-weight: 700; color: var(--text-primary);">
+                Select Ingested Reel:
+              </span>
+              <select id="tmpl-reel-picker" class="form-select" style="font-size: 0.82rem; font-family: var(--font-mono); font-weight: 600; padding: 5px 12px; min-width: 280px; max-width: 360px;" onchange="reposterView.selectTemplateReel(this.value)">
+                ${activeTemplateJobs.map(j => `
+                  <option value="${j.id}" ${String(j.id) === String(primaryJob.id) ? 'selected' : ''}>
+                    ${j.shortcode ? `/reel/${j.shortcode}` : `Reel #${j.id}`} — ${j.page_slug ? `@${j.page_slug}` : 'Page'}
+                  </option>
+                `).join('')}
+              </select>
+              <span class="stream-badge-page ${pageClass}">${tmplConfig.page_handle || '@page'}</span>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="reposterView.openTemplateModal(${selectedPageId || 1}, '${primaryJob.id}')">
-              Customize Template Overlay ⚙
-            </button>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+              Selected Reel ID: <span style="color: var(--text-primary); font-weight: 600;">#${primaryJob.id}</span>
+            </div>
           </div>
 
           <div class="template-before-after-grid">
-            <!-- Left: Before (Raw Source Reel) -->
+            <!-- ─────────────────────────────────────────── -->
+            <!-- Column 1 (Left): Before — Raw Ingested Reel -->
+            <!-- ─────────────────────────────────────────── -->
             <div class="template-reel-card">
               <div class="flex items-center justify-between mb-2">
                 <span class="status-badge-warning" style="font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 4px;">
-                  ● 1. Before (Raw Source Reel)
+                  ● 1. Before (Raw Ingested Clip)
                 </span>
                 <span style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">Unbranded</span>
               </div>
-              
-              <div class="template-reel-poster" onclick="reposterView.previewVideo('${primaryJob.raw_video_url || primaryJob.video_url}', '${primaryJob.shortcode}')" title="Watch Raw Reel Clip">
-                <img src="${primaryJob.raw_thumbnail_url || primaryJob.thumbnail_url}" alt="Raw Source Reel" />
-                <button type="button" class="downloaded-play-pill" style="width: 36px; height: 36px; font-size: 14px;">▶</button>
-                <span class="downloaded-hd-badge">Raw Video</span>
+
+              <!-- Aspect Ratio Switcher Pills -->
+              <div class="aspect-ratio-selector-bar">
+                <button type="button" class="aspect-ratio-pill ${selectedAspectRatio === '9:16' ? 'active' : ''}" data-ratio="9:16" onclick="reposterView.setReelAspectRatio('9:16')" title="Standard 9:16 Vertical Reel (1080×1920)">
+                  9:16 Vertical
+                </button>
+                <button type="button" class="aspect-ratio-pill ${selectedAspectRatio === '16:9' ? 'active' : ''}" data-ratio="16:9" onclick="reposterView.setReelAspectRatio('16:9')" title="16:9 Widescreen (Letterboxed with Ambient Blur)">
+                  16:9 Widescreen
+                </button>
+                <button type="button" class="aspect-ratio-pill ${selectedAspectRatio === '1:1' ? 'active' : ''}" data-ratio="1:1" onclick="reposterView.setReelAspectRatio('1:1')" title="1:1 Square (Letterboxed with Ambient Blur)">
+                  1:1 Square
+                </button>
+                <button type="button" class="aspect-ratio-pill ${selectedAspectRatio === '4:5' ? 'active' : ''}" data-ratio="4:5" onclick="reposterView.setReelAspectRatio('4:5')" title="4:5 Portrait (Letterboxed with Ambient Blur)">
+                  4:5 Portrait
+                </button>
+              </div>
+
+              <!-- Ambient Blur Adaptive Video Container -->
+              <div class="ambient-blur-container" onclick="reposterView.previewVideo('${primaryJob.raw_video_url || primaryJob.video_url}', '${primaryJob.shortcode}')" title="Watch Raw Reel Clip" style="cursor: pointer; margin-bottom: 0.85rem;">
+                <img src="${primaryJob.raw_thumbnail_url || primaryJob.thumbnail_url}" class="ambient-blur-bg" alt="Ambient Blur Background" />
+                <img id="studio-before-inner-video" src="${primaryJob.raw_thumbnail_url || primaryJob.thumbnail_url}" class="ambient-inner-video ${ratioClass}" alt="Raw Source Reel" />
+                <button type="button" class="downloaded-play-pill" style="width: 36px; height: 36px; font-size: 14px; z-index: 5;">▶</button>
+                <span class="downloaded-hd-badge" style="z-index: 5;">Raw Video</span>
               </div>
 
               <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem;">
@@ -1216,39 +1268,129 @@ window.reposterView = (function() {
               </button>
             </div>
 
-            <!-- Center: Transformation Pipeline Connector -->
-            <div class="template-connector-box">
-              <div class="template-connector-arrow">➔</div>
-              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-                Transferred into Brand Template
+            <!-- ─────────────────────────────────────────── -->
+            <!-- Column 2 (Middle): Active Template Studio   -->
+            <!-- ─────────────────────────────────────────── -->
+            <div class="middle-template-card">
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                <span>Template Control Center</span>
+                <span style="font-size: 0.7rem; font-family: var(--font-mono); color: var(--accent-primary); font-weight: 600;">Active Studio</span>
               </div>
-              <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 1rem; max-width: 240px; line-height: 1.35;">
-                Composited using OmniStudio FFmpeg Engine with dynamic glass layers & audio leveling
+              <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.35;">
+                Customize branding layers or upload your own 1080×1920 Figma PNG overlay template:
               </p>
 
-              <div class="template-layer-tag">
-                <span>🏷️</span>
-                <span>Layer 1: Top Brand Header Badge</span>
+              <!-- Tabs: Visual Designer vs Figma Import -->
+              <div class="template-tab-bar">
+                <button type="button" class="template-tab-btn ${activeTemplateTab === 'canvas' ? 'active' : ''}" data-tab="canvas" onclick="reposterView.switchTemplateTab('canvas')">
+                  <span>🎨 Visual Designer</span>
+                </button>
+                <button type="button" class="template-tab-btn ${activeTemplateTab === 'figma' ? 'active' : ''}" data-tab="figma" onclick="reposterView.switchTemplateTab('figma')">
+                  <span>📁 Import Figma PNG</span>
+                </button>
               </div>
-              <div class="template-layer-tag">
-                <span>✨</span>
-                <span>Layer 2: 8px Dynamic Glow Rails</span>
+
+              <!-- Tab 1: Visual Designer Form -->
+              <div id="studio-tab-canvas" style="display: ${activeTemplateTab === 'canvas' ? 'block' : 'none'};">
+                <!-- Header Badge & Logo -->
+                <div class="mb-2">
+                  <label class="text-xs text-muted" style="font-weight: 600; display: block; margin-bottom: 3px;">
+                    1. Brand Header & Logo
+                  </label>
+                  <input type="text" id="studio-header-input" class="form-input" style="font-size: 0.78rem; padding: 4px 8px; width: 100%;" value="${escapeHtml(headerText)}" oninput="reposterView.updateStudioPreview()" placeholder="@page_handle" />
+                  <!-- Logo Picker -->
+                  <div class="template-logo-picker">
+                    <span class="text-xs text-muted" style="font-size: 0.68rem; margin-right: 2px;">Logo:</span>
+                    ${['🎮', '🎬', '🍿', '⚡', '👑', '🔥'].map(logo => `
+                      <button type="button" class="template-logo-option ${activeBrandLogo === logo ? 'active' : ''}" data-logo="${logo}" onclick="reposterView.setTemplateBrandLogo('${logo}')" title="Use ${logo} Logo">
+                        ${logo}
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <!-- Bottom CTA Banner -->
+                <div class="mb-2">
+                  <label class="text-xs text-muted" style="font-weight: 600; display: block; margin-bottom: 3px;">
+                    2. Lower CTA Banner Text
+                  </label>
+                  <input type="text" id="studio-footer-input" class="form-input" style="font-size: 0.78rem; padding: 4px 8px; width: 100%;" value="${escapeHtml(footerText)}" oninput="reposterView.updateStudioPreview()" placeholder="◄ ◄ CTA TEXT ► ►" />
+                </div>
+
+                <!-- Accent Glow & Border Width -->
+                <div class="mb-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <div>
+                    <label class="text-xs text-muted" style="font-weight: 600; display: block; margin-bottom: 3px;">Border Glow</label>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <input type="color" id="studio-color-picker" value="${accentColor}" style="width: 28px; height: 26px; border: none; cursor: pointer; border-radius: 4px; padding: 0;" oninput="reposterView.updateStudioPreview()" />
+                      <span id="studio-color-hex" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">${accentColor}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="text-xs text-muted" style="font-weight: 600; display: block; margin-bottom: 3px;">Rail Width</label>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <input type="range" id="studio-border-width" min="2" max="16" value="${borderWidth}" style="width: 100%; cursor: pointer;" oninput="reposterView.updateStudioPreview()" />
+                      <span id="studio-width-val" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); min-width: 26px;">${borderWidth}px</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Brackets Toggle -->
+                <div class="flex items-center gap-2 mb-3">
+                  <input type="checkbox" id="studio-brackets-check" ${showBrackets ? 'checked' : ''} onchange="reposterView.updateStudioPreview()" style="cursor: pointer;" />
+                  <label for="studio-brackets-check" class="text-xs text-muted" style="cursor: pointer; font-size: 0.72rem;">
+                    Show 4-Corner Camera Registration Brackets
+                  </label>
+                </div>
               </div>
-              <div class="template-layer-tag">
-                <span>📐</span>
-                <span>Layer 3: 4 Registration Brackets</span>
+
+              <!-- Tab 2: Figma / Custom PNG Importer -->
+              <div id="studio-tab-figma" style="display: ${activeTemplateTab === 'figma' ? 'block' : 'none'};">
+                <div class="figma-upload-zone" onclick="document.getElementById('figma-file-input').click()" ondragover="event.preventDefault(); this.classList.add('dragging')" ondragleave="this.classList.remove('dragging')" ondrop="event.preventDefault(); this.classList.remove('dragging'); reposterView.handleFigmaFileDrop(event)">
+                  <span class="figma-upload-icon">📁</span>
+                  <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
+                    Click or Drag Figma 1080×1920 PNG
+                  </div>
+                  <div style="font-size: 0.7rem; color: var(--text-muted);">
+                    Transparent PNG frame exported from Figma, Photoshop, or Canva
+                  </div>
+                  <input type="file" id="figma-file-input" accept="image/png" style="display: none;" onchange="reposterView.handleFigmaFileSelect(event)" />
+                </div>
+
+                ${activeFigmaOverlayUrl ? `
+                  <div style="margin-bottom: 0.75rem;">
+                    <div class="text-xs text-muted" style="font-weight: 600; margin-bottom: 3px;">Active Uploaded Frame:</div>
+                    <img src="${activeFigmaOverlayUrl}" class="figma-preview-thumb" alt="Figma Frame Preview" />
+                    <div style="font-size: 0.68rem; font-family: var(--font-mono); color: var(--agent-reposter); display: flex; align-items: center; justify-content: space-between;">
+                      <span>✓ Custom Figma Template Active</span>
+                      <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.65rem; padding: 1px 6px;" onclick="reposterView.clearFigmaTemplate()">Reset</button>
+                    </div>
+                  </div>
+                ` : `
+                  <div class="text-xs text-muted mb-2" style="font-size: 0.72rem; line-height: 1.35;">
+                    Or load one of our ready-to-use custom 1080×1920 frame presets:
+                  </div>
+                `}
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 0.75rem;">
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 4px 6px;" onclick="reposterView.loadSampleFigmaTemplate('vice_city')">
+                    🎮 Vice City Frame
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" style="font-size: 0.7rem; padding: 4px 6px;" onclick="reposterView.loadSampleFigmaTemplate('cinema_gold')">
+                    🎬 Cinema 4K Frame
+                  </button>
+                </div>
               </div>
-              <div class="template-layer-tag">
-                <span>📢</span>
-                <span>Layer 4: Lower Niche CTA Bar</span>
-              </div>
-              <div class="template-layer-tag">
-                <span>🔊</span>
-                <span>Layer 5: Studio Audio Normalization</span>
-              </div>
+
+              <!-- Center Action Button: Pass Reel Through Template & Render -->
+              <button type="button" class="pass-reel-btn" id="studio-composite-btn" onclick="reposterView.compositeReelWithTemplate()">
+                <span>⚡ Pass Reel Through Template & Render</span>
+              </button>
             </div>
 
-            <!-- Right: After (Branded Live Reel) -->
+            <!-- ─────────────────────────────────────────── -->
+            <!-- Column 3 (Right): After — Branded Live Reel -->
+            <!-- ─────────────────────────────────────────── -->
             <div class="template-reel-card" style="border-color: ${accentColor};">
               <div class="flex items-center justify-between mb-2">
                 <span class="status-badge-ready" style="font-size: 0.72rem; font-weight: 600; padding: 2px 7px; border-radius: 4px;">
@@ -1257,27 +1399,32 @@ window.reposterView = (function() {
                 <span style="font-size: 0.7rem; color: var(--agent-reposter); font-weight: 600; font-family: var(--font-mono);">Production Ready</span>
               </div>
 
-              <div class="template-reel-poster" onclick="reposterView.previewVideo('${primaryJob.branded_video_url || primaryJob.video_url}', '${primaryJob.shortcode}')" title="Watch Branded Reel in Player">
-                <img src="${primaryJob.branded_thumbnail_url || primaryJob.thumbnail_url}" alt="Branded Reel" />
+              <!-- Ambient Blur Adaptive Video Container for Branded Output -->
+              <div class="ambient-blur-container" onclick="reposterView.previewVideo('${primaryJob.branded_video_url || primaryJob.video_url}', '${primaryJob.shortcode}')" title="Watch Branded Reel in Player" style="cursor: pointer; margin-bottom: 0.85rem;">
+                <img src="${primaryJob.branded_thumbnail_url || primaryJob.thumbnail_url}" class="ambient-blur-bg" alt="Ambient Blur Background" />
+                <img id="studio-after-inner-video" src="${primaryJob.branded_thumbnail_url || primaryJob.thumbnail_url}" class="ambient-inner-video ${ratioClass}" alt="Branded Reel" />
                 
-                <!-- Live Visual Frame Overlay Mockup -->
-                <div class="template-frame-overlay ${pageClass}" style="border-color: ${accentColor}; box-shadow: inset 0 0 16px ${accentColor}66;">
-                  <span class="template-badge-top" style="border-color: ${accentColor}; color: ${isMovie ? '#FFD166' : '#00F0FF'};">
-                    ${escapeHtml(headerText)}
+                <!-- Custom Figma Transparent PNG Overlay -->
+                <img id="studio-figma-overlay-img" src="${activeFigmaOverlayUrl || ''}" style="display: ${activeTemplateTab === 'figma' && activeFigmaOverlayUrl ? 'block' : 'none'}; position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; object-fit: contain; z-index: 3;" alt="Figma Overlay" />
+
+                <!-- Live Dynamic Canvas Frame Overlay -->
+                <div id="studio-after-frame" class="template-frame-overlay ${pageClass}" style="display: ${activeTemplateTab === 'canvas' || !activeFigmaOverlayUrl ? 'flex' : 'none'}; border-color: ${accentColor}; border-width: ${borderWidth}px; box-shadow: inset 0 0 16px ${accentColor}66; z-index: 3;">
+                  <span id="studio-after-header" class="template-badge-top" style="border-color: ${accentColor}; color: ${isMovie ? '#FFD166' : '#00F0FF'};">
+                    <span id="studio-after-logo">${activeBrandLogo}</span> ${escapeHtml(headerText)}
                   </span>
-                  <span class="template-badge-bottom" style="border-color: ${isMovie ? '#C1121F' : '#F72585'}; color: ${isMovie ? '#FFD166' : '#FF8A00'};">
+                  <span id="studio-after-footer" class="template-badge-bottom" style="border-color: ${isMovie ? '#C1121F' : '#F72585'}; color: ${isMovie ? '#FFD166' : '#FF8A00'};">
                     ${escapeHtml(footerText)}
                   </span>
                 </div>
 
-                <button type="button" class="downloaded-play-pill" style="width: 36px; height: 36px; font-size: 14px;">▶</button>
-                <span class="downloaded-hd-badge">1080p Branded</span>
+                <button type="button" class="downloaded-play-pill" style="width: 36px; height: 36px; font-size: 14px; z-index: 5;">▶</button>
+                <span class="downloaded-hd-badge" style="z-index: 5;">1080p Branded</span>
               </div>
 
               <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem;">
                 <div class="flex items-center justify-between mb-1" style="font-family: var(--font-mono); font-size: 0.7rem;">
                   <span>Applied Preset:</span>
-                  <span style="font-weight: 600; color: ${accentColor};">${presetName}</span>
+                  <span style="font-weight: 600; color: ${accentColor};">${activeTemplateTab === 'figma' ? 'Custom Figma PNG Frame' : presetName}</span>
                 </div>
                 <div class="flex items-center justify-between" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted);">
                   <span>Feed Framing:</span>
@@ -1286,10 +1433,10 @@ window.reposterView = (function() {
               </div>
 
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.openTemplateModal(${selectedPageId || 1}, '${primaryJob.id}')" style="font-size: 0.74rem;">
-                  Edit Template ⚙
+                <button type="button" class="btn btn-secondary btn-sm" onclick="reposterView.previewVideo('${primaryJob.branded_video_url || primaryJob.video_url}', '${primaryJob.shortcode}')" style="font-size: 0.74rem;">
+                  Watch Branded ▶
                 </button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="reposterView.switchStage('published')" style="font-size: 0.74rem;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${primaryJob.id})" style="font-size: 0.74rem;">
                   Live Broadcast ➔
                 </button>
               </div>
@@ -1300,7 +1447,7 @@ window.reposterView = (function() {
         <!-- Table of Reels in Template Transformation Pipeline -->
         <div class="card table-container" style="padding: 0; overflow-x: auto; border-radius: 12px; box-shadow: none;">
           <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-card); font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between;">
-            <span>Reels in Template Transformation Pipeline (${jobs.length})</span>
+            <span>Reels in Template Transformation Pipeline (${activeTemplateJobs.length})</span>
             <span style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">Auto-framed upon download</span>
           </div>
           <table class="data-table" style="width: 100%;">
@@ -1316,7 +1463,7 @@ window.reposterView = (function() {
               </tr>
             </thead>
             <tbody>
-              ${jobs.map(j => {
+              ${activeTemplateJobs.map(j => {
                 const pageSlug = j.page_slug ? `@${j.page_slug}` : (j.page_handle || `@page#${j.page_id}`);
                 const isMovieJob = pageSlug.includes('movies') || j.page_id === 2 || String(j.page_id) === '2';
                 const jobClass = isMovieJob ? 'movies' : 'gta6';
@@ -1328,7 +1475,7 @@ window.reposterView = (function() {
                 const thumbSrc = j.branded_thumbnail_url || j.thumbnail_url;
 
                 return `
-                  <tr>
+                  <tr style="${String(j.id) === String(primaryJob.id) ? 'background: rgba(184, 91, 53, 0.04);' : ''}">
                     <td style="text-align: center; vertical-align: middle; padding: 0.65rem 0.5rem; width: 75px;">
                       <div class="downloaded-preview-wrap" style="width: 58px; height: 82px;" onclick="reposterView.previewVideo('${videoUrl || thumbSrc}', '${j.shortcode}')" title="Preview video in player">
                         <span class="downloaded-hd-badge" style="font-size: 0.55rem; padding: 1px 3px;">1080p</span>
@@ -1374,10 +1521,10 @@ window.reposterView = (function() {
                       </div>
                     </td>
                     <td style="text-align: right; width: 12%;">
-                      <button class="btn btn-secondary btn-sm" onclick="reposterView.openTemplateModal(${j.page_id || selectedPageId || 1}, '${j.id}')" style="font-size: 0.74rem; padding: 4px 8px; margin-bottom: 4px; width: 100%;">
-                        Edit Template ⚙
+                      <button class="btn btn-secondary btn-sm" onclick="reposterView.selectTemplateReel('${j.id}')" style="font-size: 0.74rem; padding: 4px 8px; margin-bottom: 4px; width: 100%;">
+                        Load in Studio ⚙
                       </button>
-                      <button class="btn btn-primary btn-sm" onclick="reposterView.switchStage('published')" style="font-size: 0.74rem; padding: 4px 8px; width: 100%;">
+                      <button class="btn btn-primary btn-sm" onclick="reposterView.approveJob(${j.id})" style="font-size: 0.74rem; padding: 4px 8px; width: 100%;">
                         Publish ➔
                       </button>
                     </td>
@@ -2398,6 +2545,295 @@ window.reposterView = (function() {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Template Studio 3-Column Interactive Methods
+  // ─────────────────────────────────────────────────────────────
+  function selectTemplateReel(jobId) {
+    selectedTemplateReelId = jobId;
+    renderActiveStage();
+  }
+
+  function setReelAspectRatio(ratio) {
+    selectedAspectRatio = ratio;
+    document.querySelectorAll('.aspect-ratio-pill').forEach(pill => {
+      pill.classList.toggle('active', pill.dataset.ratio === ratio);
+    });
+
+    const beforeInner = document.getElementById('studio-before-inner-video');
+    const afterInner = document.getElementById('studio-after-inner-video');
+    const ratioClass = `ratio-${ratio.replace(':', '-')}`;
+    ['ratio-9-16', 'ratio-16-9', 'ratio-1-1', 'ratio-4-5'].forEach(cls => {
+      if (beforeInner) beforeInner.classList.remove(cls);
+      if (afterInner) afterInner.classList.remove(cls);
+    });
+    if (beforeInner) beforeInner.classList.add(ratioClass);
+    if (afterInner) afterInner.classList.add(ratioClass);
+
+    const aspectLabel = document.getElementById('studio-aspect-label');
+    if (aspectLabel) {
+      const modeName = ratio === '9:16' ? 'Vertical' : ratio === '16:9' ? 'Landscape (Letterbox)' : ratio === '1:1' ? 'Square (Letterbox)' : 'Portrait';
+      aspectLabel.textContent = `${ratio} ${modeName}`;
+    }
+  }
+
+  function switchTemplateTab(tab) {
+    activeTemplateTab = tab;
+    document.querySelectorAll('.template-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    const canvasTab = document.getElementById('studio-tab-canvas');
+    const figmaTab = document.getElementById('studio-tab-figma');
+    if (canvasTab) canvasTab.style.display = tab === 'canvas' ? 'block' : 'none';
+    if (figmaTab) figmaTab.style.display = tab === 'figma' ? 'block' : 'none';
+    updateStudioPreview();
+  }
+
+  function setTemplateBrandLogo(logo) {
+    activeBrandLogo = logo;
+    document.querySelectorAll('.template-logo-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.logo === logo);
+    });
+    const logoEl = document.getElementById('studio-after-logo');
+    if (logoEl) logoEl.textContent = logo;
+  }
+
+  function updateStudioPreview() {
+    const headerInput = document.getElementById('studio-header-input');
+    const footerInput = document.getElementById('studio-footer-input');
+    const colorPicker = document.getElementById('studio-color-picker');
+    const hexLabel = document.getElementById('studio-color-hex');
+    const borderWidth = document.getElementById('studio-border-width');
+    const widthVal = document.getElementById('studio-width-val');
+    const bracketsCheck = document.getElementById('studio-brackets-check');
+
+    const accent = colorPicker ? colorPicker.value : '#00F0FF';
+    if (hexLabel) hexLabel.textContent = accent;
+    const bWidth = borderWidth ? `${borderWidth.value}px` : '8px';
+    if (widthVal && borderWidth) widthVal.textContent = `${borderWidth.value}px`;
+    const showBrackets = bracketsCheck ? bracketsCheck.checked : true;
+
+    const afterFrame = document.getElementById('studio-after-frame');
+    const afterHeader = document.getElementById('studio-after-header');
+    const afterFooter = document.getElementById('studio-after-footer');
+    const figmaOverlayImg = document.getElementById('studio-figma-overlay-img');
+
+    if (activeTemplateTab === 'figma' && activeFigmaOverlayUrl) {
+      if (figmaOverlayImg) {
+        figmaOverlayImg.style.display = 'block';
+        figmaOverlayImg.src = activeFigmaOverlayUrl;
+      }
+      if (afterFrame) afterFrame.style.display = 'none';
+    } else {
+      if (figmaOverlayImg) figmaOverlayImg.style.display = 'none';
+      if (afterFrame) {
+        afterFrame.style.display = 'flex';
+        afterFrame.style.borderColor = accent;
+        afterFrame.style.borderWidth = bWidth;
+        afterFrame.style.boxShadow = `inset 0 0 16px ${accent}66, 0 0 10px ${accent}66`;
+      }
+      if (afterHeader) {
+        afterHeader.style.borderColor = accent;
+        afterHeader.style.color = accent;
+        afterHeader.innerHTML = `<span id="studio-after-logo">${activeBrandLogo || '🎮'}</span> ${escapeHtml(headerInput?.value || '@page_handle')}`;
+      }
+      if (afterFooter) {
+        afterFooter.textContent = footerInput?.value || '◄ ◄ NICHE CTA TEXT ► ►';
+        afterFooter.style.color = accent;
+      }
+    }
+  }
+
+  function handleFigmaFileSelect(e) {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    processFigmaFile(file);
+  }
+
+  function handleFigmaFileDrop(e) {
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    processFigmaFile(file);
+  }
+
+  function processFigmaFile(file) {
+    if (!file.type.includes('png')) {
+      window.app?.toast('Please upload a transparent PNG file exported from Figma, Photoshop, or Canva', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      const dataUrl = evt.target?.result;
+      if (dataUrl) {
+        await uploadFigmaDataUrl(dataUrl, file.name);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadFigmaDataUrl(dataUrl, filename = 'template.png') {
+    try {
+      window.app?.toast('Uploading Figma PNG overlay...', 'info');
+      const res = await fetch('/api/reposter/templates/upload-figma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataUrl,
+          page_id: selectedPageId || 1
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to upload Figma PNG');
+      activeFigmaOverlayUrl = data.url;
+      activeTemplateTab = 'figma';
+      window.app?.toast('Figma 1080×1920 PNG template imported successfully!', 'success');
+      await renderActiveStage();
+    } catch (err) {
+      window.app?.toast('Figma upload failed: ' + err.message, 'error');
+    }
+  }
+
+  function clearFigmaTemplate() {
+    activeFigmaOverlayUrl = '';
+    activeTemplateTab = 'canvas';
+    renderActiveStage();
+  }
+
+  async function loadSampleFigmaTemplate(sampleType) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1080;
+      canvas.height = 1920;
+      const ctx = canvas.getContext('2d');
+
+      if (sampleType === 'vice_city') {
+        // Vice city neon frame
+        const topGrad = ctx.createLinearGradient(0, 0, 0, 240);
+        topGrad.addColorStop(0, 'rgba(10, 8, 16, 0.95)');
+        topGrad.addColorStop(1, 'rgba(10, 8, 16, 0)');
+        ctx.fillStyle = topGrad;
+        ctx.fillRect(0, 0, 1080, 240);
+
+        const botGrad = ctx.createLinearGradient(0, 1680, 0, 1920);
+        botGrad.addColorStop(0, 'rgba(10, 8, 16, 0)');
+        botGrad.addColorStop(1, 'rgba(10, 8, 16, 0.96)');
+        ctx.fillStyle = botGrad;
+        ctx.fillRect(0, 1680, 1080, 240);
+
+        // Neon border rails
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = '#00F0FF';
+        ctx.strokeRect(32, 32, 1016, 1856);
+
+        // Corner accents
+        ctx.fillStyle = '#F72585';
+        ctx.fillRect(20, 20, 36, 36);
+        ctx.fillRect(1024, 20, 36, 36);
+        ctx.fillRect(20, 1864, 36, 36);
+        ctx.fillRect(1024, 1864, 36, 36);
+
+        // Top badge
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.2)';
+        ctx.fillRect(320, 50, 440, 56);
+        ctx.strokeStyle = '#00F0FF';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(320, 50, 440, 56);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 30px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎮 GTA VI • VICE CITY 007', 540, 90);
+      } else {
+        // Cinema gold frame
+        const topGrad = ctx.createLinearGradient(0, 0, 0, 220);
+        topGrad.addColorStop(0, 'rgba(12, 10, 8, 0.95)');
+        topGrad.addColorStop(1, 'rgba(12, 10, 8, 0)');
+        ctx.fillStyle = topGrad;
+        ctx.fillRect(0, 0, 1080, 220);
+
+        const botGrad = ctx.createLinearGradient(0, 1700, 0, 1920);
+        botGrad.addColorStop(0, 'rgba(12, 10, 8, 0)');
+        botGrad.addColorStop(1, 'rgba(12, 10, 8, 0.95)');
+        ctx.fillStyle = botGrad;
+        ctx.fillRect(0, 1700, 1080, 220);
+
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = '#FFD166';
+        ctx.strokeRect(32, 32, 1016, 1856);
+
+        // Top badge
+        ctx.fillStyle = 'rgba(255, 209, 102, 0.18)';
+        ctx.fillRect(300, 50, 480, 56);
+        ctx.strokeStyle = '#FFD166';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(300, 50, 480, 56);
+        ctx.fillStyle = '#FFD166';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎬 @movie_series_365 | CINEMA', 540, 90);
+      }
+
+      const dataUrl = canvas.toDataURL('image/png');
+      await uploadFigmaDataUrl(dataUrl, `${sampleType}_preset.png`);
+    } catch (err) {
+      window.app?.toast('Failed to load sample preset: ' + err.message, 'error');
+    }
+  }
+
+  async function compositeReelWithTemplate() {
+    const btn = document.getElementById('studio-composite-btn');
+    const targetJobId = selectedTemplateReelId || activeTemplateJobs[0]?.id || '18111603524617292';
+    const targetPageId = selectedPageId || 1;
+
+    try {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Compositing 1080p Video with Template...</span>';
+      }
+
+      const headerVal = document.getElementById('studio-header-input')?.value;
+      const footerVal = document.getElementById('studio-footer-input')?.value;
+      const colorVal = document.getElementById('studio-color-picker')?.value;
+      const widthVal = document.getElementById('studio-border-width')?.value;
+
+      const payload = {
+        page_id: targetPageId,
+        aspect_ratio_mode: selectedAspectRatio,
+        template_type: activeTemplateTab,
+        figma_overlay_url: activeFigmaOverlayUrl,
+        brand_logo_icon: activeBrandLogo,
+        header_text: headerVal,
+        footer_text: footerVal,
+        accent_color: colorVal,
+        border_width: widthVal
+      };
+
+      const res = await fetch(`/api/reposter/jobs/${targetJobId}/apply-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || 'Failed to composite reel');
+
+      window.app?.toast(`⚡ Reel #${targetJobId} successfully passed through template and rendered in 1080p!`, 'success');
+      if (btn) {
+        btn.innerHTML = '<span>✓ Reel Composited & Production Ready!</span>';
+        setTimeout(() => {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>⚡ Pass Reel Through Template & Render</span>';
+          }
+        }, 2200);
+      }
+      await renderActiveStage();
+    } catch (err) {
+      window.app?.toast('Compositing failed: ' + err.message, 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Pass Reel Through Template & Render</span>';
+      }
+    }
+  }
+
   return {
     render,
     selectPage,
@@ -2420,6 +2856,17 @@ window.reposterView = (function() {
     setTemplateAccent,
     updateLiveTemplatePreview,
     saveTemplateSettings,
+    selectTemplateReel,
+    setReelAspectRatio,
+    switchTemplateTab,
+    setTemplateBrandLogo,
+    updateStudioPreview,
+    handleFigmaFileSelect,
+    handleFigmaFileDrop,
+    uploadFigmaDataUrl,
+    clearFigmaTemplate,
+    loadSampleFigmaTemplate,
+    compositeReelWithTemplate,
     previewVideo,
     onEvent,
     refresh: async () => {

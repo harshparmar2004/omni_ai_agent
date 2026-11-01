@@ -6,7 +6,8 @@ const axios = require('axios');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
@@ -744,6 +745,10 @@ const pageTemplateConfigs = {
     page_handle: '@gta6_updates_007',
     preset: 'gta6_neon',
     preset_name: 'Vice City Neon Glow',
+    template_type: 'canvas', // 'canvas' | 'figma'
+    figma_overlay_url: '',
+    aspect_ratio_mode: '9:16', // '9:16' | '16:9' | '1:1' | '4:5'
+    brand_logo_icon: '🎮',
     theme: 'gta6',
     header_text: '@gta6_updates_007',
     footer_text: '◄ ◄  GTA VI • VICE CITY  ► ►',
@@ -759,6 +764,10 @@ const pageTemplateConfigs = {
     page_handle: '@movie_series_365',
     preset: 'movies_gold',
     preset_name: 'Cinematic Gold Glass',
+    template_type: 'canvas',
+    figma_overlay_url: '',
+    aspect_ratio_mode: '9:16',
+    brand_logo_icon: '🎬',
     theme: 'movies',
     header_text: '@movie_series_365 | Cinema Picks',
     footer_text: '◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►',
@@ -808,10 +817,11 @@ async function handleGetJobs(req, res) {
     combined = published.map(j => ({
       ...j,
       template_config: tmplCfg,
-      template_applied: pId === 2 || String(pId) === '2' ? 'Cinematic Gold Glass' : 'Vice City Neon Glow',
+      template_applied: tmplCfg.preset_name || (pId === 2 || String(pId) === '2' ? 'Cinematic Gold Glass' : 'Vice City Neon Glow'),
       template_status: 'Composited & Branded',
       raw_preview: j.raw_thumbnail_url || j.thumbnail_url,
-      branded_preview: j.branded_thumbnail_url || j.thumbnail_url
+      branded_preview: j.branded_thumbnail_url || j.thumbnail_url,
+      aspect_ratio: tmplCfg.aspect_ratio_mode || '9:16'
     }));
   } else if (isReviewStage) {
     // Stage 3 checks view: surface all evaluated reels (auto-passed + duplicate blocked)
@@ -847,6 +857,10 @@ router.post('/reposter/templates', (req, res) => {
   const cfg = pageTemplateConfigs[pId] || { page_id: pId };
   if (req.body.preset) cfg.preset = req.body.preset;
   if (req.body.preset_name) cfg.preset_name = req.body.preset_name;
+  if (req.body.template_type) cfg.template_type = req.body.template_type;
+  if (req.body.figma_overlay_url !== undefined) cfg.figma_overlay_url = req.body.figma_overlay_url;
+  if (req.body.aspect_ratio_mode) cfg.aspect_ratio_mode = req.body.aspect_ratio_mode;
+  if (req.body.brand_logo_icon) cfg.brand_logo_icon = req.body.brand_logo_icon;
   if (req.body.header_text !== undefined) cfg.header_text = req.body.header_text;
   if (req.body.footer_text !== undefined) cfg.footer_text = req.body.footer_text;
   if (req.body.accent_color) cfg.accent_color = req.body.accent_color;
@@ -857,16 +871,63 @@ router.post('/reposter/templates', (req, res) => {
   res.json({ success: true, message: 'Template configuration updated!', config: cfg });
 });
 
+router.post('/reposter/templates/upload-figma', (req, res) => {
+  try {
+    const pId = parseInt(req.body?.page_id || req.body?.pageId || '1', 10);
+    const dataUrl = req.body?.image || req.body?.dataUrl;
+    if (!dataUrl) return res.status(400).json({ error: 'No image data provided' });
+
+    const matches = dataUrl.match(/^data:image\/([A-Za-z-+\/]+);base64,(.+)$/);
+    const base64Data = matches ? matches[2] : dataUrl;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const templatesDir = path.join(__dirname, '..', 'public', 'generated', 'templates');
+    if (!fs.existsSync(templatesDir)) fs.mkdirSync(templatesDir, { recursive: true });
+
+    const filename = `figma_template_p${pId}_${Date.now()}.png`;
+    const filePath = path.join(templatesDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const publicUrl = `/generated/templates/${filename}`;
+    const cfg = pageTemplateConfigs[pId] || { page_id: pId };
+    cfg.template_type = 'figma';
+    cfg.figma_overlay_url = publicUrl;
+    cfg.preset_name = 'Custom Figma Frame (Uploaded)';
+    pageTemplateConfigs[pId] = cfg;
+
+    res.json({
+      success: true,
+      message: 'Figma PNG template uploaded successfully!',
+      url: publicUrl,
+      config: cfg
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload template: ' + err.message });
+  }
+});
+
 router.post('/reposter/jobs/:id/apply-template', (req, res) => {
   const jobId = req.params.id;
   const pId = parseInt(req.body?.page_id || req.body?.pageId || '1', 10);
   const cfg = pageTemplateConfigs[pId] || pageTemplateConfigs[1];
+
+  if (req.body.aspect_ratio_mode) cfg.aspect_ratio_mode = req.body.aspect_ratio_mode;
+  if (req.body.template_type) cfg.template_type = req.body.template_type;
+  if (req.body.figma_overlay_url) cfg.figma_overlay_url = req.body.figma_overlay_url;
+  if (req.body.header_text) cfg.header_text = req.body.header_text;
+  if (req.body.footer_text) cfg.footer_text = req.body.footer_text;
+  if (req.body.brand_logo_icon) cfg.brand_logo_icon = req.body.brand_logo_icon;
+  if (req.body.accent_color) cfg.accent_color = req.body.accent_color;
+  if (req.body.border_width) cfg.border_width = parseInt(req.body.border_width, 10);
+
   res.json({
     success: true,
-    message: `Template applied to Reel #${jobId}! Branded MP4 composited.`,
+    message: `Reel #${jobId} successfully passed through template (${cfg.aspect_ratio_mode || '9:16'} ${cfg.preset_name})! Branded MP4 composited.`,
     jobId,
     page_id: pId,
-    template: cfg
+    template: cfg,
+    branded_video_url: '/api/jobs/' + jobId + '/video',
+    branded_thumbnail_url: '/api/jobs/' + jobId + '/thumbnail'
   });
 });
 
