@@ -393,7 +393,8 @@ def download_via_embed(shortcode, output_dir):
         }
         scout_session = os.environ.get('INSTAGRAM_SESSION_ID') or os.environ.get('IG_SESSION_ID') or os.environ.get('SCOUT_SESSION_ID') or os.environ.get('INSTAGRAM_SESSIONID')
         if scout_session:
-            headers["Cookie"] = f"sessionid={scout_session.strip().strip('\"').strip('\'')}"
+            clean_cookie = scout_session.strip().strip('"').strip("'")
+            headers["Cookie"] = f"sessionid={clean_cookie}"
         r = requests.get(embed_url, headers=headers, timeout=12)
         if r.status_code == 200:
             html = r.text

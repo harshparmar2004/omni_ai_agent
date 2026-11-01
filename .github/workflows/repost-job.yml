@@ -145,7 +145,7 @@ jobs:
               process.exit(0);
             }
 
-            const text = '⚠️ <b>Cloud Runner Alert:</b>\n\nThe runner could not complete this repost job. This typically happens if the reel is age-restricted (18+), from a private account, or blocked by Instagram.\n\n💡 <i>Please try sharing a public unrestricted reel, or check your scout account session.</i>';
+            const text = '⚠️ <b>Cloud Runner Alert:</b>\n\nThe runner could not complete this repost job. This typically happens if the reel is age-restricted (18+), from a private account, or blocked by Instagram.\n\n💡 <i>Please try sharing a public unrestricted reel!</i>';
             if (msgId) {
               axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
                 chat_id: chatId,

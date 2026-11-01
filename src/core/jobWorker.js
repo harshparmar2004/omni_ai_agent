@@ -434,7 +434,7 @@ class JobWorkerPool {
 
         let guidance = '';
         if (isAgeRestricted) {
-          guidance = '\n\n🔞 <b>Age-Gated Content:</b> The creator has set an 18+ limit on this reel. Instagram requires an authenticated adult session to access it.';
+          guidance = '\n\n🔞 <b>Age-Gated Content:</b> The creator set an 18+ audience limit on this reel. Instagram blocks public downloads for age-gated reels.';
         } else if (isPrivate) {
           guidance = '\n\n🔒 <b>Private Account:</b> Instagram blocks access to private accounts. OmniStudio only processes public reels.';
         }
@@ -447,7 +447,7 @@ class JobWorkerPool {
           ``,
           `⚠️ <b>Reason:</b> ${cleanErr}${guidance}`,
           ``,
-          `💡 <i>Tip: Try sharing a public unrestricted reel, or update your scout account session.</i>`
+          `💡 <i>Tip: Please ensure the reel is from a public creator and does not have 18+ age restrictions.</i>`
         ], {
           inline_keyboard: [
             [{ text: '🔁 Retry Now', callback_data: `retry_job:${job.id}` }]
