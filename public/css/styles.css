@@ -1681,6 +1681,31 @@ table.data-table tr:hover td {
   color: #DC2626;
 }
 
+.pipeline-step-icon-wrap.stage-sources {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563EB;
+}
+
+.pipeline-step-icon-wrap.stage-discovered {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284C7;
+}
+
+.pipeline-step-icon-wrap.stage-ranked {
+  background: rgba(245, 158, 11, 0.14);
+  color: #D97706;
+}
+
+.pipeline-step-icon-wrap.stage-review {
+  background: rgba(217, 119, 6, 0.14);
+  color: #B45309;
+}
+
+.pipeline-step-icon-wrap.stage-active {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4F46E5;
+}
+
 .pipeline-step-info-col {
   display: flex;
   flex-direction: column;
@@ -3352,12 +3377,14 @@ table.data-table tr:hover td {
 /* ─────────────────────────────────────────────────────────────
    Multi-Account Page Selector Sheet & Dropdown
    ───────────────────────────────────────────────────────────── */
-.rp-page-selector-wrap {
+.rp-page-selector-wrap,
+.wt-page-selector-wrap {
   position: relative;
   display: inline-block;
 }
 
-.rp-page-sheet {
+.rp-page-sheet,
+.wt-page-sheet {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
@@ -3374,7 +3401,8 @@ table.data-table tr:hover td {
   animation: fadeIn 0.18s ease-out;
 }
 
-.rp-page-sheet.hidden {
+.rp-page-sheet.hidden,
+.wt-page-sheet.hidden {
   display: none !important;
 }
 

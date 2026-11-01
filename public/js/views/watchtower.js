@@ -42,9 +42,12 @@ window.watchtowerView = (function() {
     if (selectedPageId === null && pages.length > 0) {
       selectedPageId = pages[0].id;
     }
+    const selectedPage = pages.find(p => p.id === selectedPageId);
+    const activePageLabel = selectedPage ? escapeHtml(selectedPage.name) : 'All Connected Pages';
+    const activePageHandle = selectedPage ? (selectedPage.handle || '@' + selectedPage.slug) : `(${pages.length} pages)`;
 
     container.innerHTML = `
-      <!-- 1. Header Bar -->
+      <!-- 1. Header Bar with Clean Title & Scalable Multi-Page Selector Sheet -->
       <div class="mb-4 flex items-center justify-between" style="flex-wrap: wrap; gap: 1rem;">
         <div class="flex items-center gap-3">
           <div>
@@ -54,12 +57,58 @@ window.watchtowerView = (function() {
               </h2>
               <span id="wt-header-status-badge" class="status-text status-text-info">Active</span>
             </div>
-            <p class="text-sm text-muted" style="margin-top: 0.15rem; margin-bottom: 0;">
-              Autonomous 24/7 competitor surveillance, AI copywriting, review staging, and Meta live publishing
-            </p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+
+        <div class="flex items-center gap-2" style="position: relative;">
+          <!-- Scalable Multi-Account Selector Sheet Trigger -->
+          <div class="wt-page-selector-wrap rp-page-selector-wrap">
+            <button id="wt-page-sheet-btn" class="btn btn-secondary btn-sm" onclick="watchtowerView.togglePageSheet(event)" style="display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.38rem 0.85rem; font-size: 0.82rem; border-radius: 8px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; background: rgba(184, 91, 53, 0.12); color: var(--accent-primary); font-size: 0.72rem; font-weight: 700;">IG</span>
+              <span id="wt-page-sheet-label" style="font-weight: 600; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${activePageLabel}
+              </span>
+              <span id="wt-page-sheet-handle" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted);">
+                ${activePageHandle}
+              </span>
+              <svg id="wt-page-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="opacity: 0.6; transition: transform 0.2s;"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <!-- Sheet Dropdown (Scalable for 50-60+ accounts with real-time search) -->
+            <div id="wt-page-sheet" class="wt-page-sheet rp-page-sheet hidden" onclick="event.stopPropagation()">
+              <div class="rp-page-sheet-header">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span style="font-weight: 700; font-size: 0.88rem;">Select Target Account</span>
+                  <span style="font-size: 0.7rem; font-weight: 600; background: rgba(184, 91, 53, 0.1); color: var(--accent-primary); padding: 1px 7px; border-radius: 10px;">
+                    ${pages.length} Pages
+                  </span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="watchtowerView.closePageSheet()" style="padding: 1px 6px; font-size: 0.8rem; line-height: 1;">✕</button>
+              </div>
+
+              <!-- Real-time Filter Search for 50-60+ accounts -->
+              <div class="rp-page-sheet-search">
+                <div style="position: relative;">
+                  <input type="text" id="wt-page-search-input" placeholder="Search accounts, @handle..." class="form-input" style="font-size: 0.78rem; padding: 0.4rem 0.65rem 0.4rem 1.85rem; border-radius: 6px; width: 100%;" oninput="watchtowerView.filterPages(this.value)" />
+                  <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); opacity: 0.45; font-size: 0.8rem;">🔍</span>
+                </div>
+              </div>
+
+              <!-- Scrollable accounts list -->
+              <div class="rp-page-sheet-list" id="wt-page-sheet-items">
+                ${renderPageSheetHtml()}
+              </div>
+
+              <!-- Sheet Footer -->
+              <div class="rp-page-sheet-footer">
+                <span>Watchtower surveillance & publishing</span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.app?.navigateTo('pages'); watchtowerView.closePageSheet();" style="font-size: 0.72rem; padding: 2px 7px;">
+                  + Manage Pages
+                </button>
+              </div>
+            </div>
+          </div>
+
           <button id="wt-btn-pause-toggle" class="btn btn-secondary btn-sm" onclick="watchtowerView.togglePause()">
             Pause
           </button>
@@ -69,12 +118,7 @@ window.watchtowerView = (function() {
         </div>
       </div>
 
-      <!-- 2. Multi-Page Selector Bar -->
-      <div class="pipeline-page-switcher" id="wt-page-switcher">
-        ${renderPageSwitcherPills()}
-      </div>
-
-      <!-- 2.5 Peak Audience Traffic Windows Widget -->
+      <!-- 2. Peak Audience Traffic Windows Widget -->
       <div id="wt-peak-windows-container" style="margin-bottom: 1rem;"></div>
 
       <!-- 3. Top Interactive Pipeline Stepper -->
@@ -92,31 +136,151 @@ window.watchtowerView = (function() {
     await loadPeakWindows();
     await loadPipelineSummary();
     await renderActiveStage();
+    setTimeout(() => triggerPipelineFlowAnimation(), 120);
   }
 
-  function renderPageSwitcherPills() {
+  function renderPageSheetHtml() {
     const pages = window.app?.pages || [];
     const isAll = selectedPageId === null;
 
-    let html = `
-      <button class="pipeline-page-pill ${isAll ? 'active' : ''}" onclick="watchtowerView.selectPage(null)">
-        <span>All Connected Pages</span>
+    let itemsHtml = `
+      <!-- All Connected Pages Option -->
+      <button type="button" class="rp-page-sheet-item ${isAll ? 'active' : ''}" onclick="watchtowerView.selectPage(null)">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(30, 26, 23, 0.06); display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+            🌐
+          </div>
+          <div style="text-align: left;">
+            <div style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">All Connected Pages</div>
+            <div style="font-size: 0.72rem; color: var(--text-muted);">Combined surveillance across all ${pages.length} accounts</div>
+          </div>
+        </div>
+        ${isAll ? `<span class="rp-page-selected-check">✓</span>` : ''}
       </button>
+      <div style="font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.06em; padding: 0.5rem 0.5rem 0.25rem 0.5rem; margin-top: 0.35rem;">
+        Instagram Accounts (${pages.length})
+      </div>
     `;
 
     pages.forEach(p => {
       const isActive = selectedPageId === p.id;
-      html += `
-        <button class="pipeline-page-pill ${isActive ? 'active' : ''}" onclick="watchtowerView.selectPage(${p.id})">
-          <span>${escapeHtml(p.name)}</span>
-          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-muted)'}; margin-left: 4px;">
-            ${p.handle || '@' + p.slug}
-          </span>
+      const isMovie = (p.slug || '').includes('movies') || p.id === 2;
+      const initial = (p.name || 'IG').charAt(0).toUpperCase();
+      const quotaStr = p.today_published_count !== undefined ? `${p.today_published_count}/${p.daily_quota || 3}` : '0/3';
+
+      itemsHtml += `
+        <button type="button" class="rp-page-sheet-item ${isActive ? 'active' : ''}" onclick="watchtowerView.selectPage(${p.id})" data-page-name="${escapeHtml(p.name || '').toLowerCase()}" data-page-handle="${escapeHtml(p.handle || p.slug || '').toLowerCase()}">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: ${isMovie ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : 'linear-gradient(135deg, #B85B35, #E17055)'}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;">
+              ${initial}
+            </div>
+            <div style="min-width: 0; text-align: left;">
+              <div style="font-weight: 600; font-size: 0.84rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${escapeHtml(p.name)}
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.35rem;">
+                <span>${p.handle || '@' + p.slug}</span>
+                <span>•</span>
+                <span style="color: ${isActive ? 'var(--accent-primary)' : 'inherit'};">Quota: ${quotaStr}</span>
+              </div>
+            </div>
+          </div>
+          <div style="margin-left: 0.5rem; flex-shrink: 0;">
+            ${isActive ? `<span class="rp-page-selected-check">✓</span>` : ''}
+          </div>
         </button>
       `;
     });
 
-    return html;
+    return itemsHtml;
+  }
+
+  function togglePageSheet(event) {
+    if (event) event.stopPropagation();
+    const sheet = document.getElementById('wt-page-sheet');
+    const caret = document.getElementById('wt-page-caret');
+    if (!sheet) return;
+
+    const isHidden = sheet.classList.contains('hidden');
+    if (isHidden) {
+      sheet.classList.remove('hidden');
+      sheet.style.display = 'flex';
+      if (caret) caret.style.transform = 'rotate(180deg)';
+      const searchInput = document.getElementById('wt-page-search-input');
+      if (searchInput) {
+        searchInput.value = '';
+        filterPages('');
+        setTimeout(() => searchInput.focus(), 60);
+      }
+    } else {
+      closePageSheet();
+    }
+  }
+
+  function closePageSheet() {
+    const sheet = document.getElementById('wt-page-sheet');
+    const caret = document.getElementById('wt-page-caret');
+    if (sheet) {
+      sheet.classList.add('hidden');
+      sheet.style.display = 'none';
+    }
+    if (caret) caret.style.transform = 'rotate(0deg)';
+  }
+
+  function filterPages(query) {
+    const q = (query || '').toLowerCase().trim();
+    const items = document.querySelectorAll('#wt-page-sheet-items .rp-page-sheet-item');
+    items.forEach(el => {
+      const name = el.getAttribute('data-page-name') || '';
+      const handle = el.getAttribute('data-page-handle') || '';
+      if (!name && !handle) {
+        el.style.display = (!q || 'all connected pages'.includes(q)) ? 'flex' : 'none';
+        return;
+      }
+      if (!q || name.includes(q) || handle.includes(q)) {
+        el.style.display = 'flex';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+  }
+
+  function triggerPipelineFlowAnimation() {
+    const nodes = [
+      document.getElementById('wt-step-sources'),
+      document.getElementById('wt-step-discovered'),
+      document.getElementById('wt-step-ranked'),
+      document.getElementById('wt-step-downloaded'),
+      document.getElementById('wt-step-review'),
+      document.getElementById('wt-step-active'),
+      document.getElementById('wt-step-published'),
+      document.getElementById('wt-step-failed')
+    ];
+    const connectors = [
+      document.getElementById('wt-flow-arrow-1'),
+      document.getElementById('wt-flow-arrow-2'),
+      document.getElementById('wt-flow-arrow-3'),
+      document.getElementById('wt-flow-arrow-4'),
+      document.getElementById('wt-flow-arrow-5'),
+      document.getElementById('wt-flow-arrow-6'),
+      document.getElementById('wt-flow-arrow-7')
+    ];
+
+    nodes.forEach(n => n && n.classList.remove('flow-pulse'));
+    connectors.forEach(c => c && c.classList.remove('flow-active'));
+
+    nodes.forEach((node, idx) => {
+      setTimeout(() => {
+        if (node) {
+          node.classList.add('flow-pulse');
+          setTimeout(() => node.classList.remove('flow-pulse'), 850);
+        }
+        if (idx > 0 && connectors[idx - 1]) {
+          connectors[idx - 1].classList.add('flow-active');
+          setTimeout(() => connectors[idx - 1].classList.remove('flow-active'), 850);
+        }
+      }, idx * 160);
+    });
   }
 
   function renderStepperHtml() {
@@ -126,91 +290,263 @@ window.watchtowerView = (function() {
 
     return `
       <div class="pipeline-stepper-header">
-        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-          <span>Publishing Pipeline Flow for <b>${pageLabel}</b></span>
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <span class="pipeline-live-flow-dot"></span>
+          <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); letter-spacing: 0.05em;">
+            Publishing Pipeline Flow for <b style="color: var(--accent-primary);">${pageLabel}</b>
+          </div>
         </div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">
-          Cadence: <strong>Every 3 Hours ± Jitter</strong>
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="watchtowerView.triggerPipelineFlowAnimation()" style="font-size: 0.72rem; padding: 2px 9px; font-weight: 600; gap: 4px;" title="Replay automated pipeline progression">
+            <span>⚡ Replay Flow</span>
+          </button>
+          <div style="font-size: 0.74rem; color: var(--text-muted);">
+            Cadence: <strong>Every 3 Hours ± Jitter</strong>
+          </div>
         </div>
       </div>
 
       <div class="pipeline-stepper">
         <!-- Stage 1: Tracking Accounts -->
-        <div class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Tracked Competitor Accounts">
-          <span class="pipeline-step-num">1.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Tracking Accounts</span>
-            <span class="pipeline-step-count" id="ps-count-sources">${s.sources} Accounts</span>
+        <div id="wt-step-sources" class="pipeline-step-node ${activeStage === 'sources' ? 'active' : ''}" onclick="watchtowerView.switchStage('sources')" title="Tracked Competitor Accounts">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-sources">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 1</div>
+              <div class="pipeline-step-title">Tracking</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.sources > 0 ? '#2563EB' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-sources">${s.sources} Accounts</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.sources > 0 ? 'Active' : 'Empty'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 1 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-1" title="Surveillance scan triggers reel discovery">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 2: Discovered -->
-        <div class="pipeline-step-node ${activeStage === 'discovered' ? 'active' : ''}" onclick="watchtowerView.switchStage('discovered')" title="Raw Discovered Reels">
-          <span class="pipeline-step-num">2.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Discovered</span>
-            <span class="pipeline-step-count" id="ps-count-discovered">${s.discovered} Ingested</span>
+        <div id="wt-step-discovered" class="pipeline-step-node ${activeStage === 'discovered' ? 'active' : ''}" onclick="watchtowerView.switchStage('discovered')" title="Raw Discovered Reels">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-discovered">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 2</div>
+              <div class="pipeline-step-title">Discovered</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.discovered > 0 ? '#0284C7' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-discovered">${s.discovered} Ingested</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.discovered > 0 ? 'Scanned' : 'Idle'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 2 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-2" title="Raw reels fed to AI viral scoring">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 3: AI Ranked -->
-        <div class="pipeline-step-node ${activeStage === 'ranked' ? 'active' : ''}" onclick="watchtowerView.switchStage('ranked')" title="Viral Scored Reels (≥70)">
-          <span class="pipeline-step-num">3.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">AI Ranked</span>
-            <span class="pipeline-step-count" id="ps-count-ranked">${s.ranked} Scored</span>
+        <div id="wt-step-ranked" class="pipeline-step-node ${activeStage === 'ranked' ? 'active' : ''}" onclick="watchtowerView.switchStage('ranked')" title="Viral Scored Reels (≥70)">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-ranked">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 3</div>
+              <div class="pipeline-step-title">AI Ranked</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.ranked > 0 ? '#D97706' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-ranked">${s.ranked} Scored</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.ranked > 0 ? '≥70 Viral' : 'Waiting'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 3 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-3" title="Top-scoring reels fetched by downloader">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 4: Downloaded Media -->
-        <div class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="watchtowerView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
-          <span class="pipeline-step-num">4.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Downloaded Media</span>
-            <span class="pipeline-step-count" id="ps-count-downloaded" style="font-weight: 600; color: ${s.downloaded > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready Files</span>
+        <div id="wt-step-downloaded" class="pipeline-step-node ${activeStage === 'downloaded' ? 'active' : ''}" onclick="watchtowerView.switchStage('downloaded')" title="Downloaded 1080p MP4 media files ready in local storage">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-downloaded">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 4</div>
+              <div class="pipeline-step-title">Downloaded</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${(s.downloaded || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-downloaded" style="font-weight: 600; color: ${(s.downloaded || 0) > 0 ? 'var(--accent-primary)' : 'inherit'};">${s.downloaded || 0} Ready MP4</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${(s.downloaded || 0) > 0 ? 'Ready' : 'Waiting'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 4 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-4" title="Media passed to review & staging">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 5: Review & Staged -->
-        <div class="pipeline-step-node ${activeStage === 'review' ? 'active' : ''} ${s.review > 0 ? 'has-review' : ''}" onclick="watchtowerView.switchStage('review')" title="Staged Reels Awaiting Approval">
-          <span class="pipeline-step-num" style="${s.review > 0 && activeStage !== 'review' ? 'color: var(--warning);' : ''}">5.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Review & Staged</span>
-            <span class="pipeline-step-count" id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning); font-weight: 700;' : ''}">${s.review} Needs Review</span>
+        <div id="wt-step-review" class="pipeline-step-node ${activeStage === 'review' ? 'active' : ''} ${s.review > 0 ? 'has-review' : ''}" onclick="watchtowerView.switchStage('review')" title="Staged Reels Awaiting Approval">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-review">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 5</div>
+              <div class="pipeline-step-title">Review / Staged</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.review > 0 ? 'var(--warning, #B45309)' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-review" style="${s.review > 0 ? 'color: var(--warning, #B45309); font-weight: 700;' : ''}">${s.review} Needs Review</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.review > 0 ? 'Review' : 'Approved'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 5 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-5" title="Approved jobs dispatched for upload">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 6: In-Flight -->
-        <div class="pipeline-step-node ${activeStage === 'active' ? 'active' : ''}" onclick="watchtowerView.switchStage('active')" title="Active Downloading & Meta Upload">
-          <span class="pipeline-step-num">6.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">In-Flight</span>
-            <span class="pipeline-step-count" id="ps-count-active">${s.active} Processing</span>
+        <div id="wt-step-active" class="pipeline-step-node ${activeStage === 'active' ? 'active' : ''}" onclick="watchtowerView.switchStage('active')" title="Active Downloading & Meta Upload">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-active">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 6</div>
+              <div class="pipeline-step-title">In-Flight</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.active > 0 ? '#4F46E5' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-active">${s.active} Processing</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.active > 0 ? 'In-Flight' : 'Idle'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
+
+        <!-- Connector 6 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-6" title="Completed uploads confirmed on Meta Feed">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
 
         <!-- Stage 7: Live Published -->
-        <div class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="watchtowerView.switchStage('published')" title="Live on Instagram">
-          <span class="pipeline-step-num">7.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Live Posts</span>
-            <span class="pipeline-step-count" id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
+        <div id="wt-step-published" class="pipeline-step-node ${activeStage === 'published' ? 'active' : ''}" onclick="watchtowerView.switchStage('published')" title="Live on Instagram">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-published">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 7</div>
+              <div class="pipeline-step-title">Live Posts</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.published > 0 ? '#059669' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-published" style="color: var(--agent-reposter); font-weight: 600;">${s.published} Live</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.published > 0 ? 'Live IG' : 'Synced'}
           </div>
         </div>
-        <div class="pipeline-step-arrow">→</div>
 
-        <!-- Stage 8: Failed / Retries -->
-        <div class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="watchtowerView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
-          <span class="pipeline-step-num" style="${s.failed > 0 && activeStage !== 'failed' ? 'color: var(--danger);' : ''}">8.</span>
-          <div class="pipeline-step-info">
-            <span class="pipeline-step-label">Retries</span>
-            <span class="pipeline-step-count" id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
+        <!-- Connector 7 -->
+        <div class="pipeline-flow-connector" id="wt-flow-arrow-7" title="Error detection and automatic retry loop">
+          <div class="connector-track"><div class="connector-pulse"></div></div>
+          <svg class="connector-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>
+
+        <!-- Stage 8: Retries -->
+        <div id="wt-step-failed" class="pipeline-step-node ${activeStage === 'failed' ? 'active' : ''} ${s.failed > 0 ? 'has-failed' : ''}" onclick="watchtowerView.switchStage('failed')" title="Failed Jobs with 1-Click Retry">
+          <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+            <div class="pipeline-step-icon-wrap stage-failed">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+            </div>
+            <div class="pipeline-step-info-col">
+              <div class="pipeline-step-super">Stage 8</div>
+              <div class="pipeline-step-title">Retries</div>
+              <div class="pipeline-step-metric-line">
+                <span style="color: ${s.failed > 0 ? '#DC2626' : 'var(--text-muted)'}; font-size: 0.75rem;">●</span>
+                <span id="ps-count-failed" style="${s.failed > 0 ? 'color: var(--danger); font-weight: 700;' : ''}">${s.failed} Errors</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-step-status-pill">
+            ${s.failed > 0 ? 'Action Req' : '0 Clean'}
           </div>
         </div>
       </div>
@@ -292,8 +628,21 @@ window.watchtowerView = (function() {
   async function selectPage(pageId) {
     selectedPageId = pageId;
     stage2Page = 0;
-    const switcher = document.getElementById('wt-page-switcher');
-    if (switcher) switcher.innerHTML = renderPageSwitcherPills();
+    closePageSheet();
+
+    const pages = window.app?.pages || [];
+    const selectedPage = pages.find(p => p.id === selectedPageId);
+    const labelEl = document.getElementById('wt-page-sheet-label');
+    const handleEl = document.getElementById('wt-page-sheet-handle');
+    if (labelEl) {
+      labelEl.textContent = selectedPage ? selectedPage.name : 'All Connected Pages';
+    }
+    if (handleEl) {
+      handleEl.textContent = selectedPage ? (selectedPage.handle || '@' + selectedPage.slug) : `(${pages.length} pages)`;
+    }
+
+    const itemsContainer = document.getElementById('wt-page-sheet-items');
+    if (itemsContainer) itemsContainer.innerHTML = renderPageSheetHtml();
 
     const stepper = document.getElementById('wt-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
@@ -301,19 +650,29 @@ window.watchtowerView = (function() {
     await loadPeakWindows();
     await loadPipelineSummary();
     await renderActiveStage();
+    setTimeout(() => triggerPipelineFlowAnimation(), 120);
   }
 
   async function switchStage(stageName, pageId) {
     activeStage = stageName;
     if (pageId !== undefined) {
       selectedPageId = pageId;
+      const pages = window.app?.pages || [];
+      const selectedPage = pages.find(p => p.id === selectedPageId);
+      const labelEl = document.getElementById('wt-page-sheet-label');
+      const handleEl = document.getElementById('wt-page-sheet-handle');
+      if (labelEl) {
+        labelEl.textContent = selectedPage ? selectedPage.name : 'All Connected Pages';
+      }
+      if (handleEl) {
+        handleEl.textContent = selectedPage ? (selectedPage.handle || '@' + selectedPage.slug) : `(${pages.length} pages)`;
+      }
+      const itemsContainer = document.getElementById('wt-page-sheet-items');
+      if (itemsContainer) itemsContainer.innerHTML = renderPageSheetHtml();
     }
     if (stageName === 'discovered') {
       stage2Page = 0;
     }
-
-    const switcher = document.getElementById('wt-page-switcher');
-    if (switcher) switcher.innerHTML = renderPageSwitcherPills();
 
     const stepper = document.getElementById('wt-stepper-container');
     if (stepper) stepper.innerHTML = renderStepperHtml();
@@ -1776,10 +2135,32 @@ window.watchtowerView = (function() {
       .replace(/"/g, '&quot;');
   }
 
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', (e) => {
+      const sheet = document.getElementById('wt-page-sheet');
+      const btn = document.getElementById('wt-page-sheet-btn');
+      if (sheet && !sheet.classList.contains('hidden')) {
+        if (!sheet.contains(e.target) && !btn?.contains(e.target)) {
+          closePageSheet();
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closePageSheet();
+      }
+    });
+  }
+
   return {
     render,
     selectPage,
     switchStage,
+    togglePageSheet,
+    closePageSheet,
+    filterPages,
+    triggerPipelineFlowAnimation,
     setDownloadedViewMode,
     runCycle,
     togglePause,
