@@ -727,6 +727,8 @@ async function handleGetJobs(req, res) {
     combined = published;
   } else if (statusQuery.includes('queued') || statusQuery.includes('processing') || statusQuery.includes('publishing')) {
     combined = inProgressJobs;
+  } else if (statusQuery.includes('pending') || statusQuery.includes('ready')) {
+    combined = [];
   } else {
     combined = [...inProgressJobs, ...published];
   }

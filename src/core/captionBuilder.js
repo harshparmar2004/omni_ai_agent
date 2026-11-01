@@ -21,7 +21,16 @@ const CTA_PATTERNS = [
 
 function cleanRawCaption(rawCaption, competitorHandles = []) {
   if (!rawCaption) return '';
-  let text = rawCaption;
+  let text = rawCaption
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&;s/g, "'s")
+    .replace(/&;/g, "'")
+    .replace(/&nbsp;/g, ' ');
 
   // 1. Strip third-party credit / source / repost lines
   for (const pattern of CTA_PATTERNS) {

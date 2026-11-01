@@ -89,6 +89,21 @@ window.reposterView = (function() {
     };
   }
 
+  function cleanCaptionText(str) {
+    if (!str) return '';
+    return str
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&;s/g, "'s")
+      .replace(/&;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+  }
+
   async function render() {
     const container = document.getElementById('view-reposter');
     if (!container) return;
@@ -814,7 +829,7 @@ window.reposterView = (function() {
                     <label class="form-label font-bold" style="font-size: 0.78rem;">
                       AI Hook, Attribution & Caption:
                     </label>
-                    <textarea id="rp-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.45;">${escapeHtml(initialCaption)}</textarea>
+                    <textarea id="rp-caption-${j.id}" class="form-input" rows="4" style="font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.45;">${escapeHtml(cleanCaptionText(initialCaption))}</textarea>
                   </div>
 
                   <div class="flex items-center justify-between mt-3">
