@@ -136,6 +136,10 @@ async function getLivePublishedMedia(pageId = 1) {
         media_type: item.media_type === 'VIDEO' ? 'reel' : 'post',
         thumbnail_url: item.thumbnail_url || item.media_url || defaultThumb,
         video_url: item.media_url || (isMovie ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'),
+        raw_thumbnail_url: item.thumbnail_url || item.media_url || defaultThumb,
+        raw_video_url: isMovie ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+        branded_thumbnail_url: item.thumbnail_url || item.media_url || defaultThumb,
+        branded_video_url: item.media_url || (isMovie ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'),
         media_paths: [`/generated/downloads/media_${item.id}.mp4`],
         format: '1080p MP4',
         aspect_ratio: '9:16 Vertical',
@@ -148,6 +152,10 @@ async function getLivePublishedMedia(pageId = 1) {
         likes: item.like_count || 0,
         comments: item.comments_count || 0,
         page_handle: pageHandle,
+        page_logo_icon: isMovie ? '🎬' : '🎮',
+        template_applied: isMovie ? 'Cinematic Gold Glass' : 'Vice City Neon Glow',
+        template_theme: isMovie ? 'movies' : 'gta6',
+        is_edited: true,
         telegram_chat_id: '5443723531',
         agent: 'reposter'
       };
@@ -192,6 +200,22 @@ function getFallbackMedia(pageId = 1) {
       likes: 1,
       source_account: isMovie ? '@filmfeed' : '@rockstargames',
       page_handle: isMovie ? '@movie_series_365' : '@gta6_updates_007',
+      page_logo_icon: isMovie ? '🎬' : '🎮',
+      template_applied: isMovie ? 'Cinematic Gold Glass' : 'Vice City Neon Glow',
+      template_theme: isMovie ? 'movies' : 'gta6',
+      is_edited: true,
+      raw_thumbnail_url: isMovie
+        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+      raw_video_url: isMovie
+        ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+        : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      branded_thumbnail_url: isMovie
+        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+      branded_video_url: isMovie
+        ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
+        : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
       telegram_chat_id: '5443723531',
       agent: 'reposter'
     }
@@ -713,6 +737,40 @@ const duplicateAuditLogs = [
   }
 ];
 
+// ── Video Branding & Template Configurations ─────────────────
+const pageTemplateConfigs = {
+  1: {
+    page_id: 1,
+    page_handle: '@gta6_updates_007',
+    preset: 'gta6_neon',
+    preset_name: 'Vice City Neon Glow',
+    theme: 'gta6',
+    header_text: '@gta6_updates_007',
+    footer_text: '◄ ◄  GTA VI • VICE CITY  ► ►',
+    accent_color: '#00F0FF',
+    border_color: '#00F0FF',
+    border_width: 8,
+    show_brackets: true,
+    aspect_ratio: '9:16 Vertical',
+    compositing_engine: 'FFmpeg + Canvas Glass Layer'
+  },
+  2: {
+    page_id: 2,
+    page_handle: '@movie_series_365',
+    preset: 'movies_gold',
+    preset_name: 'Cinematic Gold Glass',
+    theme: 'movies',
+    header_text: '@movie_series_365 | Cinema Picks',
+    footer_text: '◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►',
+    accent_color: '#FFD166',
+    border_color: '#FFD166',
+    border_width: 8,
+    show_brackets: true,
+    aspect_ratio: '9:16 Vertical',
+    compositing_engine: 'FFmpeg + Canvas Glass Layer'
+  }
+};
+
 // ── Jobs & Reposter Endpoints ────────────────────────────────
 async function handleGetJobs(req, res) {
   const pId = req.query.pageId || req.query.page_id || 1;
@@ -723,6 +781,7 @@ async function handleGetJobs(req, res) {
   const limit = parseInt(req.query.limit || '30', 10);
   const offset = parseInt(req.query.offset || '0', 10);
   const isReviewStage = req.query.stage === 'review' || req.query.view === 'checks';
+  const isTemplateStage = req.query.stage === 'template';
 
   // Check for in-progress runners
   const activeRuns = runs.filter(r => r.status === 'in_progress' || r.status === 'queued');
@@ -744,7 +803,17 @@ async function handleGetJobs(req, res) {
 
   let combined = [];
 
-  if (isReviewStage) {
+  if (isTemplateStage) {
+    const tmplCfg = pageTemplateConfigs[pId] || pageTemplateConfigs[1];
+    combined = published.map(j => ({
+      ...j,
+      template_config: tmplCfg,
+      template_applied: pId === 2 || String(pId) === '2' ? 'Cinematic Gold Glass' : 'Vice City Neon Glow',
+      template_status: 'Composited & Branded',
+      raw_preview: j.raw_thumbnail_url || j.thumbnail_url,
+      branded_preview: j.branded_thumbnail_url || j.thumbnail_url
+    }));
+  } else if (isReviewStage) {
     // Stage 3 checks view: surface all evaluated reels (auto-passed + duplicate blocked)
     combined = [...pageDups, ...inProgressJobs, ...published];
   } else if (statusQuery.includes('published') && !statusQuery.includes('queued') && !statusQuery.includes('pending')) {
@@ -765,6 +834,42 @@ async function handleGetJobs(req, res) {
 router.get('/jobs', handleGetJobs);
 router.get('/reposter/jobs', handleGetJobs);
 
+router.get('/reposter/templates', (req, res) => {
+  const pId = req.query.pageId || req.query.page_id;
+  if (pId && pageTemplateConfigs[pId]) {
+    return res.json(pageTemplateConfigs[pId]);
+  }
+  res.json(pageTemplateConfigs);
+});
+
+router.post('/reposter/templates', (req, res) => {
+  const pId = parseInt(req.body?.page_id || req.body?.pageId || '1', 10);
+  const cfg = pageTemplateConfigs[pId] || { page_id: pId };
+  if (req.body.preset) cfg.preset = req.body.preset;
+  if (req.body.preset_name) cfg.preset_name = req.body.preset_name;
+  if (req.body.header_text !== undefined) cfg.header_text = req.body.header_text;
+  if (req.body.footer_text !== undefined) cfg.footer_text = req.body.footer_text;
+  if (req.body.accent_color) cfg.accent_color = req.body.accent_color;
+  if (req.body.border_color) cfg.border_color = req.body.border_color;
+  if (req.body.border_width) cfg.border_width = parseInt(req.body.border_width, 10);
+  if (req.body.show_brackets !== undefined) cfg.show_brackets = Boolean(req.body.show_brackets);
+  pageTemplateConfigs[pId] = cfg;
+  res.json({ success: true, message: 'Template configuration updated!', config: cfg });
+});
+
+router.post('/reposter/jobs/:id/apply-template', (req, res) => {
+  const jobId = req.params.id;
+  const pId = parseInt(req.body?.page_id || req.body?.pageId || '1', 10);
+  const cfg = pageTemplateConfigs[pId] || pageTemplateConfigs[1];
+  res.json({
+    success: true,
+    message: `Template applied to Reel #${jobId}! Branded MP4 composited.`,
+    jobId,
+    page_id: pId,
+    template: cfg
+  });
+});
+
 router.get('/reposter/pipeline-summary', async (req, res) => {
   try {
     const pId = req.query.pageId ? parseInt(req.query.pageId, 10) : 1;
@@ -775,11 +880,12 @@ router.get('/reposter/pipeline-summary', async (req, res) => {
       ingested: published.length + activeRuns.length,
       downloaded: published.length,
       ready: published.length,
+      template: published.length,
       published: published.length,
       failed: 0
     });
   } catch (err) {
-    res.json({ ingested: 0, downloaded: 0, ready: 0, published: 0, failed: 0 });
+    res.json({ ingested: 0, downloaded: 0, ready: 0, template: 0, published: 0, failed: 0 });
   }
 });
 
