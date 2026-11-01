@@ -8,7 +8,7 @@ window.reposterView = (function() {
   let selectedPageId = null; // null = all pages
   let activeStage = 'ingest'; // 'ingest' | 'downloaded' | 'ready' | 'published' | 'failed'
   let downloadedViewMode = 'table'; // 'table' (default) | 'grid'
-  let ingestViewMode = 'grid'; // 'grid' (default for stream) | 'table'
+  let ingestViewMode = (typeof localStorage !== 'undefined' && localStorage.getItem('omni_ingest_view_mode')) || 'table'; // 'table' (default for Telegram Received) | 'grid'
   let publishedViewMode = 'table'; // 'table' (default) | 'grid'
   let activeTrackingJobId = null;
   let activeStage3Jobs = [];
@@ -353,6 +353,7 @@ window.reposterView = (function() {
   // ─────────────────────────────────────────────────────────────
   function setIngestViewMode(mode) {
     ingestViewMode = mode;
+    try { localStorage.setItem('omni_ingest_view_mode', mode); } catch (e) {}
     const container = document.getElementById('rp-stage-deck');
     if (container && activeStage === 'ingest') {
       renderIngestStage(container);
@@ -395,13 +396,13 @@ window.reposterView = (function() {
         </div>
 
         <div class="flex items-center gap-2" style="flex-wrap: wrap;">
-          <!-- View Mode Switcher: Cards View vs Table View -->
+          <!-- View Mode Switcher: Table View (Default) vs Cards View -->
           <div class="view-mode-switcher">
-            <button class="view-mode-btn ${ingestViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('grid')" title="Cards View">
-              <span>Cards View</span>
-            </button>
             <button class="view-mode-btn ${ingestViewMode === 'table' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('table')" title="Table View">
               <span>Table View</span>
+            </button>
+            <button class="view-mode-btn ${ingestViewMode === 'grid' ? 'active' : ''}" onclick="reposterView.setIngestViewMode('grid')" title="Cards View">
+              <span>Cards View</span>
             </button>
           </div>
 
