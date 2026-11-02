@@ -787,20 +787,28 @@ function drawDiamond(ctx, cx, cy, size) {
  * - Deep obsidian void with ambient neon dot matrix grid
  */
 function generateClubbingCyberOverlay(handle, options = {}) {
+  const cleanHandle = (handle || 'clubbingcult').replace(/^@/, '');
+  const {
+    cardX = 166,
+    cardY = 322,
+    cardW = 748,
+    cardH = 1328,
+    isVertical = true
+  } = options;
+
+  // For 9:16 vertical, use the dedicated high-res master template asset matching user safe-zone specifications
+  if (isVertical) {
+    const masterPath = path.join(__dirname, '..', '..', 'public', 'images', 'clubbingcult_9_16_template.png');
+    if (fs.existsSync(masterPath)) {
+      return masterPath;
+    }
+  }
+
   const { createCanvas } = require('@napi-rs/canvas');
   const width = 1080;
   const height = 1920;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
-
-  const cleanHandle = (handle || 'clubbingcult').replace(/^@/, '');
-  const {
-    cardX = 100,
-    cardY = 195,
-    cardW = 880,
-    cardH = 1480,
-    isVertical = true
-  } = options;
 
   const neonGreen = '#00FFA3';
   const neonLime = '#39FF14';
@@ -1424,11 +1432,11 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   if (isVertical) {
     if (isClubbing) {
-      // Clubbing Cult Cyberpunk HUD: 9:16 Adaptive Card Cutout
-      cardW = 880;
-      cardH = 1480;
-      cardX = Math.round((1080 - cardW) / 2);
-      cardY = 195;
+      // Clubbing Cult Cyberpunk HUD: 9:16 Instagram Safe-Zone Geometry (748x1328)
+      cardW = 748;
+      cardH = 1328;
+      cardX = 166;
+      cardY = 322;
 
       videoFilter = [
         `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
