@@ -147,7 +147,10 @@ async function main() {
   const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
-  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "clubbing"').run(clubbingToken, clubbingIgId);
+  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
+  const clubbingToken = sanitizeToken(process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
+  const clubbingIgId = (process.env.CLUBBING_CULT_IG_USER_ID || process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
+  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
   let pages = getPages({ isActiveOnly: true });
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
