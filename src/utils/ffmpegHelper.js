@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -1238,6 +1238,114 @@ async function isLetterboxedReel(videoOrImagePath) {
 }
 
 /**
+ * Detects the active video rectangle inside an incoming reel,
+ * distinguishing actual moving video content from letterbox black bands and floating competitor text.
+ * @param {string} videoOrImagePath - Path to video or frame image
+ * @returns {Promise<{ isLetterboxed: boolean, startY: number, endY: number, height: number, totalHeight: number }>}
+ */
+async function detectActiveVideoBounds(videoOrImagePath) {
+  let framePath = videoOrImagePath;
+  let tempFrame = false;
+
+  if (!videoOrImagePath || !fs.existsSync(videoOrImagePath)) {
+    return { isLetterboxed: false, startY: 0, endY: 1920, height: 1920, totalHeight: 1920 };
+  }
+
+  try {
+    const ext = path.extname(videoOrImagePath).toLowerCase();
+    const isVideo = ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(ext);
+    if (isVideo) {
+      const publicDir = path.join(__dirname, '..', '..', 'public');
+      const genDir = path.join(publicDir, 'generated');
+      if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+      framePath = path.join(genDir, `bounds_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`);
+      execSync(`ffmpeg -y -ss 00:00:01.500 -i "${videoOrImagePath}" -vframes 1 -q:v 3 "${framePath}"`, { stdio: 'ignore', timeout: 8000 });
+      tempFrame = true;
+    }
+
+    if (!fs.existsSync(framePath)) {
+      return { isLetterboxed: false, startY: 0, endY: 1920, height: 1920, totalHeight: 1920 };
+    }
+
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
+    const img = await loadImage(framePath);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    const startX = Math.floor(img.width * 0.15);
+    const endX = Math.floor(img.width * 0.85);
+    const sampleW = endX - startX;
+
+    // Scan horizontal lines across height
+    const rowBrightness = [];
+    for (let y = 0; y < img.height; y++) {
+      let sum = 0;
+      for (let x = startX; x < endX; x += 4) {
+        const p = ctx.getImageData(x, y, 1, 1).data;
+        sum += (p[0] * 0.299 + p[1] * 0.587 + p[2] * 0.114);
+      }
+      rowBrightness.push(sum / (sampleW / 4));
+    }
+
+    // Group rows into continuous spans
+    const spans = [];
+    let currentSpan = null;
+    for (let y = 0; y < img.height; y++) {
+      const isBright = rowBrightness[y] > 4.0;
+      if (isBright) {
+        if (!currentSpan) {
+          currentSpan = { startY: y, endY: y, maxB: rowBrightness[y] };
+        } else {
+          currentSpan.endY = y;
+          currentSpan.maxB = Math.max(currentSpan.maxB, rowBrightness[y]);
+        }
+      } else {
+        if (currentSpan) {
+          currentSpan.height = currentSpan.endY - currentSpan.startY + 1;
+          spans.push(currentSpan);
+          currentSpan = null;
+        }
+      }
+    }
+    if (currentSpan) {
+      currentSpan.height = currentSpan.endY - currentSpan.startY + 1;
+      spans.push(currentSpan);
+    }
+
+    // A real video must be at least 15% of total frame height (floating text lines are 1-4%)
+    const minVideoHeight = img.height * 0.15;
+    const videoSpans = spans.filter(s => s.height >= minVideoHeight);
+
+    if (videoSpans.length === 0) {
+      return { isLetterboxed: false, startY: 0, endY: img.height, height: img.height, totalHeight: img.height };
+    }
+
+    // Pick the largest span as the primary video content
+    videoSpans.sort((a, b) => b.height - a.height);
+    const primary = videoSpans[0];
+
+    // If primary video spans >= 85% of total height, it's a full-frame video
+    const isLetterboxed = primary.height < (img.height * 0.85);
+
+    return {
+      isLetterboxed,
+      startY: primary.startY,
+      endY: primary.endY,
+      height: primary.height,
+      totalHeight: img.height
+    };
+  } catch (err) {
+    console.warn(`[FFmpeg Helper] Video bounds detection notice: ${err.message}`);
+    return { isLetterboxed: false, startY: 0, endY: 1920, height: 1920, totalHeight: 1920 };
+  } finally {
+    if (tempFrame && fs.existsSync(framePath)) {
+      try { fs.unlinkSync(framePath); } catch (_) {}
+    }
+  }
+}
+
+/**
  * Generates the authentic Evolving AI & Cult Information Video-Essay Overlay
  * Solid black 1080x1920 canvas with:
  * - Prominent 92px circular brand avatar + bold page name + verified blue badge + handle
@@ -1786,20 +1894,25 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   if (isVideoEssay) {
     // Evolving AI & Cult Information Minimalist Center Layout:
     if (isVertical) {
-      const isPreFormatted = await isLetterboxedReel(absPath);
-      if (isPreFormatted) {
-        // Pre-formatted reel from competitor (e.g. @evolving.ai):
-        // Keep video at 1080:1920 in its original center position!
-        // The Cult Information overlay covers Y=0 to 680 in solid black,
-        // completely obliterating any competitor header and title text (e.g. at Y=580-664)!
-        cardW = 1080;
-        cardH = 680;
-        cardX = 0;
-        cardY = 680;
+      const bounds = await detectActiveVideoBounds(absPath);
+      if (bounds && bounds.isLetterboxed && bounds.height > 100) {
+        // Competitor or letterboxed reel (e.g. @evolving.ai style):
+        // Physically crop the input video to ONLY the active video window,
+        // completely eliminating 100% of competitor headers, titles, and floating text!
+        const cropY = Math.max(0, Math.floor(bounds.startY / 2) * 2);
+        const cropH = Math.floor(bounds.height / 2) * 2;
+        const activeAspect = inW / cropH;
 
+        cardW = 1080;
+        cardH = Math.round(cardW / activeAspect);
+        cardH = Math.floor(cardH / 2) * 2;
+        cardX = 0;
+        cardY = Math.round((1920 - cardH) / 2); // 656px for 16:9
+
+        console.log(`[FFmpeg Helper] ✂️ Auto-Cropped active video bounds: Y=${cropY} H=${cropH} -> Framed to ${cardW}x${cardH} at Y=${cardY}`);
         videoFilter = [
-          '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]',
-          '[v0][1:v]overlay=0:0[outv]'
+          `[0:v]crop=in_w:${cropH}:0:${cropY},scale=${cardW}:${cardH},pad=1080:1920:0:${cardY}:color=black[v1]`,
+          '[v1][1:v]overlay=0:0[outv]'
         ].join(';');
       } else {
         // Raw full-frame vertical video: frame into centered video-essay card
@@ -2329,6 +2442,7 @@ module.exports = {
   generateClubbingCyberOverlay,
   generateEvolvingAiOverlay,
   isLetterboxedReel,
+  detectActiveVideoBounds,
   prepareVideoForFeedCard,
   extractVideoCover
 };

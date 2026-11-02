@@ -285,4 +285,45 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(fs.existsSync(deepOverlay), 'Deep blackout overlay file must exist');
     assert.ok(fs.statSync(deepOverlay).size > 10000, 'Deep blackout overlay must be non-empty PNG');
   });
+
+  await t.test('11. Deterministic Active Video Auto-Cropper & Competitor Text Elimination', async () => {
+    const { detectActiveVideoBounds, generateEvolvingAiOverlay } = require('../src/utils/ffmpegHelper');
+    const { createCanvas } = require('@napi-rs/canvas');
+    const fs = require('fs');
+
+    assert.equal(typeof detectActiveVideoBounds, 'function', 'detectActiveVideoBounds must be an exported function');
+
+    // 1. Safe handling on missing file
+    const safeRes = await detectActiveVideoBounds('/non/existent/video.mp4');
+    assert.equal(safeRes.isLetterboxed, false);
+    assert.equal(safeRes.startY, 0);
+
+    // 2. Synthetic letterboxed video test frame (1080x1920 with 16:9 video at Y=656 to 1264 and text lines at Y=230)
+    const testCanvas = createCanvas(1080, 1920);
+    const ctx = testCanvas.getContext('2d');
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, 1080, 1920);
+
+    // Floating text span (simulating competitor title: 20px high)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(100, 230, 400, 20);
+
+    // Active video footage span (simulating 16:9 video: 608px high, rich brightness and colors)
+    ctx.fillStyle = '#4488AA';
+    ctx.fillRect(0, 656, 1080, 608);
+
+    const tmpFrame = path.join(__dirname, 'temp_test_letterbox_frame.png');
+    fs.writeFileSync(tmpFrame, testCanvas.toBuffer('image/png'));
+
+    try {
+      const bounds = await detectActiveVideoBounds(tmpFrame);
+      assert.equal(bounds.isLetterboxed, true, 'Must detect letterboxing');
+      assert.ok(bounds.height >= 550 && bounds.height <= 650, `Detected video height should be ~608px, got ${bounds.height}`);
+      assert.ok(bounds.startY >= 640 && bounds.startY <= 670, `Detected startY should be ~656px, got ${bounds.startY}`);
+      // Assert that the floating text at Y=230 was completely excluded from the video bounds!
+      assert.ok(bounds.startY > 300, 'Floating text at Y=230 must be excluded from active video bounds');
+    } finally {
+      if (fs.existsSync(tmpFrame)) fs.unlinkSync(tmpFrame);
+    }
+  });
 });
