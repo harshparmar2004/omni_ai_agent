@@ -93,7 +93,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.equal(getJob(jobId), undefined);
   });
 
-  await t.test('6. Clubbing Cult Universal Neon Green Aesthetic Template & Caption Formatting', () => {
+  await t.test('6. Clubbing Cult Universal Neon Green Aesthetic Template & Caption Formatting', async () => {
     const { generateFeedPostOverlay, generateStoryOverlay, generateFeedWatermark } = require('../src/utils/ffmpegHelper');
     const fs = require('fs');
 
@@ -117,20 +117,20 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(!built.includes('@tomorrowland'), 'Should strip competitor mention');
 
     // 2. 9:16 Vertical Cyberpunk HUD Template: Full-Scale Exact 9:16 Ratio & @clubbingcult at Top
-    const vPath = generateFeedPostOverlay('clubbingcult', {
+    const vPath = await generateFeedPostOverlay('clubbingcult', {
       cardX: 126, cardY: 215, cardW: 828, cardH: 1472, isVertical: true, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(vPath), 'Vertical cyber overlay must exist');
     assert.ok(fs.statSync(vPath).size > 10000, 'Vertical cyber overlay must be valid PNG');
 
     // 3. 16:9 Landscape Adaptive Cyberpunk HUD Template
-    const lPath = generateFeedPostOverlay('clubbingcult', {
+    const lPath = await generateFeedPostOverlay('clubbingcult', {
       cardX: 80, cardY: 701, cardW: 920, cardH: 518, isVertical: false, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(lPath), 'Landscape cyber overlay must exist');
 
     // 4. 1:1 Square Adaptive Cyberpunk HUD Template
-    const sqPath = generateFeedPostOverlay('clubbingcult', {
+    const sqPath = await generateFeedPostOverlay('clubbingcult', {
       cardX: 110, cardY: 530, cardW: 860, cardH: 860, isVertical: false, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(sqPath), 'Square cyber overlay must exist');
@@ -180,46 +180,45 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(cronYml.includes('cloudflared'), 'watchtower-cron.yml must install native cloudflared');
   });
 
-  await t.test('8. Dedicated Evolving AI Video-Essay Template & Automated Copywriting Engine', async () => {
+  await t.test('8. Dedicated Cult Information Video-Essay Template & Automated Copywriting Engine', async () => {
     const { generateFeedPostOverlay, generateEvolvingAiOverlay } = require('../src/utils/ffmpegHelper');
     const { buildAiCaptionDetails, buildCaption } = require('../src/core/captionBuilder');
     const { getPageBySlug } = require('../src/database');
     const fs = require('fs');
 
     // 1. Verify Page Schema Seed
-    const aiPage = getPageBySlug('ai_curation');
-    assert.ok(aiPage, 'ai_curation page must exist in database');
-    assert.equal(aiPage.handle, '@evolving.ai');
-    assert.equal(aiPage.name, 'Evolving AI');
+    const cultPage = getPageBySlug('cult_information') || getPageBySlug('ai_curation');
+    assert.ok(cultPage, 'cult_information page must exist in database');
+    assert.equal(cultPage.handle, '@cult_information');
+    assert.equal(cultPage.name, 'Cult Information');
 
     // 2. Caption & Viral Hook Builder
     const rawCaption = "Nvidia announces next-gen Blackwell Ultra GPU with 288GB HBM3e memory. Follow @nvidia for more info! Link in bio. #tech #ai";
     const details = await buildAiCaptionDetails({
       rawCaption,
       sourceUsername: 'nvidia',
-      page: aiPage
+      page: cultPage
     });
 
-    assert.ok(details.caption, 'Should produce AI caption');
+    assert.ok(details.caption, 'Should produce video-essay caption');
     assert.ok(details.hookHeadline, 'Should generate a viral hook headline');
-    assert.ok(details.caption.includes('@evolving.ai'), 'Should include Evolving AI handle');
-    assert.ok(details.caption.includes('Save this reel') || details.caption.includes('AI revolution'), 'Should include save CTA');
-    assert.ok(details.caption.includes('#ai'), 'Should include #ai hashtag');
+    assert.ok(details.caption.includes('@cult_information'), 'Should include Cult Information handle');
+    assert.ok(details.caption.includes('Save this reel') || details.caption.includes('share with someone'), 'Should include save CTA');
     assert.ok(!details.caption.includes('@nvidia'), 'Zero credits: should strip competitor handle');
 
-    // 3. Evolving AI 1080x1920 Video-Essay Overlay Generation
-    const overlayPath = generateFeedPostOverlay('evolving.ai', {
+    // 3. Cult Information 1080x1920 Video-Essay Overlay Generation
+    const overlayPath = await generateFeedPostOverlay('cult_information', {
       cardX: 0,
       cardY: 540,
       cardW: 1080,
       cardH: 608,
       isVertical: false,
-      theme: 'evolving_ai',
-      page: aiPage,
+      theme: 'video_essay',
+      page: cultPage,
       hookHeadline: details.hookHeadline
     });
 
-    assert.ok(fs.existsSync(overlayPath), 'Evolving AI overlay file must exist');
+    assert.ok(fs.existsSync(overlayPath), 'Cult Information overlay file must exist');
     assert.ok(fs.statSync(overlayPath).size > 10000, 'Overlay PNG must be a valid non-empty graphic');
   });
 });

@@ -1093,7 +1093,7 @@ function drawVerifiedBadge(ctx, x, y, size = 18) {
  * - Cutout hole where the centered video is overlaid
  * - Clean safe margins at bottom for Instagram native UI
  */
-function generateEvolvingAiOverlay(handle, options = {}) {
+async function generateEvolvingAiOverlay(handle, options = {}) {
   const cleanHandle = (handle || 'evolving.ai').replace(/^@/, '');
   const {
     cardX = 0,
@@ -1145,10 +1145,10 @@ function generateEvolvingAiOverlay(handle, options = {}) {
   if (existingAvatarPath) {
     try {
       const { loadImage } = require('@napi-rs/canvas');
-      const avatarImg = loadImage(existingAvatarPath);
+      const avatarImg = await loadImage(existingAvatarPath);
       ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
     } catch (e) {
-      // Fallback to dynamic monogram
+      console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
     }
   } else {
     // Dynamic Modern Monogram based on actual page name
@@ -1162,27 +1162,27 @@ function generateEvolvingAiOverlay(handle, options = {}) {
     const words = (pageName || 'Channel').trim().split(/\s+/);
     const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    ctx.fillStyle = '#c1d82f'; // Cult signature lime
+    ctx.font = '900 24px "Arial Black", -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, avatarCenter, avatarCenterY);
   }
   ctx.restore();
 
-  // Avatar border ring
+  // Avatar border ring with subtle brand lime accent
   ctx.save();
   ctx.beginPath();
   ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = '#2A2A2E';
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#c1d82f';
+  ctx.lineWidth = 1.8;
   ctx.stroke();
   ctx.restore();
 
   // Page Name + Verified Badge
   const textLeftX = marginX + avatarSize + 18;
   ctx.save();
-  ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.font = '900 24px "Arial Black", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1192,17 +1192,17 @@ function generateEvolvingAiOverlay(handle, options = {}) {
   drawVerifiedBadge(ctx, textLeftX + nameWidth + 8, headerTopY + 7, 20);
 
   // Handle below name
-  ctx.font = '400 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.font = '500 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#8E8E93'; // iOS muted gray
-  ctx.fillText('@' + cleanHandle, textLeftX, headerTopY + 34);
+  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 34);
   ctx.restore();
 
-  // 4. Punchy Viral Headline / Hook
+  // 4. Punchy Viral Headline / Hook (Brand Guidelines: Strong / Poster / Grotesk)
   const headlineY = headerTopY + avatarSize + 32;
   const maxTextWidth = width - (marginX * 2);
 
   ctx.save();
-  ctx.font = '700 34px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.font = '900 34px "Arial Black", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1232,7 +1232,7 @@ function generateEvolvingAiOverlay(handle, options = {}) {
  * Supports adaptive geometry: 9:16 vertical full screen, 16:9 landscape, 1:1 square.
  * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink) vs 'clubbing' (Cyberpunk HUD) vs 'evolving_ai' (Minimalist Video-Essay).
  */
-function generateFeedPostOverlay(handle, options = {}) {
+async function generateFeedPostOverlay(handle, options = {}) {
   const { createCanvas } = require('@napi-rs/canvas');
   const width = 1080;
   const height = 1920;
@@ -1249,19 +1249,19 @@ function generateFeedPostOverlay(handle, options = {}) {
   } = options;
 
   const theme = options.theme || (
-    cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
-    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' :
-    (cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation') ? 'evolving_ai' : 'gta6'))
+    (cleanHandle.includes('clubbing') || (options.page && options.page.slug === 'clubbing')) ? 'clubbing' :
+    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies')) ? 'movies' :
+    (cleanHandle.includes('cult_info') || cleanHandle.includes('cultinformation') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation')) ? 'video_essay' : 'gta6'
   );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
-  const isEvolvingAi = theme === 'evolving_ai' || theme === 'ai_curation';
+  const isVideoEssay = theme === 'video_essay' || theme === 'evolving_ai' || theme === 'cult_information' || theme === 'ai_curation';
 
   if (isClubbing) {
     return generateClubbingCyberOverlay(cleanHandle, options);
   }
-  if (isEvolvingAi) {
-    return generateEvolvingAiOverlay(cleanHandle, options);
+  if (isVideoEssay) {
+    return await generateEvolvingAiOverlay(cleanHandle, options);
   }
 
   // 1. Ambient Background for letterboxed videos (landscape / square)
@@ -1611,17 +1611,17 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const aspect = inW / inH;
   const isVertical = aspect <= 0.65; // ~9:16 vertical
   const theme = options.theme || (
-    handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    (handle.includes('clubbing') || options.page?.slug === 'clubbing') ? 'clubbing' :
     (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' :
-    (handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'evolving_ai' : 'gta6'))
+    (handle.includes('cult_info') || handle.includes('cultinformation') || options.page?.slug === 'cult_information' || handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6'))
   );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
-  const isEvolvingAi = theme === 'evolving_ai' || theme === 'ai_curation';
+  const isVideoEssay = theme === 'video_essay' || theme === 'evolving_ai' || theme === 'cult_information' || theme === 'ai_curation';
 
   let cardW, cardH, cardX, cardY, videoFilter;
 
-  if (isEvolvingAi) {
+  if (isVideoEssay) {
     // Evolving AI Minimalist Center Layout:
     // Solid pitch black canvas with video centered below headline
     if (aspect >= 1.4) {
@@ -1726,14 +1726,14 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     }
   }
 
-  const overlayPngPath = generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, ...options });
+  const overlayPngPath = await generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, ...options });
 
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);
   const base = path.basename(absPath, ext);
   const framedOutput = path.join(dir, `${base}_feed_framed.mp4`);
 
-  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isEvolvingAi ? 'Evolving AI Video-Essay' : 'GTA 6 Vice City'));
+  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Video-Essay' : 'GTA 6 Vice City'));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
   // Build filter graph combining video framing and audio normalization in ONE pass
@@ -1762,7 +1762,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'] });
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(framedOutput)) {
-        console.log(`[FFmpeg Helper] ✅ ${isClubbing ? 'Clubbing Cult' : (isMovie ? 'Cinematic Movie' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6'))} Framed Feed Reel generated: ${framedOutput}`);
+        console.log(`[FFmpeg Helper] ✅ ${isClubbing ? 'Clubbing Cult' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information' : 'GTA 6'))} Framed Feed Reel generated: ${framedOutput}`);
         resolve(framedOutput);
       } else {
         console.warn(`[FFmpeg Helper] ⚠️ Feed frame FFmpeg exited with code ${code}, falling back to original media`);

@@ -40,7 +40,7 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
   // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
   text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const lower = match.toLowerCase();
-    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult' || lower === '@evolving.ai') return match;
+    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult' || lower === '@cult_information' || lower === '@evolving.ai') return match;
     return '';
   });
 
@@ -104,19 +104,19 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
                   page.id === 2 || String(page.id) === '2';
 
-  const isEvolvingAi = (page.slug && (page.slug === 'ai_curation' || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
-                       (page.handle && (page.handle.includes('evolving') || page.handle.includes('ai'))) ||
-                       (page.name && /evolving|ai|tech|silicon|chips/i.test(page.name)) ||
+  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
+                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || page.handle.includes('ai'))) ||
+                       (page.name && /cult.*info|evolving|ai|tech/i.test(page.name)) ||
                        page.id === 4 || String(page.id) === '4';
 
-  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isEvolvingAi ? 'evolving.ai' : 'gta6_updates_007'));
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isVideoEssay ? 'cult_information' : 'gta6_updates_007'));
   const handle = page.handle || `@${page.slug || defaultHandle}`;
-  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6')));
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isVideoEssay ? 'Cult Information' : 'GTA 6')));
   const followCta = isClubbing
     ? `🪩 Follow ${handle} for the wildest club sets, concert moments & festival drops!`
     : (isMovie
       ? `🍿 Follow ${handle} for daily movie & series recommendations!`
-      : (isEvolvingAi
+      : (isVideoEssay
         ? `🔔 Follow ${handle} for daily high-impact breakdowns & updates!`
         : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`));
 
@@ -126,14 +126,14 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
     ? "🔥 Rate this track/set 1-10 in the comments below! 👇"
     : (isMovie
       ? "💬 What's your thoughts on this? Drop your reaction below 👇"
-      : (isEvolvingAi
+      : (isVideoEssay
         ? "💬 Will this change everything, or is it overhyped? Drop your thoughts below 👇"
         : ENGAGEMENT_PROMPTS[promptIdx]));
   const saveShareCta = isClubbing
     ? "💾 Save this reel & send to your party crew! 🔊"
     : (isMovie
       ? "💾 Save this reel so you don't lose it!"
-      : (isEvolvingAi
+      : (isVideoEssay
         ? "💾 Save this reel & share with someone who needs to see this! 🚀"
         : '💾 Save & share this reel with a friend who is waiting for GTA 6!'));
 
@@ -141,9 +141,9 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const originalTags = extractHashtags(rawCaption);
   const defaultClubbingTags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult';
   const defaultMovieTags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies';
-  const defaultAiTags = '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai';
+  const defaultCultTags = '#cultinformation #information #culture #knowledge #curation #mustknow #explore';
   const defaultGtaTags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks';
-  const fallbackTags = isClubbing ? defaultClubbingTags : (isMovie ? defaultMovieTags : (isEvolvingAi ? defaultAiTags : defaultGtaTags));
+  const fallbackTags = isClubbing ? defaultClubbingTags : (isMovie ? defaultMovieTags : (isVideoEssay ? defaultCultTags : defaultGtaTags));
   const defaultTags = extractHashtags(page.default_hashtags || fallbackTags);
 
   const tagSet = new Set();

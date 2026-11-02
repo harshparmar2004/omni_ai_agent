@@ -184,10 +184,19 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_status TEXT DEFAULT "idle"'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN telegram_message_id TEXT DEFAULT ""'); } catch (e) {}
 
-  // Seed dedicated Evolving AI Video-Essay page
+  // Seed / migrate dedicated Cult Information Video-Essay page
   try {
-    const existingAiPage = db.prepare('SELECT id FROM pages WHERE slug = ?').get('ai_curation');
-    if (!existingAiPage) {
+    db.prepare(`
+      UPDATE pages SET
+        slug = 'cult_information',
+        name = 'Cult Information',
+        handle = '@cult_information',
+        default_hashtags = '#cultinformation #information #culture #knowledge #curation #mustknow #explore'
+      WHERE slug = 'ai_curation'
+    `).run();
+
+    const existingCultPage = db.prepare('SELECT id FROM pages WHERE slug = ?').get('cult_information');
+    if (!existingCultPage) {
       const now = new Date().toISOString();
       db.prepare(`
         INSERT INTO pages (
@@ -196,13 +205,13 @@ function initV7Schema(db) {
           posts_per_cycle, daily_quota, min_spacing_minutes, is_active, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        'ai_curation',
-        'Evolving AI',
-        '@evolving.ai',
+        'cult_information',
+        'Cult Information',
+        '@cult_information',
         'PENDING_IG_USER_ID',
         'PENDING_ACCESS_TOKEN',
         '{caption}\n\n{hashtags}',
-        '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai',
+        '#cultinformation #information #culture #knowledge #curation #mustknow #explore',
         0,
         0,
         'auto',
@@ -215,7 +224,7 @@ function initV7Schema(db) {
       );
     }
   } catch (e) {
-    console.warn('[Database] Notice initializing ai_curation page:', e.message);
+    console.warn('[Database] Notice initializing cult_information page:', e.message);
   }
 }
 

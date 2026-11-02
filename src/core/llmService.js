@@ -141,14 +141,14 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
                   page.id === 2 || String(page.id) === '2';
 
-  const isEvolvingAi = (page.slug && (page.slug === 'ai_curation' || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
-                       (page.handle && (page.handle.includes('evolving') || page.handle.includes('ai'))) ||
-                       (page.name && /evolving|ai|tech|silicon|chips/i.test(page.name)) ||
+  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
+                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || page.handle.includes('ai'))) ||
+                       (page.name && /cult.*info|evolving|ai|tech/i.test(page.name)) ||
                        page.id === 4 || String(page.id) === '4';
 
-  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isEvolvingAi ? 'evolving.ai' : 'gta6_updates_007'));
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isVideoEssay ? 'cult_information' : 'gta6_updates_007'));
   const handle = page.handle || `@${page.slug || defaultHandle}`;
-  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6 Updates')));
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isVideoEssay ? 'Cult Information' : 'GTA 6 Updates')));
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const cleanedSource = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
@@ -234,9 +234,9 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
     };
   }
 
-  // ── Dedicated Evolving AI Copy & Hook Engine ──
-  if (isEvolvingAi) {
-    console.log('[LLM Service] 🤖 Evolving AI Account detected: Generating viral hook headline & video-essay breakdown.');
+  // ── Dedicated Video-Essay / Headline Copy & Hook Engine ──
+  if (isVideoEssay) {
+    console.log(`[LLM Service] 📰 Video-Essay Account detected (${pageName}): Generating viral hook headline & breakdown.`);
 
     const defaultAiHeadline = 'The next generation of AI is evolving faster than anyone expected';
     let headline = defaultAiHeadline;

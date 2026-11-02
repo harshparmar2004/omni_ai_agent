@@ -264,11 +264,11 @@ class JobWorkerPool {
       let pubResult = null;
       if (mediaType === 'reel') {
         let feedVideoPath = mediaPaths[0];
-        const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
+        const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('clubbing'));
         const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
-        const isEvolvingAiPage = page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && page.handle.includes('evolving'));
-        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isEvolvingAiPage ? 'evolving_ai' : 'gta6'));
-        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : (isEvolvingAiPage ? 'Evolving AI Video-Essay' : 'GTA 6 Vice City'));
+        const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving')));
+        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
+        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : (isVideoEssayPage ? 'Cult Information Video-Essay' : 'GTA 6 Vice City'));
         const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode') || 'frame';
 
         if (brandingMode === 'frame') {
