@@ -562,7 +562,7 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (isClubbing) {
-    ctx.fillText(`@${cleanHandle}  |  Live Sets & Parties`, width / 2, headerY + headerH / 2);
+    ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, headerY + headerH / 2);
   } else if (isMovie) {
     ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
   } else {
@@ -808,250 +808,268 @@ function generateFeedPostOverlay(handle, options = {}) {
     ctx.restore();
   }
 
-  // 2. Bolder Boundaries (8px multi-stop gradient border)
-  ctx.save();
-  const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+  // 2. Bolder Boundaries (8px multi-stop gradient border) — for GTA 6 & Movies
+  if (!isClubbing) {
+    ctx.save();
+    const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    if (isMovie) {
+      bGrad.addColorStop(0, '#FFD166');
+      bGrad.addColorStop(0.35, '#FFB703');
+      bGrad.addColorStop(0.70, '#C1121F');
+      bGrad.addColorStop(1, '#E5A93C');
+      ctx.shadowColor = 'rgba(255, 183, 3, 0.70)';
+    } else {
+      bGrad.addColorStop(0, '#00F0FF');
+      bGrad.addColorStop(0.3, '#7209B7');
+      bGrad.addColorStop(0.65, '#F72585');
+      bGrad.addColorStop(1, '#FF8A00');
+      ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
+    }
+
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = bGrad;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 18);
+    ctx.stroke();
+
+    // Inner accent rail
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = isMovie ? 'rgba(255, 209, 102, 0.40)' : 'rgba(0, 240, 255, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
+    ctx.stroke();
+
+    // 3. Prominent Corner Brackets (Registration Marks)
+    const bLen = 42;
+    ctx.lineWidth = 5;
+
+    if (isMovie) {
+      // TL (Champagne Gold)
+      ctx.strokeStyle = '#FFD166';
+      ctx.shadowColor = '#FFD166';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+      ctx.stroke();
+
+      // TR (Amber Gold)
+      ctx.strokeStyle = '#FFB703';
+      ctx.shadowColor = '#FFB703';
+      ctx.beginPath();
+      ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+      ctx.stroke();
+
+      // BL (Amber Gold)
+      ctx.strokeStyle = '#FFB703';
+      ctx.shadowColor = '#FFB703';
+      ctx.beginPath();
+      ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+      ctx.stroke();
+
+      // BR (Burnished Gold)
+      ctx.strokeStyle = '#E5A93C';
+      ctx.shadowColor = '#E5A93C';
+      ctx.beginPath();
+      ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH - bLen);
+      ctx.stroke();
+    } else {
+      // TL (Cyan)
+      ctx.strokeStyle = '#00F0FF';
+      ctx.shadowColor = '#00F0FF';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+      ctx.stroke();
+
+      // TR (Pink)
+      ctx.strokeStyle = '#F72585';
+      ctx.shadowColor = '#F72585';
+      ctx.beginPath();
+      ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+      ctx.stroke();
+
+      // BL (Pink)
+      ctx.strokeStyle = '#F72585';
+      ctx.shadowColor = '#F72585';
+      ctx.beginPath();
+      ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+      ctx.stroke();
+
+      // BR (Sunset Orange)
+      ctx.strokeStyle = '#FF8A00';
+      ctx.shadowColor = '#FF8A00';
+      ctx.beginPath();
+      ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY - bLen);
+      ctx.stroke();
+    }
+
+    // 4. Bottom Boundary Theme Bar
+    const botBarW = Math.min(680, cardW - 80);
+    const botBarX = cardX + (cardW - botBarW) / 2;
+    const botBarY = cardY + cardH - 12;
+
+    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+    if (isMovie) {
+      botGrad.addColorStop(0, 'rgba(255, 209, 102, 0)');
+      botGrad.addColorStop(0.2, '#FFD166');
+      botGrad.addColorStop(0.5, '#FFB703');
+      botGrad.addColorStop(0.8, '#C1121F');
+      botGrad.addColorStop(1, 'rgba(193, 18, 31, 0)');
+      ctx.fillStyle = botGrad;
+      ctx.shadowColor = 'rgba(255, 183, 3, 0.85)';
+    } else {
+      botGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+      botGrad.addColorStop(0.15, '#00F0FF');
+      botGrad.addColorStop(0.5, '#F72585');
+      botGrad.addColorStop(0.85, '#FF8A00');
+      botGrad.addColorStop(1, 'rgba(255, 138, 0, 0)');
+      ctx.fillStyle = botGrad;
+      ctx.shadowColor = 'rgba(255, 138, 0, 0.9)';
+    }
+
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
+    ctx.fill();
+
+    ctx.font = isMovie ? 'bold 12px "Helvetica Neue", Arial, sans-serif' : '900 13px Impact, Arial Black, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    if (isMovie) {
+      ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
+    } else {
+      ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
+    }
+    ctx.restore();
+  }
+
+  // 5. Account Branding Box
   if (isClubbing) {
-    bGrad.addColorStop(0, '#00FFA3');
-    bGrad.addColorStop(0.35, '#00E5FF');
-    bGrad.addColorStop(0.70, '#39FF14');
-    bGrad.addColorStop(1, '#00FF88');
+    // Sleek Modern Center Glass Pill — ONLY @clubbingcult, NO boundaries
+    const badgePosition = options.badgePosition || process.env.CLUBBING_BADGE_POSITION || 'center';
+    const badgeY = options.badgeY || (badgePosition === 'top' ? 220 : (badgePosition === 'upper-middle' ? 560 : 960));
+    const text = `@${cleanHandle.toLowerCase()}`;
+
+    ctx.save();
+    ctx.font = '900 28px "Arial Black", Impact, sans-serif';
+    const textMetrics = ctx.measureText(text);
+
+    const iconSpace = 38;
+    const padX = 30;
+    const boxW = textMetrics.width + padX * 2 + iconSpace;
+    const boxH = 58;
+    const boxX = (width - boxW) / 2;
+    const boxY = badgeY - boxH / 2;
+    const radius = 29;
+
+    // Ambient glow
     ctx.shadowColor = 'rgba(0, 255, 163, 0.75)';
-  } else if (isMovie) {
-    bGrad.addColorStop(0, '#FFD166');
-    bGrad.addColorStop(0.35, '#FFB703');
-    bGrad.addColorStop(0.70, '#C1121F');
-    bGrad.addColorStop(1, '#E5A93C');
-    ctx.shadowColor = 'rgba(255, 183, 3, 0.70)';
-  } else {
-    bGrad.addColorStop(0, '#00F0FF');
-    bGrad.addColorStop(0.3, '#7209B7');
-    bGrad.addColorStop(0.65, '#F72585');
-    bGrad.addColorStop(1, '#FF8A00');
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
-  }
+    ctx.shadowBlur = 22;
 
-  ctx.shadowBlur = 22;
-  ctx.strokeStyle = bGrad;
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.roundRect(cardX, cardY, cardW, cardH, 18);
-  ctx.stroke();
+    // Obsidian glass pill
+    ctx.fillStyle = 'rgba(4, 14, 8, 0.88)';
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+    ctx.fill();
 
-  // Inner accent rail
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 209, 102, 0.40)' : 'rgba(0, 240, 255, 0.45)');
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
-  ctx.stroke();
+    // Electric neon gradient border (2.5px)
+    const bGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+    bGrad.addColorStop(0, '#00FFA3');
+    bGrad.addColorStop(0.5, '#00E5FF');
+    bGrad.addColorStop(1, '#39FF14');
+    ctx.strokeStyle = bGrad;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
 
-  // 3. Prominent Corner Brackets (Registration Marks)
-  const bLen = 42;
-  ctx.lineWidth = 5;
+    // Inner highlight
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, radius - 2);
+    ctx.stroke();
 
-  if (isClubbing) {
-    // TL (Electric Neon Green)
-    ctx.strokeStyle = '#00FFA3';
+    // Pulse dot
+    const dotX = boxX + padX + 8;
+    const dotY = badgeY;
     ctx.shadowColor = '#00FFA3';
     ctx.shadowBlur = 12;
+    ctx.fillStyle = '#00FFA3';
     ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
-    ctx.stroke();
+    ctx.arc(dotX, dotY, 7, 0, Math.PI * 2);
+    ctx.fill();
 
-    // TR (Laser Cyan)
-    ctx.strokeStyle = '#00E5FF';
-    ctx.shadowColor = '#00E5FF';
-    ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
-    ctx.stroke();
+    // Text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText(text, dotX + 18, badgeY);
 
-    // BL (Electric Neon Green)
-    ctx.strokeStyle = '#00FFA3';
-    ctx.shadowColor = '#00FFA3';
-    ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
-    ctx.stroke();
-
-    // BR (Electric Lime)
-    ctx.strokeStyle = '#39FF14';
-    ctx.shadowColor = '#39FF14';
-    ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
-    ctx.stroke();
-  } else if (isMovie) {
-    // TL (Champagne Gold)
-    ctx.strokeStyle = '#FFD166';
-    ctx.shadowColor = '#FFD166';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
-    ctx.stroke();
-
-    // TR (Amber Gold)
-    ctx.strokeStyle = '#FFB703';
-    ctx.shadowColor = '#FFB703';
-    ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
-    ctx.stroke();
-
-    // BL (Amber Gold)
-    ctx.strokeStyle = '#FFB703';
-    ctx.shadowColor = '#FFB703';
-    ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
-    ctx.stroke();
-
-    // BR (Burnished Gold)
-    ctx.strokeStyle = '#E5A93C';
-    ctx.shadowColor = '#E5A93C';
-    ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH - bLen);
-    ctx.stroke();
+    ctx.restore();
   } else {
-    // TL (Cyan)
-    ctx.strokeStyle = '#00F0FF';
-    ctx.shadowColor = '#00F0FF';
-    ctx.shadowBlur = 12;
+    // Existing Top Account Badge for Movies & GTA 6
+    const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
+    const text = isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase();
+
+    ctx.save();
+    ctx.font = isMovie ? 'bold 20px "Helvetica Neue", Arial, sans-serif' : '900 24px Impact, Arial Black, sans-serif';
+    const textMetrics = ctx.measureText(text);
+    const padX = 28;
+    const boxW = textMetrics.width + padX * 2;
+    const boxH = 50;
+    const boxX = (width - boxW) / 2;
+    const boxY = badgeY - boxH / 2;
+    const radius = 6;
+
+    // Outer glow
+    ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)';
+    ctx.shadowBlur = 18;
+
+    // Dark glass background
+    ctx.fillStyle = isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)';
     ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+    ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+    ctx.fill();
+
+    // Border (3.5px)
+    const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+    if (isMovie) {
+      boxGrad.addColorStop(0, '#FFD166');
+      boxGrad.addColorStop(0.5, '#FFB703');
+      boxGrad.addColorStop(1, '#E5A93C');
+    } else {
+      boxGrad.addColorStop(0, '#00F0FF');
+      boxGrad.addColorStop(0.5, '#F72585');
+      boxGrad.addColorStop(1, '#FF8A00');
+    }
+    ctx.strokeStyle = boxGrad;
+    ctx.lineWidth = 3.5;
     ctx.stroke();
 
-    // TR (Pink)
-    ctx.strokeStyle = '#F72585';
-    ctx.shadowColor = '#F72585';
+    // Inner subtle accent
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
     ctx.stroke();
 
-    // BL (Pink)
-    ctx.strokeStyle = '#F72585';
-    ctx.shadowColor = '#F72585';
-    ctx.beginPath();
-    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
-    ctx.stroke();
-
-    // BR (Sunset Orange)
-    ctx.strokeStyle = '#FF8A00';
-    ctx.shadowColor = '#FF8A00';
-    ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY - bLen);
-    ctx.stroke();
+    // Account text
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 5;
+    ctx.fillText(text, width / 2, badgeY);
+    ctx.restore();
   }
-
-  // 4. Bottom Boundary Theme Bar
-  const botBarW = Math.min(680, cardW - 80);
-  const botBarX = cardX + (cardW - botBarW) / 2;
-  const botBarY = cardY + cardH - 12;
-
-  const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
-  if (isClubbing) {
-    botGrad.addColorStop(0, 'rgba(0, 255, 163, 0)');
-    botGrad.addColorStop(0.2, '#00FFA3');
-    botGrad.addColorStop(0.5, '#00E5FF');
-    botGrad.addColorStop(0.8, '#39FF14');
-    botGrad.addColorStop(1, 'rgba(57, 255, 20, 0)');
-    ctx.fillStyle = botGrad;
-    ctx.shadowColor = 'rgba(0, 255, 163, 0.85)';
-  } else if (isMovie) {
-    botGrad.addColorStop(0, 'rgba(255, 209, 102, 0)');
-    botGrad.addColorStop(0.2, '#FFD166');
-    botGrad.addColorStop(0.5, '#FFB703');
-    botGrad.addColorStop(0.8, '#C1121F');
-    botGrad.addColorStop(1, 'rgba(193, 18, 31, 0)');
-    ctx.fillStyle = botGrad;
-    ctx.shadowColor = 'rgba(255, 183, 3, 0.85)';
-  } else {
-    botGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
-    botGrad.addColorStop(0.15, '#00F0FF');
-    botGrad.addColorStop(0.5, '#F72585');
-    botGrad.addColorStop(0.85, '#FF8A00');
-    botGrad.addColorStop(1, 'rgba(255, 138, 0, 0)');
-    ctx.fillStyle = botGrad;
-    ctx.shadowColor = 'rgba(255, 138, 0, 0.9)';
-  }
-
-  ctx.shadowBlur = 16;
-  ctx.beginPath();
-  ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
-  ctx.fill();
-
-  ctx.font = isMovie ? 'bold 12px "Helvetica Neue", Arial, sans-serif' : '900 13px Impact, Arial Black, sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-  ctx.shadowBlur = 6;
-  if (isClubbing) {
-    ctx.fillText('◄ ◄  CLUBBING CULT • CONCERTS & NIGHTLIFE  ► ►', cardX + cardW / 2, botBarY - 14);
-  } else if (isMovie) {
-    ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
-  } else {
-    ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
-  }
-  ctx.restore();
-
-  // 5. Top Account Badge
-  const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
-  const text = isClubbing
-    ? `@${cleanHandle.toLowerCase()}  |  Live Sets & Parties`
-    : (isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase());
-
-  ctx.save();
-  ctx.font = isMovie ? 'bold 20px "Helvetica Neue", Arial, sans-serif' : '900 24px Impact, Arial Black, sans-serif';
-  const textMetrics = ctx.measureText(text);
-  const padX = 28;
-  const boxW = textMetrics.width + padX * 2;
-  const boxH = 50;
-  const boxX = (width - boxW) / 2;
-  const boxY = badgeY - boxH / 2;
-  const radius = 6;
-
-  // Outer glow
-  ctx.shadowColor = isClubbing ? 'rgba(0, 255, 163, 0.7)' : (isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)');
-  ctx.shadowBlur = 18;
-
-  // Dark glass background
-  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.94)' : (isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)');
-  ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, radius);
-  ctx.fill();
-
-  // Border (3.5px)
-  const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
-  if (isClubbing) {
-    boxGrad.addColorStop(0, '#00FFA3');
-    boxGrad.addColorStop(0.5, '#00E5FF');
-    boxGrad.addColorStop(1, '#39FF14');
-  } else if (isMovie) {
-    boxGrad.addColorStop(0, '#FFD166');
-    boxGrad.addColorStop(0.5, '#FFB703');
-    boxGrad.addColorStop(1, '#E5A93C');
-  } else {
-    boxGrad.addColorStop(0, '#00F0FF');
-    boxGrad.addColorStop(0.5, '#F72585');
-    boxGrad.addColorStop(1, '#FF8A00');
-  }
-  ctx.strokeStyle = boxGrad;
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
-
-  // Inner subtle accent
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
-  ctx.stroke();
-
-  // Account text
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-  ctx.shadowBlur = 5;
-  ctx.fillText(text, width / 2, badgeY);
-  ctx.restore();
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const genDir = path.join(publicDir, 'generated');
@@ -1101,46 +1119,81 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   const aspect = inW / inH;
   const isVertical = aspect <= 0.65; // ~9:16 vertical
+  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
+  const isMovie = theme === 'movies';
 
   let cardW, cardH, cardX, cardY, videoFilter;
 
   if (isVertical) {
-    // 9:16 Full Screen Immersion with narrow boundaries
-    cardW = 1032;
-    cardH = 1872;
-    cardX = 24;
-    cardY = 24;
+    if (isClubbing) {
+      // Clubbing Cult: 100% 9:16 Full Screen Edge-to-Edge immersion, ZERO outer padding/borders
+      cardW = 1080;
+      cardH = 1920;
+      cardX = 0;
+      cardY = 0;
 
-    videoFilter = [
-      '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
-      '[v1][1:v]overlay=0:0[outv]'
-    ].join(';');
+      videoFilter = [
+        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v1]',
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
+    } else {
+      // 9:16 Full Screen Immersion with narrow boundaries
+      cardW = 1032;
+      cardH = 1872;
+      cardX = 24;
+      cardY = 24;
+
+      videoFilter = [
+        '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
+    }
   } else {
     // Landscape (16:9) or Square (1:1) / Portrait (4:5)
-    cardW = 1032;
-    cardH = Math.round(cardW / aspect);
-    if (cardH > 1650) {
-      cardH = 1650;
-      cardW = Math.round(cardH * aspect);
-    }
-    // Ensure even dimensions for libx264
-    cardW = Math.floor(cardW / 2) * 2;
-    cardH = Math.floor(cardH / 2) * 2;
-    cardX = Math.round((1080 - cardW) / 2);
-    cardY = Math.round((1920 - cardH) / 2);
+    if (isClubbing) {
+      // Clubbing Cult: Full width 1080 card with ambient blurred background
+      cardW = 1080;
+      cardH = Math.round(cardW / aspect);
+      if (cardH > 1920) {
+        cardH = 1920;
+        cardW = Math.round(cardH * aspect);
+      }
+      cardW = Math.floor(cardW / 2) * 2;
+      cardH = Math.floor(cardH / 2) * 2;
+      cardX = Math.round((1080 - cardW) / 2);
+      cardY = Math.round((1920 - cardH) / 2);
 
-    videoFilter = [
-      '[0:v]split=2[bg_raw][fg_raw]',
-      '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
-      `[fg_raw]scale=${cardW}:${cardH}[card]`,
-      `[bg][card]overlay=${cardX}:${cardY}[v1]`,
-      '[v1][1:v]overlay=0:0[outv]'
-    ].join(';');
+      videoFilter = [
+        '[0:v]split=2[bg_raw][fg_raw]',
+        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+        `[fg_raw]scale=${cardW}:${cardH}[card]`,
+        `[bg][card]overlay=${cardX}:${cardY}[v1]`,
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
+    } else {
+      cardW = 1032;
+      cardH = Math.round(cardW / aspect);
+      if (cardH > 1650) {
+        cardH = 1650;
+        cardW = Math.round(cardH * aspect);
+      }
+      // Ensure even dimensions for libx264
+      cardW = Math.floor(cardW / 2) * 2;
+      cardH = Math.floor(cardH / 2) * 2;
+      cardX = Math.round((1080 - cardW) / 2);
+      cardY = Math.round((1920 - cardH) / 2);
+
+      videoFilter = [
+        '[0:v]split=2[bg_raw][fg_raw]',
+        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+        `[fg_raw]scale=${cardW}:${cardH}[card]`,
+        `[bg][card]overlay=${cardX}:${cardY}[v1]`,
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
+    }
   }
 
-  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
-  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
-  const isMovie = theme === 'movies';
   const overlayPngPath = generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, ...options });
 
   const dir = path.dirname(absPath);
@@ -1177,7 +1230,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'] });
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(framedOutput)) {
-        console.log(`[FFmpeg Helper] ✅ ${isMovie ? 'Cinematic Movie' : 'GTA 6'} Framed Feed Reel generated: ${framedOutput}`);
+        console.log(`[FFmpeg Helper] ✅ ${isClubbing ? 'Clubbing Cult' : (isMovie ? 'Cinematic Movie' : 'GTA 6')} Framed Feed Reel generated: ${framedOutput}`);
         resolve(framedOutput);
       } else {
         console.warn(`[FFmpeg Helper] ⚠️ Feed frame FFmpeg exited with code ${code}, falling back to original media`);

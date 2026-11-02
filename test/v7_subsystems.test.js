@@ -116,16 +116,16 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(built.includes('#clubbing'), 'Should include #clubbing hashtag');
     assert.ok(!built.includes('@tomorrowland'), 'Should strip competitor mention');
 
-    // 2. 9:16 Vertical Template
+    // 2. 9:16 Vertical Boundary-less Template
     const vPath = generateFeedPostOverlay('clubbingcult', {
-      cardX: 24, cardY: 24, cardW: 1032, cardH: 1872, isVertical: true, theme: 'clubbing'
+      cardX: 0, cardY: 0, cardW: 1080, cardH: 1920, isVertical: true, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(vPath), 'Vertical overlay must exist');
     assert.ok(fs.statSync(vPath).size > 10000, 'Vertical overlay must be valid PNG');
 
     // 3. 16:9 Landscape Adaptive Template
     const lPath = generateFeedPostOverlay('clubbingcult', {
-      cardX: 24, cardY: 670, cardW: 1032, cardH: 580, isVertical: false, theme: 'clubbing'
+      cardX: 0, cardY: 670, cardW: 1080, cardH: 580, isVertical: false, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(lPath), 'Landscape overlay must exist');
 
