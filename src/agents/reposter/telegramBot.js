@@ -271,8 +271,12 @@ async function handleMessage(msg) {
   // Build direct publish destination options for Telegram sharing
   const buttons = [];
   for (const page of activePages) {
+    const isAi = page.slug === 'ai_curation' || (page.handle && page.handle.includes('evolving'));
+    const isClub = page.slug === 'clubbing' || (page.handle && page.handle.includes('club'));
+    const isMovie = page.slug === 'movies' || (page.handle && page.handle.includes('movie'));
+    const icon = isAi ? '🤖' : (isClub ? '🪩' : (isMovie ? '🍿' : '🚀'));
     buttons.push([{
-      text: `🚀 Post to ${page.name} (${page.handle})`,
+      text: `${icon} Post to ${page.name} (${page.handle})`,
       callback_data: `post:${page.id}:${shortcode}`
     }]);
   }

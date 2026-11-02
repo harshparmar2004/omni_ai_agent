@@ -40,7 +40,7 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
   // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
   text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const lower = match.toLowerCase();
-    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult') return match;
+    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult' || lower === '@evolving.ai') return match;
     return '';
   });
 
@@ -104,14 +104,21 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
                   page.id === 2 || String(page.id) === '2';
 
-  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : 'gta6_updates_007');
+  const isEvolvingAi = (page.slug && (page.slug === 'ai_curation' || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
+                       (page.handle && (page.handle.includes('evolving') || page.handle.includes('ai'))) ||
+                       (page.name && /evolving|ai|tech|silicon|chips/i.test(page.name)) ||
+                       page.id === 4 || String(page.id) === '4';
+
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isEvolvingAi ? 'evolving.ai' : 'gta6_updates_007'));
   const handle = page.handle || `@${page.slug || defaultHandle}`;
-  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : 'GTA 6'));
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6')));
   const followCta = isClubbing
     ? `🪩 Follow ${handle} for the wildest club sets, concert moments & festival drops!`
     : (isMovie
       ? `🍿 Follow ${handle} for daily movie & series recommendations!`
-      : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`);
+      : (isEvolvingAi
+        ? `🤖 Follow ${handle} for daily breakthrough AI updates & tech breakdowns!`
+        : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`));
 
   // Dynamic interactive prompt to trigger comments, saves, and shares (high algorithmic weighting)
   const promptIdx = Math.abs(simpleHash(bodyWithoutHashtags || 'default')) % ENGAGEMENT_PROMPTS.length;
@@ -119,19 +126,24 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
     ? "🔥 Rate this track/set 1-10 in the comments below! 👇"
     : (isMovie
       ? "💬 What's your thoughts on this? Drop your reaction below 👇"
-      : ENGAGEMENT_PROMPTS[promptIdx]);
+      : (isEvolvingAi
+        ? "💬 Will this change everything, or is it overhyped? Drop your thoughts below 👇"
+        : ENGAGEMENT_PROMPTS[promptIdx]));
   const saveShareCta = isClubbing
     ? "💾 Save this reel & send to your party crew! 🔊"
     : (isMovie
       ? "💾 Save this reel so you don't lose it!"
-      : '💾 Save & share this reel with a friend who is waiting for GTA 6!');
+      : (isEvolvingAi
+        ? "💾 Save this reel & share with someone following the AI revolution! 🚀"
+        : '💾 Save & share this reel with a friend who is waiting for GTA 6!'));
 
   // Collect and deduplicate hashtags (Meta Reels Algorithm: 4-5 hyper-relevant tags)
   const originalTags = extractHashtags(rawCaption);
   const defaultClubbingTags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult';
   const defaultMovieTags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies';
+  const defaultAiTags = '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai';
   const defaultGtaTags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks';
-  const fallbackTags = isClubbing ? defaultClubbingTags : (isMovie ? defaultMovieTags : defaultGtaTags);
+  const fallbackTags = isClubbing ? defaultClubbingTags : (isMovie ? defaultMovieTags : (isEvolvingAi ? defaultAiTags : defaultGtaTags));
   const defaultTags = extractHashtags(page.default_hashtags || fallbackTags);
 
   const tagSet = new Set();
@@ -172,18 +184,36 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
 }
 
 /**
- * Builds AI-buffed viral caption via configured LLM provider
- * Falls back to deterministic buildCaption if LLM is unavailable
+ * Builds AI-buffed viral caption and metadata (including hook headline)
  */
-async function buildAiCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
+async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', page = {} }) {
   try {
     const { generateAiCaption } = require('./llmService');
     const result = await generateAiCaption({ rawCaption, sourceUsername, page });
-    return result.caption || buildCaption({ rawCaption, sourceUsername, page });
+    return {
+      caption: result.caption || buildCaption({ rawCaption, sourceUsername, page }),
+      hookHeadline: result.hookHeadline || '',
+      provider: result.provider || 'fallback',
+      model: result.model || 'none'
+    };
   } catch (err) {
     console.warn(`[Caption Builder] AI generation fallback: ${err.message}`);
-    return buildCaption({ rawCaption, sourceUsername, page });
+    return {
+      caption: buildCaption({ rawCaption, sourceUsername, page }),
+      hookHeadline: '',
+      provider: 'fallback',
+      model: 'none'
+    };
   }
+}
+
+/**
+ * Builds AI-buffed viral caption via configured LLM provider
+ * Falls back to deterministic buildCaption if LLM is unavailable
+ */
+async function buildAiCaption(options) {
+  const details = await buildAiCaptionDetails(options);
+  return details.caption;
 }
 
 module.exports = {
@@ -191,5 +221,6 @@ module.exports = {
   extractHashtags,
   stripHashtagsFromText,
   buildCaption,
-  buildAiCaption
+  buildAiCaption,
+  buildAiCaptionDetails
 };

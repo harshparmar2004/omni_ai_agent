@@ -3,7 +3,7 @@ const fs = require('fs');
 const { getPageById, updateDiscoveredPost, getPublishedCountToday, getLastPublishedTimestamp, getSetting } = require('../database');
 const { updateJobProgress, getJob, listJobs } = require('./jobQueue');
 const { downloadInstagramMedia } = require('./downloader');
-const { buildCaption, buildAiCaption } = require('./captionBuilder');
+const { buildCaption, buildAiCaption, buildAiCaptionDetails } = require('./captionBuilder');
 const { publishReel, publishCarousel, publishImage, publishStory } = require('./publisher');
 const notifier = require('./notifier');
 
@@ -233,9 +233,16 @@ class JobWorkerPool {
 
       // ── Step 2: Build Caption ───────────────────────────────
       job = updateJobProgress(jobId, 'ready', 'caption_building');
-      const finalCaption = job.caption && job.caption !== rawCaption
-        ? job.caption // user edited caption
-        : await buildAiCaption({ rawCaption, sourceUsername: sourceUploader, page });
+      let hookHeadline = '';
+      let finalCaption = '';
+
+      if (job.caption && job.caption !== rawCaption) {
+        finalCaption = job.caption;
+      } else {
+        const copyDetails = await buildAiCaptionDetails({ rawCaption, sourceUsername: sourceUploader, page });
+        finalCaption = copyDetails.caption;
+        hookHeadline = copyDetails.hookHeadline || '';
+      }
 
       job = updateJobProgress(jobId, 'ready', 'caption_ready', { caption: finalCaption });
 
@@ -259,15 +266,16 @@ class JobWorkerPool {
         let feedVideoPath = mediaPaths[0];
         const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
         const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
-        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : 'gta6');
-        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : 'GTA 6 Vice City');
+        const isEvolvingAiPage = page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && page.handle.includes('evolving'));
+        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isEvolvingAiPage ? 'evolving_ai' : 'gta6'));
+        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : (isEvolvingAiPage ? 'Evolving AI Video-Essay' : 'GTA 6 Vice City'));
         const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode') || 'frame';
 
         if (brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying ${themeLabel} Framed Template to Feed Reel for ${page.handle}...`);
-            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle, page, theme: pageTheme });
+            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle, page, theme: pageTheme, hookHeadline });
             if (framed) {
               const absCandidate = (path.isAbsolute(framed) && fs.existsSync(framed))
                 ? framed

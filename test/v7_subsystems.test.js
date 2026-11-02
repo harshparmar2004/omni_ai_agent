@@ -179,4 +179,47 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(cronYml.includes('node-cache'), 'watchtower-cron.yml must cache node_modules');
     assert.ok(cronYml.includes('cloudflared'), 'watchtower-cron.yml must install native cloudflared');
   });
+
+  await t.test('8. Dedicated Evolving AI Video-Essay Template & Automated Copywriting Engine', async () => {
+    const { generateFeedPostOverlay, generateEvolvingAiOverlay } = require('../src/utils/ffmpegHelper');
+    const { buildAiCaptionDetails, buildCaption } = require('../src/core/captionBuilder');
+    const { getPageBySlug } = require('../src/database');
+    const fs = require('fs');
+
+    // 1. Verify Page Schema Seed
+    const aiPage = getPageBySlug('ai_curation');
+    assert.ok(aiPage, 'ai_curation page must exist in database');
+    assert.equal(aiPage.handle, '@evolving.ai');
+    assert.equal(aiPage.name, 'Evolving AI');
+
+    // 2. Caption & Viral Hook Builder
+    const rawCaption = "Nvidia announces next-gen Blackwell Ultra GPU with 288GB HBM3e memory. Follow @nvidia for more info! Link in bio. #tech #ai";
+    const details = await buildAiCaptionDetails({
+      rawCaption,
+      sourceUsername: 'nvidia',
+      page: aiPage
+    });
+
+    assert.ok(details.caption, 'Should produce AI caption');
+    assert.ok(details.hookHeadline, 'Should generate a viral hook headline');
+    assert.ok(details.caption.includes('@evolving.ai'), 'Should include Evolving AI handle');
+    assert.ok(details.caption.includes('AI revolution'), 'Should include AI revolution save CTA');
+    assert.ok(details.caption.includes('#ai'), 'Should include #ai hashtag');
+    assert.ok(!details.caption.includes('@nvidia'), 'Zero credits: should strip competitor handle');
+
+    // 3. Evolving AI 1080x1920 Video-Essay Overlay Generation
+    const overlayPath = generateFeedPostOverlay('evolving.ai', {
+      cardX: 0,
+      cardY: 540,
+      cardW: 1080,
+      cardH: 608,
+      isVertical: false,
+      theme: 'evolving_ai',
+      page: aiPage,
+      hookHeadline: details.hookHeadline
+    });
+
+    assert.ok(fs.existsSync(overlayPath), 'Evolving AI overlay file must exist');
+    assert.ok(fs.statSync(overlayPath).size > 10000, 'Overlay PNG must be a valid non-empty graphic');
+  });
 });

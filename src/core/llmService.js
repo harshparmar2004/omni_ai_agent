@@ -141,9 +141,14 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
                   page.id === 2 || String(page.id) === '2';
 
-  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : 'gta6_updates_007');
+  const isEvolvingAi = (page.slug && (page.slug === 'ai_curation' || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
+                       (page.handle && (page.handle.includes('evolving') || page.handle.includes('ai'))) ||
+                       (page.name && /evolving|ai|tech|silicon|chips/i.test(page.name)) ||
+                       page.id === 4 || String(page.id) === '4';
+
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isEvolvingAi ? 'evolving.ai' : 'gta6_updates_007'));
   const handle = page.handle || `@${page.slug || defaultHandle}`;
-  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates'));
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6 Updates')));
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const cleanedSource = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
@@ -226,6 +231,114 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
       provider: 'original_curated_movie',
       model: 'none',
       breakdown: movieBody
+    };
+  }
+
+  // ── Dedicated Evolving AI Copy & Hook Engine ──
+  if (isEvolvingAi) {
+    console.log('[LLM Service] 🤖 Evolving AI Account detected: Generating viral hook headline & video-essay breakdown.');
+
+    const defaultAiHeadline = 'The next generation of AI is evolving faster than anyone expected';
+    let headline = defaultAiHeadline;
+    let aiBreakdown = cleanedSource || 'Breakthrough development in artificial intelligence model reasoning and computing hardware.';
+    let usedProvider = 'deterministic';
+    let usedModel = 'none';
+
+    // If source has sentences, extract a punchy first sentence as fallback hook
+    if (cleanedSource) {
+      const firstSentence = cleanedSource.split(/[.!?\n]/)[0].trim();
+      if (firstSentence && firstSentence.length >= 15 && firstSentence.length <= 110) {
+        headline = firstSentence.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+      }
+    }
+
+    const aiPrompt = `You are the lead tech writer for "${pageName}" (${handle}), an elite Instagram page covering artificial intelligence and futuristic technology (in the exact style of evolving.ai).
+Analyze the source description and generate two items in strict JSON format:
+1. "headline": A punchy, curiosity-driven viral headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. (Example: "The most expensive AI chips in the world are now worth more than $10,000,000,000").
+2. "breakdown": A high-energy 2-3 sentence video-essay post body explaining the significance, scale, or mind-blowing reality of this technology.
+
+Source Content:
+"""
+${cleanedSource || 'Cutting-edge artificial intelligence, humanoid robotics, and neural computing breakthrough.'}
+"""
+
+Respond ONLY with valid JSON in this exact structure:
+{"headline": "...", "breakdown": "..."}`;
+
+    const preferredProvider = getSetting('default_provider', 'gemini');
+    const geminiKey = getSetting('gemini_api_key', '') || process.env.GEMINI_API_KEY || '';
+    const groqKey = getSetting('groq_api_key', '') || process.env.GROQ_API_KEY || '';
+
+    const providersToTry = [];
+    if (preferredProvider === 'groq') {
+      if (groqKey) providersToTry.push({ name: 'groq', fn: () => callGroq(aiPrompt, groqKey), model: 'llama-3.3-70b-versatile' });
+      if (geminiKey) providersToTry.push({ name: 'gemini', fn: () => callGemini(aiPrompt, geminiKey), model: 'gemini-1.5-flash' });
+    } else if (preferredProvider === 'ollama') {
+      providersToTry.push({ name: 'ollama', fn: () => callOllama(aiPrompt), model: 'local' });
+      if (geminiKey) providersToTry.push({ name: 'gemini', fn: () => callGemini(aiPrompt, geminiKey), model: 'gemini-1.5-flash' });
+      if (groqKey) providersToTry.push({ name: 'groq', fn: () => callGroq(aiPrompt, groqKey), model: 'llama-3.3-70b-versatile' });
+    } else {
+      if (geminiKey) providersToTry.push({ name: 'gemini', fn: () => callGemini(aiPrompt, geminiKey), model: 'gemini-1.5-flash' });
+      if (groqKey) providersToTry.push({ name: 'groq', fn: () => callGroq(aiPrompt, groqKey), model: 'llama-3.3-70b-versatile' });
+    }
+
+    for (const provider of providersToTry) {
+      try {
+        console.log(`[LLM Service] Querying ${provider.name} for Evolving AI copy...`);
+        const rawOutput = await provider.fn();
+        if (rawOutput) {
+          try {
+            const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
+            const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+            if (parsed && parsed.headline) {
+              headline = parsed.headline.trim();
+              if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();
+              usedProvider = provider.name;
+              usedModel = provider.model;
+              break;
+            }
+          } catch (jsonErr) {
+            console.warn('[LLM Service] Could not parse JSON from LLM, using fallback extraction:', jsonErr.message);
+          }
+        }
+      } catch (err) {
+        console.warn(`[LLM Service] Provider ${provider.name} failed: ${err.message}`);
+      }
+    }
+
+    const aiEngagement = [
+      "💬 Will this change everything, or is it overhyped? Drop your thoughts below 👇",
+      "💾 Save this reel & share with someone following the AI revolution! 🚀"
+    ].join('\n');
+
+    const aiFollowLine = `🤖 Follow ${handle} for daily breakthrough AI updates & tech breakdowns!`;
+
+    const originalTags = extractHashtags(rawCaption);
+    const defaultTags = extractHashtags(page.default_hashtags || '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai');
+    const nicheAiTags = ['#ai', '#technology', '#artificialintelligence', '#tech', '#future', '#innovation', '#evolvingai'];
+
+    const tagSet = new Set();
+    const mergedTags = [];
+    for (const tag of [...nicheAiTags, ...defaultTags, ...originalTags]) {
+      const lower = tag.toLowerCase();
+      if (!tagSet.has(lower) && tagSet.size < 6) {
+        tagSet.add(lower);
+        mergedTags.push(tag);
+      }
+    }
+    const hashtagBlock = mergedTags.join(' ');
+
+    const finalAiCaption = [aiBreakdown, aiEngagement, aiFollowLine, hashtagBlock]
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+
+    return {
+      caption: finalAiCaption,
+      hookHeadline: headline,
+      provider: usedProvider,
+      model: usedModel,
+      breakdown: aiBreakdown
     };
   }
 

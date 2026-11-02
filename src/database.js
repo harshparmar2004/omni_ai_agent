@@ -183,6 +183,40 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_status TEXT DEFAULT "idle"'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN telegram_message_id TEXT DEFAULT ""'); } catch (e) {}
+
+  // Seed dedicated Evolving AI Video-Essay page
+  try {
+    const existingAiPage = db.prepare('SELECT id FROM pages WHERE slug = ?').get('ai_curation');
+    if (!existingAiPage) {
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO pages (
+          slug, name, handle, ig_user_id, access_token, caption_template,
+          default_hashtags, attribution_enabled, watermark_enabled, post_mode,
+          posts_per_cycle, daily_quota, min_spacing_minutes, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'ai_curation',
+        'Evolving AI',
+        '@evolving.ai',
+        'PENDING_IG_USER_ID',
+        'PENDING_ACCESS_TOKEN',
+        '{caption}\n\n{hashtags}',
+        '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai',
+        0,
+        0,
+        'auto',
+        1,
+        5,
+        120,
+        1,
+        now,
+        now
+      );
+    }
+  } catch (e) {
+    console.warn('[Database] Notice initializing ai_curation page:', e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1045,10 +1045,156 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   return overlayPath;
 }
 
+function wrapText(ctx, text, maxWidth) {
+  if (!text) return [];
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = words[0] || '';
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i];
+    const width = ctx.measureText(currentLine + ' ' + word).width;
+    if (width < maxWidth) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
+function drawVerifiedBadge(ctx, x, y, size = 18) {
+  ctx.save();
+  ctx.fillStyle = '#0095F6'; // Instagram verified blue
+  ctx.beginPath();
+  ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crisp white checkmark
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + size * 0.28, y + size * 0.52);
+  ctx.lineTo(x + size * 0.44, y + size * 0.68);
+  ctx.lineTo(x + size * 0.74, y + size * 0.34);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Generates the authentic Evolving AI Video-Essay Overlay
+ * Solid black 1080x1920 canvas with:
+ * - Circular brand avatar + Page Name + Verified Badge + Handle
+ * - Curiosity-driven viral headline text wrapped cleanly
+ * - Cutout hole where the centered video is overlaid
+ * - Clean safe margins at bottom for Instagram native UI
+ */
+function generateEvolvingAiOverlay(handle, options = {}) {
+  const cleanHandle = (handle || 'evolving.ai').replace(/^@/, '');
+  const {
+    cardX = 0,
+    cardY = 540,
+    cardW = 1080,
+    cardH = 608,
+    pageName = options.page?.name || 'Evolving AI',
+    hookHeadline = options.hookHeadline || options.headline || 'The most expensive AI chips in the world are now worth more than $10,000,000,000'
+  } = options;
+
+  const { createCanvas } = require('@napi-rs/canvas');
+  const width = 1080;
+  const height = 1920;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  // 1. Pitch black background (pure #000000)
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Clear cutout where the video plays cleanly without borders
+  ctx.clearRect(cardX, cardY, cardW, cardH);
+
+  // 3. Header Section (Left Aligned, exactly like evolving.ai)
+  const marginX = 54;
+  const headerTopY = 210; // Safe below IG top bar (Y < 180)
+
+  // Circular Logo Avatar
+  const avatarSize = 64;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(marginX + avatarSize / 2, headerTopY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#111111';
+  ctx.fill();
+  ctx.strokeStyle = '#2A2A2E';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Inner minimal logo graphic
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 13px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('EVOLVING', marginX + avatarSize / 2, headerTopY + avatarSize / 2 - 5);
+  ctx.font = 'bold 10px Arial, sans-serif';
+  ctx.fillStyle = '#0095F6';
+  ctx.fillText('AI', marginX + avatarSize / 2, headerTopY + avatarSize / 2 + 9);
+  ctx.restore();
+
+  // Page Name + Verified Badge
+  const textLeftX = marginX + avatarSize + 18;
+  ctx.save();
+  ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(pageName, textLeftX, headerTopY + 4);
+
+  const nameWidth = ctx.measureText(pageName).width;
+  drawVerifiedBadge(ctx, textLeftX + nameWidth + 8, headerTopY + 7, 20);
+
+  // Handle below name
+  ctx.font = '400 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.fillStyle = '#8E8E93'; // iOS muted gray
+  ctx.fillText('@' + cleanHandle, textLeftX, headerTopY + 34);
+  ctx.restore();
+
+  // 4. Punchy Viral Headline / Hook
+  const headlineY = headerTopY + avatarSize + 32;
+  const maxTextWidth = width - (marginX * 2);
+
+  ctx.save();
+  ctx.font = '700 34px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
+    .replace(/^["'“”]/, '')
+    .replace(/["'“”]$/, '');
+
+  const lines = wrapText(ctx, cleanHeadline, maxTextWidth);
+  const lineHeight = 46;
+  lines.forEach((line, idx) => {
+    ctx.fillText(line, marginX, headlineY + (idx * lineHeight));
+  });
+  ctx.restore();
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  const genDir = path.join(publicDir, 'generated');
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'evolving_ai'}.png`);
+  fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+  return overlayPath;
+}
+
 /**
  * Generates Feed Reel Frame Template Overlay
  * Supports adaptive geometry: 9:16 vertical full screen, 16:9 landscape, 1:1 square.
- * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink) vs 'clubbing' (Cyberpunk HUD).
+ * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink) vs 'clubbing' (Cyberpunk HUD) vs 'evolving_ai' (Minimalist Video-Essay).
  */
 function generateFeedPostOverlay(handle, options = {}) {
   const { createCanvas } = require('@napi-rs/canvas');
@@ -1066,12 +1212,20 @@ function generateFeedPostOverlay(handle, options = {}) {
     isVertical = true
   } = options;
 
-  const theme = options.theme || (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' : (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6'));
+  const theme = options.theme || (
+    cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
+    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' :
+    (cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation') ? 'evolving_ai' : 'gta6'))
+  );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+  const isEvolvingAi = theme === 'evolving_ai' || theme === 'ai_curation';
 
   if (isClubbing) {
     return generateClubbingCyberOverlay(cleanHandle, options);
+  }
+  if (isEvolvingAi) {
+    return generateEvolvingAiOverlay(cleanHandle, options);
   }
 
   // 1. Ambient Background for letterboxed videos (landscape / square)
@@ -1420,13 +1574,54 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   const aspect = inW / inH;
   const isVertical = aspect <= 0.65; // ~9:16 vertical
-  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
+  const theme = options.theme || (
+    handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' :
+    (handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'evolving_ai' : 'gta6'))
+  );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+  const isEvolvingAi = theme === 'evolving_ai' || theme === 'ai_curation';
 
   let cardW, cardH, cardX, cardY, videoFilter;
 
-  if (isVertical) {
+  if (isEvolvingAi) {
+    // Evolving AI Minimalist Center Layout:
+    // Solid pitch black canvas with video centered below headline
+    if (aspect >= 1.4) {
+      // 16:9 Landscape Video (e.g. 1080x608)
+      cardW = 1080;
+      cardH = Math.round(cardW / aspect);
+      cardH = Math.floor(cardH / 2) * 2;
+      cardX = 0;
+      cardY = 540;
+    } else if (aspect >= 0.95 && aspect <= 1.05) {
+      // 1:1 Square Video (e.g. 1080x1080)
+      cardW = 1080;
+      cardH = 1080;
+      cardX = 0;
+      cardY = 460;
+    } else if (isVertical) {
+      // 9:16 Vertical Video: scale to fit middle section below headline
+      cardW = 1080;
+      cardH = 1240;
+      cardX = 0;
+      cardY = 480;
+    } else {
+      // 4:5 or standard portrait
+      cardW = 1080;
+      cardH = Math.round(cardW / aspect);
+      if (cardH > 1300) cardH = 1300;
+      cardH = Math.floor(cardH / 2) * 2;
+      cardX = 0;
+      cardY = 480;
+    }
+
+    videoFilter = [
+      `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
+      '[v1][1:v]overlay=0:0[outv]'
+    ].join(';');
+  } else if (isVertical) {
     if (isClubbing) {
       // Clubbing Cult Cyberpunk HUD: 9:16 Full-Scale Exact Ratio (828x1472 @ 126, 215)
       cardW = 828;
@@ -1502,7 +1697,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const base = path.basename(absPath, ext);
   const framedOutput = path.join(dir, `${base}_feed_framed.mp4`);
 
-  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : 'GTA 6 Vice City');
+  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isEvolvingAi ? 'Evolving AI Video-Essay' : 'GTA 6 Vice City'));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
   // Build filter graph combining video framing and audio normalization in ONE pass
@@ -1531,7 +1726,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'inherit'] });
     proc.on('close', (code) => {
       if (code === 0 && fs.existsSync(framedOutput)) {
-        console.log(`[FFmpeg Helper] ✅ ${isClubbing ? 'Clubbing Cult' : (isMovie ? 'Cinematic Movie' : 'GTA 6')} Framed Feed Reel generated: ${framedOutput}`);
+        console.log(`[FFmpeg Helper] ✅ ${isClubbing ? 'Clubbing Cult' : (isMovie ? 'Cinematic Movie' : (isEvolvingAi ? 'Evolving AI' : 'GTA 6'))} Framed Feed Reel generated: ${framedOutput}`);
         resolve(framedOutput);
       } else {
         console.warn(`[FFmpeg Helper] ⚠️ Feed frame FFmpeg exited with code ${code}, falling back to original media`);
@@ -1903,6 +2098,7 @@ module.exports = {
   applyBrandedFeedOverlay,
   generateFeedPostOverlay,
   generateClubbingCyberOverlay,
+  generateEvolvingAiOverlay,
   prepareVideoForFeedCard,
   extractVideoCover
 };
