@@ -429,14 +429,22 @@ class JobWorkerPool {
         } catch (e) {}
 
         const cleanErr = escapeHtml(err.message);
+        const isTokenInvalid = /OAuthException|access token|Session has expired|invalidated because the user changed their password|Code 190|OAuth/i.test(err.message) || err.metaCode === 190;
         const isAgeRestricted = /age[- ]restricted|under 18|limits on who can see/i.test(err.message);
         const isPrivate = /private/i.test(err.message);
 
         let guidance = '';
-        if (isAgeRestricted) {
+        let tip = '💡 <i>Tip: Please ensure the reel is from a public creator and does not have 18+ age restrictions.</i>';
+
+        if (isTokenInvalid) {
+          guidance = '\n\n🔑 <b>Meta Access Token Expired/Revoked:</b>\nInstagram session was invalidated (e.g. because account password was changed or session expired). Please generate a fresh token in Meta Developer Portal and update it in Pages Settings or GitHub Secrets.';
+          tip = '💡 <i>Tip: Generate a fresh token in Meta Developer Portal, update it in Pages Settings or GitHub Secrets, then tap Retry Now.</i>';
+        } else if (isAgeRestricted) {
           guidance = '\n\n🔞 <b>Age-Gated Content:</b> The creator set an 18+ audience limit on this reel. Instagram blocks public downloads for age-gated reels.';
         } else if (isPrivate) {
           guidance = '\n\n🔒 <b>Private Account:</b> Instagram blocks access to private accounts. OmniStudio only processes public reels.';
+        } else {
+          tip = '💡 <i>Tip: Check target account status or try a different public reel.</i>';
         }
 
         // Surface exact failure in Telegram with Retry button
@@ -447,10 +455,10 @@ class JobWorkerPool {
           ``,
           `⚠️ <b>Reason:</b> ${cleanErr}${guidance}`,
           ``,
-          `💡 <i>Tip: Please ensure the reel is from a public creator and does not have 18+ age restrictions.</i>`
+          tip
         ], {
           inline_keyboard: [
-            [{ text: '🔁 Retry Now', callback_data: `retry_job:${job.id}` }]
+            [{ text: '🔁 Retry Now', callback_data: `post:${page.id}:${shortcode}` }]
           ]
         });
       }

@@ -10,6 +10,21 @@ const { getGraphBase } = require('./tokenManager');
  * Zero mock mode, zero microservice hijacking, 100% official Meta API.
  */
 
+function formatMetaError(err, context = '') {
+  if (err.response?.data?.error) {
+    const metaErr = err.response.data.error;
+    const msg = metaErr.error_user_msg || metaErr.message || 'Meta API request failed';
+    const code = metaErr.code ? ` (Meta Code ${metaErr.code}${metaErr.error_subcode ? `, Subcode ${metaErr.error_subcode}` : ''})` : '';
+    const errObj = new Error(`${context ? `${context}: ` : ''}${msg}${code}`);
+    errObj.metaCode = metaErr.code;
+    errObj.metaSubcode = metaErr.error_subcode;
+    errObj.metaType = metaErr.type;
+    errObj.response = err.response;
+    return errObj;
+  }
+  return err;
+}
+
 async function pollContainer(containerId, token, baseUrl, onProgress = null) {
   let isReady = false;
   let attempts = 0;
@@ -138,12 +153,16 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
       console.warn(`[Publisher] Retrying reel container creation without optional AI/offset tags: ${err.response?.data?.error?.message || err.message}`);
       delete initParams.is_ai_generated;
       delete initParams.thumb_offset;
-      initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-        params: initParams,
-        timeout: 35000
-      });
+      try {
+        initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+          params: initParams,
+          timeout: 35000
+        });
+      } catch (retryErr) {
+        throw formatMetaError(retryErr, 'Reel container creation failed');
+      }
     } else {
-      throw err;
+      throw formatMetaError(err, 'Reel container creation failed');
     }
   }
 
@@ -158,10 +177,15 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
   // 3. Publish container live
   if (onProgress) onProgress('publishing', 1, 1);
 
-  const publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
-    params: { creation_id: containerId, access_token: token },
-    timeout: 35000
-  });
+  let publishRes;
+  try {
+    publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
+      params: { creation_id: containerId, access_token: token },
+      timeout: 35000
+    });
+  } catch (pubErr) {
+    throw formatMetaError(pubErr, 'Reel media publication failed');
+  }
 
   const igMediaId = publishRes.data?.id;
   if (!igMediaId) {
@@ -197,14 +221,19 @@ async function publishCarousel({ page, imagePaths, caption, onProgress = null })
   const childIds = [];
   for (let i = 0; i < Math.min(10, imagePaths.length); i++) {
     const publicUrl = await getPublicUrlForMedia(imagePaths[i]);
-    const childRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-      params: {
-        image_url: publicUrl,
-        is_carousel_item: true,
-        access_token: token
-      },
-      timeout: 25000
-    });
+    let childRes;
+    try {
+      childRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+        params: {
+          image_url: publicUrl,
+          is_carousel_item: true,
+          access_token: token
+        },
+        timeout: 25000
+      });
+    } catch (itemErr) {
+      throw formatMetaError(itemErr, `Carousel child item ${i + 1} creation failed`);
+    }
 
     const childId = childRes.data?.id;
     if (!childId) throw new Error(`Failed to create carousel child item ${i + 1}`);
@@ -214,16 +243,21 @@ async function publishCarousel({ page, imagePaths, caption, onProgress = null })
 
   // 2. Create parent container
   if (onProgress) onProgress('creating_carousel', 0, 1);
-  const carouselRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-    params: {
-      media_type: 'CAROUSEL',
-      children: childIds.join(','),
-      caption: caption,
-      is_ai_generated: false,
-      access_token: token
-    },
-    timeout: 25000
-  });
+  let carouselRes;
+  try {
+    carouselRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+      params: {
+        media_type: 'CAROUSEL',
+        children: childIds.join(','),
+        caption: caption,
+        is_ai_generated: false,
+        access_token: token
+      },
+      timeout: 25000
+    });
+  } catch (carErr) {
+    throw formatMetaError(carErr, 'Carousel container creation failed');
+  }
 
   const containerId = carouselRes.data?.id;
   if (!containerId) throw new Error('Meta API did not return carousel parent container ID');
@@ -233,10 +267,15 @@ async function publishCarousel({ page, imagePaths, caption, onProgress = null })
 
   // 4. Publish live
   if (onProgress) onProgress('publishing', 1, 1);
-  const publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
-    params: { creation_id: containerId, access_token: token },
-    timeout: 25000
-  });
+  let publishRes;
+  try {
+    publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
+      params: { creation_id: containerId, access_token: token },
+      timeout: 25000
+    });
+  } catch (pubErr) {
+    throw formatMetaError(pubErr, 'Carousel media publication failed');
+  }
 
   const igMediaId = publishRes.data?.id;
   if (!igMediaId) throw new Error('Meta API media_publish did not return media ID for carousel');
@@ -263,15 +302,20 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
   if (onProgress) onProgress('uploading', 0, 1);
   const publicUrl = await getPublicUrlForMedia(imagePath);
 
-  const initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-    params: {
-      image_url: publicUrl,
-      caption: caption,
-      is_ai_generated: false,
-      access_token: token
-    },
-    timeout: 25000
-  });
+  let initRes;
+  try {
+    initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+      params: {
+        image_url: publicUrl,
+        caption: caption,
+        is_ai_generated: false,
+        access_token: token
+      },
+      timeout: 25000
+    });
+  } catch (imgErr) {
+    throw formatMetaError(imgErr, 'Image container creation failed');
+  }
 
   const containerId = initRes.data?.id;
   if (!containerId) throw new Error('Meta API did not return container ID for image');
@@ -279,10 +323,15 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
   await pollContainer(containerId, token, baseUrl, onProgress);
 
   if (onProgress) onProgress('publishing', 1, 1);
-  const publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
-    params: { creation_id: containerId, access_token: token },
-    timeout: 25000
-  });
+  let publishRes;
+  try {
+    publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
+      params: { creation_id: containerId, access_token: token },
+      timeout: 25000
+    });
+  } catch (pubErr) {
+    throw formatMetaError(pubErr, 'Image media publication failed');
+  }
 
   const igMediaId = publishRes.data?.id;
   if (!igMediaId) throw new Error('Meta API media_publish did not return media ID for image');
@@ -363,12 +412,16 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
     if (initParams.is_ai_generated !== undefined) {
       console.warn(`[Publisher] Retrying story container creation without is_ai_generated tag: ${err.response?.data?.error?.message || err.message}`);
       delete initParams.is_ai_generated;
-      initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-        params: initParams,
-        timeout: 35000
-      });
+      try {
+        initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+          params: initParams,
+          timeout: 35000
+        });
+      } catch (retryErr) {
+        throw formatMetaError(retryErr, 'Story container creation failed');
+      }
     } else {
-      throw err;
+      throw formatMetaError(err, 'Story container creation failed');
     }
   }
 
@@ -383,10 +436,15 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
   // 3. Publish Story Container Live
   if (onProgress) onProgress('publishing_story', 1, 1);
 
-  const publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
-    params: { creation_id: containerId, access_token: token },
-    timeout: 35000
-  });
+  let publishRes;
+  try {
+    publishRes = await axios.post(`${baseUrl}/${igUserId}/media_publish`, null, {
+      params: { creation_id: containerId, access_token: token },
+      timeout: 35000
+    });
+  } catch (pubErr) {
+    throw formatMetaError(pubErr, 'Story media publication failed');
+  }
 
   const igMediaId = publishRes.data?.id;
   if (!igMediaId) {

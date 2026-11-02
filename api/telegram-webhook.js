@@ -109,8 +109,8 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    if (action === 'post') {
-      const pageId = parts[1];
+    if (action === 'post' || action === 'retry') {
+      const pageId = parts[1] || '1';
       const shortcode = parts[2];
       const pages = getPagesList();
       const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };

@@ -362,6 +362,22 @@ router.put('/pages/:id', (req, res) => {
     target.has_valid_token = true;
   }
 
+  // Persist to SQLite if available
+  try {
+    const Database = require('better-sqlite3');
+    const dbPath = path.join(process.cwd(), 'data', 'database.sqlite');
+    if (fs.existsSync(dbPath)) {
+      const db = new Database(dbPath);
+      if (access_token && ig_user_id) {
+        db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ?, handle = ?, name = ? WHERE id = ?').run(access_token, ig_user_id, target.handle, target.name, target.id);
+      } else if (access_token) {
+        db.prepare('UPDATE pages SET access_token = ?, handle = ?, name = ? WHERE id = ?').run(access_token, target.handle, target.name, target.id);
+      }
+    }
+  } catch (e) {
+    console.warn('[PUT /pages/:id DB update notice]:', e.message);
+  }
+
   res.json({ success: true, page: target });
 });
 
@@ -379,6 +395,7 @@ router.post('/pages/:id/test', async (req, res) => {
   const igId = req.body?.ig_user_id || target.ig_user_id || (target.id === 2 ? MOVIE_IG_USER_ID : (target.id === 3 ? TECH_IG_USER_ID : IG_USER_ID));
 
   if (!token) {
+    target.has_valid_token = false;
     return res.json({
       success: false,
       valid: false,
@@ -408,6 +425,7 @@ router.post('/pages/:id/test', async (req, res) => {
       message: `Meta Graph API token is active and valid for @${verifiedUsername} (ID: ${verifiedId}).`
     });
   } catch (err) {
+    target.has_valid_token = false;
     res.json({
       success: false,
       valid: false,
