@@ -1121,26 +1121,62 @@ function generateEvolvingAiOverlay(handle, options = {}) {
   const marginX = 54;
   const headerTopY = 210; // Safe below IG top bar (Y < 180)
 
-  // Circular Logo Avatar
+  // Circular Logo Avatar (supports custom image file or dynamic initials)
   const avatarSize = 64;
+  const avatarCenter = marginX + avatarSize / 2;
+  const avatarCenterY = headerTopY + avatarSize / 2;
+  const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
+  const candidateAvatarPaths = [
+    options.avatarPath,
+    path.join(brandingDir, `${cleanHandle}_avatar.png`),
+    path.join(brandingDir, `${cleanHandle}_avatar.jpg`),
+    path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.png`),
+    path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.jpg`)
+  ].filter(Boolean);
+
+  const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
+
   ctx.save();
   ctx.beginPath();
-  ctx.arc(marginX + avatarSize / 2, headerTopY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#111111';
-  ctx.fill();
+  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  if (existingAvatarPath) {
+    try {
+      const { loadImage } = require('@napi-rs/canvas');
+      const avatarImg = loadImage(existingAvatarPath);
+      ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
+    } catch (e) {
+      // Fallback to dynamic monogram
+    }
+  } else {
+    // Dynamic Modern Monogram based on actual page name
+    const bgGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
+    bgGrad.addColorStop(0, '#1C1C1E');
+    bgGrad.addColorStop(1, '#0C0C0E');
+    ctx.fillStyle = bgGrad;
+    ctx.fill();
+
+    // Extract 1-2 initials from page name
+    const words = (pageName || 'Channel').trim().split(/\s+/);
+    const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initials, avatarCenter, avatarCenterY);
+  }
+  ctx.restore();
+
+  // Avatar border ring
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
   ctx.strokeStyle = '#2A2A2E';
   ctx.lineWidth = 1.5;
   ctx.stroke();
-
-  // Inner minimal logo graphic
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 13px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('EVOLVING', marginX + avatarSize / 2, headerTopY + avatarSize / 2 - 5);
-  ctx.font = 'bold 10px Arial, sans-serif';
-  ctx.fillStyle = '#0095F6';
-  ctx.fillText('AI', marginX + avatarSize / 2, headerTopY + avatarSize / 2 + 9);
   ctx.restore();
 
   // Page Name + Verified Badge

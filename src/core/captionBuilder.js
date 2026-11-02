@@ -117,7 +117,7 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
     : (isMovie
       ? `🍿 Follow ${handle} for daily movie & series recommendations!`
       : (isEvolvingAi
-        ? `🤖 Follow ${handle} for daily breakthrough AI updates & tech breakdowns!`
+        ? `🔔 Follow ${handle} for daily high-impact breakdowns & updates!`
         : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`));
 
   // Dynamic interactive prompt to trigger comments, saves, and shares (high algorithmic weighting)
@@ -134,7 +134,7 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
     : (isMovie
       ? "💾 Save this reel so you don't lose it!"
       : (isEvolvingAi
-        ? "💾 Save this reel & share with someone following the AI revolution! 🚀"
+        ? "💾 Save this reel & share with someone who needs to see this! 🚀"
         : '💾 Save & share this reel with a friend who is waiting for GTA 6!'));
 
   // Collect and deduplicate hashtags (Meta Reels Algorithm: 4-5 hyper-relevant tags)

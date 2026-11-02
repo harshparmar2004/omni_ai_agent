@@ -252,14 +252,14 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
       }
     }
 
-    const aiPrompt = `You are the lead tech writer for "${pageName}" (${handle}), an elite Instagram page covering artificial intelligence and futuristic technology (in the exact style of evolving.ai).
+    const aiPrompt = `You are the lead content creator and writer for "${pageName}" (${handle}), an elite Instagram channel producing viral high-retention video-essays.
 Analyze the source description and generate two items in strict JSON format:
-1. "headline": A punchy, curiosity-driven viral headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. (Example: "The most expensive AI chips in the world are now worth more than $10,000,000,000").
-2. "breakdown": A high-energy 2-3 sentence video-essay post body explaining the significance, scale, or mind-blowing reality of this technology.
+1. "headline": A punchy, curiosity-driven viral hook headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. (Example: "The most expensive AI chips in the world are now worth more than $10,000,000,000").
+2. "breakdown": A high-energy 2-3 sentence video-essay post body explaining the significance, scale, or mind-blowing reality of this topic.
 
 Source Content:
 """
-${cleanedSource || 'Cutting-edge artificial intelligence, humanoid robotics, and neural computing breakthrough.'}
+${cleanedSource || 'Groundbreaking development and high-impact industry highlights.'}
 """
 
 Respond ONLY with valid JSON in this exact structure:

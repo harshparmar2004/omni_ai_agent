@@ -203,7 +203,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(details.caption, 'Should produce AI caption');
     assert.ok(details.hookHeadline, 'Should generate a viral hook headline');
     assert.ok(details.caption.includes('@evolving.ai'), 'Should include Evolving AI handle');
-    assert.ok(details.caption.includes('AI revolution'), 'Should include AI revolution save CTA');
+    assert.ok(details.caption.includes('Save this reel') || details.caption.includes('AI revolution'), 'Should include save CTA');
     assert.ok(details.caption.includes('#ai'), 'Should include #ai hashtag');
     assert.ok(!details.caption.includes('@nvidia'), 'Zero credits: should strip competitor handle');
 
