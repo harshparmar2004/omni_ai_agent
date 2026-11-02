@@ -165,6 +165,58 @@ Respond ONLY with valid JSON:
 }
 
 /**
+ * Local offline OCR fallback using Tesseract.js & canvas cropping
+ * Requires zero API keys and runs 100% locally.
+ */
+async function localOcrHeadlineDetection(framePath) {
+  try {
+    const Tesseract = require('tesseract.js');
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
+
+    const img = await loadImage(framePath);
+    // Crop the upper-middle region where reel titles are located (Y=20% to Y=48%)
+    const cropY = Math.floor(img.height * 0.20);
+    const cropH = Math.floor(img.height * 0.28);
+    const canvas = createCanvas(img.width, cropH);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, cropY, img.width, cropH, 0, 0, img.width, cropH);
+
+    const res = await Tesseract.recognize(canvas.toBuffer('image/png'), 'eng');
+    const rawLines = (res.data?.text || '').split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length >= 4)
+      .filter(l => !/cult|information|reels|share|comment|nobody can fly|every great thing/i.test(l))
+      .filter(l => !/^[0-9:\s=D+&©@#]+$/.test(l))
+      .filter(l => /^[A-Z]/.test(l)); // Must start with capitalized letter
+
+    if (rawLines.length === 0) return null;
+
+    let title = rawLines.slice(0, 2).join(' ')
+      .replace(/[©®™]/g, '')
+      .replace(/^["'“”]/, '')
+      .replace(/["'“”]$/, '')
+      .trim();
+
+    const wordCount = title.split(/\s+/).length;
+    if (wordCount >= 2 && wordCount <= 14) {
+      const { parseHeadlineTokens } = require('../utils/ffmpegHelper');
+      const tokens = parseHeadlineTokens(title);
+      const highlightedTitle = tokens.map(t => t.highlight ? `**${t.text}**` : t.text).join(' ');
+
+      return {
+        hasTitle: true,
+        headline: highlightedTitle,
+        rawTitle: title
+      };
+    }
+    return null;
+  } catch (err) {
+    console.warn(`[Video Vision] Local OCR notice: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Detects and extracts on-screen title text from a video or image file
  * @param {string} videoOrImagePath - Path to the video or image
  * @param {Object} options
@@ -237,6 +289,24 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
       } catch (openAiErr) {
         console.warn(`[Video Vision] OpenAI Vision attempt failed: ${openAiErr.message}`);
       }
+    }
+
+    // 3. Try Local Offline OCR (Zero API Key Required)
+    try {
+      console.log('[Video Vision] 👁️ Scanning video frame with high-precision Local OCR...');
+      const localResult = await localOcrHeadlineDetection(framePath);
+      if (localResult && localResult.hasTitle && localResult.headline) {
+        console.log(`[Video Vision] ✅ Found On-Screen Hook via Local OCR: "${localResult.headline}"`);
+        return {
+          found: true,
+          headline: localResult.headline,
+          rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
+          hasCompetitorHeader: true,
+          provider: 'local_ocr'
+        };
+      }
+    } catch (localErr) {
+      console.warn(`[Video Vision] Local OCR attempt notice: ${localErr.message}`);
     }
 
     return { found: false, reason: 'no_title_detected_or_no_vision_key' };

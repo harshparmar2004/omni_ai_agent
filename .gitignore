@@ -48,5 +48,6 @@ ENV/
 # OS & Temporary
 .DS_Store
 Thumbs.db
+*.traineddata
 test.png
 test.svg
