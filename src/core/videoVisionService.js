@@ -79,15 +79,14 @@ async function callGeminiVision(imagePath, apiKey) {
   const imageBuffer = fs.readFileSync(imagePath);
   const base64Data = imageBuffer.toString('base64');
 
-  const prompt = `Analyze this video frame from a social media reel.
-1. Check if there is an on-screen title, hook, or headline text displayed on the screen (such as at the top or above the video content).
-2. If yes, extract that EXACT title or hook text. DO NOT hallucinate.
-3. Identify 1 to 3 of the most impactful keywords, numbers, or terms in the headline.
-4. Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "Scientists Made The First **Living Thing** Built For **Mars**").
-5. If no title is visible or it is only generic subtitles/captions at the bottom, set hasTitle to false.
+  const prompt = `Analyze this video frame from a social media reel (1080x1920 layout).
+1. "headline": Check if there is an on-screen title, hook, or headline text displayed on the screen (such as at the top or above the video content). If yes, extract that EXACT title or hook text. If not, write an ultra-catchy 8-12 word hook based on what is happening in the video.
+2. Identify 1 to 3 of the most impactful keywords, numbers, or terms in the headline. Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "Scientists Made The First **Living Thing** Built For **Mars**").
+3. "topicBreakdown": Write a concise, 2-sentence high-energy explanation of this topic for an Instagram caption post body.
+4. "hasCompetitorHeader": Is there existing text, title, or account branding in the top area (above the video)? (true/false)
 
 Respond ONLY with valid JSON in this exact structure:
-{"hasTitle": true, "headline": "...", "rawTitle": "..."}`;
+{"hasTitle": true, "headline": "...", "rawTitle": "...", "topicBreakdown": "...", "hasCompetitorHeader": true}`;
 
   const requestBody = {
     contents: [
@@ -106,7 +105,7 @@ Respond ONLY with valid JSON in this exact structure:
     generationConfig: {
       temperature: 0.1,
       response_mime_type: 'application/json',
-      maxOutputTokens: 300
+      maxOutputTokens: 400
     }
   };
 
@@ -207,6 +206,8 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
             found: true,
             headline: cleanHeadline,
             rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
+            breakdown: result.topicBreakdown || '',
+            hasCompetitorHeader: Boolean(result.hasCompetitorHeader),
             provider: 'gemini_vision'
           };
         }

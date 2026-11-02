@@ -253,6 +253,9 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
         if (visionResult && visionResult.found && visionResult.headline) {
           console.log(`[LLM Service] 👁️ On-Screen Reel Vision detected hook: "${visionResult.headline}"`);
           headline = visionResult.headline;
+          if (visionResult.breakdown) {
+            aiBreakdown = visionResult.breakdown;
+          }
           usedProvider = visionResult.provider || 'gemini_vision';
           usedModel = 'multimodal_ocr';
         }
