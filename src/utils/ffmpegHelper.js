@@ -790,10 +790,10 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   const cleanHandle = (handle || 'clubbingcult').replace(/^@/, '');
   const isVertical = options.isVertical !== undefined ? options.isVertical : true;
   const {
-    cardW = isVertical ? 720 : 920,
-    cardH = isVertical ? 1280 : 518,
-    cardX = isVertical ? 180 : 80,
-    cardY = isVertical ? 270 : 701,
+    cardW = isVertical ? 828 : 920,
+    cardH = isVertical ? 1472 : 518,
+    cardX = isVertical ? 126 : 80,
+    cardY = isVertical ? 215 : 701,
   } = options;
 
   const { createCanvas } = require('@napi-rs/canvas');
@@ -890,11 +890,11 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   ctx.restore();
 
   // 6. Top HUD Header Badge: Shifted upside, displays @CLUBBINGCULT
-  const headerY = Math.max(80, cardY - (isVertical ? 86 : 95));
-  const badgeW = isVertical ? 560 : 600;
-  const badgeH = isVertical ? 58 : 66;
+  const headerY = Math.max(70, cardY - (isVertical ? 82 : 95));
+  const badgeW = isVertical ? 580 : 600;
+  const badgeH = isVertical ? 62 : 66;
   const badgeX = (width - badgeW) / 2;
-  const headerCut = isVertical ? 14 : 16;
+  const headerCut = isVertical ? 15 : 16;
 
   ctx.save();
   ctx.fillStyle = 'rgba(2, 8, 4, 0.95)';
@@ -963,14 +963,14 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   ctx.textBaseline = 'middle';
 
   const centerY = cardY + cardH / 2;
-  const leftX = Math.max(34, (cardX - bMargin) / 2);
+  const leftX = Math.max(30, (cardX - bMargin) / 2);
   ctx.save();
   ctx.translate(leftX, centerY);
   ctx.rotate(-Math.PI / 2);
   ctx.fillText('C L U B B I N G   C U L T   •   O F F I C I A L', 0, 0);
   ctx.restore();
 
-  const rightX = Math.min(width - 34, width - (cardX - bMargin) / 2);
+  const rightX = Math.min(width - 30, width - (cardX - bMargin) / 2);
   ctx.save();
   ctx.translate(rightX, centerY);
   ctx.rotate(Math.PI / 2);
@@ -979,7 +979,7 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   ctx.restore();
 
   // 8. Bottom Footer Section (Shifted up with template, center kept clear for IG caption)
-  const footerLineY = isVertical ? (cardY + cardH + bMargin + 28) : Math.min(1820, cardY + cardH + bMargin + 40);
+  const footerLineY = isVertical ? (cardY + cardH + bMargin + 26) : Math.min(1820, cardY + cardH + bMargin + 40);
 
   ctx.save();
   ctx.strokeStyle = 'rgba(0, 255, 163, 0.45)';
@@ -998,7 +998,7 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   ctx.fill();
   ctx.restore();
 
-  const footerTextY = footerLineY + (isVertical ? 28 : 36);
+  const footerTextY = footerLineY + (isVertical ? 26 : 36);
 
   // Left: ● LIVE
   ctx.save();
@@ -1428,11 +1428,11 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   if (isVertical) {
     if (isClubbing) {
-      // Clubbing Cult Cyberpunk HUD: 9:16 Shifted Upside for Instagram Safe Zone (720x1280 @ 180, 270)
-      cardW = 720;
-      cardH = 1280;
-      cardX = 180;
-      cardY = 270;
+      // Clubbing Cult Cyberpunk HUD: 9:16 Full-Scale Exact Ratio (828x1472 @ 126, 215)
+      cardW = 828;
+      cardH = 1472;
+      cardX = 126;
+      cardY = 215;
 
       videoFilter = [
         `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
