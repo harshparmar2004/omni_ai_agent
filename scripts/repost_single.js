@@ -168,7 +168,7 @@ async function main() {
   const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
-  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "clubbing"').run(clubbingToken, clubbingIgId);
+  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
   pages = getPages();
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
@@ -228,9 +228,28 @@ async function main() {
     throw new Error(`Failed to obtain a valid jobId from submitLink (result: ${JSON.stringify(enqueueResult)})`);
   }
 
+  const notifier = require('../src/core/notifier');
+
   if (messageId) {
     db.prepare('UPDATE publish_jobs SET telegram_message_id = ? WHERE id = ?').run(messageId, jobId);
     job.telegram_message_id = messageId;
+
+    // Immediate feedback: notify Telegram that Cloud Runner is connected and starting media ingest
+    const selectedPage = pages.find(p => p.id === pageId) || pages[0];
+    const targetHandle = selectedPage?.handle || `@page_${pageId}`;
+    try {
+      notifier.editTelegramMessage(
+        chatId,
+        messageId,
+        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${enqueueResult.shortcode || 'reel'}</code>\n` +
+        `📱 <b>Destination:</b> <code>${targetHandle}</code>\n\n` +
+        `✅ <b>1. Ingest:</b> Cloud runner connected & active\n` +
+        `⏳ <b>2. Download:</b> Starting media extraction...\n` +
+        `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
+        `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
+        `<i>Status: Running on cloud worker...</i>`
+      ).catch(() => {});
+    } catch (e) {}
   }
 
   // Handle already published duplicate reels unless forced

@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
+const fs = require('fs');
 const { getDb, getPages, getSourceAccounts, listPublishJobs, getSetting } = require('../src/database');
 const { buildCaption, cleanRawCaption, extractHashtags } = require('../src/core/captionBuilder');
 const { enqueueJob, getJob, listJobs, updateJobProgress, deleteJob } = require('../src/core/jobQueue');
@@ -137,5 +138,39 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     // 5. Branded Watermark Badge
     const wmPath = generateFeedWatermark('clubbingcult', { theme: 'clubbing' });
     assert.ok(fs.existsSync(wmPath), 'Watermark badge must exist');
+  });
+
+  await t.test('7. Cloud Runner & Container Initialization Latency Optimization', () => {
+    const { hasDirectCloudflared } = require('../src/core/tunnelService');
+    assert.equal(typeof hasDirectCloudflared, 'function', 'hasDirectCloudflared helper must be exported');
+    const directAvailable = hasDirectCloudflared();
+    assert.equal(typeof directAvailable, 'boolean', 'hasDirectCloudflared must return a boolean without throwing');
+
+    // Verify Docker & Cloud Run deployment manifests
+    const dockerfilePath = path.join(__dirname, '..', 'Dockerfile');
+    const dockerignorePath = path.join(__dirname, '..', '.dockerignore');
+    const deployScriptPath = path.join(__dirname, '..', 'deploy-cloudrun.sh');
+
+    assert.ok(fs.existsSync(dockerfilePath), 'Dockerfile must exist');
+    assert.ok(fs.existsSync(dockerignorePath), '.dockerignore must exist');
+    assert.ok(fs.existsSync(deployScriptPath), 'deploy-cloudrun.sh must exist');
+
+    const dockerContent = fs.readFileSync(dockerfilePath, 'utf8');
+    assert.ok(dockerContent.includes('cloudflared'), 'Dockerfile must pre-bake native cloudflared');
+    assert.ok(dockerContent.includes('yt-dlp'), 'Dockerfile must pre-bake yt-dlp');
+    assert.ok(dockerContent.includes('server.js'), 'Dockerfile must boot server.js');
+
+    // Verify GitHub Actions workflows contain node_modules caching and direct cloudflared
+    const repostJobPath = path.join(__dirname, '..', '.github', 'workflows', 'repost-job.yml');
+    const cronJobPath = path.join(__dirname, '..', '.github', 'workflows', 'watchtower-cron.yml');
+
+    const repostYml = fs.readFileSync(repostJobPath, 'utf8');
+    assert.ok(repostYml.includes('node-cache'), 'repost-job.yml must cache node_modules');
+    assert.ok(repostYml.includes('cloudflared'), 'repost-job.yml must install native cloudflared');
+    assert.ok(repostYml.includes('pip-cache'), 'repost-job.yml must cache pip packages');
+
+    const cronYml = fs.readFileSync(cronJobPath, 'utf8');
+    assert.ok(cronYml.includes('node-cache'), 'watchtower-cron.yml must cache node_modules');
+    assert.ok(cronYml.includes('cloudflared'), 'watchtower-cron.yml must install native cloudflared');
   });
 });

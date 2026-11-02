@@ -116,20 +116,48 @@ module.exports = async function handler(req, res) {
       const pages = getPagesList();
       const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };
 
+      const cloudRunUrl = (process.env.CLOUD_RUN_WORKER_URL || process.env.CLOUD_RUN_URL || '').trim().replace(/\/$/, '');
+      const isCloudRun = Boolean(cloudRunUrl);
+
       // Update message with in-place stepper
       await editTelegram(
         chatId,
         messageId,
         `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>\n` +
         `📱 <b>Destination:</b> <code>${targetPage.handle}</code> (${targetPage.name})\n\n` +
-        `⏳ <b>1. Ingest:</b> Cloud runner initializing...\n` +
+        `⏳ <b>1. Ingest:</b> ${isCloudRun ? 'Cloud Run worker connecting...' : 'Cloud runner initializing...'}\n` +
         `⚪ <b>2. Download:</b> Waiting\n` +
         `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
         `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
-        `<i>Status: Spawning GitHub Actions cloud runner...</i>`
+        `<i>Status: ${isCloudRun ? 'Dispatching to high-speed Cloud Run service...' : 'Spawning turbocharged cloud runner...'}</i>`
       );
 
-      // Trigger GitHub Actions Workflow
+      // 1. Instant Direct Cloud Run Dispatch (Sub-second latency)
+      if (cloudRunUrl) {
+        try {
+          console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}...`);
+          await axios.post(
+            `${cloudRunUrl}/api/reposter/jobs`,
+            {
+              url: `https://www.instagram.com/reel/${shortcode}/`,
+              chatId: String(chatId),
+              chat_id: String(chatId),
+              pageId: parseInt(pageId, 10),
+              page_id: parseInt(pageId, 10),
+              messageId: String(messageId),
+              message_id: String(messageId),
+              origin: 'telegram_cloud'
+            },
+            { timeout: 10000 }
+          );
+          console.log(`[Webhook] ✓ Successfully dispatched to Cloud Run for #${shortcode}`);
+          return res.status(200).json({ ok: true, runner: 'cloud_run' });
+        } catch (crErr) {
+          console.warn(`[Webhook Cloud Run Warning]: ${crErr.message}. Falling back to GitHub Actions runner...`);
+        }
+      }
+
+      // 2. Trigger Turbocharged GitHub Actions Workflow
       if (!GITHUB_TOKEN) {
         await sendTelegram(
           chatId,

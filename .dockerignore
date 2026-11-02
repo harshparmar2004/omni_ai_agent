@@ -1,0 +1,9 @@
+node_modules
+.git
+.github
+*.log
+data/*.sqlite
+data/downloads/*
+public/generated/downloads/*
+public/generated/carousels/*
+test

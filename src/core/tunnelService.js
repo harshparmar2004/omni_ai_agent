@@ -15,15 +15,32 @@ let fallbackLtTunnel = null;
 let isStarting = false;
 let currentPort = 4000;
 
+const { execSync } = require('child_process');
+
+function hasDirectCloudflared() {
+  try {
+    const cmd = process.platform === 'win32' ? 'where cloudflared' : 'which cloudflared';
+    execSync(cmd, { stdio: 'ignore' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 /**
  * Launch Cloudflare Edge Tunnel
  */
 function launchCloudflareTunnel(port = 4000) {
   return new Promise((resolve) => {
-    console.log(`[Tunnel Service] ⚡ Starting Cloudflare Edge Tunnel on port ${port}...`);
+    const directAvailable = hasDirectCloudflared();
+    console.log(`[Tunnel Service] ⚡ Starting Cloudflare Edge Tunnel on port ${port} (${directAvailable ? 'direct native binary' : 'via npx package'})...`);
     
-    // Spawn npx cloudflared tunnel --url http://127.0.0.1:<port>
-    const cp = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://127.0.0.1:${port}`], {
+    const binary = directAvailable ? 'cloudflared' : 'npx';
+    const binaryArgs = directAvailable 
+      ? ['tunnel', '--url', `http://127.0.0.1:${port}`]
+      : ['--yes', 'cloudflared', 'tunnel', '--url', `http://127.0.0.1:${port}`];
+
+    const cp = spawn(binary, binaryArgs, {
       shell: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -202,5 +219,6 @@ module.exports = {
   startTunnel,
   ensureTunnelOnline,
   getTunnelUrl,
-  closeTunnel
+  closeTunnel,
+  hasDirectCloudflared
 };

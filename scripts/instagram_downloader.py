@@ -52,15 +52,32 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
     os.makedirs(carousel_dir, exist_ok=True)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ]
-        )
+        try:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-blink-features=AutomationControlled"
+                ]
+            )
+        except Exception as launch_err:
+            err_str = str(launch_err).lower()
+            if "playwright install" in err_str or "executable doesn't exist" in err_str or "not found" in err_str:
+                print("[Downloader] ⚡ On-demand Playwright Chromium installation triggered...", file=sys.stderr)
+                subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=False)
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-blink-features=AutomationControlled"
+                    ]
+                )
+            else:
+                raise launch_err
         context = await browser.new_context(
             user_agent=(
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

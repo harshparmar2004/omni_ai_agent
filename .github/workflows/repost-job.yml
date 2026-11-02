@@ -59,16 +59,28 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
 
-      - name: 🐍 Setup Python 3.10
-        uses: actions/setup-python@v5
+      - name: 💾 Restore Node Modules Cache
+        uses: actions/cache@v4
+        id: node-cache
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
 
       - name: 📦 Install Node Dependencies
+        if: steps.node-cache.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: ⚡ Ensure Native Cloudflared Executable
+        run: |
+          if ! command -v cloudflared &> /dev/null; then
+            echo "[Cloud Runner] Installing native Cloudflared binary..."
+            sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+            sudo chmod +x /usr/local/bin/cloudflared
+          fi
+          cloudflared --version
 
       - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
@@ -91,6 +103,15 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
+      - name: 💾 Cache Pip Packages
+        uses: actions/cache@v4
+        id: pip-cache
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: 💾 Cache Playwright Chromium
         uses: actions/cache@v4
         id: playwright-cache
@@ -98,12 +119,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-v1
 
-      - name: 🌐 Install Dependencies & Playwright Chromium
-        run: |
-          pip install playwright yt-dlp requests
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
-            playwright install chromium
-          fi
+      - name: 🌐 Install Fast Media Stream Downloader
+        run: pip install --quiet yt-dlp requests playwright
 
       - name: 🚀 Run Autonomous Reposter Engine
         env:

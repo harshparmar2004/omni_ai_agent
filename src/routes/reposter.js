@@ -24,7 +24,7 @@ router.get('/pipeline-summary', (req, res) => {
  */
 router.post('/jobs', async (req, res) => {
   try {
-    const { url, pageId, reviewCaption } = req.body;
+    const { url, pageId, chatId, messageId, chat_id, message_id, reviewCaption } = req.body;
     if (!url) {
       return res.status(400).json({ error: 'Instagram URL is required' });
     }
@@ -32,7 +32,9 @@ router.post('/jobs', async (req, res) => {
     const result = await submitLink({
       url,
       pageId: pageId ? parseInt(pageId, 10) : null,
-      origin: 'dashboard',
+      origin: req.body.origin || 'dashboard',
+      chatId: chatId || chat_id || '',
+      messageId: messageId || message_id || '',
       reviewCaption: Boolean(reviewCaption)
     });
 
