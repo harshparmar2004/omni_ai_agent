@@ -116,12 +116,12 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(built.includes('#clubbing'), 'Should include #clubbing hashtag');
     assert.ok(!built.includes('@tomorrowland'), 'Should strip competitor mention');
 
-    // 2. 9:16 Vertical Cyberpunk HUD Template (Instagram Safe-Zone Compliant)
+    // 2. 9:16 Vertical Template: Clean Proper Square Branding Badge in Reel
     const vPath = generateFeedPostOverlay('clubbingcult', {
-      cardX: 166, cardY: 322, cardW: 748, cardH: 1328, isVertical: true, theme: 'clubbing'
+      cardX: 0, cardY: 0, cardW: 1080, cardH: 1920, isVertical: true, theme: 'clubbing'
     });
-    assert.ok(fs.existsSync(vPath), 'Vertical cyber overlay must exist');
-    assert.ok(fs.statSync(vPath).size > 10000, 'Vertical cyber overlay must be valid PNG');
+    assert.ok(fs.existsSync(vPath), 'Vertical square overlay must exist');
+    assert.ok(fs.statSync(vPath).size > 10000, 'Vertical square overlay must be valid PNG');
 
     // 3. 16:9 Landscape Adaptive Cyberpunk HUD Template
     const lPath = generateFeedPostOverlay('clubbingcult', {

@@ -796,12 +796,146 @@ function generateClubbingCyberOverlay(handle, options = {}) {
     isVertical = true
   } = options;
 
-  // For 9:16 vertical, use the dedicated high-res master template asset matching user safe-zone specifications
+  // For 9:16 vertical, generate the clean square branding badge in the middle of the reel
   if (isVertical) {
-    const masterPath = path.join(__dirname, '..', '..', 'public', 'images', 'clubbingcult_9_16_template.png');
-    if (fs.existsSync(masterPath)) {
-      return masterPath;
-    }
+    const { createCanvas } = require('@napi-rs/canvas');
+    const width = 1080;
+    const height = 1920;
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    const squareSize = options.squareSize || 310;
+    const centerY = options.centerY || options.badgeY || (process.env.CLUBBING_BADGE_Y ? parseInt(process.env.CLUBBING_BADGE_Y, 10) : 960);
+    const sqX = (width - squareSize) / 2;
+    const sqY = centerY - (squareSize / 2);
+    const radius = 22;
+
+    const neonGreen = '#00FFA3';
+    const neonLime = '#39FF14';
+
+    ctx.save();
+
+    // 1. Ambient Outer Neon Glow
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
+    ctx.shadowBlur = 26;
+
+    // 2. Obsidian Glass Background
+    ctx.fillStyle = 'rgba(3, 8, 5, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(sqX, sqY, squareSize, squareSize, radius);
+    ctx.fill();
+
+    // 3. Subtle Glass Depth Gradient
+    const depthGrad = ctx.createLinearGradient(sqX, sqY, sqX + squareSize, sqY + squareSize);
+    depthGrad.addColorStop(0, 'rgba(0, 255, 163, 0.09)');
+    depthGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+    depthGrad.addColorStop(1, 'rgba(0, 255, 163, 0.05)');
+    ctx.fillStyle = depthGrad;
+    ctx.beginPath();
+    ctx.roundRect(sqX, sqY, squareSize, squareSize, radius);
+    ctx.fill();
+
+    // 4. Outer Neon Green Border (2.5px)
+    const borderGrad = ctx.createLinearGradient(sqX, sqY, sqX + squareSize, sqY + squareSize);
+    borderGrad.addColorStop(0, '#00FFA3');
+    borderGrad.addColorStop(0.5, '#00E5FF');
+    borderGrad.addColorStop(1, '#39FF14');
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.roundRect(sqX, sqY, squareSize, squareSize, radius);
+    ctx.stroke();
+
+    // 5. Inner Hairline Accent (1px)
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(sqX + 3.5, sqY + 3.5, squareSize - 7, squareSize - 7, radius - 2);
+    ctx.stroke();
+
+    // 6. Minimal Top Accent: Pulse Dot + "LIVE REEL" and Mini Equalizer
+    const topAccY = sqY + 36;
+    ctx.save();
+    ctx.fillStyle = neonLime;
+    ctx.shadowColor = neonLime;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(sqX + 34, topAccY, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 11px "Courier New", monospace, sans-serif';
+    ctx.fillStyle = 'rgba(0, 255, 163, 0.8)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LIVE REEL', sqX + 44, topAccY);
+
+    // Equalizer wave on top right
+    const waveX = sqX + squareSize - 58;
+    ctx.fillStyle = neonGreen;
+    const bars = [8, 14, 7, 12, 6];
+    bars.forEach((bH, i) => {
+      ctx.fillRect(waveX + (i * 5), topAccY - (bH / 2), 2.2, bH);
+    });
+    ctx.restore();
+
+    // 7. Brand Name: CLUBBING CULT (matching official logo)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // "CLUBBING"
+    ctx.save();
+    ctx.font = '900 27px "Arial Black", "Trebuchet MS", sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.65)';
+    ctx.shadowBlur = 10;
+    ctx.fillText('CLUBBING', width / 2, sqY + 104);
+
+    // "CULT"
+    ctx.fillText('CULT', width / 2, sqY + 146);
+    ctx.restore();
+
+    // 8. Dividing Neon Underline (exact from official logo)
+    const lineW = 75;
+    const lineY = sqY + 178;
+    ctx.save();
+    ctx.strokeStyle = neonGreen;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = neonGreen;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(width / 2 - lineW / 2, lineY);
+    ctx.lineTo(width / 2 + lineW / 2, lineY);
+    ctx.stroke();
+    ctx.restore();
+
+    // 9. Instagram Page Name: @clubbingcult
+    ctx.save();
+    ctx.font = 'bold 18px "Courier New", monospace, sans-serif';
+    ctx.fillStyle = neonGreen;
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
+    ctx.shadowBlur = 6;
+    ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, sqY + 218);
+    ctx.restore();
+
+    // 10. Clean minimal bottom subline
+    ctx.save();
+    ctx.font = 'bold 10px Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+    ctx.shadowBlur = 0;
+    ctx.fillText('N I G H T L I F E', width / 2, sqY + 262);
+    ctx.restore();
+
+    ctx.restore();
+
+    const publicDir = path.join(__dirname, '..', '..', 'public');
+    const genDir = path.join(publicDir, 'generated');
+    if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+    const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'clubbingcult'}.png`);
+    fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+    return overlayPath;
   }
 
   const { createCanvas } = require('@napi-rs/canvas');
@@ -1432,14 +1566,14 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   if (isVertical) {
     if (isClubbing) {
-      // Clubbing Cult Cyberpunk HUD: 9:16 Instagram Safe-Zone Geometry (748x1328)
-      cardW = 748;
-      cardH = 1328;
-      cardX = 166;
-      cardY = 322;
+      // Clubbing Cult: 9:16 Full Screen Edge-to-Edge video with centered proper square branding badge
+      cardW = 1080;
+      cardH = 1920;
+      cardX = 0;
+      cardY = 0;
 
       videoFilter = [
-        `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
+        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v1]',
         '[v1][1:v]overlay=0:0[outv]'
       ].join(';');
     } else {
