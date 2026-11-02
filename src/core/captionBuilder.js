@@ -186,10 +186,10 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
 /**
  * Builds AI-buffed viral caption and metadata (including hook headline)
  */
-async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', page = {} }) {
+async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '' }) {
   try {
     const { generateAiCaption } = require('./llmService');
-    const result = await generateAiCaption({ rawCaption, sourceUsername, page });
+    const result = await generateAiCaption({ rawCaption, sourceUsername, page, videoPath });
     return {
       caption: result.caption || buildCaption({ rawCaption, sourceUsername, page }),
       hookHeadline: result.hookHeadline || '',

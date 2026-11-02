@@ -130,7 +130,7 @@ async function callOllama(prompt) {
  * @param {Object} options.page - Target destination page configuration
  * @returns {Promise<{ caption: string, provider: string, model: string }>}
  */
-async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
+async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '' }) {
   const isClubbing = (page.slug && page.slug.includes('club')) ||
                      (page.handle && page.handle.includes('club')) ||
                      (page.name && /club|rave|party|dance|edm|techno|concert/i.test(page.name)) ||
@@ -245,8 +245,24 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
     let usedProvider = 'deterministic';
     let usedModel = 'none';
 
-    // If source has sentences, extract a punchy first sentence as fallback hook (decimal-safe)
-    if (cleanedSource) {
+    // 1. Check On-Screen Reel Vision OCR first if video is provided (reads text written on the reel!)
+    if (videoPath) {
+      try {
+        const { detectOnScreenHeadline } = require('./videoVisionService');
+        const visionResult = await detectOnScreenHeadline(videoPath);
+        if (visionResult && visionResult.found && visionResult.headline) {
+          console.log(`[LLM Service] 👁️ On-Screen Reel Vision detected hook: "${visionResult.headline}"`);
+          headline = visionResult.headline;
+          usedProvider = visionResult.provider || 'gemini_vision';
+          usedModel = 'multimodal_ocr';
+        }
+      } catch (visionErr) {
+        console.warn(`[LLM Service] Video vision scan notice: ${visionErr.message}`);
+      }
+    }
+
+    // 2. If no on-screen title was detected, extract a punchy first sentence from caption (decimal-safe)
+    if (headline === defaultAiHeadline && cleanedSource) {
       const clean = cleanedSource.replace(/^["'“”]/, '').replace(/["'“”]$/, '').trim();
       // Match up to first sentence ending (. ! ? or newline) but DO NOT split on decimal digits (e.g. $12.93 or $1.12)
       const sentenceMatch = clean.match(/^([^.!?\n]+(?:\.\d+[^.!?\n]*)*)(?:[.!?\n]|$)/);

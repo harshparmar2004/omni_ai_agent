@@ -1754,12 +1754,12 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       if (isPreFormatted) {
         // Pre-formatted reel from competitor (e.g. @evolving.ai):
         // Keep video at 1080:1920 in its original center position!
-        // The Cult Information overlay covers Y=0 to 640 in solid black,
-        // completely obliterating the competitor's header and replacing it with Cult Information!
+        // The Cult Information overlay covers Y=0 to 740 in solid black,
+        // completely obliterating any competitor header and title text (e.g. at Y=580-664)!
         cardW = 1080;
-        cardH = 720;
+        cardH = 680;
         cardX = 0;
-        cardY = 640;
+        cardY = 740;
 
         videoFilter = [
           '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]',

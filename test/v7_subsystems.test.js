@@ -257,4 +257,32 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     // 4. Competitor Letterbox Detection Export
     assert.equal(typeof isLetterboxedReel, 'function', 'isLetterboxedReel must be an exported function');
   });
+
+  await t.test('10. Video Vision Service & On-Screen Reel OCR Subsystem', async () => {
+    const { extractSnapshotFrame, detectOnScreenHeadline } = require('../src/core/videoVisionService');
+    const { generateFeedPostOverlay } = require('../src/utils/ffmpegHelper');
+    const fs = require('fs');
+
+    assert.equal(typeof extractSnapshotFrame, 'function', 'extractSnapshotFrame must be exported');
+    assert.equal(typeof detectOnScreenHeadline, 'function', 'detectOnScreenHeadline must be exported');
+
+    // Handle missing or invalid video path safely
+    const missingRes = await detectOnScreenHeadline('/non/existent/video.mp4');
+    assert.equal(missingRes.found, false);
+    assert.equal(missingRes.reason, 'file_not_found');
+
+    // Verify 740px deep blackout overlay generation for competitor text elimination
+    const deepOverlay = await generateFeedPostOverlay('cult_information', {
+      cardX: 0,
+      cardY: 740,
+      cardW: 1080,
+      cardH: 680,
+      isVertical: true,
+      theme: 'video_essay',
+      hookHeadline: "Scientists Made The First **Living Thing** Built For **Mars**"
+    });
+
+    assert.ok(fs.existsSync(deepOverlay), 'Deep blackout overlay file must exist');
+    assert.ok(fs.statSync(deepOverlay).size > 10000, 'Deep blackout overlay must be non-empty PNG');
+  });
 });

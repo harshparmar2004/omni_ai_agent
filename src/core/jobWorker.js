@@ -239,7 +239,12 @@ class JobWorkerPool {
       if (job.caption && job.caption !== rawCaption) {
         finalCaption = job.caption;
       } else {
-        const copyDetails = await buildAiCaptionDetails({ rawCaption, sourceUsername: sourceUploader, page });
+        const copyDetails = await buildAiCaptionDetails({
+          rawCaption,
+          sourceUsername: sourceUploader,
+          page,
+          videoPath: (mediaPaths && mediaPaths[0]) || ''
+        });
         finalCaption = copyDetails.caption;
         hookHeadline = copyDetails.hookHeadline || '';
       }
