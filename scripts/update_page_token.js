@@ -97,7 +97,7 @@ async function run() {
       console.log(`\n💾 Database Updated Successfully for Page #${page.id}!`);
       console.log(`   Token prefix: ${newToken.substring(0, 15)}...${newToken.slice(-6)}`);
       console.log('\n👉 Next Step: Update your GitHub Repository Secret:');
-      const secretName = page.id === 2 ? 'MOVIE_META_ACCESS_TOKEN' : (page.id === 3 ? 'TECH_META_ACCESS_TOKEN' : 'META_ACCESS_TOKEN');
+      const secretName = page.id === 2 ? 'MOVIE_META_ACCESS_TOKEN' : (page.id === 3 ? 'CLUBBING_META_ACCESS_TOKEN (or TECH_META_ACCESS_TOKEN)' : 'META_ACCESS_TOKEN');
       console.log(`   Go to GitHub Repository -> Settings -> Secrets and variables -> Actions`);
       console.log(`   Update secret: ${secretName}`);
     } else {

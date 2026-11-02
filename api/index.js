@@ -20,8 +20,10 @@ const META_ACCESS_TOKEN = sanitizeToken(process.env.META_ACCESS_TOKEN || 'IGAAYJ
 const IG_USER_ID = (process.env.IG_USER_ID || '17841428668115319').trim();
 const MOVIE_META_ACCESS_TOKEN = sanitizeToken(process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD');
 const MOVIE_IG_USER_ID = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
-const TECH_META_ACCESS_TOKEN = sanitizeToken(process.env.TECH_META_ACCESS_TOKEN || process.env.HARSH_META_ACCESS_TOKEN || '');
-const TECH_IG_USER_ID = (process.env.TECH_IG_USER_ID || '17841434441251009').trim();
+const CLUBBING_META_ACCESS_TOKEN = sanitizeToken(process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || process.env.HARSH_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD');
+const CLUBBING_IG_USER_ID = (process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
+const TECH_META_ACCESS_TOKEN = CLUBBING_META_ACCESS_TOKEN;
+const TECH_IG_USER_ID = CLUBBING_IG_USER_ID;
 
 // Path normalization middleware for Vercel Serverless rewrites
 app.use((req, res, next) => {
@@ -40,12 +42,12 @@ function getCompetitorsConfig() {
       const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed)) {
-          return { gta6: parsed, movies: [] };
+          return { gta6: parsed, movies: [], clubbing: [] };
         }
         return {
           gta6: Array.isArray(parsed.gta6) ? parsed.gta6 : ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
           movies: Array.isArray(parsed.movies) ? parsed.movies : [],
-          techguy: Array.isArray(parsed.techguy) ? parsed.techguy : []
+          clubbing: Array.isArray(parsed.clubbing) ? parsed.clubbing : (Array.isArray(parsed.techguy) ? parsed.techguy : ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'])
         };
       }
     }
@@ -53,7 +55,7 @@ function getCompetitorsConfig() {
   return {
     gta6: ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
     movies: [],
-    techguy: []
+    clubbing: ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords']
   };
 }
 
@@ -61,8 +63,8 @@ function getCompetitors(targetPage = null) {
   const cfg = getCompetitorsConfig();
   if (targetPage === 1 || targetPage === '1' || targetPage === 'gta6') return cfg.gta6;
   if (targetPage === 2 || targetPage === '2' || targetPage === 'movies') return cfg.movies;
-  if (targetPage === 3 || targetPage === '3' || targetPage === 'techguy') return cfg.techguy || [];
-  return [...cfg.gta6, ...cfg.movies, ...(cfg.techguy || [])];
+  if (targetPage === 3 || targetPage === '3' || targetPage === 'clubbing' || targetPage === 'techguy') return cfg.clubbing || [];
+  return [...cfg.gta6, ...cfg.movies, ...(cfg.clubbing || [])];
 }
 
 // Helper: Normalize username or Instagram URL
@@ -107,19 +109,19 @@ async function saveCompetitorsToGitHub(competitorsConfig, commitMessage) {
 }
 
 // Live Cache for Meta Graph API Media per page (1 minute TTL)
-let mediaCache = { 1: { data: null, timestamp: 0 }, 2: { data: null, timestamp: 0 } };
+let mediaCache = { 1: { data: null, timestamp: 0 }, 2: { data: null, timestamp: 0 }, 3: { data: null, timestamp: 0 } };
 const MEDIA_CACHE_TTL_MS = 60 * 1000;
 
 async function getLivePublishedMedia(pageId = 1) {
-  const pId = (pageId === 2 || String(pageId) === '2' || pageId === 'movies') ? 2 : 1;
+  const pId = (pageId === 3 || String(pageId) === '3' || pageId === 'clubbing') ? 3 : ((pageId === 2 || String(pageId) === '2' || pageId === 'movies') ? 2 : 1);
   const now = Date.now();
   if (mediaCache[pId]?.data && (now - mediaCache[pId].timestamp < MEDIA_CACHE_TTL_MS)) {
     return mediaCache[pId].data;
   }
 
-  const token = pId === 2 ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN;
-  const igId = pId === 2 ? MOVIE_IG_USER_ID : IG_USER_ID;
-  const pageHandle = pId === 2 ? '@movie_series_365' : '@gta6_updates_007';
+  const token = pId === 3 ? CLUBBING_META_ACCESS_TOKEN : (pId === 2 ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN);
+  const igId = pId === 3 ? CLUBBING_IG_USER_ID : (pId === 2 ? MOVIE_IG_USER_ID : IG_USER_ID);
+  const pageHandle = pId === 3 ? '@clubbingcult' : (pId === 2 ? '@movie_series_365' : '@gta6_updates_007');
 
   if (!token) return getFallbackMedia(pId);
 
@@ -131,10 +133,13 @@ async function getLivePublishedMedia(pageId = 1) {
     const formatted = raw.map((item) => {
       const match = (item.permalink || '').match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       const shortcode = match ? match[1] : `ig_${item.id}`;
+      const isClubbing = (pId === 3 || String(pId) === '3');
       const isMovie = (pId === 2 || String(pId) === '2');
-      const defaultThumb = isMovie
-        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80';
+      const defaultThumb = isClubbing
+        ? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
+        : (isMovie
+          ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80');
 
       return {
         id: item.id,
@@ -150,7 +155,7 @@ async function getLivePublishedMedia(pageId = 1) {
         format: '1080p MP4',
         aspect_ratio: '9:16 Vertical',
         dimensions: '1080 × 1920',
-        file_size: isMovie ? '22.8 MB' : '18.4 MB',
+        file_size: isClubbing ? '20.4 MB' : (isMovie ? '22.8 MB' : '18.4 MB'),
         created_at: item.timestamp,
         downloaded_at: item.timestamp,
         published_at: item.timestamp,
@@ -275,27 +280,31 @@ const PAGE_MOVIES = {
   is_active: 1
 };
 
-const PAGE_TECH = {
+const PAGE_CLUBBING = {
   id: 3,
-  slug: 'techguy',
-  name: 'Tech Guy Harsh Parmar',
-  handle: '@techguyharshparmar',
-  ig_user_id: TECH_IG_USER_ID,
-  access_token: TECH_META_ACCESS_TOKEN,
-  access_token_masked: TECH_META_ACCESS_TOKEN ? `${TECH_META_ACCESS_TOKEN.substring(0, 6)}...${TECH_META_ACCESS_TOKEN.slice(-4)}` : '',
-  has_valid_token: Boolean(TECH_META_ACCESS_TOKEN && TECH_META_ACCESS_TOKEN.length > 20),
+  slug: 'clubbing',
+  name: 'Clubbing Cult',
+  handle: '@clubbingcult',
+  ig_user_id: CLUBBING_IG_USER_ID,
+  access_token: CLUBBING_META_ACCESS_TOKEN,
+  access_token_masked: CLUBBING_META_ACCESS_TOKEN ? `${CLUBBING_META_ACCESS_TOKEN.substring(0, 6)}...${CLUBBING_META_ACCESS_TOKEN.slice(-4)}` : '',
+  has_valid_token: Boolean(CLUBBING_META_ACCESS_TOKEN && CLUBBING_META_ACCESS_TOKEN.length > 20),
   caption_template: '{caption}\n\n{hashtags}',
-  default_hashtags: '#tech #technology #gadgets #ai #techguyharshparmar',
+  default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult',
+  icon: '🪩',
+  accent_color: '#00FFA3',
   attribution_enabled: 0,
   watermark_enabled: 0,
   post_mode: 'auto',
   posts_per_cycle: 1,
-  daily_quota: 5,
+  daily_quota: 7,
   min_spacing_minutes: 90,
   is_active: 1
 };
 
-let dynamicPages = [PAGE_GTA6, PAGE_MOVIES, PAGE_TECH];
+const PAGE_TECH = PAGE_CLUBBING;
+
+let dynamicPages = [PAGE_GTA6, PAGE_MOVIES, PAGE_CLUBBING];
 
 function getPagesList() {
   return dynamicPages;
@@ -696,6 +705,24 @@ router.get('/sources', (req, res) => {
     }
   }
 
+  if (!pageFilter || pageFilter === 3) {
+    for (const u of (cfg.clubbing || [])) {
+      const syncedCount = (reservoir[u] || []).length || 6;
+      sources.push({
+        id: idCounter++,
+        username: u,
+        page_id: 3,
+        page_slug: 'clubbing',
+        page_name: 'Clubbing Cult',
+        page_handle: '@clubbingcult',
+        synced_posts_count: syncedCount,
+        last_checked_at: new Date(Date.now() - (idCounter * 15 * 60 * 1000)).toISOString(),
+        is_active: 1,
+        health: 'ok'
+      });
+    }
+  }
+
   res.json(sources);
 });
 
@@ -861,7 +888,7 @@ router.get('/watchtower/pipeline-summary', async (req, res) => {
   const pageFilter = req.query.pageId ? parseInt(req.query.pageId, 10) : null;
   const cfg = getCompetitorsConfig();
   const published = await getLivePublishedMedia(pageFilter || 1);
-  const totalSources = pageFilter === 2 ? cfg.movies.length : (pageFilter === 1 ? cfg.gta6.length : cfg.gta6.length + cfg.movies.length);
+  const totalSources = pageFilter === 3 ? (cfg.clubbing || []).length : (pageFilter === 2 ? cfg.movies.length : (pageFilter === 1 ? cfg.gta6.length : cfg.gta6.length + cfg.movies.length + (cfg.clubbing || []).length));
 
   res.json({
     sources: totalSources,
@@ -886,6 +913,13 @@ const GTA_CAPTIONS = [
   'Weapon wheel & combat mechanics comparison with GTA 5 💥 #rockstar'
 ];
 
+const CLUBBING_CAPTIONS = [
+  'Insane live festival drop from this weekend! 🪩 Rate this track 1-10 👇 #clubbing #rave',
+  'Underground techno live set that broke the dancefloor 🔥 #techno #edm #clubbingcult',
+  'Epic house party energy! Save this & tag your crew 🔊 #party #houseparty',
+  'Unreal crowd reaction at the festival mainstage! 🚀 #concert #festivals #nightlife'
+];
+
 function buildDiscoveriesReservoir() {
   let reservoir = {};
   try {
@@ -898,9 +932,17 @@ function buildDiscoveriesReservoir() {
   const list = [];
   let id = 101;
   const now = Date.now();
+  const cfg = getCompetitorsConfig();
 
   for (const [creator, urls] of Object.entries(reservoir)) {
     if (!Array.isArray(urls)) continue;
+    const isClubCreator = (cfg.clubbing || []).some(c => c.toLowerCase() === creator.toLowerCase());
+    const isMovieCreator = (cfg.movies || []).some(c => c.toLowerCase() === creator.toLowerCase());
+    const pId = isClubCreator ? 3 : (isMovieCreator ? 2 : 1);
+    const pSlug = isClubCreator ? 'clubbing' : (isMovieCreator ? 'movies' : 'gta6');
+    const pName = isClubCreator ? 'Clubbing Cult' : (isMovieCreator ? 'Movie Recommendations' : 'GTA 6 Updates 007');
+    const pHandle = isClubCreator ? '@clubbingcult' : (isMovieCreator ? '@movie_series_365' : '@gta6_updates_007');
+
     urls.forEach((url, idx) => {
       const match = url.match(/\/reel\/([A-Za-z0-9_-]+)/);
       const shortcode = match ? match[1] : `reel_${id}`;
@@ -911,20 +953,24 @@ function buildDiscoveriesReservoir() {
       const comments = Math.round(likes * 0.04);
       const views = likes * 8 + 15000;
 
+      const caption = isClubCreator
+        ? CLUBBING_CAPTIONS[(id + idx) % CLUBBING_CAPTIONS.length]
+        : GTA_CAPTIONS[(id + idx) % GTA_CAPTIONS.length];
+
       list.push({
         id: id++,
         shortcode,
         url,
         media_type: 'reel',
-        caption: GTA_CAPTIONS[(id + idx) % GTA_CAPTIONS.length],
+        caption,
         score: rankScore,
         virality_score: rankScore,
         status: 'new',
         source_username: creator,
-        page_id: 1,
-        page_slug: 'gta6',
-        page_name: 'GTA 6 Updates 007',
-        page_handle: '@gta6_updates_007',
+        page_id: pId,
+        page_slug: pSlug,
+        page_name: pName,
+        page_handle: pHandle,
         posted_at: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
         created_at: new Date(now - hoursAgo * 3600 * 1000).toISOString(),
         age_hours: hoursAgo,

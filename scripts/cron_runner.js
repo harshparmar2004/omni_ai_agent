@@ -90,17 +90,21 @@ async function main() {
     });
   }
 
-  let page3 = db.prepare('SELECT * FROM pages WHERE id = 3 OR slug = "techguy"').get();
+  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
+  const clubbingToken = sanitizeToken(process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
+  const clubbingIgId = (process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
+
+  let page3 = db.prepare('SELECT * FROM pages WHERE id = 3 OR slug = "clubbing" OR slug = "techguy"').get();
   if (!page3) {
-    console.log('💻 Creating default Page #3 (@techguyharshparmar)...');
+    console.log('🪩 Creating default Page #3 (@clubbingcult)...');
     createPage({
-      slug: 'techguy',
-      name: 'Tech Guy Harsh Parmar',
-      handle: '@techguyharshparmar',
-      ig_user_id: process.env.TECH_IG_USER_ID || '17841434441251009',
-      access_token: process.env.TECH_META_ACCESS_TOKEN || '',
+      slug: 'clubbing',
+      name: 'Clubbing Cult',
+      handle: '@clubbingcult',
+      ig_user_id: clubbingIgId,
+      access_token: clubbingToken,
       caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#tech #technology #gadgets #ai #techguyharshparmar',
+      default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult',
       attribution_enabled: 0,
       watermark_enabled: 0,
       post_mode: 'auto',
@@ -124,7 +128,7 @@ async function main() {
     db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
     db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks', is_active = 1 WHERE id = 1").run();
     db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
-    db.prepare("UPDATE pages SET slug = 'techguy', name = 'Tech Guy Harsh Parmar', handle = '@techguyharshparmar', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#tech #technology #gadgets #ai #techguyharshparmar', is_active = 1 WHERE id = 3").run();
+    db.prepare("UPDATE pages SET slug = 'clubbing', name = 'Clubbing Cult', handle = '@clubbingcult', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult', is_active = 1 WHERE id = 3 OR slug = 'techguy' OR slug = 'clubbing'").run();
   } catch (e) {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
@@ -143,17 +147,14 @@ async function main() {
   const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
-  if (process.env.TECH_META_ACCESS_TOKEN) {
-    const techToken = sanitizeToken(process.env.TECH_META_ACCESS_TOKEN);
-    const techId = (process.env.TECH_IG_USER_ID || '17841434441251009').trim();
-    db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "techguy"').run(techToken, techId);
-  }
+  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "clubbing"').run(clubbingToken, clubbingIgId);
   let pages = getPages({ isActiveOnly: true });
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
   const { createSourceAccount } = require('../src/database');
   let gtaCompetitors = ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'];
   let movieCompetitors = [];
+  let clubbingCompetitors = ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'];
 
   const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
   if (fs.existsSync(competitorsJsonPath)) {
@@ -162,6 +163,7 @@ async function main() {
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         if (parsed.gta6 && Array.isArray(parsed.gta6)) gtaCompetitors = parsed.gta6;
         if (parsed.movies && Array.isArray(parsed.movies)) movieCompetitors = parsed.movies;
+        if (parsed.clubbing && Array.isArray(parsed.clubbing)) clubbingCompetitors = parsed.clubbing;
       } else if (Array.isArray(parsed)) {
         gtaCompetitors = parsed;
       }
@@ -201,8 +203,23 @@ async function main() {
     }
   }
 
-  const allActiveSources = [...cleanGta, ...cleanMovies];
-  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}]`);
+  // Register Clubbing sources for Page 3
+  const cleanClubbing = [...new Set(clubbingCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+  if (cleanClubbing.length === 0) {
+    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 3').run(); } catch (e) {}
+  } else {
+    try {
+      const placeholders = cleanClubbing.map(() => '?').join(',');
+      db.prepare(`DELETE FROM source_accounts WHERE page_id = 3 AND username NOT IN (${placeholders})`).run(...cleanClubbing);
+    } catch (e) {}
+    for (const comp of cleanClubbing) {
+      createSourceAccount({ username: comp, page_id: 3, is_active: 1 });
+      try { db.prepare('UPDATE source_accounts SET page_id = 3, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
+    }
+  }
+
+  const allActiveSources = [...cleanGta, ...cleanMovies, ...cleanClubbing];
+  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}] | Clubbing: [${cleanClubbing.map(c => '@' + c).join(', ')}]`);
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);

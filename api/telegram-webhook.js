@@ -57,7 +57,8 @@ function getPagesList() {
   } catch (e) {}
   return [
     { id: '1', slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', icon: '🎮' },
-    { id: '2', slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', icon: '🍿' }
+    { id: '2', slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', icon: '🍿' },
+    { id: '3', slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', icon: '🪩' }
   ];
 }
 

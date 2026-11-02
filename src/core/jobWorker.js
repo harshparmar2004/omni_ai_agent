@@ -257,14 +257,15 @@ class JobWorkerPool {
       let pubResult = null;
       if (mediaType === 'reel') {
         let feedVideoPath = mediaPaths[0];
-        const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode', 'frame');
-        const isMoviePage = page.slug === 'movies' || page.id === 2 || (page.handle && page.handle.includes('movie'));
-        const pageTheme = isMoviePage ? 'movies' : 'gta6';
+        const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
+        const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
+        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : 'gta6');
+        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : 'GTA 6 Vice City');
 
         if (brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
-            console.log(`[Job Worker] 🎨 Applying ${isMoviePage ? 'Cinematic Movie' : 'GTA 6 Vice City'} Framed Template to Feed Reel for ${page.handle}...`);
+            console.log(`[Job Worker] 🎨 Applying ${themeLabel} Framed Template to Feed Reel for ${page.handle}...`);
             const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle, page, theme: pageTheme });
             if (framed) {
               const absCandidate = (path.isAbsolute(framed) && fs.existsSync(framed))
@@ -280,8 +281,8 @@ class JobWorkerPool {
         } else if (brandingMode === 'watermark') {
           try {
             const { applyBrandedFeedOverlay } = require('../utils/ffmpegHelper');
-            console.log(`[Job Worker] 🎨 Applying custom GTA 6 identity watermark to Reel for ${page.handle}...`);
-            const branded = await applyBrandedFeedOverlay(mediaPaths[0], { handle: page.handle });
+            console.log(`[Job Worker] 🎨 Applying custom ${themeLabel} watermark to Reel for ${page.handle}...`);
+            const branded = await applyBrandedFeedOverlay(mediaPaths[0], { handle: page.handle, theme: pageTheme, page });
             if (branded) {
               const absCandidate = (path.isAbsolute(branded) && fs.existsSync(branded))
                 ? branded

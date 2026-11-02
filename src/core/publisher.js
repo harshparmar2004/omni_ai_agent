@@ -373,8 +373,9 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
   const isVideo = Boolean(videoPath);
   let publicMediaUrl = '';
 
-  const isMoviePage = page.slug === 'movies' || page.id === 2 || (page.handle && page.handle.includes('movie'));
-  const pageTheme = isMoviePage ? 'movies' : 'gta6';
+  const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
+  const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
+  const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : 'gta6');
 
   if (isVideo) {
     const { prepareVideoForStory } = require('../utils/ffmpegHelper');

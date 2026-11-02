@@ -450,19 +450,32 @@ function generateStoryOverlay(handle, options = {}) {
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
   const typeLabel = options.typeLabel || 'NEW REEL';
-  const theme = options.theme || (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6');
+  const theme = options.theme || (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' : (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
 
   // Compute or inherit dynamic geometry
-  const geom = (options.cardW && options.cardH && options.cardX !== undefined && options.cardY !== undefined)
-    ? options
-    : computeStoryCardGeometry(options.inputWidth || 1080, options.inputHeight || 1920);
-
-  const { cardX, cardY, cardW, cardH, headerX, headerY, headerW, headerH, ctaX, ctaY, ctaW, ctaH } = geom;
+  const computed = computeStoryCardGeometry(options.inputWidth || 1080, options.inputHeight || 1920);
+  const cardX = options.cardX !== undefined ? options.cardX : computed.cardX;
+  const cardY = options.cardY !== undefined ? options.cardY : computed.cardY;
+  const cardW = options.cardW !== undefined ? options.cardW : computed.cardW;
+  const cardH = options.cardH !== undefined ? options.cardH : computed.cardH;
+  const headerX = options.headerX !== undefined ? options.headerX : Math.round((width - Math.min(cardW, 580)) / 2);
+  const headerY = options.headerY !== undefined ? options.headerY : Math.max(120, cardY - 54 - 24);
+  const headerW = options.headerW !== undefined ? options.headerW : Math.min(cardW, 580);
+  const headerH = options.headerH !== undefined ? options.headerH : 54;
+  const ctaX = options.ctaX !== undefined ? options.ctaX : Math.round((width - Math.min(cardW - 40, 440)) / 2);
+  const ctaY = options.ctaY !== undefined ? options.ctaY : Math.min(height - 54 - 120, cardY + cardH + 24);
+  const ctaW = options.ctaW !== undefined ? options.ctaW : Math.min(cardW - 40, 440);
+  const ctaH = options.ctaH !== undefined ? options.ctaH : 54;
 
   // 1. Ambient Background color tint & vignette
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  if (isMovie) {
+  if (isClubbing) {
+    bgGrad.addColorStop(0, 'rgba(4, 18, 10, 0.85)');
+    bgGrad.addColorStop(0.5, 'rgba(6, 28, 14, 0.72)');
+    bgGrad.addColorStop(1, 'rgba(2, 12, 6, 0.90)');
+  } else if (isMovie) {
     bgGrad.addColorStop(0, 'rgba(8, 8, 12, 0.78)');
     bgGrad.addColorStop(0.5, 'rgba(22, 14, 18, 0.65)');
     bgGrad.addColorStop(1, 'rgba(6, 6, 8, 0.85)');
@@ -477,7 +490,7 @@ function generateStoryOverlay(handle, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, 'rgba(0, 0, 0, 0.70)');
+  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.70)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 
@@ -497,7 +510,12 @@ function generateStoryOverlay(handle, options = {}) {
   // 3. Sleek hairline border around the media card
   const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
   ctx.save();
-  if (isMovie) {
+  if (isClubbing) {
+    borderGrad.addColorStop(0, '#00FFA3');   // Electric Neon Green
+    borderGrad.addColorStop(0.5, '#00E5FF'); // Laser Mint / Cyan
+    borderGrad.addColorStop(1, '#39FF14');   // Electric Lime
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
+  } else if (isMovie) {
     borderGrad.addColorStop(0, 'rgba(255, 215, 120, 0.90)'); // Soft Champagne Gold
     borderGrad.addColorStop(0.5, 'rgba(212, 175, 55, 0.55)'); // Amber Gold
     borderGrad.addColorStop(1, 'rgba(193, 18, 31, 0.75)');   // Velvet Crimson accent
@@ -523,8 +541,8 @@ function generateStoryOverlay(handle, options = {}) {
 
   // 4. Top Header: Minimal Frosted Glass Badge
   ctx.save();
-  ctx.fillStyle = 'rgba(14, 14, 18, 0.88)';
-  ctx.strokeStyle = isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)';
+  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : 'rgba(14, 14, 18, 0.88)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)');
   ctx.lineWidth = 1.5;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
   ctx.shadowBlur = 12;
@@ -543,7 +561,9 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.font = 'bold 21px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (isMovie) {
+  if (isClubbing) {
+    ctx.fillText(`@${cleanHandle}  |  Live Sets & Parties`, width / 2, headerY + headerH / 2);
+  } else if (isMovie) {
     ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
   } else {
     ctx.fillText(`@${cleanHandle}  |  Official News & Leaks`, width / 2, headerY + headerH / 2);
@@ -552,7 +572,11 @@ function generateStoryOverlay(handle, options = {}) {
   // 5. Bottom CTA Sticker (clean interactive pill)
   const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
   ctx.save();
-  if (isMovie) {
+  if (isClubbing) {
+    ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
+    ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
+  } else if (isMovie) {
     ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
     ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
     ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
@@ -563,7 +587,7 @@ function generateStoryOverlay(handle, options = {}) {
   }
   ctx.shadowBlur = 14;
   ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : 'rgba(255, 255, 255, 0.25)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   if (ctx.roundRect) {
@@ -575,11 +599,13 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.stroke();
   ctx.restore();
 
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = isClubbing ? '#051209' : '#FFFFFF';
   ctx.font = 'bold 19px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (isMovie) {
+  if (isClubbing) {
+    ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
+  } else if (isMovie) {
     ctx.fillText('Watch Full Scene  >', width / 2, ctaY + ctaH / 2);
   } else {
     ctx.fillText('Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
@@ -605,10 +631,12 @@ function generateFeedWatermark(handle, options = {}) {
   const ctx = canvas.getContext('2d');
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+  const isClubbing = cleanHandle.includes('club') || options.theme === 'clubbing' || options.page?.slug === 'clubbing';
+  const isMovie = cleanHandle.includes('movie') || options.theme === 'movies' || options.page?.slug === 'movies';
 
   ctx.save();
-  ctx.fillStyle = 'rgba(13, 2, 33, 0.78)';
-  ctx.shadowColor = 'rgba(247, 37, 133, 0.5)';
+  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.88)' : (isMovie ? 'rgba(12, 10, 14, 0.88)' : 'rgba(13, 2, 33, 0.78)');
+  ctx.shadowColor = isClubbing ? 'rgba(0, 255, 163, 0.65)' : (isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.5)');
   ctx.shadowBlur = 12;
   ctx.beginPath();
   if (ctx.roundRect) {
@@ -619,29 +647,40 @@ function generateFeedWatermark(handle, options = {}) {
   ctx.fill();
 
   const borderGrad = ctx.createLinearGradient(0, 0, w, h);
-  borderGrad.addColorStop(0, '#00F0FF');
-  borderGrad.addColorStop(0.5, '#F72585');
-  borderGrad.addColorStop(1, '#FF8A00');
+  if (isClubbing) {
+    borderGrad.addColorStop(0, '#00FFA3');
+    borderGrad.addColorStop(0.5, '#00E5FF');
+    borderGrad.addColorStop(1, '#39FF14');
+  } else if (isMovie) {
+    borderGrad.addColorStop(0, '#FFD166');
+    borderGrad.addColorStop(0.5, '#FFB703');
+    borderGrad.addColorStop(1, '#C1121F');
+  } else {
+    borderGrad.addColorStop(0, '#00F0FF');
+    borderGrad.addColorStop(0.5, '#F72585');
+    borderGrad.addColorStop(1, '#FF8A00');
+  }
   ctx.strokeStyle = borderGrad;
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();
 
-  // GTA VI monogram
-  ctx.fillStyle = '#F72585';
+  // Monogram / Brand tag
+  ctx.fillStyle = isClubbing ? '#00FFA3' : (isMovie ? '#FFD166' : '#F72585');
   ctx.font = '900 24px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('VI', 22, h / 2);
+  const monogram = isClubbing ? 'CC' : (isMovie ? '365' : 'VI');
+  ctx.fillText(monogram, 18, h / 2);
 
   // Separator bar
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.fillRect(58, 16, 1.5, 40);
+  ctx.fillRect(64, 16, 1.5, 40);
 
   // Handle
   ctx.fillStyle = '#FFFFFF';
   ctx.font = 'bold 20px Arial, sans-serif';
-  ctx.fillText(`@${cleanHandle}`, 72, h / 2);
+  ctx.fillText(`@${cleanHandle}`, 78, h / 2);
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const genDir = path.join(publicDir, 'generated');
@@ -730,13 +769,18 @@ function generateFeedPostOverlay(handle, options = {}) {
     isVertical = true
   } = options;
 
-  const theme = options.theme || (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6');
+  const theme = options.theme || (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' : (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
 
   // 1. Ambient Background for letterboxed videos (landscape / square)
   if (!isVertical) {
     const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-    if (isMovie) {
+    if (isClubbing) {
+      bgGrad.addColorStop(0, 'rgba(4, 18, 10, 0.90)');
+      bgGrad.addColorStop(0.5, 'rgba(8, 30, 16, 0.78)');
+      bgGrad.addColorStop(1, 'rgba(2, 12, 6, 0.92)');
+    } else if (isMovie) {
       bgGrad.addColorStop(0, 'rgba(12, 10, 14, 0.88)');
       bgGrad.addColorStop(0.5, 'rgba(28, 16, 12, 0.75)');
       bgGrad.addColorStop(1, 'rgba(12, 10, 14, 0.88)');
@@ -751,7 +795,7 @@ function generateFeedPostOverlay(handle, options = {}) {
     // Vignette
     const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 900);
     vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vig.addColorStop(1, isMovie ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.75)');
+    vig.addColorStop(1, (isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.75)');
     ctx.fillStyle = vig;
     ctx.fillRect(0, 0, width, height);
 
@@ -767,7 +811,13 @@ function generateFeedPostOverlay(handle, options = {}) {
   // 2. Bolder Boundaries (8px multi-stop gradient border)
   ctx.save();
   const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-  if (isMovie) {
+  if (isClubbing) {
+    bGrad.addColorStop(0, '#00FFA3');
+    bGrad.addColorStop(0.35, '#00E5FF');
+    bGrad.addColorStop(0.70, '#39FF14');
+    bGrad.addColorStop(1, '#00FF88');
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.75)';
+  } else if (isMovie) {
     bGrad.addColorStop(0, '#FFD166');
     bGrad.addColorStop(0.35, '#FFB703');
     bGrad.addColorStop(0.70, '#C1121F');
@@ -790,7 +840,7 @@ function generateFeedPostOverlay(handle, options = {}) {
 
   // Inner accent rail
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = isMovie ? 'rgba(255, 209, 102, 0.40)' : 'rgba(0, 240, 255, 0.45)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 209, 102, 0.40)' : 'rgba(0, 240, 255, 0.45)');
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
@@ -800,7 +850,36 @@ function generateFeedPostOverlay(handle, options = {}) {
   const bLen = 42;
   ctx.lineWidth = 5;
 
-  if (isMovie) {
+  if (isClubbing) {
+    // TL (Electric Neon Green)
+    ctx.strokeStyle = '#00FFA3';
+    ctx.shadowColor = '#00FFA3';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+    ctx.stroke();
+
+    // TR (Laser Cyan)
+    ctx.strokeStyle = '#00E5FF';
+    ctx.shadowColor = '#00E5FF';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.stroke();
+
+    // BL (Electric Neon Green)
+    ctx.strokeStyle = '#00FFA3';
+    ctx.shadowColor = '#00FFA3';
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+    ctx.stroke();
+
+    // BR (Electric Lime)
+    ctx.strokeStyle = '#39FF14';
+    ctx.shadowColor = '#39FF14';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.stroke();
+  } else if (isMovie) {
     // TL (Champagne Gold)
     ctx.strokeStyle = '#FFD166';
     ctx.shadowColor = '#FFD166';
@@ -856,7 +935,7 @@ function generateFeedPostOverlay(handle, options = {}) {
     ctx.strokeStyle = '#FF8A00';
     ctx.shadowColor = '#FF8A00';
     ctx.beginPath();
-    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH - bLen);
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY - bLen);
     ctx.stroke();
   }
 
@@ -866,7 +945,15 @@ function generateFeedPostOverlay(handle, options = {}) {
   const botBarY = cardY + cardH - 12;
 
   const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
-  if (isMovie) {
+  if (isClubbing) {
+    botGrad.addColorStop(0, 'rgba(0, 255, 163, 0)');
+    botGrad.addColorStop(0.2, '#00FFA3');
+    botGrad.addColorStop(0.5, '#00E5FF');
+    botGrad.addColorStop(0.8, '#39FF14');
+    botGrad.addColorStop(1, 'rgba(57, 255, 20, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.85)';
+  } else if (isMovie) {
     botGrad.addColorStop(0, 'rgba(255, 209, 102, 0)');
     botGrad.addColorStop(0.2, '#FFD166');
     botGrad.addColorStop(0.5, '#FFB703');
@@ -895,7 +982,9 @@ function generateFeedPostOverlay(handle, options = {}) {
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
   ctx.shadowBlur = 6;
-  if (isMovie) {
+  if (isClubbing) {
+    ctx.fillText('◄ ◄  CLUBBING CULT • CONCERTS & NIGHTLIFE  ► ►', cardX + cardW / 2, botBarY - 14);
+  } else if (isMovie) {
     ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
   } else {
     ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
@@ -904,7 +993,9 @@ function generateFeedPostOverlay(handle, options = {}) {
 
   // 5. Top Account Badge
   const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
-  const text = isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase();
+  const text = isClubbing
+    ? `@${cleanHandle.toLowerCase()}  |  Live Sets & Parties`
+    : (isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase());
 
   ctx.save();
   ctx.font = isMovie ? 'bold 20px "Helvetica Neue", Arial, sans-serif' : '900 24px Impact, Arial Black, sans-serif';
@@ -917,18 +1008,22 @@ function generateFeedPostOverlay(handle, options = {}) {
   const radius = 6;
 
   // Outer glow
-  ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)';
+  ctx.shadowColor = isClubbing ? 'rgba(0, 255, 163, 0.7)' : (isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)');
   ctx.shadowBlur = 18;
 
   // Dark glass background
-  ctx.fillStyle = isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)';
+  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.94)' : (isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)');
   ctx.beginPath();
   ctx.roundRect(boxX, boxY, boxW, boxH, radius);
   ctx.fill();
 
   // Border (3.5px)
   const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
-  if (isMovie) {
+  if (isClubbing) {
+    boxGrad.addColorStop(0, '#00FFA3');
+    boxGrad.addColorStop(0.5, '#00E5FF');
+    boxGrad.addColorStop(1, '#39FF14');
+  } else if (isMovie) {
     boxGrad.addColorStop(0, '#FFD166');
     boxGrad.addColorStop(0.5, '#FFB703');
     boxGrad.addColorStop(1, '#E5A93C');
@@ -1043,7 +1138,8 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     ].join(';');
   }
 
-  const theme = options.theme || (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6');
+  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
   const overlayPngPath = generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, ...options });
 
@@ -1052,7 +1148,8 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const base = path.basename(absPath, ext);
   const framedOutput = path.join(dir, `${base}_feed_framed.mp4`);
 
-  console.log(`[FFmpeg Helper] 🎨 Composing ${isMovie ? 'Cinematic Movie' : 'GTA 6 Vice City'} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
+  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : 'GTA 6 Vice City');
+  console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
   // Build filter graph combining video framing and audio normalization in ONE pass
   const fullFilter = hasAudio
@@ -1120,7 +1217,8 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   }
 
   const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
-  const theme = options.theme || (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6');
+  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
 
   const { execSync } = require('child_process');
@@ -1150,7 +1248,8 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   const base = path.basename(absPath, ext);
   const storyOutput = path.join(dir, `${base}_story_card.mp4`);
 
-  console.log(`[FFmpeg Helper] 🎨 Composing ${isMovie ? 'Cinematic Movie' : 'GTA 6'} Instagram Story Reel Card for @${handle} (${videoWidth}x${videoHeight} -> Card ${geom.cardW}x${geom.cardH} @ ${geom.cardX},${geom.cardY})...`);
+  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : 'GTA 6');
+  console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Instagram Story Reel Card for @${handle} (${videoWidth}x${videoHeight} -> Card ${geom.cardW}x${geom.cardH} @ ${geom.cardX},${geom.cardY})...`);
 
   const filter = [
     '[0:v]split=2[bg_raw][fg_raw]',
@@ -1224,7 +1323,8 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const cleanHandle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
-  const theme = options.theme || (options.page?.slug === 'movies' || cleanHandle.includes('movie') ? 'movies' : 'gta6');
+  const theme = options.theme || (cleanHandle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || cleanHandle.includes('movie') ? 'movies' : 'gta6'));
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
 
   const width = 1080;
@@ -1238,7 +1338,11 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   ctx.drawImage(img, -width * 0.25, -height * 0.25, width * 1.5, height * 1.5);
 
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  if (isMovie) {
+  if (isClubbing) {
+    bgGrad.addColorStop(0, 'rgba(4, 18, 10, 0.85)');
+    bgGrad.addColorStop(0.5, 'rgba(6, 28, 14, 0.72)');
+    bgGrad.addColorStop(1, 'rgba(2, 12, 6, 0.90)');
+  } else if (isMovie) {
     bgGrad.addColorStop(0, 'rgba(8, 8, 12, 0.78)');
     bgGrad.addColorStop(0.5, 'rgba(22, 14, 18, 0.65)');
     bgGrad.addColorStop(1, 'rgba(6, 6, 8, 0.85)');
@@ -1253,7 +1357,7 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, 'rgba(0, 0, 0, 0.70)');
+  vig.addColorStop(1, (isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.70)');
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 
@@ -1274,7 +1378,12 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   // Draw sleek hairline border around the image card
   const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
   ctx.save();
-  if (isMovie) {
+  if (isClubbing) {
+    borderGrad.addColorStop(0, '#00FFA3');
+    borderGrad.addColorStop(0.5, '#00E5FF');
+    borderGrad.addColorStop(1, '#39FF14');
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
+  } else if (isMovie) {
     borderGrad.addColorStop(0, 'rgba(255, 215, 120, 0.90)');
     borderGrad.addColorStop(0.5, 'rgba(212, 175, 55, 0.55)');
     borderGrad.addColorStop(1, 'rgba(193, 18, 31, 0.75)');
@@ -1297,8 +1406,8 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   // 3. Top Header: Minimal Frosted Glass Badge
   ctx.save();
-  ctx.fillStyle = 'rgba(14, 14, 18, 0.88)';
-  ctx.strokeStyle = isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)';
+  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : 'rgba(14, 14, 18, 0.88)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)');
   ctx.lineWidth = 1.5;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
   ctx.shadowBlur = 12;
@@ -1313,7 +1422,9 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   ctx.font = 'bold 21px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (isMovie) {
+  if (isClubbing) {
+    ctx.fillText(`@${cleanHandle}  |  Live Sets & Parties`, width / 2, headerY + headerH / 2);
+  } else if (isMovie) {
     ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
   } else {
     ctx.fillText(`@${cleanHandle}  |  Official News & Leaks`, width / 2, headerY + headerH / 2);
@@ -1322,7 +1433,11 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   // 4. Bottom CTA Sticker
   const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
   ctx.save();
-  if (isMovie) {
+  if (isClubbing) {
+    ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
+    ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
+  } else if (isMovie) {
     ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
     ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
     ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
@@ -1333,7 +1448,7 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   }
   ctx.shadowBlur = 14;
   ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : 'rgba(255, 255, 255, 0.25)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
@@ -1342,11 +1457,13 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   ctx.stroke();
   ctx.restore();
 
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = isClubbing ? '#051209' : '#FFFFFF';
   ctx.font = 'bold 19px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (isMovie) {
+  if (isClubbing) {
+    ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
+  } else if (isMovie) {
     ctx.fillText('View Full Post  >', width / 2, ctaY + ctaH / 2);
   } else {
     ctx.fillText('View Full Post  >', width / 2, ctaY + ctaH / 2);

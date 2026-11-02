@@ -91,4 +91,51 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     deleteJob(jobId);
     assert.equal(getJob(jobId), undefined);
   });
+
+  await t.test('6. Clubbing Cult Universal Neon Green Aesthetic Template & Caption Formatting', () => {
+    const { generateFeedPostOverlay, generateStoryOverlay, generateFeedWatermark } = require('../src/utils/ffmpegHelper');
+    const fs = require('fs');
+
+    // 1. Caption Builder
+    const rawCaption = "Wildest festival drop ever at Tomorrowland! Follow @tomorrowland for more! Comment TRACK for link. #rave #edm";
+    const built = buildCaption({
+      rawCaption,
+      sourceUsername: 'tomorrowland',
+      page: {
+        id: 3,
+        slug: 'clubbing',
+        name: 'Clubbing Cult',
+        handle: '@clubbingcult'
+      }
+    });
+
+    assert.ok(built.includes('@clubbingcult'), 'Should include Clubbing Cult handle');
+    assert.ok(built.includes('Rate this track/set'), 'Should include clubbing engagement prompt');
+    assert.ok(built.includes('party crew'), 'Should include clubbing save CTA');
+    assert.ok(built.includes('#clubbing'), 'Should include #clubbing hashtag');
+    assert.ok(!built.includes('@tomorrowland'), 'Should strip competitor mention');
+
+    // 2. 9:16 Vertical Template
+    const vPath = generateFeedPostOverlay('clubbingcult', {
+      cardX: 24, cardY: 24, cardW: 1032, cardH: 1872, isVertical: true, theme: 'clubbing'
+    });
+    assert.ok(fs.existsSync(vPath), 'Vertical overlay must exist');
+    assert.ok(fs.statSync(vPath).size > 10000, 'Vertical overlay must be valid PNG');
+
+    // 3. 16:9 Landscape Adaptive Template
+    const lPath = generateFeedPostOverlay('clubbingcult', {
+      cardX: 24, cardY: 670, cardW: 1032, cardH: 580, isVertical: false, theme: 'clubbing'
+    });
+    assert.ok(fs.existsSync(lPath), 'Landscape overlay must exist');
+
+    // 4. Story Card Overlay
+    const sPath = generateStoryOverlay('clubbingcult', {
+      cardX: 72, cardY: 240, cardW: 936, cardH: 1440, theme: 'clubbing'
+    });
+    assert.ok(fs.existsSync(sPath), 'Story overlay must exist');
+
+    // 5. Branded Watermark Badge
+    const wmPath = generateFeedWatermark('clubbingcult', { theme: 'clubbing' });
+    assert.ok(fs.existsSync(wmPath), 'Watermark badge must exist');
+  });
 });

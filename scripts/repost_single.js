@@ -116,17 +116,21 @@ async function main() {
     });
   }
 
-  const hasTechPage = pages.some(p => p.id === 3 || p.slug === 'techguy' || p.handle === '@techguyharshparmar');
-  if (!hasTechPage) {
-    console.log('💻 Creating Page #3 (@techguyharshparmar)...');
+  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
+  const clubbingToken = sanitizeToken(process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
+  const clubbingIgId = (process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
+
+  const hasClubbingPage = pages.some(p => p.id === 3 || p.slug === 'clubbing' || p.handle === '@clubbingcult');
+  if (!hasClubbingPage) {
+    console.log('🪩 Creating Page #3 (@clubbingcult)...');
     createPage({
-      slug: 'techguy',
-      name: 'Tech Guy Harsh Parmar',
-      handle: '@techguyharshparmar',
-      ig_user_id: process.env.TECH_IG_USER_ID || '17841434441251009',
-      access_token: process.env.TECH_META_ACCESS_TOKEN || '',
+      slug: 'clubbing',
+      name: 'Clubbing Cult',
+      handle: '@clubbingcult',
+      ig_user_id: clubbingIgId,
+      access_token: clubbingToken,
       caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#tech #technology #gadgets #ai #techguyharshparmar',
+      default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult',
       attribution_enabled: 0,
       watermark_enabled: 0,
       post_mode: 'auto',
@@ -141,7 +145,7 @@ async function main() {
   try {
     db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
     db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
-    db.prepare("UPDATE pages SET slug = 'techguy', name = 'Tech Guy Harsh Parmar', handle = '@techguyharshparmar', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#tech #technology #gadgets #ai #techguyharshparmar', is_active = 1 WHERE id = 3").run();
+    db.prepare("UPDATE pages SET slug = 'clubbing', name = 'Clubbing Cult', handle = '@clubbingcult', ig_user_id = ?, access_token = ?, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult', is_active = 1 WHERE id = 3 OR slug = 'techguy' OR slug = 'clubbing'").run(clubbingIgId, clubbingToken);
   } catch (e) {}
 
   function sanitizeToken(token) {
@@ -164,11 +168,7 @@ async function main() {
   const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
-  if (process.env.TECH_META_ACCESS_TOKEN) {
-    const techToken = sanitizeToken(process.env.TECH_META_ACCESS_TOKEN);
-    const techId = (process.env.TECH_IG_USER_ID || '17841434441251009').trim();
-    db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "techguy"').run(techToken, techId);
-  }
+  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "clubbing"').run(clubbingToken, clubbingIgId);
   pages = getPages();
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);

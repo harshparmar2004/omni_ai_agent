@@ -131,15 +131,61 @@ async function callOllama(prompt) {
  * @returns {Promise<{ caption: string, provider: string, model: string }>}
  */
 async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
+  const isClubbing = (page.slug && page.slug.includes('club')) ||
+                     (page.handle && page.handle.includes('club')) ||
+                     (page.name && /club|rave|party|dance|edm|techno|concert/i.test(page.name)) ||
+                     page.id === 3 || String(page.id) === '3';
+
   const isMovie = (page.slug && page.slug.includes('movie')) ||
                   (page.handle && page.handle.includes('movie')) ||
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
-                  page.id === 2;
+                  page.id === 2 || String(page.id) === '2';
 
-  const handle = page.handle || `@${page.slug || (isMovie ? 'movie_series_365' : 'gta6_updates_007')}`;
-  const pageName = page.name || (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates');
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : 'gta6_updates_007');
+  const handle = page.handle || `@${page.slug || defaultHandle}`;
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : 'GTA 6 Updates'));
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const cleanedSource = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
+
+  // ── Dedicated Clubbing Cult Caption Engine ──
+  if (isClubbing) {
+    console.log('[LLM Service] 🪩 Clubbing Cult Account detected: Generating high-energy festival/rave caption & footer.');
+    const clubbingBody = cleanedSource || '🔊 TURN UP THE VOLUME! LIVE SET DROP 🔥';
+
+    const clubbingEngagement = [
+      "🔥 Rate this track/set 1-10 in the comments below! 👇",
+      "💾 Save this reel & send to your party crew! 🔊"
+    ].join('\n');
+
+    const clubbingFollowLine = `🪩 Follow ${handle} for the wildest club sets, concert moments & festival drops!`;
+
+    const originalTags = extractHashtags(rawCaption);
+    const defaultTags = extractHashtags(page.default_hashtags || '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult');
+    const nicheClubTags = ['#clubbing', '#party', '#houseparty', '#concert', '#rave', '#techno', '#edm', '#nightlife', '#festivals', '#clubbingcult'];
+
+    const tagSet = new Set();
+    const mergedTags = [];
+    for (const tag of [...nicheClubTags, ...defaultTags, ...originalTags]) {
+      const lower = tag.toLowerCase();
+      if (!tagSet.has(lower) && tagSet.size < 6) {
+        tagSet.add(lower);
+        mergedTags.push(tag);
+      }
+    }
+    const hashtagBlock = mergedTags.join(' ');
+
+    const finalClubbingCaption = [clubbingBody, clubbingEngagement, clubbingFollowLine, hashtagBlock]
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+
+    return {
+      caption: finalClubbingCaption,
+      provider: 'original_curated_clubbing',
+      model: 'none',
+      breakdown: clubbingBody
+    };
+  }
 
   // ── Dedicated Movie & Cinema Caption Engine ──
   // Preserves original scraped reel info (title, year, IMDb, synopsis, comments)

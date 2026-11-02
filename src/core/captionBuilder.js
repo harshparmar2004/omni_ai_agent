@@ -40,7 +40,7 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
   // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
   text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const lower = match.toLowerCase();
-    if (lower === '@gta6_updates_007' || lower === '@movie_series_365') return match;
+    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult') return match;
     return '';
   });
 
@@ -94,31 +94,45 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
   const competitorHandles = sourceUsername ? [sourceUsername] : [];
   const bodyWithoutHashtags = stripHashtagsFromText(cleanRawCaption(rawCaption, competitorHandles));
 
+  const isClubbing = (page.slug && page.slug.includes('club')) ||
+                     (page.handle && page.handle.includes('club')) ||
+                     (page.name && /club|rave|party|dance|edm|techno|concert/i.test(page.name)) ||
+                     page.id === 3 || String(page.id) === '3';
+
   const isMovie = (page.slug && page.slug.includes('movie')) ||
                   (page.handle && page.handle.includes('movie')) ||
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
-                  page.id === 2;
+                  page.id === 2 || String(page.id) === '2';
 
-  const handle = page.handle || `@${page.slug || (isMovie ? 'movie_series_365' : 'gta6_updates_007')}`;
-  const pageName = page.name || (isMovie ? 'Movie Recommendations' : 'GTA 6');
-  const followCta = isMovie
-    ? `🍿 Follow ${handle} for daily movie & series recommendations!`
-    : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`;
+  const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : 'gta6_updates_007');
+  const handle = page.handle || `@${page.slug || defaultHandle}`;
+  const pageName = page.name || (isClubbing ? 'Clubbing Cult' : (isMovie ? 'Movie Recommendations' : 'GTA 6'));
+  const followCta = isClubbing
+    ? `🪩 Follow ${handle} for the wildest club sets, concert moments & festival drops!`
+    : (isMovie
+      ? `🍿 Follow ${handle} for daily movie & series recommendations!`
+      : `🔥 Follow ${handle} for daily ${pageName} leaks, map secrets & official news!`);
 
   // Dynamic interactive prompt to trigger comments, saves, and shares (high algorithmic weighting)
   const promptIdx = Math.abs(simpleHash(bodyWithoutHashtags || 'default')) % ENGAGEMENT_PROMPTS.length;
-  const engagementPrompt = isMovie
-    ? "💬 What's your thoughts on this? Drop your reaction below 👇"
-    : ENGAGEMENT_PROMPTS[promptIdx];
-  const saveShareCta = isMovie
-    ? "💾 Save this reel so you don't lose it!"
-    : '💾 Save & share this reel with a friend who is waiting for GTA 6!';
+  const engagementPrompt = isClubbing
+    ? "🔥 Rate this track/set 1-10 in the comments below! 👇"
+    : (isMovie
+      ? "💬 What's your thoughts on this? Drop your reaction below 👇"
+      : ENGAGEMENT_PROMPTS[promptIdx]);
+  const saveShareCta = isClubbing
+    ? "💾 Save this reel & send to your party crew! 🔊"
+    : (isMovie
+      ? "💾 Save this reel so you don't lose it!"
+      : '💾 Save & share this reel with a friend who is waiting for GTA 6!');
 
   // Collect and deduplicate hashtags (Meta Reels Algorithm: 4-5 hyper-relevant tags)
   const originalTags = extractHashtags(rawCaption);
+  const defaultClubbingTags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult';
   const defaultMovieTags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies';
   const defaultGtaTags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks';
-  const defaultTags = extractHashtags(page.default_hashtags || (isMovie ? defaultMovieTags : defaultGtaTags));
+  const fallbackTags = isClubbing ? defaultClubbingTags : (isMovie ? defaultMovieTags : defaultGtaTags);
+  const defaultTags = extractHashtags(page.default_hashtags || fallbackTags);
 
   const tagSet = new Set();
   const mergedTags = [];
