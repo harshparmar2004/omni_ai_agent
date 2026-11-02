@@ -1071,7 +1071,13 @@ function wrapText(ctx, text, maxWidth) {
  */
 function parseHeadlineTokens(rawHeadline) {
   if (!rawHeadline) return [];
-  const clean = rawHeadline.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+  const clean = rawHeadline
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^["'“”\s]+/, '')
+    .replace(/["'“”\s]+$/, '')
+    .trim();
 
   const hasExplicitMarkup = /\*\*.*?\*\*|\*.*?\*|<hl>.*?<\/hl>/.test(clean);
   const tokens = [];
@@ -1377,12 +1383,40 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   // 2. Clear cutout where the video plays cleanly without borders
   ctx.clearRect(cardX, cardY, cardW, cardH);
 
-  // 3. Header Section (Left Aligned, prominent bold modern layout)
+  // 3. Ergonomic Downward Layout & Spacing:
+  // Dynamically position Cult Information logo & headline closer to the video (cardY),
+  // leaving comfortable top margin below Instagram chrome and ensuring 100% black belt coverage!
   const marginX = 56;
-  const headerTopY = options.headerTopY || 220;
+  const maxTextWidth = width - (marginX * 2);
+  const avatarSize = 84;
+  const lineHeight = 56;
+  const spaceAboveVideo = 44; // Comfortable space between headline bottom and video top
+  const spaceBetweenHeaderAndHeadline = 24;
 
-  // Circular Logo Avatar (92px diameter - 50% larger than old 64px)
-  const avatarSize = 92;
+  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+  const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^["'“”\s]+/, '')
+    .replace(/["'“”\s]+$/, '')
+    .trim();
+
+  const tokens = parseHeadlineTokens(cleanHeadline);
+  const lines = wrapTokens(ctx, tokens, maxTextWidth);
+  const totalTextHeight = lines.length * lineHeight;
+
+  // Calculate dynamic downward anchor:
+  // Headline ends spaceAboveVideo (44px) above the video cutout (cardY)
+  const defaultHeadlineY = cardY - spaceAboveVideo - totalTextHeight;
+  const headlineY = options.headlineY !== undefined ? options.headlineY : Math.max(380, defaultHeadlineY);
+
+  // Position Cult Information logo/header above the headline (shifted downward from top edge)
+  const defaultHeaderTopY = headlineY - spaceBetweenHeaderAndHeadline - avatarSize;
+  const headerTopY = options.headerTopY !== undefined ? options.headerTopY : Math.max(260, defaultHeaderTopY);
+
+  // Circular Logo Avatar (84px diameter)
   const avatarCenter = marginX + avatarSize / 2;
   const avatarCenterY = headerTopY + avatarSize / 2;
   const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
@@ -1424,7 +1458,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 
     ctx.fillStyle = '#c1d82f'; // Cult signature lime
-    ctx.font = '900 32px "Arial Black", -apple-system, sans-serif';
+    ctx.font = '900 30px "Arial Black", -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, avatarCenter, avatarCenterY);
@@ -1443,38 +1477,28 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   ctx.restore();
 
   // Page Name + Verified Badge
-  const textLeftX = marginX + avatarSize + 22;
+  const textLeftX = marginX + avatarSize + 20;
   ctx.save();
-  ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'middle';
-  ctx.fillText(pageName, textLeftX, headerTopY + 28);
+  ctx.fillText(pageName, textLeftX, headerTopY + 26);
 
   const nameWidth = ctx.measureText(pageName).width;
-  drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, headerTopY + 16, 24);
+  drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, headerTopY + 14, 22);
 
   // Handle below name
-  ctx.font = '500 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '500 21px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#999999'; // iOS muted gray
-  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 68);
+  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 62);
   ctx.restore();
 
   // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
-  const headlineY = headerTopY + avatarSize + 36;
-  const maxTextWidth = width - (marginX * 2);
   const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult lime green
 
   ctx.save();
-  ctx.font = '900 46px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.textBaseline = 'top';
-
-  const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
-    .replace(/^["'“”]/, '')
-    .replace(/["'“”]$/, '');
-
-  const tokens = parseHeadlineTokens(cleanHeadline);
-  const lines = wrapTokens(ctx, tokens, maxTextWidth);
-  const lineHeight = 60;
   const spaceWidth = ctx.measureText(' ').width;
 
   lines.forEach((lineTokens, lineIdx) => {
@@ -1915,11 +1939,11 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
           '[v1][1:v]overlay=0:0[outv]'
         ].join(';');
       } else {
-        // Raw full-frame vertical video: frame into centered video-essay card
+        // Raw full-frame vertical video: frame into centered video-essay card in TRUE MIDDLE
         cardW = 1080;
-        cardH = 960;
+        cardH = 880;
         cardX = 0;
-        cardY = 680;
+        cardY = Math.round((1920 - cardH) / 2); // 520px: exact vertical symmetry (520 top, 520 bottom)
 
         videoFilter = [
           `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
@@ -2443,6 +2467,7 @@ module.exports = {
   generateEvolvingAiOverlay,
   isLetterboxedReel,
   detectActiveVideoBounds,
+  parseHeadlineTokens,
   prepareVideoForFeedCard,
   extractVideoCover
 };
