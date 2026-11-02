@@ -144,6 +144,7 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
   const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
                        (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || page.handle.includes('ai'))) ||
                        (page.name && /cult.*info|evolving|ai|tech/i.test(page.name)) ||
+                       page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.theme === 'evolving_ai' ||
                        page.id === 4 || String(page.id) === '4';
 
   const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isVideoEssay ? 'cult_information' : 'gta6_updates_007'));
@@ -244,11 +245,20 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
     let usedProvider = 'deterministic';
     let usedModel = 'none';
 
-    // If source has sentences, extract a punchy first sentence as fallback hook
+    // If source has sentences, extract a punchy first sentence as fallback hook (decimal-safe)
     if (cleanedSource) {
-      const firstSentence = cleanedSource.split(/[.!?\n]/)[0].trim();
-      if (firstSentence && firstSentence.length >= 15 && firstSentence.length <= 110) {
-        headline = firstSentence.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+      const clean = cleanedSource.replace(/^["'“”]/, '').replace(/["'“”]$/, '').trim();
+      // Match up to first sentence ending (. ! ? or newline) but DO NOT split on decimal digits (e.g. $12.93 or $1.12)
+      const sentenceMatch = clean.match(/^([^.!?\n]+(?:\.\d+[^.!?\n]*)*)(?:[.!?\n]|$)/);
+      let candidate = sentenceMatch ? sentenceMatch[1].trim() : clean;
+      if (candidate.length > 105) {
+        candidate = candidate.slice(0, 100).replace(/\s+\S*$/, '');
+      }
+      if (candidate && candidate.length >= 15) {
+        if (!candidate.includes('**')) {
+          candidate = candidate.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+        }
+        headline = candidate;
       }
     }
 
@@ -292,6 +302,9 @@ Respond ONLY with valid JSON in this exact structure:
             const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
             if (parsed && parsed.headline) {
               headline = parsed.headline.trim();
+              if (!headline.includes('**')) {
+                headline = headline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+              }
               if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();
               usedProvider = provider.name;
               usedModel = provider.model;

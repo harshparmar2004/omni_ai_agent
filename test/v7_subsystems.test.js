@@ -209,7 +209,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     // 3. Cult Information 1080x1920 Video-Essay Overlay Generation with Highlighted Words
     const overlayPath = await generateFeedPostOverlay('cult_information', {
       cardX: 0,
-      cardY: 540,
+      cardY: 656,
       cardW: 1080,
       cardH: 608,
       isVertical: false,
@@ -220,5 +220,41 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
 
     assert.ok(fs.existsSync(overlayPath), 'Cult Information overlay file must exist');
     assert.ok(fs.statSync(overlayPath).size > 10000, 'Overlay PNG must be a valid non-empty graphic');
+  });
+
+  await t.test('9. Decimal-Safe Headline Preservation & Competitor Letterbox Detection', async () => {
+    const { isLetterboxedReel } = require('../src/utils/ffmpegHelper');
+    const { buildAiCaptionDetails } = require('../src/core/captionBuilder');
+    const { getPageBySlug } = require('../src/database');
+
+    const cultPage = getPageBySlug('cult_information') || { name: 'Cult Information', handle: '@cult_information' };
+
+    // 1. Decimal number preservation in headline ($12.93 BILLION)
+    const captionWithDecimals = "NVIDIA is spending $12.93 BILLION on next-generation AI hardware. Link in bio! #tech";
+    const details1 = await buildAiCaptionDetails({
+      rawCaption: captionWithDecimals,
+      sourceUsername: 'techinsider',
+      page: cultPage
+    });
+
+    assert.ok(details1.hookHeadline.includes('12.93'), 'Must preserve decimal number 12.93 and not truncate at period');
+    assert.ok(!details1.hookHeadline.endsWith('$12'), 'Must not truncate at $12');
+
+    // 2. Decimal number preservation ($1.12)
+    const captionWithDecimals2 = "OpenAI slashed API inference prices down to $1.12 per million tokens. #ai";
+    const details2 = await buildAiCaptionDetails({
+      rawCaption: captionWithDecimals2,
+      sourceUsername: 'openai',
+      page: cultPage
+    });
+
+    assert.ok(details2.hookHeadline.includes('1.12'), 'Must preserve decimal number 1.12 and not truncate at period');
+    assert.ok(!details2.hookHeadline.endsWith('$1'), 'Must not truncate at $1');
+
+    // 3. Auto-highlighting formatting
+    assert.ok(details1.hookHeadline.includes('**'), 'Hook headline should contain highlighted keywords with **');
+
+    // 4. Competitor Letterbox Detection Export
+    assert.equal(typeof isLetterboxedReel, 'function', 'isLetterboxedReel must be an exported function');
   });
 });

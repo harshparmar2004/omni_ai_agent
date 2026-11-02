@@ -1132,7 +1132,7 @@ function wrapTokens(ctx, tokens, maxWidth) {
   return lines;
 }
 
-function drawVerifiedBadge(ctx, x, y, size = 18) {
+function drawVerifiedBadge(ctx, x, y, size = 24) {
   ctx.save();
   ctx.fillStyle = '#0095F6'; // Instagram verified blue
   ctx.beginPath();
@@ -1141,7 +1141,7 @@ function drawVerifiedBadge(ctx, x, y, size = 18) {
 
   // Crisp white checkmark
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 2.8;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -1153,43 +1153,92 @@ function drawVerifiedBadge(ctx, x, y, size = 18) {
 }
 
 /**
- * Generates the authentic Evolving AI Video-Essay Overlay
+ * Detects whether an incoming 9:16 vertical video is pre-formatted
+ * with black letterboxing / competitor header card (e.g. from @evolving.ai).
+ */
+async function isLetterboxedReel(videoOrImagePath) {
+  try {
+    let framePath = videoOrImagePath;
+    let tempFrame = false;
+
+    if (videoOrImagePath.endsWith('.mp4') || videoOrImagePath.endsWith('.mov') || videoOrImagePath.endsWith('.mkv')) {
+      const publicDir = path.join(__dirname, '..', '..', 'public');
+      const genDir = path.join(publicDir, 'generated');
+      if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+      framePath = path.join(genDir, `inspect_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`);
+      execSync(`ffmpeg -y -ss 00:00:01 -i "${videoOrImagePath}" -vframes 1 -q:v 3 "${framePath}"`, { stdio: 'ignore' });
+      tempFrame = true;
+    }
+
+    if (!fs.existsSync(framePath)) return false;
+
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
+    const img = await loadImage(framePath);
+    const canvas = createCanvas(img.width, img.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    let topBrightnessSum = 0;
+    let samplePoints = 0;
+    const yTop = Math.floor(img.height * 0.04);
+
+    for (const xFrac of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      const x = Math.floor(img.width * xFrac);
+      const pixel = ctx.getImageData(x, yTop, 1, 1).data;
+      const brightness = (pixel[0] * 0.299 + pixel[1] * 0.587 + pixel[2] * 0.114);
+      topBrightnessSum += brightness;
+      samplePoints++;
+    }
+
+    if (tempFrame && fs.existsSync(framePath)) {
+      try { fs.unlinkSync(framePath); } catch (e) {}
+    }
+
+    const avgTopBrightness = topBrightnessSum / samplePoints;
+    return avgTopBrightness < 25;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Generates the authentic Evolving AI & Cult Information Video-Essay Overlay
  * Solid black 1080x1920 canvas with:
- * - Circular brand avatar + Page Name + Verified Badge + Handle
- * - Curiosity-driven viral headline text wrapped cleanly
- * - Cutout hole where the centered video is overlaid
- * - Clean safe margins at bottom for Instagram native UI
+ * - Prominent 92px circular brand avatar + bold page name + verified blue badge + handle
+ * - Bold 46px viral headline hook with brand lime accent word highlighting
+ * - Transparent cutout for centered video content
+ * - Clean solid black safe margins at bottom for Instagram native UI
  */
 async function generateEvolvingAiOverlay(handle, options = {}) {
-  const cleanHandle = (handle || 'evolving.ai').replace(/^@/, '');
+  const cleanHandle = (handle || 'cult_information').replace(/^@/, '');
   const {
     cardX = 0,
-    cardY = 540,
+    cardY = 640,
     cardW = 1080,
     cardH = 608,
-    pageName = options.page?.name || 'Evolving AI',
-    hookHeadline = options.hookHeadline || options.headline || 'The most expensive AI chips in the world are now worth more than $10,000,000,000'
+    pageName = options.page?.name || (cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'),
+    hookHeadline = options.hookHeadline || options.headline || 'The next generation of AI is evolving faster than anyone expected'
   } = options;
 
-  const { createCanvas } = require('@napi-rs/canvas');
+  const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const width = 1080;
   const height = 1920;
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
-  // 1. Pitch black background (pure #000000)
+  // 1. Solid pitch black background (pure #000000)
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, width, height);
 
   // 2. Clear cutout where the video plays cleanly without borders
   ctx.clearRect(cardX, cardY, cardW, cardH);
 
-  // 3. Header Section (Left Aligned, exactly like evolving.ai)
-  const marginX = 54;
-  const headerTopY = 210; // Safe below IG top bar (Y < 180)
+  // 3. Header Section (Left Aligned, prominent bold modern layout)
+  const marginX = 56;
+  const headerTopY = 160;
 
-  // Circular Logo Avatar (supports custom image file or dynamic initials)
-  const avatarSize = 64;
+  // Circular Logo Avatar (92px diameter - 50% larger than old 64px)
+  const avatarSize = 92;
   const avatarCenter = marginX + avatarSize / 2;
   const avatarCenterY = headerTopY + avatarSize / 2;
   const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
@@ -1197,6 +1246,9 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     options.avatarPath,
     path.join(brandingDir, `${cleanHandle}_avatar.png`),
     path.join(brandingDir, `${cleanHandle}_avatar.jpg`),
+    path.join(brandingDir, 'cult_information_avatar.png'),
+    path.join(brandingDir, 'cult_information_logo_master.png'),
+    path.join(brandingDir, 'cult_avatar.png'),
     path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.png`),
     path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.jpg`)
   ].filter(Boolean);
@@ -1211,7 +1263,6 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   if (existingAvatarPath) {
     try {
-      const { loadImage } = require('@napi-rs/canvas');
       const avatarImg = await loadImage(existingAvatarPath);
       ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
     } catch (e) {
@@ -1225,52 +1276,52 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     ctx.fillStyle = bgGrad;
     ctx.fill();
 
-    // Extract 1-2 initials from page name
     const words = (pageName || 'Channel').trim().split(/\s+/);
     const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 
     ctx.fillStyle = '#c1d82f'; // Cult signature lime
-    ctx.font = '900 24px "Arial Black", -apple-system, sans-serif';
+    ctx.font = '900 32px "Arial Black", -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, avatarCenter, avatarCenterY);
   }
   ctx.restore();
 
-  // Avatar border ring with subtle brand lime accent
+  // Avatar border ring with brand lime accent & subtle ambient glow
   ctx.save();
   ctx.beginPath();
   ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
   ctx.strokeStyle = '#c1d82f';
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(193, 216, 47, 0.4)';
+  ctx.shadowBlur = 8;
   ctx.stroke();
   ctx.restore();
 
   // Page Name + Verified Badge
-  const textLeftX = marginX + avatarSize + 18;
+  const textLeftX = marginX + avatarSize + 22;
   ctx.save();
-  ctx.font = '900 24px "Arial Black", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(pageName, textLeftX, headerTopY + 4);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(pageName, textLeftX, headerTopY + 28);
 
   const nameWidth = ctx.measureText(pageName).width;
-  drawVerifiedBadge(ctx, textLeftX + nameWidth + 8, headerTopY + 7, 20);
+  drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, headerTopY + 16, 24);
 
   // Handle below name
-  ctx.font = '500 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  ctx.fillStyle = '#8E8E93'; // iOS muted gray
-  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 34);
+  ctx.font = '500 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.fillStyle = '#999999'; // iOS muted gray
+  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 68);
   ctx.restore();
 
   // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
-  const headlineY = headerTopY + avatarSize + 32;
+  const headlineY = headerTopY + avatarSize + 36;
   const maxTextWidth = width - (marginX * 2);
   const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult lime green
 
   ctx.save();
-  ctx.font = '900 34px "Arial Black", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '900 46px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   ctx.textBaseline = 'top';
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
@@ -1279,7 +1330,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   const tokens = parseHeadlineTokens(cleanHeadline);
   const lines = wrapTokens(ctx, tokens, maxTextWidth);
-  const lineHeight = 46;
+  const lineHeight = 60;
   const spaceWidth = ctx.measureText(' ').width;
 
   lines.forEach((lineTokens, lineIdx) => {
@@ -1697,27 +1748,58 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   let cardW, cardH, cardX, cardY, videoFilter;
 
   if (isVideoEssay) {
-    // Evolving AI Minimalist Center Layout:
-    // Solid pitch black canvas with video centered below headline
-    if (aspect >= 1.4) {
-      // 16:9 Landscape Video (e.g. 1080x608)
+    // Evolving AI & Cult Information Minimalist Center Layout:
+    if (isVertical) {
+      const isPreFormatted = await isLetterboxedReel(absPath);
+      if (isPreFormatted) {
+        // Pre-formatted reel from competitor (e.g. @evolving.ai):
+        // Keep video at 1080:1920 in its original center position!
+        // The Cult Information overlay covers Y=0 to 640 in solid black,
+        // completely obliterating the competitor's header and replacing it with Cult Information!
+        cardW = 1080;
+        cardH = 720;
+        cardX = 0;
+        cardY = 640;
+
+        videoFilter = [
+          '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]',
+          '[v0][1:v]overlay=0:0[outv]'
+        ].join(';');
+      } else {
+        // Raw full-frame vertical video: frame into centered video-essay card
+        cardW = 1080;
+        cardH = 1080;
+        cardX = 0;
+        cardY = 560;
+
+        videoFilter = [
+          `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
+          '[v1][1:v]overlay=0:0[outv]'
+        ].join(';');
+      }
+    } else if (aspect >= 1.3) {
+      // 16:9 Landscape Video (e.g. 1080x608): exact vertical symmetry!
       cardW = 1080;
       cardH = Math.round(cardW / aspect);
       cardH = Math.floor(cardH / 2) * 2;
       cardX = 0;
-      cardY = 540;
+      cardY = Math.round((1920 - cardH) / 2); // 656px for 16:9 (656 top, 656 bottom)
+
+      videoFilter = [
+        `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
     } else if (aspect >= 0.95 && aspect <= 1.05) {
-      // 1:1 Square Video (e.g. 1080x1080)
+      // 1:1 Square Video (e.g. 1080x1080): exact vertical symmetry!
       cardW = 1080;
       cardH = 1080;
       cardX = 0;
-      cardY = 460;
-    } else if (isVertical) {
-      // 9:16 Vertical Video: scale to fit middle section below headline
-      cardW = 1080;
-      cardH = 1240;
-      cardX = 0;
-      cardY = 480;
+      cardY = 420; // 420 top, 420 bottom
+
+      videoFilter = [
+        `[0:v]scale=1080:1080:force_original_aspect_ratio=increase,crop=1080:1080,pad=1080:1920:0:420:color=black[v1]`,
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
     } else {
       // 4:5 or standard portrait
       cardW = 1080;
@@ -1725,13 +1807,13 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       if (cardH > 1300) cardH = 1300;
       cardH = Math.floor(cardH / 2) * 2;
       cardX = 0;
-      cardY = 480;
-    }
+      cardY = Math.round((1920 - cardH) / 2);
 
-    videoFilter = [
-      `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
-      '[v1][1:v]overlay=0:0[outv]'
-    ].join(';');
+      videoFilter = [
+        `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
+        '[v1][1:v]overlay=0:0[outv]'
+      ].join(';');
+    }
   } else if (isVertical) {
     if (isClubbing) {
       // Clubbing Cult Cyberpunk HUD: 9:16 Full-Scale Exact Ratio (828x1472 @ 126, 215)
@@ -2210,6 +2292,7 @@ module.exports = {
   generateFeedPostOverlay,
   generateClubbingCyberOverlay,
   generateEvolvingAiOverlay,
+  isLetterboxedReel,
   prepareVideoForFeedCard,
   extractVideoCover
 };
