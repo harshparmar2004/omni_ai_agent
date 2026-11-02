@@ -116,26 +116,32 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(built.includes('#clubbing'), 'Should include #clubbing hashtag');
     assert.ok(!built.includes('@tomorrowland'), 'Should strip competitor mention');
 
-    // 2. 9:16 Vertical Boundary-less Template
+    // 2. 9:16 Vertical Cyberpunk HUD Template
     const vPath = generateFeedPostOverlay('clubbingcult', {
-      cardX: 0, cardY: 0, cardW: 1080, cardH: 1920, isVertical: true, theme: 'clubbing'
+      cardX: 100, cardY: 195, cardW: 880, cardH: 1480, isVertical: true, theme: 'clubbing'
     });
-    assert.ok(fs.existsSync(vPath), 'Vertical overlay must exist');
-    assert.ok(fs.statSync(vPath).size > 10000, 'Vertical overlay must be valid PNG');
+    assert.ok(fs.existsSync(vPath), 'Vertical cyber overlay must exist');
+    assert.ok(fs.statSync(vPath).size > 10000, 'Vertical cyber overlay must be valid PNG');
 
-    // 3. 16:9 Landscape Adaptive Template
+    // 3. 16:9 Landscape Adaptive Cyberpunk HUD Template
     const lPath = generateFeedPostOverlay('clubbingcult', {
-      cardX: 0, cardY: 670, cardW: 1080, cardH: 580, isVertical: false, theme: 'clubbing'
+      cardX: 80, cardY: 701, cardW: 920, cardH: 518, isVertical: false, theme: 'clubbing'
     });
-    assert.ok(fs.existsSync(lPath), 'Landscape overlay must exist');
+    assert.ok(fs.existsSync(lPath), 'Landscape cyber overlay must exist');
 
-    // 4. Story Card Overlay
+    // 4. 1:1 Square Adaptive Cyberpunk HUD Template
+    const sqPath = generateFeedPostOverlay('clubbingcult', {
+      cardX: 110, cardY: 530, cardW: 860, cardH: 860, isVertical: false, theme: 'clubbing'
+    });
+    assert.ok(fs.existsSync(sqPath), 'Square cyber overlay must exist');
+
+    // 5. Story Card Overlay
     const sPath = generateStoryOverlay('clubbingcult', {
       cardX: 72, cardY: 240, cardW: 936, cardH: 1440, theme: 'clubbing'
     });
     assert.ok(fs.existsSync(sPath), 'Story overlay must exist');
 
-    // 5. Branded Watermark Badge
+    // 6. Branded Watermark Badge
     const wmPath = generateFeedWatermark('clubbingcult', { theme: 'clubbing' });
     assert.ok(fs.existsSync(wmPath), 'Watermark badge must exist');
   });

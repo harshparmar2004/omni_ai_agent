@@ -749,9 +749,302 @@ async function applyBrandedFeedOverlay(inputVideoPath, options = {}) {
 }
 
 /**
+ * Draws a chamfered polygon (rectangle with cut 45-degree corners)
+ */
+function drawChamferedRect(ctx, x, y, w, h, cut) {
+  ctx.beginPath();
+  ctx.moveTo(x + cut, y);
+  ctx.lineTo(x + w - cut, y);
+  ctx.lineTo(x + w, y + cut);
+  ctx.lineTo(x + w, y + h - cut);
+  ctx.lineTo(x + w - cut, y + h);
+  ctx.lineTo(x + cut, y + h);
+  ctx.lineTo(x, y + h - cut);
+  ctx.lineTo(x, y + cut);
+  ctx.closePath();
+}
+
+/**
+ * Draws a diamond node
+ */
+function drawDiamond(ctx, cx, cy, size) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - size);
+  ctx.lineTo(cx + size, cy);
+  ctx.lineTo(cx, cy + size);
+  ctx.lineTo(cx - size, cy);
+  ctx.closePath();
+}
+
+/**
+ * Generates the authentic Cyberpunk HUD Frame Template for Clubbing Cult (@clubbingcult)
+ * Features:
+ * - Chamfered Top HUD Badge with C L U B B I N G   C U L T and diamond node connector lines
+ * - Heavy Corner Registration L-Brackets (Top/Bottom/Left/Right)
+ * - Dual neon green chamfered video frame cutout
+ * - Vertical technical side rails: "CLUBBING CULT • OFFICIAL" & "LIVE SETS • PERFORMANCES"
+ * - Bottom divider with centered diamond node, ● LIVE pulse dot, @CLUBBINGCULT, and NIGHTLIFE tags
+ * - Deep obsidian void with ambient neon dot matrix grid
+ */
+function generateClubbingCyberOverlay(handle, options = {}) {
+  const { createCanvas } = require('@napi-rs/canvas');
+  const width = 1080;
+  const height = 1920;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const cleanHandle = (handle || 'clubbingcult').replace(/^@/, '');
+  const {
+    cardX = 100,
+    cardY = 195,
+    cardW = 880,
+    cardH = 1480,
+    isVertical = true
+  } = options;
+
+  const neonGreen = '#00FFA3';
+  const neonLime = '#39FF14';
+  const darkBg = '#030604';
+
+  // 1. Dark ambient background
+  ctx.fillStyle = darkBg;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Subtle dot matrix grid in the background
+  ctx.save();
+  ctx.fillStyle = 'rgba(0, 255, 163, 0.08)';
+  const gridSpacing = 38;
+  for (let gx = 30; gx < width; gx += gridSpacing) {
+    for (let gy = 30; gy < height; gy += gridSpacing) {
+      ctx.beginPath();
+      ctx.arc(gx, gy, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // 3. Clear cutout where video plays (chamfered window)
+  const cutSize = isVertical ? 28 : 20;
+  ctx.save();
+  drawChamferedRect(ctx, cardX, cardY, cardW, cardH, cutSize);
+  ctx.clip();
+  ctx.clearRect(0, 0, width, height);
+  ctx.restore();
+
+  // 4. Double neon green chamfered border
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.75)';
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = neonGreen;
+  ctx.lineWidth = 2.5;
+  drawChamferedRect(ctx, cardX, cardY, cardW, cardH, cutSize);
+  ctx.stroke();
+
+  // Inner hairline rail
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(0, 255, 163, 0.45)';
+  ctx.lineWidth = 1.2;
+  drawChamferedRect(ctx, cardX + 6, cardY + 6, cardW - 12, cardH - 12, Math.max(8, cutSize - 4));
+  ctx.stroke();
+  ctx.restore();
+
+  // 5. Four Heavy Corner Registration L-Brackets
+  const bMargin = 12;
+  const bLen = isVertical ? 58 : 45;
+  const bThick = 4.5;
+
+  ctx.save();
+  ctx.shadowColor = '#00FFA3';
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = neonGreen;
+  ctx.lineWidth = bThick;
+  ctx.lineCap = 'square';
+
+  // TL
+  ctx.beginPath();
+  ctx.moveTo(cardX - bMargin, cardY - bMargin + bLen);
+  ctx.lineTo(cardX - bMargin, cardY - bMargin);
+  ctx.lineTo(cardX - bMargin + bLen, cardY - bMargin);
+  ctx.stroke();
+
+  // TR
+  ctx.beginPath();
+  ctx.moveTo(cardX + cardW + bMargin - bLen, cardY - bMargin);
+  ctx.lineTo(cardX + cardW + bMargin, cardY - bMargin);
+  ctx.lineTo(cardX + cardW + bMargin, cardY - bMargin + bLen);
+  ctx.stroke();
+
+  // BL
+  ctx.beginPath();
+  ctx.moveTo(cardX - bMargin, cardY + cardH + bMargin - bLen);
+  ctx.lineTo(cardX - bMargin, cardY + cardH + bMargin);
+  ctx.lineTo(cardX - bMargin + bLen, cardY + cardH + bMargin);
+  ctx.stroke();
+
+  // BR
+  ctx.beginPath();
+  ctx.moveTo(cardX + cardW + bMargin - bLen, cardY + cardH + bMargin);
+  ctx.lineTo(cardX + cardW + bMargin, cardY + cardH + bMargin);
+  ctx.lineTo(cardX + cardW + bMargin, cardY + cardH + bMargin - bLen);
+  ctx.stroke();
+  ctx.restore();
+
+  // 6. Top HUD Header Badge
+  const headerY = Math.max(80, cardY - 95);
+  const badgeW = 600;
+  const badgeH = 66;
+  const badgeX = (width - badgeW) / 2;
+  const headerCut = 16;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(2, 8, 4, 0.95)';
+  drawChamferedRect(ctx, badgeX, headerY, badgeW, badgeH, headerCut);
+  ctx.fill();
+
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.85)';
+  ctx.shadowBlur = 16;
+  ctx.strokeStyle = neonGreen;
+  ctx.lineWidth = 2.5;
+  drawChamferedRect(ctx, badgeX, headerY, badgeW, badgeH, headerCut);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(0, 255, 163, 0.5)';
+  ctx.lineWidth = 1.2;
+  drawChamferedRect(ctx, badgeX + 4, headerY + 4, badgeW - 8, badgeH - 8, headerCut - 2);
+  ctx.stroke();
+
+  ctx.font = '900 23px "Arial Black", Arial, sans-serif';
+  ctx.fillStyle = '#E8FFF4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.6)';
+  ctx.shadowBlur = 8;
+  ctx.fillText('C L U B B I N G   C U L T', width / 2, headerY + badgeH / 2 + 1);
+  ctx.restore();
+
+  // Flanking horizontal connector lines with diamond nodes
+  const lineY = headerY + badgeH / 2;
+  ctx.save();
+  ctx.strokeStyle = neonGreen;
+  ctx.lineWidth = 1.8;
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.7)';
+  ctx.shadowBlur = 8;
+
+  ctx.beginPath();
+  ctx.moveTo(cardX - bMargin, lineY);
+  ctx.lineTo(badgeX - 14, lineY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(badgeX + badgeW + 14, lineY);
+  ctx.lineTo(cardX + cardW + bMargin, lineY);
+  ctx.stroke();
+
+  ctx.fillStyle = neonGreen;
+  drawDiamond(ctx, cardX - bMargin, lineY, 5);
+  ctx.fill();
+  drawDiamond(ctx, badgeX - 14, lineY, 4);
+  ctx.fill();
+  drawDiamond(ctx, badgeX + badgeW + 14, lineY, 4);
+  ctx.fill();
+  drawDiamond(ctx, cardX + cardW + bMargin, lineY, 5);
+  ctx.fill();
+  ctx.restore();
+
+  // 7. Side Vertical Text Rails (Left & Right)
+  ctx.save();
+  ctx.font = 'bold 15px "Courier New", monospace, sans-serif';
+  ctx.fillStyle = 'rgba(0, 255, 163, 0.42)';
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.3)';
+  ctx.shadowBlur = 4;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const leftX = Math.max(34, (cardX - bMargin) / 2);
+  ctx.save();
+  ctx.translate(leftX, height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('C L U B B I N G   C U L T   •   O F F I C I A L', 0, 0);
+  ctx.restore();
+
+  const rightX = Math.min(width - 34, width - (cardX - bMargin) / 2);
+  ctx.save();
+  ctx.translate(rightX, height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillText('L I V E   S E T S   •   P E R F O R M A N C E S', 0, 0);
+  ctx.restore();
+  ctx.restore();
+
+  // 8. Bottom Footer Section
+  const footerLineY = Math.min(1820, cardY + cardH + bMargin + 40);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0, 255, 163, 0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.6)';
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+  ctx.moveTo(cardX - bMargin, footerLineY);
+  ctx.lineTo(width / 2 - 20, footerLineY);
+  ctx.moveTo(width / 2 + 20, footerLineY);
+  ctx.lineTo(cardX + cardW + bMargin, footerLineY);
+  ctx.stroke();
+
+  ctx.fillStyle = neonGreen;
+  drawDiamond(ctx, width / 2, footerLineY, 6);
+  ctx.fill();
+  ctx.restore();
+
+  const footerTextY = footerLineY + 36;
+
+  // Left: ● LIVE
+  ctx.save();
+  ctx.font = 'bold 15px "Courier New", monospace, sans-serif';
+  ctx.fillStyle = 'rgba(0, 255, 163, 0.55)';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  
+  ctx.shadowColor = neonLime;
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = neonLime;
+  ctx.beginPath();
+  ctx.arc(cardX - bMargin + 6, footerTextY, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(0, 255, 163, 0.65)';
+  ctx.fillText('  L I V E', cardX - bMargin + 14, footerTextY);
+
+  // Center: @ C L U B B I N G C U L T
+  ctx.font = '900 18px "Arial Black", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = neonGreen;
+  ctx.shadowColor = 'rgba(0, 255, 163, 0.75)';
+  ctx.shadowBlur = 10;
+  ctx.fillText('@ C L U B B I N G C U L T', width / 2, footerTextY);
+
+  // Right: N I G H T L I F E
+  ctx.font = 'bold 15px "Courier New", monospace, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = 'rgba(0, 255, 163, 0.55)';
+  ctx.shadowBlur = 0;
+  ctx.fillText('N I G H T L I F E', cardX + cardW + bMargin, footerTextY);
+  ctx.restore();
+
+  const publicDir = path.join(__dirname, '..', '..', 'public');
+  const genDir = path.join(publicDir, 'generated');
+  if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
+
+  const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'clubbingcult'}.png`);
+  fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
+  return overlayPath;
+}
+
+/**
  * Generates Feed Reel Frame Template Overlay
  * Supports adaptive geometry: 9:16 vertical full screen, 16:9 landscape, 1:1 square.
- * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink).
+ * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink) vs 'clubbing' (Cyberpunk HUD).
  */
 function generateFeedPostOverlay(handle, options = {}) {
   const { createCanvas } = require('@napi-rs/canvas');
@@ -772,6 +1065,10 @@ function generateFeedPostOverlay(handle, options = {}) {
   const theme = options.theme || (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' : (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6'));
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+
+  if (isClubbing) {
+    return generateClubbingCyberOverlay(cleanHandle, options);
+  }
 
   // 1. Ambient Background for letterboxed videos (landscape / square)
   if (!isVertical) {
@@ -1127,14 +1424,14 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
   if (isVertical) {
     if (isClubbing) {
-      // Clubbing Cult: 100% 9:16 Full Screen Edge-to-Edge immersion, ZERO outer padding/borders
-      cardW = 1080;
-      cardH = 1920;
-      cardX = 0;
-      cardY = 0;
+      // Clubbing Cult Cyberpunk HUD: 9:16 Adaptive Card Cutout
+      cardW = 880;
+      cardH = 1480;
+      cardX = Math.round((1080 - cardW) / 2);
+      cardY = 195;
 
       videoFilter = [
-        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v1]',
+        `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
         '[v1][1:v]overlay=0:0[outv]'
       ].join(';');
     } else {
@@ -1152,21 +1449,21 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   } else {
     // Landscape (16:9) or Square (1:1) / Portrait (4:5)
     if (isClubbing) {
-      // Clubbing Cult: Full width 1080 card with ambient blurred background
-      cardW = 1080;
+      // Clubbing Cult Cyberpunk HUD: Adaptive Card for Landscape/Square
+      cardW = aspect >= 1.5 ? 920 : 860;
       cardH = Math.round(cardW / aspect);
-      if (cardH > 1920) {
-        cardH = 1920;
+      if (cardH > 1460) {
+        cardH = 1460;
         cardW = Math.round(cardH * aspect);
       }
       cardW = Math.floor(cardW / 2) * 2;
       cardH = Math.floor(cardH / 2) * 2;
       cardX = Math.round((1080 - cardW) / 2);
-      cardY = Math.round((1920 - cardH) / 2);
+      cardY = Math.round((1920 - cardH) / 2) - 10;
 
       videoFilter = [
         '[0:v]split=2[bg_raw][fg_raw]',
-        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:4[bg]',
         `[fg_raw]scale=${cardW}:${cardH}[card]`,
         `[bg][card]overlay=${cardX}:${cardY}[v1]`,
         '[v1][1:v]overlay=0:0[outv]'
@@ -1601,6 +1898,7 @@ module.exports = {
   generateFeedWatermark,
   applyBrandedFeedOverlay,
   generateFeedPostOverlay,
+  generateClubbingCyberOverlay,
   prepareVideoForFeedCard,
   extractVideoCover
 };
