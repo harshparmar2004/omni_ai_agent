@@ -129,10 +129,12 @@ async function main() {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
 
-  if (process.env.META_ACCESS_TOKEN) {
-    db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(process.env.META_ACCESS_TOKEN);
-  }
-  const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD';
+  const defaultGtaToken = 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD';
+  const gtaToken = process.env.META_ACCESS_TOKEN || defaultGtaToken;
+  db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(gtaToken);
+
+  const defaultMovieToken = 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD';
+  const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || defaultMovieToken;
   const movieIgId = process.env.MOVIE_IG_USER_ID || '29048404444808513';
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
