@@ -86,6 +86,14 @@ async function run() {
     if (newToken) {
       db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ?, handle = ? WHERE id = ?')
         .run(newToken, meRes.data.id, `@${meRes.data.username}`, page.id);
+
+      if (page.id === 1) {
+        try {
+          db.prepare("UPDATE settings SET value = ? WHERE key = 'meta_page_token'").run(newToken);
+          db.prepare("UPDATE settings SET value = ? WHERE key = 'meta_ig_user_id'").run(meRes.data.id);
+        } catch (e) {}
+      }
+
       console.log(`\n💾 Database Updated Successfully for Page #${page.id}!`);
       console.log(`   Token prefix: ${newToken.substring(0, 15)}...${newToken.slice(-6)}`);
       console.log('\n👉 Next Step: Update your GitHub Repository Secret:');
