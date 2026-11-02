@@ -1094,15 +1094,51 @@ function parseHeadlineTokens(rawHeadline) {
     // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words
     const words = clean.split(/\s+/);
     let highlightCount = 0;
-    const maxAutoHighlights = 3;
+    const maxAutoHighlights = 2;
     const viralPattern = /^(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\d+[-a-zA-Z0-9]+|world's|first|secret|unveiled|record|million|billion|trillion|blackwell|breakthrough)$/i;
 
-    for (const w of words) {
+    const stopWords = new Set([
+      'about','above','after','again','against','all','also','and','any','because','been',
+      'before','being','below','between','both','came','come','could','doing','down',
+      'during','each','even','ever','every','from','further','great','have','having',
+      'here','into','just','leave','more','most','much','never','only','other','over',
+      'same','should','some','someone','something','started','such','than','that','their',
+      'theirs','them','then','there','these','they','thing','things','this','those',
+      'through','under','until','very','what','when','where','which','while','with',
+      'would','your','yours'
+    ]);
+
+    // Pass 1: Check viral pattern and numbers
+    const tokenList = words.map(w => {
       const cleanW = w.replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9%]+$/g, '');
       const shouldHighlight = highlightCount < maxAutoHighlights && viralPattern.test(cleanW);
       if (shouldHighlight) highlightCount++;
-      tokens.push({ text: w, highlight: shouldHighlight });
+      return { text: w, highlight: shouldHighlight, clean: cleanW.toLowerCase() };
+    });
+
+    // Pass 2: If no words were highlighted, guarantee 1-2 semantic content words get brand lime highlight!
+    if (highlightCount === 0) {
+      const candidates = [];
+      tokenList.forEach((t, idx) => {
+        if (t.clean.length >= 5 && !stopWords.has(t.clean)) {
+          candidates.push({ idx, length: t.clean.length });
+        }
+      });
+      // Sort candidates by length descending to pick the most impactful words
+      candidates.sort((a, b) => b.length - a.length);
+      if (candidates.length > 0) {
+        tokenList[candidates[0].idx].highlight = true;
+        highlightCount++;
+        if (candidates.length > 1 && Math.abs(candidates[0].idx - candidates[1].idx) > 1) {
+          tokenList[candidates[1].idx].highlight = true;
+          highlightCount++;
+        }
+      } else if (tokenList.length >= 3) {
+        tokenList[tokenList.length - 2].highlight = true;
+      }
     }
+
+    tokens.push(...tokenList.map(t => ({ text: t.text, highlight: t.highlight })));
   }
 
   return tokens;
@@ -1235,7 +1271,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 3. Header Section (Left Aligned, prominent bold modern layout)
   const marginX = 56;
-  const headerTopY = 160;
+  const headerTopY = options.headerTopY || 220;
 
   // Circular Logo Avatar (92px diameter - 50% larger than old 64px)
   const avatarSize = 92;
@@ -1754,12 +1790,12 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       if (isPreFormatted) {
         // Pre-formatted reel from competitor (e.g. @evolving.ai):
         // Keep video at 1080:1920 in its original center position!
-        // The Cult Information overlay covers Y=0 to 740 in solid black,
+        // The Cult Information overlay covers Y=0 to 680 in solid black,
         // completely obliterating any competitor header and title text (e.g. at Y=580-664)!
         cardW = 1080;
         cardH = 680;
         cardX = 0;
-        cardY = 740;
+        cardY = 680;
 
         videoFilter = [
           '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]',
@@ -1768,9 +1804,9 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       } else {
         // Raw full-frame vertical video: frame into centered video-essay card
         cardW = 1080;
-        cardH = 1080;
+        cardH = 960;
         cardX = 0;
-        cardY = 560;
+        cardY = 680;
 
         videoFilter = [
           `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
