@@ -25,6 +25,11 @@ function formatMetaError(err, context = '') {
   return err;
 }
 
+function sanitizeToken(token) {
+  if (!token) return '';
+  return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
+}
+
 async function pollContainer(containerId, token, baseUrl, onProgress = null) {
   let isReady = false;
   let attempts = 0;
@@ -92,7 +97,7 @@ async function fetchPermalink(igMediaId, token, baseUrl) {
  * Check Meta's content_publishing_limit for the page
  */
 async function getPublishingLimit(page) {
-  const token = page.access_token;
+  const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
 
@@ -114,7 +119,7 @@ async function getPublishingLimit(page) {
  * Publish a Reel (video)
  */
 async function publishReel({ page, videoPath, caption, coverPath = null, onProgress = null }) {
-  const token = page.access_token;
+  const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
 
@@ -207,7 +212,7 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
  * Publish a Carousel (2-10 items)
  */
 async function publishCarousel({ page, imagePaths, caption, onProgress = null }) {
-  const token = page.access_token;
+  const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
 
@@ -295,7 +300,7 @@ async function publishCarousel({ page, imagePaths, caption, onProgress = null })
  * Publish a single Image
  */
 async function publishImage({ page, imagePath, caption, onProgress = null }) {
-  const token = page.access_token;
+  const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
 
@@ -353,7 +358,7 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
  * Note: Stories do NOT accept captions.
  */
 async function publishStory({ page, videoPath = null, imagePath = null, onProgress = null }) {
-  const token = page.access_token;
+  const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
 

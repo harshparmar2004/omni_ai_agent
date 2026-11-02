@@ -129,18 +129,24 @@ async function main() {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
 
+  function sanitizeToken(token) {
+    if (!token) return '';
+    return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
+  }
+
   const defaultGtaToken = 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD';
-  const gtaToken = process.env.META_ACCESS_TOKEN || defaultGtaToken;
+  const gtaToken = sanitizeToken(process.env.META_ACCESS_TOKEN || defaultGtaToken);
   db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(gtaToken);
 
   const defaultMovieToken = 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD';
-  const movieToken = process.env.MOVIE_META_ACCESS_TOKEN || defaultMovieToken;
-  const movieIgId = process.env.MOVIE_IG_USER_ID || '29048404444808513';
+  const movieToken = sanitizeToken(process.env.MOVIE_META_ACCESS_TOKEN || defaultMovieToken);
+  const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
   if (process.env.TECH_META_ACCESS_TOKEN) {
-    const techId = process.env.TECH_IG_USER_ID || '17841434441251009';
-    db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "techguy"').run(process.env.TECH_META_ACCESS_TOKEN, techId);
+    const techToken = sanitizeToken(process.env.TECH_META_ACCESS_TOKEN);
+    const techId = (process.env.TECH_IG_USER_ID || '17841434441251009').trim();
+    db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = "techguy"').run(techToken, techId);
   }
   let pages = getPages({ isActiveOnly: true });
 

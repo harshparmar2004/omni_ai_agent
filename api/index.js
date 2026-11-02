@@ -11,12 +11,17 @@ app.use(express.json());
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const META_ACCESS_TOKEN = process.env.META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD';
-const IG_USER_ID = process.env.IG_USER_ID || '17841428668115319';
-const MOVIE_META_ACCESS_TOKEN = process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD';
-const MOVIE_IG_USER_ID = process.env.MOVIE_IG_USER_ID || '29048404444808513';
-const TECH_META_ACCESS_TOKEN = process.env.TECH_META_ACCESS_TOKEN || process.env.HARSH_META_ACCESS_TOKEN || '';
-const TECH_IG_USER_ID = process.env.TECH_IG_USER_ID || '17841434441251009';
+function sanitizeToken(token) {
+  if (!token) return '';
+  return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
+}
+
+const META_ACCESS_TOKEN = sanitizeToken(process.env.META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD');
+const IG_USER_ID = (process.env.IG_USER_ID || '17841428668115319').trim();
+const MOVIE_META_ACCESS_TOKEN = sanitizeToken(process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD');
+const MOVIE_IG_USER_ID = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
+const TECH_META_ACCESS_TOKEN = sanitizeToken(process.env.TECH_META_ACCESS_TOKEN || process.env.HARSH_META_ACCESS_TOKEN || '');
+const TECH_IG_USER_ID = (process.env.TECH_IG_USER_ID || '17841434441251009').trim();
 
 // Path normalization middleware for Vercel Serverless rewrites
 app.use((req, res, next) => {
