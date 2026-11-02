@@ -254,7 +254,7 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
 
     const aiPrompt = `You are the lead content creator and writer for "${pageName}" (${handle}), an elite Instagram channel producing viral high-retention video-essays.
 Analyze the source description and generate two items in strict JSON format:
-1. "headline": A punchy, curiosity-driven viral hook headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. (Example: "The most expensive AI chips in the world are now worth more than $10,000,000,000").
+1. "headline": A punchy, curiosity-driven viral hook headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. Wrap 1 to 3 of the most critical impact words, numbers, or amounts in double asterisks **like this** so they are highlighted in the brand's signature lime accent color on the reel. (Example: "The most expensive AI chips in the world are now worth more than **$10,000,000,000**" or "NVIDIA Just Unveiled The World's First **1-Million-Token** Neural Supercluster").
 2. "breakdown": A high-energy 2-3 sentence video-essay post body explaining the significance, scale, or mind-blowing reality of this topic.
 
 Source Content:

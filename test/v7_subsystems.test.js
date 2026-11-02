@@ -206,7 +206,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(details.caption.includes('Save this reel') || details.caption.includes('share with someone'), 'Should include save CTA');
     assert.ok(!details.caption.includes('@nvidia'), 'Zero credits: should strip competitor handle');
 
-    // 3. Cult Information 1080x1920 Video-Essay Overlay Generation
+    // 3. Cult Information 1080x1920 Video-Essay Overlay Generation with Highlighted Words
     const overlayPath = await generateFeedPostOverlay('cult_information', {
       cardX: 0,
       cardY: 540,
@@ -215,7 +215,7 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       isVertical: false,
       theme: 'video_essay',
       page: cultPage,
-      hookHeadline: details.hookHeadline
+      hookHeadline: "NVIDIA Just Unveiled The World's First **1-Million-Token** Neural Supercluster"
     });
 
     assert.ok(fs.existsSync(overlayPath), 'Cult Information overlay file must exist');

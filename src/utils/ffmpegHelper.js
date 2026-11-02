@@ -1065,6 +1065,73 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
+/**
+ * Tokenizes headline text supporting explicit markdown (**highlighted**)
+ * as well as smart automatic keyword/number highlighting in brand colors.
+ */
+function parseHeadlineTokens(rawHeadline) {
+  if (!rawHeadline) return [];
+  const clean = rawHeadline.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+
+  const hasExplicitMarkup = /\*\*.*?\*\*|\*.*?\*|<hl>.*?<\/hl>/.test(clean);
+  const tokens = [];
+
+  if (hasExplicitMarkup) {
+    const regex = /(\*\*([^*]+)\*\*|\*([^*]+)\*|<hl>([^<]+)<\/hl>|\S+)/g;
+    let match;
+    while ((match = regex.exec(clean)) !== null) {
+      if (match[2]) {
+        match[2].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
+      } else if (match[3]) {
+        match[3].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
+      } else if (match[4]) {
+        match[4].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
+      } else {
+        tokens.push({ text: match[0], highlight: false });
+      }
+    }
+  } else {
+    // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words
+    const words = clean.split(/\s+/);
+    let highlightCount = 0;
+    const maxAutoHighlights = 3;
+    const viralPattern = /^(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\d+[-a-zA-Z0-9]+|world's|first|secret|unveiled|record|million|billion|trillion|blackwell|breakthrough)$/i;
+
+    for (const w of words) {
+      const cleanW = w.replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9%]+$/g, '');
+      const shouldHighlight = highlightCount < maxAutoHighlights && viralPattern.test(cleanW);
+      if (shouldHighlight) highlightCount++;
+      tokens.push({ text: w, highlight: shouldHighlight });
+    }
+  }
+
+  return tokens;
+}
+
+function wrapTokens(ctx, tokens, maxWidth) {
+  const lines = [];
+  let currentLine = [];
+  let currentWidth = 0;
+  const spaceWidth = ctx.measureText(' ').width;
+
+  for (const token of tokens) {
+    const tokenWidth = ctx.measureText(token.text).width;
+    const addedWidth = currentLine.length > 0 ? (spaceWidth + tokenWidth) : tokenWidth;
+
+    if (currentLine.length > 0 && (currentWidth + addedWidth) > maxWidth) {
+      lines.push(currentLine);
+      currentLine = [token];
+      currentWidth = tokenWidth;
+    } else {
+      currentLine.push(token);
+      currentWidth += addedWidth;
+    }
+  }
+
+  if (currentLine.length > 0) lines.push(currentLine);
+  return lines;
+}
+
 function drawVerifiedBadge(ctx, x, y, size = 18) {
   ctx.save();
   ctx.fillStyle = '#0095F6'; // Instagram verified blue
@@ -1197,24 +1264,32 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 34);
   ctx.restore();
 
-  // 4. Punchy Viral Headline / Hook (Brand Guidelines: Strong / Poster / Grotesk)
+  // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
   const headlineY = headerTopY + avatarSize + 32;
   const maxTextWidth = width - (marginX * 2);
+  const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult lime green
 
   ctx.save();
   ctx.font = '900 34px "Arial Black", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/^["'“”]/, '')
     .replace(/["'“”]$/, '');
 
-  const lines = wrapText(ctx, cleanHeadline, maxTextWidth);
+  const tokens = parseHeadlineTokens(cleanHeadline);
+  const lines = wrapTokens(ctx, tokens, maxTextWidth);
   const lineHeight = 46;
-  lines.forEach((line, idx) => {
-    ctx.fillText(line, marginX, headlineY + (idx * lineHeight));
+  const spaceWidth = ctx.measureText(' ').width;
+
+  lines.forEach((lineTokens, lineIdx) => {
+    let currentX = marginX;
+    const currentY = headlineY + (lineIdx * lineHeight);
+    for (const token of lineTokens) {
+      ctx.fillStyle = token.highlight ? highlightColor : '#FFFFFF';
+      ctx.fillText(token.text, currentX, currentY);
+      currentX += ctx.measureText(token.text).width + spaceWidth;
+    }
   });
   ctx.restore();
 
