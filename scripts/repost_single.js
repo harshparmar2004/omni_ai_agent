@@ -140,12 +140,37 @@ async function main() {
       is_active: 1
     });
   }
+  const defaultCultInfoToken = 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD';
+  const cultInfoToken = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || defaultCultInfoToken);
+  const cultInfoIgId = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
+
+  const hasCultPage = pages.some(p => p.id === 4 || p.slug === 'cult_information' || p.handle === '@cult_information');
+  if (!hasCultPage) {
+    console.log('💡 Creating Page #4 (@cult_information)...');
+    createPage({
+      slug: 'cult_information',
+      name: 'Cult Information',
+      handle: '@cult_information',
+      ig_user_id: cultInfoIgId,
+      access_token: cultInfoToken,
+      caption_template: '{caption}\n\n{hashtags}',
+      default_hashtags: '#ai #artificialintelligence #tech #innovation #future #cultinformation',
+      attribution_enabled: 0,
+      watermark_enabled: 0,
+      post_mode: 'auto',
+      posts_per_cycle: 1,
+      daily_quota: 10,
+      min_spacing_minutes: 0,
+      is_active: 1
+    });
+  }
   pages = getPages();
 
   try {
     db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
     db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
     db.prepare("UPDATE pages SET slug = 'clubbing', name = 'Clubbing Cult', handle = '@clubbingcult', ig_user_id = ?, access_token = ?, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult', is_active = 1 WHERE id = 3 OR slug = 'techguy' OR slug = 'clubbing'").run(clubbingIgId, clubbingToken);
+    db.prepare("UPDATE pages SET slug = 'cult_information', name = 'Cult Information', handle = '@cult_information', ig_user_id = ?, access_token = ?, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#ai #artificialintelligence #tech #innovation #future #cultinformation', is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoIgId, cultInfoToken);
   } catch (e) {}
 
   function sanitizeToken(token) {
@@ -169,6 +194,7 @@ async function main() {
   db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
 
   db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
+  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ?, is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoToken, cultInfoIgId);
   pages = getPages();
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);

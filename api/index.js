@@ -24,6 +24,8 @@ const CLUBBING_META_ACCESS_TOKEN = sanitizeToken(process.env.CLUBBING_CULT_META_
 const CLUBBING_IG_USER_ID = (process.env.CLUBBING_CULT_IG_USER_ID || process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
 const TECH_META_ACCESS_TOKEN = CLUBBING_META_ACCESS_TOKEN;
 const TECH_IG_USER_ID = CLUBBING_IG_USER_ID;
+const CULT_INFO_META_ACCESS_TOKEN = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD');
+const CULT_INFO_IG_USER_ID = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
 
 // Path normalization middleware for Vercel Serverless rewrites
 app.use((req, res, next) => {
@@ -47,7 +49,8 @@ function getCompetitorsConfig() {
         return {
           gta6: Array.isArray(parsed.gta6) ? parsed.gta6 : ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
           movies: Array.isArray(parsed.movies) ? parsed.movies : [],
-          clubbing: Array.isArray(parsed.clubbing) ? parsed.clubbing : (Array.isArray(parsed.techguy) ? parsed.techguy : ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'])
+          clubbing: Array.isArray(parsed.clubbing) ? parsed.clubbing : (Array.isArray(parsed.techguy) ? parsed.techguy : ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords']),
+          cult_information: Array.isArray(parsed.cult_information) ? parsed.cult_information : ['evolving.ai']
         };
       }
     }
@@ -55,7 +58,8 @@ function getCompetitorsConfig() {
   return {
     gta6: ['grandtheftauto6', 'paradoks.plays', 'gta6.only', 'gta6latest', 'rockstargames'],
     movies: [],
-    clubbing: ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords']
+    clubbing: ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'],
+    cult_information: ['evolving.ai']
   };
 }
 
@@ -64,7 +68,8 @@ function getCompetitors(targetPage = null) {
   if (targetPage === 1 || targetPage === '1' || targetPage === 'gta6') return cfg.gta6;
   if (targetPage === 2 || targetPage === '2' || targetPage === 'movies') return cfg.movies;
   if (targetPage === 3 || targetPage === '3' || targetPage === 'clubbing' || targetPage === 'techguy') return cfg.clubbing || [];
-  return [...cfg.gta6, ...cfg.movies, ...(cfg.clubbing || [])];
+  if (targetPage === 4 || targetPage === '4' || targetPage === 'cult_information' || targetPage === 'ai_curation') return cfg.cult_information || ['evolving.ai'];
+  return [...cfg.gta6, ...cfg.movies, ...(cfg.clubbing || []), ...(cfg.cult_information || ['evolving.ai'])];
 }
 
 // Helper: Normalize username or Instagram URL
@@ -109,19 +114,19 @@ async function saveCompetitorsToGitHub(competitorsConfig, commitMessage) {
 }
 
 // Live Cache for Meta Graph API Media per page (1 minute TTL)
-let mediaCache = { 1: { data: null, timestamp: 0 }, 2: { data: null, timestamp: 0 }, 3: { data: null, timestamp: 0 } };
+let mediaCache = { 1: { data: null, timestamp: 0 }, 2: { data: null, timestamp: 0 }, 3: { data: null, timestamp: 0 }, 4: { data: null, timestamp: 0 } };
 const MEDIA_CACHE_TTL_MS = 60 * 1000;
 
 async function getLivePublishedMedia(pageId = 1) {
-  const pId = (pageId === 3 || String(pageId) === '3' || pageId === 'clubbing') ? 3 : ((pageId === 2 || String(pageId) === '2' || pageId === 'movies') ? 2 : 1);
+  const pId = (pageId === 4 || String(pageId) === '4' || pageId === 'cult_information' || pageId === 'ai_curation') ? 4 : ((pageId === 3 || String(pageId) === '3' || pageId === 'clubbing') ? 3 : ((pageId === 2 || String(pageId) === '2' || pageId === 'movies') ? 2 : 1));
   const now = Date.now();
   if (mediaCache[pId]?.data && (now - mediaCache[pId].timestamp < MEDIA_CACHE_TTL_MS)) {
     return mediaCache[pId].data;
   }
 
-  const token = pId === 3 ? CLUBBING_META_ACCESS_TOKEN : (pId === 2 ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN);
-  const igId = pId === 3 ? CLUBBING_IG_USER_ID : (pId === 2 ? MOVIE_IG_USER_ID : IG_USER_ID);
-  const pageHandle = pId === 3 ? '@clubbingcult' : (pId === 2 ? '@movie_series_365' : '@gta6_updates_007');
+  const token = pId === 4 ? CULT_INFO_META_ACCESS_TOKEN : (pId === 3 ? CLUBBING_META_ACCESS_TOKEN : (pId === 2 ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN));
+  const igId = pId === 4 ? CULT_INFO_IG_USER_ID : (pId === 3 ? CLUBBING_IG_USER_ID : (pId === 2 ? MOVIE_IG_USER_ID : IG_USER_ID));
+  const pageHandle = pId === 4 ? '@cult_information' : (pId === 3 ? '@clubbingcult' : (pId === 2 ? '@movie_series_365' : '@gta6_updates_007'));
 
   if (!token) return getFallbackMedia(pId);
 
@@ -133,13 +138,16 @@ async function getLivePublishedMedia(pageId = 1) {
     const formatted = raw.map((item) => {
       const match = (item.permalink || '').match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
       const shortcode = match ? match[1] : `ig_${item.id}`;
+      const isCultInfo = (pId === 4 || String(pId) === '4');
       const isClubbing = (pId === 3 || String(pId) === '3');
       const isMovie = (pId === 2 || String(pId) === '2');
-      const defaultThumb = isClubbing
-        ? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
-        : (isMovie
-          ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80');
+      const defaultThumb = isCultInfo
+        ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
+        : (isClubbing
+          ? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
+          : (isMovie
+            ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+            : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80'));
 
       return {
         id: item.id,
@@ -155,7 +163,7 @@ async function getLivePublishedMedia(pageId = 1) {
         format: '1080p MP4',
         aspect_ratio: '9:16 Vertical',
         dimensions: '1080 × 1920',
-        file_size: isClubbing ? '20.4 MB' : (isMovie ? '22.8 MB' : '18.4 MB'),
+        file_size: isCultInfo ? '16.5 MB' : (isClubbing ? '20.4 MB' : (isMovie ? '22.8 MB' : '18.4 MB')),
         created_at: item.timestamp,
         downloaded_at: item.timestamp,
         published_at: item.timestamp,
@@ -178,24 +186,30 @@ async function getLivePublishedMedia(pageId = 1) {
 }
 
 function getFallbackMedia(pageId = 1) {
+  const isCultInfo = (pageId === 4 || String(pageId) === '4' || pageId === 'cult_information' || pageId === 'ai_curation');
+  const isClubbing = (pageId === 3 || String(pageId) === '3' || pageId === 'clubbing');
   const isMovie = (pageId === 2 || String(pageId) === '2' || pageId === 'movies');
   const now = Date.now();
   return [
     {
-      id: isMovie ? '18029384812398231' : '18111603524617292',
-      shortcode: isMovie ? 'DfC8JgEjh8B' : 'De3JoLwjMbt',
-      permalink: isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/',
-      story_permalink: isMovie ? 'https://www.instagram.com/stories/movie_series_365/' : 'https://www.instagram.com/stories/gta6_updates_007/',
-      source_url: isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/',
-      caption: isMovie ? 'Top upcoming thriller trailer breakdown! Credit: @filmfeed #movies #cinema' : 'New GTA 6 physics & weather teaser! Credit: @rockstargames #gta6 #gaming',
+      id: isCultInfo ? '18099882233445566' : (isClubbing ? '18055443322119988' : (isMovie ? '18029384812398231' : '18111603524617292')),
+      shortcode: isCultInfo ? 'DG1c4pBoMNf' : (isClubbing ? 'Df9Kc1OlBdB' : (isMovie ? 'DfC8JgEjh8B' : 'De3JoLwjMbt')),
+      permalink: isCultInfo ? 'https://www.instagram.com/reel/DG1c4pBoMNf/' : (isClubbing ? 'https://www.instagram.com/reel/Df9Kc1OlBdB/' : (isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/')),
+      story_permalink: isCultInfo ? 'https://www.instagram.com/stories/cult_information/' : (isClubbing ? 'https://www.instagram.com/stories/clubbingcult/' : (isMovie ? 'https://www.instagram.com/stories/movie_series_365/' : 'https://www.instagram.com/stories/gta6_updates_007/')),
+      source_url: isCultInfo ? 'https://www.instagram.com/reel/DG1c4pBoMNf/' : (isClubbing ? 'https://www.instagram.com/reel/Df9Kc1OlBdB/' : (isMovie ? 'https://www.instagram.com/reel/DfC8JgEjh8B/' : 'https://www.instagram.com/reel/De3JoLwjMbt/')),
+      caption: isCultInfo ? 'The AI Revolution is moving faster than you think. 🧠 Follow @cult_information #ai #tech' : (isClubbing ? 'Unreal festival energy! 🪩 Follow @clubbingcult #rave #techno' : (isMovie ? 'Top upcoming thriller trailer breakdown! Credit: @filmfeed #movies #cinema' : 'New GTA 6 physics & weather teaser! Credit: @rockstargames #gta6 #gaming')),
       created_at: new Date(now - 35 * 60 * 1000).toISOString(),
       downloaded_at: new Date(now - 33 * 60 * 1000).toISOString(),
       published_at: new Date().toISOString(),
       status: 'published',
       media_type: 'reel',
-      thumbnail_url: isMovie
-        ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+      thumbnail_url: isCultInfo
+        ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
+        : (isClubbing
+          ? 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80'
+          : (isMovie
+            ? 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&auto=format&fit=crop&q=80'
+            : 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80')),
       video_url: isMovie
         ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
         : 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
@@ -203,10 +217,10 @@ function getFallbackMedia(pageId = 1) {
       format: '1080p MP4',
       aspect_ratio: '9:16 Vertical',
       dimensions: '1080 × 1920',
-      file_size: isMovie ? '22.8 MB' : '18.4 MB',
+      file_size: isCultInfo ? '16.5 MB' : (isClubbing ? '20.4 MB' : (isMovie ? '22.8 MB' : '18.4 MB')),
       likes: 1,
-      source_account: isMovie ? '@filmfeed' : '@rockstargames',
-      page_handle: isMovie ? '@movie_series_365' : '@gta6_updates_007',
+      source_account: isCultInfo ? '@evolving.ai' : (isClubbing ? '@tomorrowland' : (isMovie ? '@filmfeed' : '@rockstargames')),
+      page_handle: isCultInfo ? '@cult_information' : (isClubbing ? '@clubbingcult' : (isMovie ? '@movie_series_365' : '@gta6_updates_007')),
       telegram_chat_id: '5443723531',
       agent: 'reposter'
     }
@@ -304,7 +318,29 @@ const PAGE_CLUBBING = {
 
 const PAGE_TECH = PAGE_CLUBBING;
 
-let dynamicPages = [PAGE_GTA6, PAGE_MOVIES, PAGE_CLUBBING];
+const PAGE_CULT_INFO = {
+  id: 4,
+  slug: 'cult_information',
+  name: 'Cult Information',
+  handle: '@cult_information',
+  ig_user_id: CULT_INFO_IG_USER_ID,
+  access_token: CULT_INFO_META_ACCESS_TOKEN,
+  access_token_masked: CULT_INFO_META_ACCESS_TOKEN ? `${CULT_INFO_META_ACCESS_TOKEN.substring(0, 6)}...${CULT_INFO_META_ACCESS_TOKEN.slice(-4)}` : '',
+  has_valid_token: Boolean(CULT_INFO_META_ACCESS_TOKEN && CULT_INFO_META_ACCESS_TOKEN.length > 20),
+  caption_template: '{caption}\n\n{hashtags}',
+  default_hashtags: '#ai #artificialintelligence #tech #innovation #future #cultinformation',
+  icon: '💡',
+  accent_color: '#c1d82f',
+  attribution_enabled: 0,
+  watermark_enabled: 0,
+  post_mode: 'auto',
+  posts_per_cycle: 1,
+  daily_quota: 10,
+  min_spacing_minutes: 60,
+  is_active: 1
+};
+
+let dynamicPages = [PAGE_GTA6, PAGE_MOVIES, PAGE_CLUBBING, PAGE_CULT_INFO];
 
 function getPagesList() {
   return dynamicPages;
@@ -405,8 +441,8 @@ router.delete('/pages/:id', (req, res) => {
 // ── POST /pages/:id/test ────────────────────────────────────
 router.post('/pages/:id/test', async (req, res) => {
   const target = getPage(req.params.id);
-  const token = req.body?.access_token || target.access_token || (target.id === 2 ? MOVIE_META_ACCESS_TOKEN : (target.id === 3 ? TECH_META_ACCESS_TOKEN : META_ACCESS_TOKEN));
-  const igId = req.body?.ig_user_id || target.ig_user_id || (target.id === 2 ? MOVIE_IG_USER_ID : (target.id === 3 ? TECH_IG_USER_ID : IG_USER_ID));
+  const token = req.body?.access_token || target.access_token || (target.id === 4 ? CULT_INFO_META_ACCESS_TOKEN : (target.id === 3 ? TECH_META_ACCESS_TOKEN : (target.id === 2 ? MOVIE_META_ACCESS_TOKEN : META_ACCESS_TOKEN)));
+  const igId = req.body?.ig_user_id || target.ig_user_id || (target.id === 4 ? CULT_INFO_IG_USER_ID : (target.id === 3 ? TECH_IG_USER_ID : (target.id === 2 ? MOVIE_IG_USER_ID : IG_USER_ID)));
 
   if (!token) {
     target.has_valid_token = false;

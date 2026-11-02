@@ -151,6 +151,12 @@ async function main() {
   const clubbingToken = sanitizeToken(process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
   const clubbingIgId = (process.env.CLUBBING_CULT_IG_USER_ID || process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
   db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
+
+  const defaultCultInfoToken = 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD';
+  const cultInfoToken = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || defaultCultInfoToken);
+  const cultInfoIgId = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
+  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ?, is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoToken, cultInfoIgId);
+
   let pages = getPages({ isActiveOnly: true });
 
   // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
@@ -158,6 +164,7 @@ async function main() {
   let gtaCompetitors = ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'];
   let movieCompetitors = [];
   let clubbingCompetitors = ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'];
+  let cultCompetitors = ['evolving.ai'];
 
   const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
   if (fs.existsSync(competitorsJsonPath)) {
@@ -167,6 +174,7 @@ async function main() {
         if (parsed.gta6 && Array.isArray(parsed.gta6)) gtaCompetitors = parsed.gta6;
         if (parsed.movies && Array.isArray(parsed.movies)) movieCompetitors = parsed.movies;
         if (parsed.clubbing && Array.isArray(parsed.clubbing)) clubbingCompetitors = parsed.clubbing;
+        if (parsed.cult_information && Array.isArray(parsed.cult_information)) cultCompetitors = parsed.cult_information;
       } else if (Array.isArray(parsed)) {
         gtaCompetitors = parsed;
       }
@@ -221,8 +229,23 @@ async function main() {
     }
   }
 
-  const allActiveSources = [...cleanGta, ...cleanMovies, ...cleanClubbing];
-  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}] | Clubbing: [${cleanClubbing.map(c => '@' + c).join(', ')}]`);
+  // Register Cult Information sources for Page 4
+  const cleanCult = [...new Set(cultCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
+  if (cleanCult.length === 0) {
+    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 4').run(); } catch (e) {}
+  } else {
+    try {
+      const placeholders = cleanCult.map(() => '?').join(',');
+      db.prepare(`DELETE FROM source_accounts WHERE page_id = 4 AND username NOT IN (${placeholders})`).run(...cleanCult);
+    } catch (e) {}
+    for (const comp of cleanCult) {
+      createSourceAccount({ username: comp, page_id: 4, is_active: 1 });
+      try { db.prepare('UPDATE source_accounts SET page_id = 4, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
+    }
+  }
+
+  const allActiveSources = [...cleanGta, ...cleanMovies, ...cleanClubbing, ...cleanCult];
+  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}] | Clubbing: [${cleanClubbing.map(c => '@' + c).join(', ')}] | Cult Information: [${cleanCult.map(c => '@' + c).join(', ')}]`);
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
