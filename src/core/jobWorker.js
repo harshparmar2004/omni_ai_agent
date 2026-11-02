@@ -261,6 +261,7 @@ class JobWorkerPool {
         const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
         const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : 'gta6');
         const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : 'GTA 6 Vice City');
+        const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode') || 'frame';
 
         if (brandingMode === 'frame') {
           try {
