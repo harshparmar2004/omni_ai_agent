@@ -82,9 +82,13 @@ function stopTelegramBot() {
 }
 
 async function pollUpdatesLoop() {
-  const token = getTelegramToken();
-
   while (!stopRequested) {
+    const token = getTelegramToken();
+    if (!token) {
+      await new Promise(r => setTimeout(r, 5000));
+      continue;
+    }
+
     try {
       const res = await axios.get(`https://api.telegram.org/bot${token}/getUpdates`, {
         params: {
