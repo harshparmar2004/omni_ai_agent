@@ -101,11 +101,17 @@ async function pollUpdatesLoop() {
       }
     } catch (err) {
       if (stopRequested) break;
-      const isNetwork = /timeout|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(err.message);
-      if (!isNetwork) {
-        console.warn(`[Telegram Bot Poll Error]: ${err.message}`);
+      const isGatewayError = err.response && (err.response.status === 502 || err.response.status === 503 || err.response.status === 504);
+      if (isGatewayError) {
+        console.warn(`[Telegram Bot] ⚠️ Telegram API Gateway temporarily unavailable (HTTP ${err.response.status}). Retrying in 8s...`);
+        await new Promise(r => setTimeout(r, 8000));
+      } else {
+        const isNetwork = /timeout|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(err.message);
+        if (!isNetwork) {
+          console.warn(`[Telegram Bot Poll Error]: ${err.message}`);
+        }
+        await new Promise(r => setTimeout(r, 4000));
       }
-      await new Promise(r => setTimeout(r, 4000));
     }
   }
 }
