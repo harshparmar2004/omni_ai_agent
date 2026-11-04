@@ -10,7 +10,15 @@ app.use(express.json());
 
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const ACTIVE_FALLBACK_TELEGRAM_TOKEN = '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI';
+function getTelegramToken() {
+  const envToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!envToken || envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || envToken.length < 20) {
+    return ACTIVE_FALLBACK_TELEGRAM_TOKEN;
+  }
+  return envToken;
+}
+const TELEGRAM_TOKEN = getTelegramToken();
 function sanitizeToken(token) {
   if (!token) return '';
   return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
@@ -1399,7 +1407,7 @@ router.post('/settings', (req, res) => {
 
 router.post('/system/telegram/test', async (req, res) => {
   try {
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    await axios.post(`https://api.telegram.org/bot${getTelegramToken()}/sendMessage`, {
       chat_id: '5443723531',
       text: '🔔 <b>OmniStudio Cloud Ping:</b> System handshake OK!',
       parse_mode: 'HTML'

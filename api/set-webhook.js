@@ -1,14 +1,24 @@
 const axios = require('axios');
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const ACTIVE_FALLBACK_TOKEN = '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI';
+
+function getTelegramToken() {
+  const envToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!envToken || envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || envToken.length < 20) {
+    return ACTIVE_FALLBACK_TOKEN;
+  }
+  return envToken;
+}
 
 module.exports = async function handler(req, res) {
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const token = getTelegramToken();
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'omni-ai-agent-tawny.vercel.app';
   const proto = req.headers['x-forwarded-proto'] || 'https';
-  const webhookUrl = `${proto}://${host}/api/telegram-webhook`;
+  const customUrl = req.query?.url || req.body?.url;
+  const webhookUrl = customUrl || `${proto}://${host}/api/telegram-webhook`;
 
   try {
-    const response = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook`, {
+    const response = await axios.post(`https://api.telegram.org/bot${token}/setWebhook`, {
       url: webhookUrl,
       drop_pending_updates: false
     });
@@ -44,3 +54,4 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+

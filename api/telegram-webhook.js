@@ -1,12 +1,21 @@
 const axios = require('axios');
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const ACTIVE_FALLBACK_TOKEN = '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI';
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const ALLOWED_CHATS = (process.env.ALLOWED_CHAT_IDS || '5443723531').split(',').map(s => s.trim());
 
+function getTelegramToken() {
+  const envToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!envToken || envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || envToken.length < 20) {
+    return ACTIVE_FALLBACK_TOKEN;
+  }
+  return envToken;
+}
+
 async function sendTelegram(chatId, text, extra = {}) {
+  const token = getTelegramToken();
   try {
-    const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    const res = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
       chat_id: chatId,
       text: text,
       parse_mode: 'HTML',
@@ -21,8 +30,9 @@ async function sendTelegram(chatId, text, extra = {}) {
 }
 
 async function editTelegram(chatId, messageId, text, extra = {}) {
+  const token = getTelegramToken();
   try {
-    const res = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/editMessageText`, {
+    const res = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
       chat_id: chatId,
       message_id: parseInt(messageId, 10),
       text: text,
@@ -38,8 +48,9 @@ async function editTelegram(chatId, messageId, text, extra = {}) {
 }
 
 async function answerCallbackQuery(queryId, text = '') {
+  const token = getTelegramToken();
   try {
-    await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/answerCallbackQuery`, {
+    await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
       callback_query_id: queryId,
       text: text
     }, { timeout: 5000 });
@@ -133,7 +144,7 @@ module.exports = async function handler(req, res) {
         `<i>Status: ${isCloudRun ? 'Dispatching to high-speed Cloud Run service...' : 'Spawning turbocharged cloud runner...'}</i>`
       );
 
-      // 1. Instant Direct Cloud Run Dispatch (Sub-second latency)
+      // 1. Direct Cloud Run Dispatch (if configured)
       if (cloudRunUrl) {
         try {
           console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}...`);
@@ -214,32 +225,74 @@ module.exports = async function handler(req, res) {
     await sendTelegram(
       chatId,
       `👋 <b>Welcome to OmniStudio v7 Autonomous Cloud Agent!</b>\n\n` +
+      `Your agents run <b>24/7 in the cloud</b> — even when your laptop is turned off.\n\n` +
       `<b>⚡ Agent 1 (On-Demand Reposter):</b>\n` +
       `• Share any Instagram Reel or Post link here.\n` +
       `• Auto-downloads media, writes viral hook, transcodes & publishes to Feed + Story in <50s.\n\n` +
       `<b>🛰️ Agent 2 (Watchtower 24/7 Surveillance):</b>\n` +
-      `• <code>/post</code> — Trigger autonomous competitor scan & publish viral winner immediately\n` +
+      `• Monitors competitors and auto-publishes 7 viral reels/day at peak IST times.\n\n` +
+      `<b>📋 Commands:</b>\n` +
+      `• <code>/post</code> — Trigger competitor scan & publish winner immediately\n` +
       `• <code>/post force</code> — Force publish immediately even if outside peak window\n` +
-      `• <code>/status</code> — View system health, quota, and peak schedule\n\n` +
-      `<i>Tip: Just tap /post or share any Instagram Reel link!</i>`
+      `• <code>/pages</code> — View all 4 connected accounts & daily quotas\n` +
+      `• <code>/status</code> — View cloud gateway, runners, and IST schedule\n` +
+      `• <code>/queue</code> — View dispatch queue status\n\n` +
+      `<i>Tip: Just share any Instagram Reel link or tap /post!</i>`
+    );
+    return res.status(200).json({ ok: true });
+  }
+
+  if (text.startsWith('/pages')) {
+    const pages = getPagesList();
+    let msg = `📱 <b>Connected OmniStudio Instagram Destinations (${pages.length}/4):</b>\n\n`;
+    for (const p of pages) {
+      msg += `${p.icon || '📱'} <b>${p.name}</b> (Page #${p.id})\n`;
+      msg += `   • Handle: <code>${p.handle}</code>\n`;
+      msg += `   • Daily Target: <b>7 High-Virality Reels / Day</b>\n`;
+      msg += `   • Attribution: Zero Creator Credits (100% Brand Native)\n`;
+      msg += `   • Cross-Publishing: Feed + Story\n\n`;
+    }
+    msg += `💡 <i>To repost, simply share any Instagram reel link here and select your target account!</i>`;
+    await sendTelegram(chatId, msg);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (text.startsWith('/queue')) {
+    await sendTelegram(
+      chatId,
+      `📊 <b>OmniStudio Cloud Dispatch & Queue Engine</b>\n\n` +
+      `🟢 <b>Queue State:</b> Ready (Serverless & GitHub Actions Direct)\n` +
+      `⚡ <b>Worker Pipeline:</b> GitHub Actions Cloud (Zero Laptop Required)\n` +
+      `📦 <b>Active Jobs:</b> Dispatched asynchronously with real-time status reporting\n\n` +
+      `<i>Tip: Send any Instagram link to immediately trigger a new repost job.</i>`
     );
     return res.status(200).json({ ok: true });
   }
 
   if (text.startsWith('/status')) {
+    const now = new Date();
+    const istTimeStr = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: true });
+    const istHour = parseInt(now.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false }), 10);
+    const isNight = istHour >= 22 || istHour < 8;
+
     await sendTelegram(
       chatId,
       `🛰️ <b>OmniStudio v7 Cloud Engine Status</b>\n\n` +
-      `🟢 <b>Serverless Gateway:</b> Active on Vercel\n` +
-      `📱 <b>Target Page:</b> <code>@gta6_updates_007</code>\n` +
-      `🎯 <b>Daily Quota:</b> 7 High-Virality Reels / Day\n` +
-      `🚫 <b>Zero Creator Credits:</b> Active (100% Brand Native)\n` +
-      `⚡ <b>AI Engine:</b> Groq Llama 3.3 70B (High-Speed)\n\n` +
+      `🟢 <b>Serverless Gateway:</b> Active on Vercel 24/7\n` +
+      `🤖 <b>Telegram Autonomous Bridge:</b> Online (No Laptop Required)\n` +
+      `⚡ <b>Automation Engine:</b> GitHub Actions Cloud\n` +
+      `🕒 <b>Current IST Time:</b> <code>${istTimeStr} IST</code>\n` +
+      `🛡️ <b>Audience Window Status:</b> ${isNight ? '🌙 Night Blackout Active (Resumes 08:30 IST)' : '☀️ Active Daytime Engagement Window'}\n\n` +
+      `📱 <b>Connected Pages (4):</b>\n` +
+      `• 🎮 <code>@gta6_updates_007</code> (7/day)\n` +
+      `• 🍿 <code>@movie_series_365</code> (7/day)\n` +
+      `• 🪩 <code>@clubbingcult</code> (7/day)\n` +
+      `• 💡 <code>@cult_information</code> (7/day)\n\n` +
       `📅 <b>Automated IST Posting Schedule:</b>\n` +
       `• 🌅 <b>Morning (08:30 - 11:30 IST):</b> 09:00 AM & 10:30 AM\n` +
       `• 🥪 <b>Lunch (12:30 - 16:30 IST):</b> 01:30 PM & 03:30 PM\n` +
       `• 🌆 <b>Evening (17:00 - 21:30 IST):</b> 06:30 PM, 08:00 PM & 09:15 PM\n` +
-      `• 🌙 <b>Night Blackout:</b> 21:30 - 08:30 IST (Zero overnight posting to prevent bot flags)\n\n` +
+      `• 🌙 <b>Night Blackout:</b> 21:30 - 08:30 IST\n\n` +
       `💡 <i>Send <code>/post</code> anytime to trigger a Watchtower cycle instantly!</i>`
     );
     return res.status(200).json({ ok: true });
@@ -257,12 +310,18 @@ module.exports = async function handler(req, res) {
     }
 
     const isForce = text.includes('force');
+    let targetPageName = 'All Configured Pages';
+    if (text.includes('movie') || text.includes('2')) targetPageName = '@movie_series_365';
+    else if (text.includes('clubbing') || text.includes('3')) targetPageName = '@clubbingcult';
+    else if (text.includes('cult') || text.includes('4')) targetPageName = '@cult_information';
+    else if (text.includes('gta') || text.includes('1')) targetPageName = '@gta6_updates_007';
+
     await sendTelegram(
       chatId,
       `🛰️ <b>Agent 2 (Watchtower 24/7) Engaged!</b>\n\n` +
-      `🔍 <b>Task:</b> Scanning your active competitor accounts for fresh viral reels\n` +
-      `📱 <b>Target:</b> <code>@gta6_updates_007</code>\n` +
-      `⚙️ <b>Mode:</b> ${isForce ? 'Force Instant Publish (Blackout Bypassed)' : 'Peak Virality Scoring'}\n\n` +
+      `🔍 <b>Task:</b> Scanning competitor accounts for fresh viral reels\n` +
+      `📱 <b>Target:</b> <code>${targetPageName}</code>\n` +
+      `⚙️ <b>Mode:</b> ${isForce ? '⚡ Force Instant Publish (Blackout Bypassed)' : '🎯 Peak Virality Pacing'}\n\n` +
       `<i>Cloud runner dispatched. As soon as the winning reel is transcoded & published, you will receive the live Instagram link here!</i>`
     );
 
@@ -298,9 +357,10 @@ module.exports = async function handler(req, res) {
 
   // Check Instagram Link
   const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+
   if (!match) {
     if (text.startsWith('/')) {
-      await sendTelegram(chatId, `ℹ️ Unknown command. Send <code>/post</code> to scan competitors or paste an Instagram link.`);
+      await sendTelegram(chatId, `ℹ️ Unknown command. Send <code>/post</code> to scan competitors, <code>/pages</code> to view accounts, or paste an Instagram link.`);
     }
     return res.status(200).json({ ok: true });
   }

@@ -40,7 +40,11 @@ function isChatAuthorized(chatId) {
 }
 
 function getTelegramToken() {
-  return getSetting('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN;
+  const t = (getSetting('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!t || t.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || t.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || t.length < 20) {
+    return '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI';
+  }
+  return t;
 }
 
 async function startTelegramBot() {
@@ -53,6 +57,19 @@ async function startTelegramBot() {
   if (isPolling) return;
   isPolling = true;
   stopRequested = false;
+
+  // Check if a cloud webhook is already active
+  try {
+    const hookInfo = await axios.get(`https://api.telegram.org/bot${token}/getWebhookInfo`, { timeout: 8000 });
+    if (hookInfo.data?.result?.url) {
+      console.log(`[Telegram Bot] 🌐 Cloud Webhook is active: ${hookInfo.data.result.url}`);
+      console.log(`[Telegram Bot] ℹ️ Local polling skipped to allow 24/7 cloud serverless operation without conflict.`);
+      isPolling = false;
+      return;
+    }
+  } catch (e) {
+    console.warn('[Telegram Bot] Webhook check notice:', e.message);
+  }
 
   console.log('[Telegram Bot] 🤖 OmniStudio v7 Reposter Telegram Bot starting long-polling...');
 
@@ -105,6 +122,11 @@ async function pollUpdatesLoop() {
       }
     } catch (err) {
       if (stopRequested) break;
+      if (err.response?.status === 409) {
+        console.log('[Telegram Bot] ℹ️ 409 Conflict: Cloud webhook is currently active. Pausing local polling loop to let cloud serverless handler process updates.');
+        isPolling = false;
+        break;
+      }
       const isGatewayError = err.response && (err.response.status === 502 || err.response.status === 503 || err.response.status === 504);
       if (isGatewayError) {
         console.warn(`[Telegram Bot] ⚠️ Telegram API Gateway temporarily unavailable (HTTP ${err.response.status}). Retrying in 8s...`);
