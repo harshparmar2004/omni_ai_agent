@@ -1406,15 +1406,24 @@ router.post('/settings', (req, res) => {
 });
 
 router.post('/system/telegram/test', async (req, res) => {
+  const token = getTelegramToken();
+  const rawEnv = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
   try {
-    await axios.post(`https://api.telegram.org/bot${getTelegramToken()}/sendMessage`, {
+    const tgRes = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
       chat_id: '5443723531',
       text: '🔔 <b>OmniStudio Cloud Ping:</b> System handshake OK!',
       parse_mode: 'HTML'
     });
-    res.json({ success: true, message: 'Telegram notification sent!' });
+    res.json({ success: true, message: 'Telegram notification sent!', usedTokenPrefix: token.substring(0, 15) });
   } catch (err) {
-    res.json({ success: false, error: err.message });
+    res.json({
+      success: false,
+      error: err.message,
+      detail: err.response?.data,
+      usedTokenPrefix: token.substring(0, 15),
+      rawEnvPrefix: rawEnv.substring(0, 15),
+      rawEnvLength: rawEnv.length
+    });
   }
 });
 
