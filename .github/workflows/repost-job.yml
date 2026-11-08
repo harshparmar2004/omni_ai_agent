@@ -66,18 +66,18 @@ jobs:
           node-version: 22
 
       - name: 📡 Notify Telegram: Cloud Runner Online
-        if: inputs.message_id != ''
+        if: github.event.inputs.message_id != ''
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
-          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
-          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+          TELEGRAM_CHAT_ID: ${{ github.event.inputs.chat_id }}
+          TELEGRAM_MESSAGE_ID: ${{ github.event.inputs.message_id }}
         run: |
           node -e "
             const axios = require('axios');
             const token = process.env.TELEGRAM_BOT_TOKEN;
             const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
             const msgId = process.env.TELEGRAM_MESSAGE_ID;
-            const shortcode = '${{ inputs.url }}'.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/)?.[1] || 'reel';
+            const shortcode = '${{ github.event.inputs.url }}'.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/)?.[1] || 'reel';
             if (!token || !msgId) process.exit(0);
             axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
               chat_id: chatId,
@@ -174,23 +174,23 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          TARGET_URL: ${{ inputs.url }}
-          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
-          TARGET_PAGE_ID: ${{ inputs.page_id }}
-          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+          TARGET_URL: ${{ github.event.inputs.url }}
+          TELEGRAM_CHAT_ID: ${{ github.event.inputs.chat_id }}
+          TARGET_PAGE_ID: ${{ github.event.inputs.page_id }}
+          TELEGRAM_MESSAGE_ID: ${{ github.event.inputs.message_id }}
           INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
           FEED_BRANDING_MODE: 'frame'
           NODE_ENV: production
         run: |
-          FORCE_FLAG="${{ inputs.force == 'true' && '--force' || '' }}"
-          node scripts/repost_single.js --url="${{ inputs.url }}" --chat-id="${{ inputs.chat_id }}" --page-id="${{ inputs.page_id }}" --message-id="${{ inputs.message_id }}" $FORCE_FLAG
+          FORCE_FLAG="${{ github.event.inputs.force == 'true' && '--force' || '' }}"
+          node scripts/repost_single.js --url="${{ github.event.inputs.url }}" --chat-id="${{ github.event.inputs.chat_id }}" --page-id="${{ github.event.inputs.page_id }}" --message-id="${{ github.event.inputs.message_id }}" $FORCE_FLAG
 
       - name: 📢 Notify Telegram on Failure or Cancellation
         if: failure() || cancelled()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
-          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
-          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+          TELEGRAM_CHAT_ID: ${{ github.event.inputs.chat_id }}
+          TELEGRAM_MESSAGE_ID: ${{ github.event.inputs.message_id }}
         run: |
           node -e "
             const axios = require('axios');

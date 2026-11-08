@@ -248,38 +248,50 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
-      try {
-        const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`;
-        await axios.post(
-          dispatchUrl,
-          {
-            ref: 'main',
-            inputs: {
-              url: `https://www.instagram.com/reel/${shortcode}/`,
-              chat_id: String(chatId),
-              page_id: String(pageId),
-              message_id: String(messageId),
-              force: isForce ? 'true' : 'false'
-            }
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${GITHUB_TOKEN}`,
-              Accept: 'application/vnd.github.v3+json',
-              'User-Agent': 'OmniStudio-Vercel-Bridge'
-            },
-            timeout: 15000
-          }
-        );
+      // Support candidate workflow identifiers: ID 393722735, repost-job.yml, .github/workflows/repost-job.yml
+      const workflowCandidates = ['393722735', 'repost-job.yml', '.github/workflows/repost-job.yml'];
+      let dispatchSuccess = false;
+      let lastErrDetail = '';
 
-        console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} on Page #${pageId} (Force: ${isForce}, Message ID: ${messageId})`);
-      } catch (err) {
-        console.error('[Webhook Dispatch Error]:', err.response?.data || err.message);
-        const detail = err.response?.data?.message || err.message;
+      for (const wf of workflowCandidates) {
+        try {
+          const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+          await axios.post(
+            dispatchUrl,
+            {
+              ref: 'main',
+              inputs: {
+                url: `https://www.instagram.com/reel/${shortcode}/`,
+                chat_id: String(chatId),
+                page_id: String(pageId),
+                message_id: String(messageId || ''),
+                force: isForce ? 'true' : 'false'
+              }
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${GITHUB_TOKEN}`,
+                Accept: 'application/vnd.github.v3+json',
+                'User-Agent': 'OmniStudio-Vercel-Bridge'
+              },
+              timeout: 15000
+            }
+          );
+
+          console.log(`[Webhook] ✓ GitHub Actions Dispatched via '${wf}' for #${shortcode} on Page #${pageId} (Force: ${isForce}, Message ID: ${messageId})`);
+          dispatchSuccess = true;
+          break;
+        } catch (err) {
+          lastErrDetail = err.response?.data?.message || err.message;
+          console.warn(`[Webhook Dispatch Attempt Failed for '${wf}']: ${lastErrDetail}`);
+        }
+      }
+
+      if (!dispatchSuccess) {
         await editTelegram(
           chatId,
           messageId,
-          `❌ <b>Cloud Dispatch Failed:</b> ${detail}\nPlease check your GitHub token permissions.`
+          `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\nPlease check your GitHub token permissions (requires 'repo' or 'workflow' scope) or try again.`
         );
       }
 
@@ -394,31 +406,42 @@ module.exports = async function handler(req, res) {
       `<i>Cloud runner dispatched. As soon as the winning reel is transcoded & published, you will receive the live Instagram link here!</i>`
     );
 
-    try {
-      const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/watchtower-cron.yml/dispatches`;
-      const dispatchPayload = { ref: 'main' };
-      if (isForce) {
-        dispatchPayload.inputs = { force: 'true' };
-      }
-      await axios.post(
-        dispatchUrl,
-        dispatchPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'OmniStudio-Telegram-Bridge'
-          },
-          timeout: 15000
+    const wtCandidates = ['393660179', 'watchtower-cron.yml', '.github/workflows/watchtower-cron.yml'];
+    let wtSuccess = false;
+    let wtErrDetail = '';
+
+    for (const wf of wtCandidates) {
+      try {
+        const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+        const dispatchPayload = { ref: 'main' };
+        if (isForce) {
+          dispatchPayload.inputs = { force: 'true' };
         }
-      );
-      console.log(`[Telegram Webhook] Watchtower workflow dispatched successfully (Force: ${isForce})`);
-    } catch (err) {
-      console.error('[Watchtower Telegram Dispatch Error]:', err.response?.data || err.message);
-      const detail = err.response?.data?.message || err.message;
+        await axios.post(
+          dispatchUrl,
+          dispatchPayload,
+          {
+            headers: {
+              Authorization: `Bearer ${GITHUB_TOKEN}`,
+              Accept: 'application/vnd.github.v3+json',
+              'User-Agent': 'OmniStudio-Telegram-Bridge'
+            },
+            timeout: 15000
+          }
+        );
+        console.log(`[Telegram Webhook] ✓ Watchtower workflow dispatched via '${wf}' (Force: ${isForce})`);
+        wtSuccess = true;
+        break;
+      } catch (err) {
+        wtErrDetail = err.response?.data?.message || err.message;
+        console.warn(`[Watchtower Telegram Dispatch Attempt Failed for '${wf}']: ${wtErrDetail}`);
+      }
+    }
+
+    if (!wtSuccess) {
       await sendTelegram(
         chatId,
-        `❌ <b>Watchtower Dispatch Failed:</b> ${detail}\nPlease check your GitHub token permissions.`
+        `❌ <b>Watchtower Dispatch Failed:</b> ${wtErrDetail}\nPlease check your GitHub token permissions.`
       );
     }
     return res.status(200).json({ ok: true });

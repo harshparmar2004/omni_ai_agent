@@ -132,7 +132,7 @@ jobs:
           COMPETITOR_ACCOUNTS: ${{ secrets.COMPETITOR_ACCOUNTS || vars.COMPETITOR_ACCOUNTS }}
           INSTAGRAM_SESSION_ID: ${{ secrets.INSTAGRAM_SESSION_ID }}
           FEED_BRANDING_MODE: 'frame'
-          FORCE_PUBLISH: ${{ inputs.force || 'false' }}
+          FORCE_PUBLISH: ${{ github.event.inputs.force || 'false' }}
           NODE_ENV: production
         run: |
           node scripts/cron_runner.js

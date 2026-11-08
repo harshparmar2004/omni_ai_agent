@@ -35,6 +35,28 @@ const TECH_IG_USER_ID = CLUBBING_IG_USER_ID;
 const CULT_INFO_META_ACCESS_TOKEN = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD');
 const CULT_INFO_IG_USER_ID = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
 
+async function dispatchGitHubWorkflow(workflowNameOrId, payload) {
+  if (!GITHUB_TOKEN) return false;
+  const candidates = (workflowNameOrId === 'repost-job.yml' || workflowNameOrId === '393722735')
+    ? ['393722735', 'repost-job.yml', '.github/workflows/repost-job.yml']
+    : ['393660179', 'watchtower-cron.yml', '.github/workflows/watchtower-cron.yml'];
+
+  for (const wf of candidates) {
+    try {
+      await axios.post(
+        `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`,
+        payload,
+        { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Dashboard' }, timeout: 15000 }
+      );
+      return true;
+    } catch (e) {
+      console.warn(`[Dispatch Warning for ${wf}]`, e.response?.data?.message || e.message);
+    }
+  }
+  return false;
+}
+
+
 // Path normalization middleware for Vercel Serverless rewrites
 app.use((req, res, next) => {
   const matched = req.headers['x-matched-path'] || req.headers['x-forwarded-uri'];
@@ -812,16 +834,11 @@ router.post('/sources/:id/check', async (req, res) => {
 // ── Trigger Scan (Watchtower Cron) ──────────────────────────
 async function handleScan(req, res) {
   if (GITHUB_TOKEN) {
-    try {
-      await axios.post(
-        `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/watchtower-cron.yml/dispatches`,
-        { ref: 'main' },
-        { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Dashboard' } }
-      );
+    const ok = await dispatchGitHubWorkflow('watchtower-cron.yml', { ref: 'main' });
+    if (ok) {
       return res.json({ success: true, message: 'Surveillance cycle triggered on GitHub Actions!' });
-    } catch (e) {
-      return res.json({ success: true, warning: 'GitHub dispatch warning: ' + e.message });
     }
+    return res.json({ success: true, warning: 'GitHub dispatch could not be triggered. Check token permissions.' });
   }
   res.json({ success: true, message: 'Surveillance cycle scheduled.' });
 }
@@ -1141,23 +1158,17 @@ router.post('/discoveries/:id/post', async (req, res) => {
   const targetUrl = item?.url || `https://www.instagram.com/reel/${id}/`;
 
   if (GITHUB_TOKEN) {
-    try {
-      await axios.post(
-        `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`,
-        {
-          ref: 'main',
-          inputs: {
-            url: targetUrl,
-            chat_id: '5443723531',
-            page_id: String(item?.page_id || '1'),
-            force: 'true'
-          }
-        },
-        { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Dashboard' } }
-      );
+    const ok = await dispatchGitHubWorkflow('repost-job.yml', {
+      ref: 'main',
+      inputs: {
+        url: targetUrl,
+        chat_id: '5443723531',
+        page_id: String(item?.page_id || '1'),
+        force: 'true'
+      }
+    });
+    if (ok) {
       return res.json({ success: true, message: `Reel #${item?.shortcode || id} dispatched to publishing pipeline!` });
-    } catch (e) {
-      console.warn('[Dispatch Warning]', e.message);
     }
   }
   res.json({ success: true, message: `Reel #${item?.shortcode || id} queued for publishing.` });
@@ -1172,21 +1183,15 @@ router.post('/discoveries/batch-post', async (req, res) => {
 
   for (const item of selectedItems) {
     if (GITHUB_TOKEN) {
-      try {
-        await axios.post(
-          `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`,
-          {
-            ref: 'main',
-            inputs: {
-              url: item.url,
-              chat_id: '5443723531',
-              page_id: String(item.page_id || '1'),
-              force: 'true'
-            }
-          },
-          { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Dashboard' } }
-        );
-      } catch (e) {}
+      await dispatchGitHubWorkflow('repost-job.yml', {
+        ref: 'main',
+        inputs: {
+          url: item.url,
+          chat_id: '5443723531',
+          page_id: String(item.page_id || '1'),
+          force: 'true'
+        }
+      });
     }
   }
 
@@ -1326,24 +1331,19 @@ async function handleCreateRepostJob(req, res) {
   }
 
   if (GITHUB_TOKEN) {
-    try {
-      await axios.post(
-        `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/repost-job.yml/dispatches`,
-        {
-          ref: 'main',
-          inputs: {
-            url: url,
-            chat_id: '5443723531',
-            page_id: String(req.body?.page_id || '1'),
-            force: 'true'
-          }
-        },
-        { headers: { Authorization: `Bearer ${GITHUB_TOKEN}`, 'User-Agent': 'OmniStudio-Dashboard' } }
-      );
+    const ok = await dispatchGitHubWorkflow('repost-job.yml', {
+      ref: 'main',
+      inputs: {
+        url: url,
+        chat_id: '5443723531',
+        page_id: String(req.body?.page_id || '1'),
+        force: 'true'
+      }
+    });
+    if (ok) {
       return res.json({ success: true, message: 'Job dispatched to GitHub Actions runner!' });
-    } catch (e) {
-      return res.json({ success: true, warning: 'Dispatch warning: ' + e.message });
     }
+    return res.json({ success: true, warning: 'Dispatch warning: could not trigger GitHub Actions runner.' });
   }
 
   res.json({ success: true, message: 'Job queued for publishing.' });

@@ -283,9 +283,9 @@ class JobWorkerPool {
         } catch (_) {}
 
         pageTheme = savedTemplate?.template_type || page.template_slug;
-        if (pageTheme === 'neon' || pageTheme === 'clubbing') pageTheme = 'clubbing';
-        else if (pageTheme === 'editorial' || pageTheme === 'video_essay' || pageTheme === 'cult_information') pageTheme = 'video_essay';
-        else if (pageTheme === 'cinema' || pageTheme === 'movies') pageTheme = 'movies';
+        if (page.template_preset === 'cinematic' || page.brand_theme === 'cinematic_gold' || pageTheme === 'cinema' || pageTheme === 'movies') pageTheme = 'movies';
+        else if (page.template_preset === 'cyber_hud' || page.brand_theme === 'cyberpunk_green' || pageTheme === 'neon' || pageTheme === 'clubbing') pageTheme = 'clubbing';
+        else if (page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' || pageTheme === 'editorial' || pageTheme === 'video_essay' || pageTheme === 'cult_information') pageTheme = 'video_essay';
         else if (pageTheme === 'gta6' || pageTheme === 'vice_city') pageTheme = 'gta6';
         else if (!pageTheme || pageTheme === 'default') {
           // Heuristic fallback for legacy pages

@@ -1688,14 +1688,18 @@ async function generateFeedPostOverlay(handle, options = {}) {
     isVertical = true
   } = options;
 
+  const pagePreset = options.page?.template_preset || options.template_preset || options.page?.brand_theme || options.template;
+  const pageSlug = options.page?.slug || options.slug || '';
+  const pageNameStr = (options.pageName || options.page?.name || '').toLowerCase();
+
   const theme = options.theme || (
-    (cleanHandle.includes('clubbing') || (options.page && options.page.slug === 'clubbing')) ? 'clubbing' :
-    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') || options.page?.slug === 'cinema') ? 'movies' :
-    (cleanHandle.includes('cult_info') || cleanHandle.includes('cultinformation') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation')) ? 'video_essay' : 'gta6'
+    (cleanHandle.includes('clubbing') || pageSlug === 'clubbing' || pagePreset === 'cyber_hud' || pagePreset === 'cyberpunk_green') ? 'clubbing' :
+    (cleanHandle.includes('movie') || cleanHandle.includes('cinema') || pageSlug === 'movies' || pageSlug === 'cinema' || pagePreset === 'cinematic' || pagePreset === 'cinematic_gold' || pageNameStr.includes('movie') || pageNameStr.includes('cinema')) ? 'movies' :
+    (Boolean(options.showHeadline) || cleanHandle.includes('cult_info') || cleanHandle.includes('cultinformation') || pageSlug === 'cult_information' || pagePreset === 'video_essay' || pagePreset === 'electric_lime' || (pageNameStr.includes('cult') && pageNameStr.includes('info'))) ? 'video_essay' : 'gta6'
   );
-  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult' || theme === 'neon';
-  const isMovie = theme === 'movies' || theme === 'cinema' || theme === 'movie';
-  const isVideoEssay = theme === 'video_essay' || theme === 'evolving_ai' || theme === 'cult_information' || theme === 'ai_curation';
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult' || theme === 'neon' || pagePreset === 'cyber_hud' || pagePreset === 'cyberpunk_green';
+  const isMovie = theme === 'movies' || theme === 'cinema' || theme === 'movie' || pagePreset === 'cinematic' || pagePreset === 'cinematic_gold';
+  const isVideoEssay = (options.showHeadline === true) || theme === 'video_essay' || theme === 'evolving_ai' || theme === 'cult_information' || theme === 'ai_curation' || pagePreset === 'video_essay' || pagePreset === 'electric_lime';
 
   if (isClubbing) {
     return await generateClubbingCyberOverlay(cleanHandle, options);
@@ -2068,8 +2072,8 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
     const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
 
-    // When cardY is >= 350 (standard feed card layout, landscape, square, or letterboxed reels)
-    if (cardY >= 350) {
+    // When cardY is >= 350 AND page is an editorial video-essay (Cult Information) with headline enabled
+    if (cardY >= 350 && (isVideoEssay || options.showHeadline === true)) {
       const avatarSize = 118;
       const lineHeight = 62;
       const spaceAboveVideo = 36;

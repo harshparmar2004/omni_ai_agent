@@ -136,7 +136,11 @@ router.post('/jobs/:id/re-render', async (req, res) => {
     if (mediaPaths.length === 0) return res.status(400).json({ error: 'No media file available to render' });
 
     const rawInput = mediaPaths[0];
-    const theme = req.body.theme || job.edit_theme || 'video_essay';
+    const theme = req.body.theme || job.edit_theme || (
+      (page.template_preset === 'cinematic' || page.brand_theme === 'cinematic_gold' || page.slug === 'movies') ? 'movies' :
+      (page.template_preset === 'cyber_hud' || page.brand_theme === 'cyberpunk_green' || page.slug === 'clubbing') ? 'clubbing' :
+      (page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' || page.slug === 'cult_information') ? 'video_essay' : 'gta6'
+    );
     const hookHeadline = req.body.hookHeadline !== undefined ? req.body.hookHeadline : (job.hook_headline || '');
 
     const framed = await prepareVideoForFeedCard(rawInput, {

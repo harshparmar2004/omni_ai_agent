@@ -24,24 +24,39 @@ module.exports = async function handler(req, res) {
 
   const force = req.query?.force === 'true' || req.body?.force === true || req.body?.force === 'true';
 
-  try {
-    const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/watchtower-cron.yml/dispatches`;
-    const dispatchPayload = { ref: 'main' };
-    if (force) {
-      dispatchPayload.inputs = { force: 'true' };
-    }
-    await axios.post(
-      dispatchUrl,
-      dispatchPayload,
-      {
-        headers: {
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          Accept: 'application/vnd.github.v3+json',
-          'User-Agent': 'OmniStudio-Vercel-Cron'
-        },
-        timeout: 15000
+  const wtCandidates = ['393660179', 'watchtower-cron.yml', '.github/workflows/watchtower-cron.yml'];
+  let dispatched = false;
+  let lastErr = null;
+
+  for (const wf of wtCandidates) {
+    try {
+      const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+      const dispatchPayload = { ref: 'main' };
+      if (force) {
+        dispatchPayload.inputs = { force: 'true' };
       }
-    );
+      await axios.post(
+        dispatchUrl,
+        dispatchPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'OmniStudio-Vercel-Cron'
+          },
+          timeout: 15000
+        }
+      );
+      dispatched = true;
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  if (!dispatched && lastErr) {
+    throw lastErr;
+  }
 
     const nowUtc = new Date().toISOString();
     console.log(`[Vercel Cron] Dispatched Watchtower workflow successfully at ${nowUtc} (Force: ${force})`);

@@ -266,10 +266,10 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
                   (page.name && /movie|series|film|cinema/i.test(page.name)) ||
                   page.id === 2 || String(page.id) === '2';
 
-  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || page.slug.includes('ai'))) ||
-                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || page.handle.includes('ai'))) ||
-                       (page.name && /cult.*info|evolving|ai|tech/i.test(page.name)) ||
-                       page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.theme === 'evolving_ai' ||
+  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || /(?:^|_)(?:ai|cult)(?:_|$)/i.test(page.slug))) ||
+                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || /(?:^|@)(?:ai|cult)(?:_|$)/i.test(page.handle))) ||
+                       (page.name && ((/\bcult\b/i.test(page.name) && /\binfo/i.test(page.name)) || /video[- ]essay/i.test(page.name) || /editorial/i.test(page.name))) ||
+                       page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' ||
                        page.id === 4 || String(page.id) === '4';
 
   const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isVideoEssay ? 'cult_information' : 'gta6_updates_007'));
