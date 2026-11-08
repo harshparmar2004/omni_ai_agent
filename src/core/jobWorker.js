@@ -123,11 +123,25 @@ class JobWorkerPool {
 
   async processJob(jobId, options = {}) {
     let job = getJob(jobId);
-    if (!job || job.status !== 'queued') return;
+    if (!job) return;
+    if (job.status !== 'queued') {
+      if (options.forceInstant || job.agent === 'reposter') {
+        job = updateJobProgress(jobId, 'queued', 'restarted') || job;
+      } else {
+        return;
+      }
+    }
 
     const page = getPageById(job.page_id);
     if (!page) {
-      updateJobProgress(jobId, 'failed', 'error', { error: `Page #${job.page_id} not found` });
+      const err = `Page #${job.page_id} not found in database`;
+      updateJobProgress(jobId, 'failed', 'error', { error: err });
+      await this.updateTelegramProgress(job, [
+        `❌ <b>Publishing Could Not Be Completed</b>`,
+        `🔗 <b>Reel:</b> <code>#${job.shortcode || 'reel'}</code>`,
+        ``,
+        `⚠️ <b>Reason:</b> ${err}`
+      ]);
       return;
     }
 

@@ -482,7 +482,8 @@ def download_instagram_media(url, output_dir):
     try:
         cmd = [
             sys.executable, "-m", "yt_dlp",
-            "--format", "best[ext=mp4]/best",
+            "-f", "bv*+ba/b",
+            "--merge-output-format", "mp4",
             "-o", output_template,
             "--print-json",
             "--no-playlist"
@@ -490,45 +491,61 @@ def download_instagram_media(url, output_dir):
         if clean_session:
             cmd.extend(["--add-header", f"Cookie: sessionid={clean_session}"])
         cmd.append(url)
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=35)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
         if res.returncode == 0 and res.stdout.strip():
             # Find the JSON metadata line
             lines = [ln.strip() for ln in res.stdout.strip().split('\n') if ln.strip().startswith('{')]
             if lines:
                 info = json.loads(lines[0])
-                ext = info.get('ext', 'mp4')
-                local_filename = f"{shortcode}.{ext}"
+                local_filename = f"{shortcode}.mp4"
                 target_file_path = os.path.join(output_dir, local_filename)
                 
                 # Check if file was saved with shortcode or media id
                 if not os.path.exists(target_file_path):
                     alt_id = info.get('id', '')
-                    if alt_id and os.path.exists(os.path.join(output_dir, f"{alt_id}.{ext}")):
-                        local_filename = f"{alt_id}.{ext}"
-                    elif os.path.exists(os.path.join(output_dir, f"{shortcode}.mp4")):
-                        local_filename = f"{shortcode}.mp4"
+                    if alt_id and os.path.exists(os.path.join(output_dir, f"{alt_id}.mp4")):
+                        local_filename = f"{alt_id}.mp4"
+                        target_file_path = os.path.join(output_dir, local_filename)
+                    elif os.path.exists(os.path.join(output_dir, f"{shortcode}.mkv")):
+                        local_filename = f"{shortcode}.mkv"
+                        target_file_path = os.path.join(output_dir, local_filename)
 
-                caption = info.get('description') or info.get('title') or ''
-                uploader = info.get('uploader') or info.get('uploader_id') or 'instagram'
-                return {
-                    "success": True,
-                    "type": "video",
-                    "id": shortcode,
-                    "title": info.get('title', ''),
-                    "caption": caption,
-                    "uploader": uploader,
-                    "owner": uploader,
-                    "duration": info.get('duration', 0),
-                    "width": info.get('width', 1080),
-                    "height": info.get('height', 1920),
-                    "thumbnail": info.get('thumbnail', ''),
-                    "local_file": local_filename,
-                    "relative_url": f"/generated/downloads/{local_filename}",
-                    "is_video": True,
-                    "is_carousel": False,
-                    "slides_count": 0,
-                    "slides": []
-                }
+                if os.path.exists(target_file_path) and os.path.getsize(target_file_path) > 30000:
+                    # Integrity verification via ffprobe
+                    is_valid = True
+                    try:
+                        chk = subprocess.run(
+                            ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", target_file_path],
+                            capture_output=True, timeout=8
+                        )
+                        if chk.returncode != 0:
+                            is_valid = False
+                            print(f"[yt-dlp corrupt stream detected (code {chk.returncode}), falling back to Playwright]", file=sys.stderr)
+                    except Exception:
+                        pass
+
+                    if is_valid:
+                        caption = info.get('description') or info.get('title') or ''
+                        uploader = info.get('uploader') or info.get('uploader_id') or 'instagram'
+                        return {
+                            "success": True,
+                            "type": "video",
+                            "id": shortcode,
+                            "title": info.get('title', ''),
+                            "caption": caption,
+                            "uploader": uploader,
+                            "owner": uploader,
+                            "duration": info.get('duration', 0),
+                            "width": info.get('width', 1080),
+                            "height": info.get('height', 1920),
+                            "thumbnail": info.get('thumbnail', ''),
+                            "local_file": local_filename,
+                            "relative_url": f"/generated/downloads/{local_filename}",
+                            "is_video": True,
+                            "is_carousel": False,
+                            "slides_count": 0,
+                            "slides": []
+                        }
     except Exception as yt_err:
         print(f"[yt-dlp fast path notice: {yt_err} -> proceeding to Scoped Playwright Extractor]", file=sys.stderr)
 

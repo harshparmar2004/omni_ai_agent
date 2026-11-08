@@ -247,24 +247,25 @@ async function main() {
   }
 
   if (messageId) {
-    db.prepare('UPDATE publish_jobs SET telegram_message_id = ? WHERE id = ?').run(messageId, jobId);
+    db.prepare('UPDATE publish_jobs SET telegram_message_id = ?, telegram_chat_id = ? WHERE id = ?').run(messageId, chatId, jobId);
     job.telegram_message_id = messageId;
+    job.telegram_chat_id = chatId;
 
     // Immediate feedback: notify Telegram that Cloud Runner is connected and starting media ingest
     const selectedPage = pages.find(p => p.id === pageId) || pages[0];
     const targetHandle = selectedPage?.handle || `@page_${pageId}`;
     try {
-      notifier.editTelegramMessage(
+      await notifier.editTelegramMessage(
         chatId,
         messageId,
         `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${enqueueResult.shortcode || 'reel'}</code>\n` +
-        `📱 <b>Destination:</b> <code>${targetHandle}</code>\n\n` +
+        `📱 <b>Destination:</b> <code>${targetHandle}</code> (${selectedPage?.name || 'Destination'})\n\n` +
         `✅ <b>1. Ingest:</b> Cloud runner connected & active\n` +
-        `⏳ <b>2. Download:</b> Starting media extraction...\n` +
+        `⏳ <b>2. Download:</b> Extracting 1080p stream & verifying...\n` +
         `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
         `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
         `<i>Status: Running on cloud worker...</i>`
-      ).catch(() => {});
+      );
     } catch (e) {}
   }
 
@@ -288,15 +289,14 @@ async function main() {
   }
 
   // Ensure status is queued so processJob picks it up immediately
-  if (job.status !== 'queued') {
-    db.prepare("UPDATE publish_jobs SET status = 'queued', attempts = 0, error = '' WHERE id = ?").run(jobId);
-  }
+  db.prepare("UPDATE publish_jobs SET status = 'queued', attempts = 0, error = '' WHERE id = ?").run(jobId);
+  job.status = 'queued';
 
   // 5. Process Job Immediately
   if (!isDryRun) {
     const jobWorkerPool = require('../src/core/jobWorker');
     console.log(`\n[Reposter Runner] 🚀 Executing Job #${jobId} end-to-end...`);
-    await jobWorkerPool.processJob(jobId);
+    await jobWorkerPool.processJob(jobId, { forceInstant: true });
     console.log(`[Reposter Runner] ✅ Job #${jobId} finished!`);
 
     const finalJob = db.prepare('SELECT * FROM publish_jobs WHERE id = ?').get(jobId);

@@ -77,7 +77,14 @@ jobs:
             const token = process.env.TELEGRAM_BOT_TOKEN;
             const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
             const msgId = process.env.TELEGRAM_MESSAGE_ID;
-            const shortcode = '${{ github.event.inputs.url }}'.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/)?.[1] || 'reel';
+            const pageMap = {
+              '1': 'GTA 6 Updates 007 (@gta6_updates_007)',
+              '2': 'Movie Series 365 (@movie_series_365)',
+              '3': 'Clubbing Cult (@clubbingcult)',
+              '4': 'Cult Information (@cult_information)'
+            };
+            const pageId = '${{ github.event.inputs.page_id }}';
+            const destName = pageMap[pageId] || ('Page #' + pageId);
             if (!token || !msgId) process.exit(0);
             fetch('https://api.telegram.org/bot' + token + '/editMessageText', {
               method: 'POST',
@@ -86,12 +93,12 @@ jobs:
                 chat_id: chatId,
                 message_id: parseInt(msgId, 10),
                 text: '⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#' + shortcode + '</code>\n' +
-                      '📱 <b>Destination:</b> Cloud runner connected & active\n\n' +
+                      '📱 <b>Destination:</b> <code>' + destName + '</code>\n\n' +
                       '✅ <b>1. Ingest:</b> Cloud runner spawned & active\n' +
-                      '⏳ <b>2. Download:</b> Starting media extraction...\n' +
+                      '⏳ <b>2. Download:</b> Extracting 1080p stream...\n' +
                       '⚪ <b>3. AI Hook & Copy:</b> Waiting\n' +
                       '⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n' +
-                      '<i>Status: Cloud worker online, extracting media...</i>',
+                      '<i>Status: Cloud worker online, extracting 1080p media...</i>',
                 parse_mode: 'HTML'
               })
             }).catch(() => {});
