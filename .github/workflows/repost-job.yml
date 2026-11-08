@@ -67,29 +67,33 @@ jobs:
 
       - name: 📡 Notify Telegram Cloud Runner Online
         if: github.event.inputs.message_id != ''
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
           TELEGRAM_CHAT_ID: ${{ github.event.inputs.chat_id }}
           TELEGRAM_MESSAGE_ID: ${{ github.event.inputs.message_id }}
         run: |
           node -e "
-            const axios = require('axios');
             const token = process.env.TELEGRAM_BOT_TOKEN;
             const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
             const msgId = process.env.TELEGRAM_MESSAGE_ID;
             const shortcode = '${{ github.event.inputs.url }}'.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/)?.[1] || 'reel';
             if (!token || !msgId) process.exit(0);
-            axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
-              chat_id: chatId,
-              message_id: parseInt(msgId, 10),
-              text: '⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#' + shortcode + '</code>\n' +
-                    '📱 <b>Destination:</b> Cloud runner connected & active\n\n' +
-                    '✅ <b>1. Ingest:</b> Cloud runner spawned & active\n' +
-                    '⏳ <b>2. Download:</b> Starting media extraction...\n' +
-                    '⚪ <b>3. AI Hook & Copy:</b> Waiting\n' +
-                    '⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n' +
-                    '<i>Status: Cloud worker online, extracting media...</i>',
-              parse_mode: 'HTML'
+            fetch('https://api.telegram.org/bot' + token + '/editMessageText', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                message_id: parseInt(msgId, 10),
+                text: '⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#' + shortcode + '</code>\n' +
+                      '📱 <b>Destination:</b> Cloud runner connected & active\n\n' +
+                      '✅ <b>1. Ingest:</b> Cloud runner spawned & active\n' +
+                      '⏳ <b>2. Download:</b> Starting media extraction...\n' +
+                      '⚪ <b>3. AI Hook & Copy:</b> Waiting\n' +
+                      '⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n' +
+                      '<i>Status: Cloud worker online, extracting media...</i>',
+                parse_mode: 'HTML'
+              })
             }).catch(() => {});
           "
 
@@ -187,13 +191,13 @@ jobs:
 
       - name: 📢 Notify Telegram on Failure or Cancellation
         if: failure() || cancelled()
+        continue-on-error: true
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
           TELEGRAM_CHAT_ID: ${{ github.event.inputs.chat_id }}
           TELEGRAM_MESSAGE_ID: ${{ github.event.inputs.message_id }}
         run: |
           node -e "
-            const axios = require('axios');
             const fs = require('fs');
             const token = process.env.TELEGRAM_BOT_TOKEN;
             const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
@@ -210,23 +214,35 @@ jobs:
               'The runner could not complete this repost job. This typically happens if the reel is age-restricted (18+), from a private account, or blocked by Instagram.\n\n' +
               '💡 <i>Please try sharing a public unrestricted reel!</i>';
             if (msgId) {
-              axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
-                chat_id: chatId,
-                message_id: parseInt(msgId, 10),
-                text: text,
-                parse_mode: 'HTML'
-              }).catch(() => {
-                axios.post('https://api.telegram.org/bot' + token + '/sendMessage', {
+              fetch('https://api.telegram.org/bot' + token + '/editMessageText', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                   chat_id: chatId,
+                  message_id: parseInt(msgId, 10),
                   text: text,
                   parse_mode: 'HTML'
+                })
+              }).catch(() => {
+                fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: chatId,
+                    text: text,
+                    parse_mode: 'HTML'
+                  })
                 }).catch(() => {});
               });
             } else {
-              axios.post('https://api.telegram.org/bot' + token + '/sendMessage', {
-                chat_id: chatId,
-                text: text,
-                parse_mode: 'HTML'
+              fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  text: text,
+                  parse_mode: 'HTML'
+                })
               }).catch(() => {});
             }
           "
