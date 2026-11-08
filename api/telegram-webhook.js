@@ -208,7 +208,7 @@ module.exports = async function handler(req, res) {
         `⚪ <b>2. Download:</b> Waiting\n` +
         `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
         `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
-        `<i>Status: ${isCloudRun ? 'Dispatching to high-speed Cloud Run service...' : 'Spawning turbocharged cloud runner...'}</i>`
+        `<i>Status: ${isCloudRun ? 'Dispatching to high-speed Cloud Run service...' : 'Spawning cloud runner... (updates in ~15s)'}</i>`
       );
 
       // 1. Direct Cloud Run Dispatch (if configured)

@@ -43,8 +43,10 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 📁 Ensure Data Directory
-        run: mkdir -p data
+      - name: 📁 Ensure Clean Data Directory
+        run: |
+          mkdir -p data
+          rm -f data/.telegram_error_notified
 
       - name: 💾 Restore Database Cache
         uses: actions/cache@v4
@@ -55,10 +57,41 @@ jobs:
           restore-keys: |
             omnistudio-db-${{ runner.os }}-
 
+      - name: 🧹 Clear Stale Telegram Error Cache
+        run: rm -f data/.telegram_error_notified
+
       - name: ⚙️ Setup Node.js 22 (LTS)
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: 📡 Notify Telegram: Cloud Runner Online
+        if: inputs.message_id != ''
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
+          TELEGRAM_CHAT_ID: ${{ inputs.chat_id }}
+          TELEGRAM_MESSAGE_ID: ${{ inputs.message_id }}
+        run: |
+          node -e "
+            const axios = require('axios');
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chatId = process.env.TELEGRAM_CHAT_ID || '5443723531';
+            const msgId = process.env.TELEGRAM_MESSAGE_ID;
+            const shortcode = '${{ inputs.url }}'.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/)?.[1] || 'reel';
+            if (!token || !msgId) process.exit(0);
+            axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
+              chat_id: chatId,
+              message_id: parseInt(msgId, 10),
+              text: '⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#' + shortcode + '</code>\n' +
+                    '📱 <b>Destination:</b> Cloud runner connected & active\n\n' +
+                    '✅ <b>1. Ingest:</b> Cloud runner spawned & active\n' +
+                    '⏳ <b>2. Download:</b> Starting media extraction...\n' +
+                    '⚪ <b>3. AI Hook & Copy:</b> Waiting\n' +
+                    '⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n' +
+                    '<i>Status: Cloud worker online, extracting media...</i>',
+              parse_mode: 'HTML'
+            }).catch(() => {});
+          "
 
       - name: 💾 Restore Node Modules Cache
         uses: actions/cache@v4
@@ -74,13 +107,14 @@ jobs:
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: ⚡ Ensure Native Cloudflared Executable
+        continue-on-error: true
         run: |
           if ! command -v cloudflared &> /dev/null; then
             echo "[Cloud Runner] Installing native Cloudflared binary..."
-            sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
-            sudo chmod +x /usr/local/bin/cloudflared
+            sudo curl --retry 5 --retry-delay 2 -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared || true
+            sudo chmod +x /usr/local/bin/cloudflared || true
           fi
-          cloudflared --version
+          cloudflared --version || echo "Native cloudflared not present, will use npx fallback"
 
       - name: 🎬 Link & Verify FFmpeg and FFprobe
         run: |
@@ -166,13 +200,15 @@ jobs:
             const msgId = process.env.TELEGRAM_MESSAGE_ID;
             if (!token) process.exit(0);
 
-            // If jobWorker or runner already notified Telegram with exact reason, do not overwrite
+            let specificError = '';
             if (fs.existsSync('data/.telegram_error_notified')) {
-              console.log('[Workflow] Specific error reason was already reported to Telegram. Skipping overwrite.');
-              process.exit(0);
+              try { specificError = fs.readFileSync('data/.telegram_error_notified', 'utf8').trim(); } catch (_) {}
             }
 
-            const text = '⚠️ <b>Cloud Runner Alert:</b>\n\nThe runner could not complete this repost job. This typically happens if the reel is age-restricted (18+), from a private account, or blocked by Instagram.\n\n💡 <i>Please try sharing a public unrestricted reel!</i>';
+            const text = '⚠️ <b>Cloud Runner Alert:</b>\n\n' +
+              (specificError ? '<b>Details:</b> <code>' + specificError.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>\n\n' : '') +
+              'The runner could not complete this repost job. This typically happens if the reel is age-restricted (18+), from a private account, or blocked by Instagram.\n\n' +
+              '💡 <i>Please try sharing a public unrestricted reel!</i>';
             if (msgId) {
               axios.post('https://api.telegram.org/bot' + token + '/editMessageText', {
                 chat_id: chatId,

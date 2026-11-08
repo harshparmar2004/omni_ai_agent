@@ -46,20 +46,21 @@ async function pollContainer(containerId, token, baseUrl, onProgress = null) {
 
     try {
       const res = await axios.get(`${baseUrl}/${containerId}`, {
-        params: { fields: 'status_code,status', access_token: token },
+        params: { fields: 'status_code,status,error_message', access_token: token },
         timeout: 10000
       });
 
       const statusCode = res.data?.status_code;
       const statusMsg = res.data?.status || '';
+      const errorMsg = res.data?.error_message || statusMsg || '';
 
-      console.log(`[Publisher] Container status (${attempts}/${maxAttempts}): ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
+      console.log(`[Publisher] Container status (${attempts}/${maxAttempts}): ${statusCode} ${errorMsg ? `(${errorMsg})` : ''}`);
 
       if (statusCode === 'FINISHED') {
         isReady = true;
       } else if (statusCode === 'ERROR' || statusCode === 'EXPIRED') {
         console.error(`[Publisher] Container failure payload:`, JSON.stringify(res.data));
-        throw new Error(`Meta container processing failed: ${statusCode} ${statusMsg ? `(${statusMsg})` : ''}`);
+        throw new Error(`Meta container processing failed: ${statusCode} ${errorMsg ? `(${errorMsg})` : ''}`);
       }
     } catch (pollErr) {
       if (pollErr.message && pollErr.message.includes('Meta container processing failed')) {
@@ -129,54 +130,106 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
 
   if (onProgress) onProgress('uploading', 0, 1);
 
-  const publicVideoUrl = await getPublicUrlForMedia(videoPath);
-  console.log(`[Publisher] 🚀 Publishing Reel for ${page.handle} via ${baseUrl}...`);
-  console.log(`[Publisher] 🌐 Public video URL: ${publicVideoUrl}`);
-
-  const initParams = {
-    media_type: 'REELS',
-    video_url: publicVideoUrl,
-    caption: caption,
-    thumb_offset: 1500,
-    is_ai_generated: false,
-    access_token: token
-  };
-
-  if (coverPath) {
-    initParams.cover_url = await getPublicUrlForMedia(coverPath);
+  let absVideoPath = videoPath;
+  if (!fs.existsSync(absVideoPath)) {
+    const candidate = path.join(__dirname, '..', '..', 'public', (videoPath || '').replace(/^[/\\]+/, ''));
+    if (fs.existsSync(candidate)) absVideoPath = candidate;
   }
 
-  // 1. Create Media Container
-  let initRes;
-  try {
-    initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-      params: initParams,
-      timeout: 35000
-    });
-  } catch (err) {
-    if (initParams.is_ai_generated !== undefined || initParams.thumb_offset !== undefined) {
-      console.warn(`[Publisher] Retrying reel container creation without optional AI/offset tags: ${err.response?.data?.error?.message || err.message}`);
-      delete initParams.is_ai_generated;
-      delete initParams.thumb_offset;
-      try {
-        initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
-          params: initParams,
-          timeout: 35000
+  let containerId = null;
+
+  // 1. Try Meta Resumable Direct Upload first (Zero tunnel dependency)
+  if (fs.existsSync(absVideoPath)) {
+    try {
+      console.log(`[Publisher] ⚡ Initializing direct Meta resumable upload for ${page.handle}...`);
+      const resumableParams = {
+        media_type: 'REELS',
+        upload_type: 'resumable',
+        caption: caption,
+        thumb_offset: 1500,
+        access_token: token
+      };
+      const rRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+        params: resumableParams,
+        timeout: 25000
+      });
+
+      const uploadUri = rRes.data?.uri;
+      containerId = rRes.data?.id;
+
+      if (uploadUri && containerId) {
+        console.log(`[Publisher] 🚀 Streaming video bytes directly to Meta CDN...`);
+        const videoBuffer = fs.readFileSync(absVideoPath);
+        await axios.post(uploadUri, videoBuffer, {
+          headers: {
+            Authorization: `OAuth ${token}`,
+            offset: '0',
+            file_size: String(videoBuffer.length),
+            'Content-Type': 'application/octet-stream'
+          },
+          timeout: 60000,
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity
         });
-      } catch (retryErr) {
-        throw formatMetaError(retryErr, 'Reel container creation failed');
+        console.log(`[Publisher] ✓ Direct video payload streamed to Meta CDN. Container: ${containerId}`);
       }
-    } else {
-      throw formatMetaError(err, 'Reel container creation failed');
+    } catch (resumableErr) {
+      console.warn(`[Publisher] Notice: Direct resumable upload unavailable (${resumableErr.response?.data?.error?.message || resumableErr.message}), falling back to public URL.`);
+      containerId = null;
     }
   }
 
-  const containerId = initRes.data?.id;
+  // 2. Fallback to Hosted Public Video URL
+  if (!containerId) {
+    const publicVideoUrl = await getPublicUrlForMedia(videoPath);
+    console.log(`[Publisher] 🚀 Publishing Reel for ${page.handle} via hosted URL...`);
+    console.log(`[Publisher] 🌐 Public video URL: ${publicVideoUrl}`);
+
+    const initParams = {
+      media_type: 'REELS',
+      video_url: publicVideoUrl,
+      caption: caption,
+      thumb_offset: 1500,
+      is_ai_generated: false,
+      access_token: token
+    };
+
+    if (coverPath) {
+      initParams.cover_url = await getPublicUrlForMedia(coverPath);
+    }
+
+    let initRes;
+    try {
+      initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+        params: initParams,
+        timeout: 35000
+      });
+    } catch (err) {
+      if (initParams.is_ai_generated !== undefined || initParams.thumb_offset !== undefined) {
+        console.warn(`[Publisher] Retrying reel container creation without optional AI/offset tags: ${err.response?.data?.error?.message || err.message}`);
+        delete initParams.is_ai_generated;
+        delete initParams.thumb_offset;
+        try {
+          initRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
+            params: initParams,
+            timeout: 35000
+          });
+        } catch (retryErr) {
+          throw formatMetaError(retryErr, 'Reel container creation failed');
+        }
+      } else {
+        throw formatMetaError(err, 'Reel container creation failed');
+      }
+    }
+
+    containerId = initRes.data?.id;
+  }
+
   if (!containerId) {
     throw new Error('Meta API did not return container ID for reel');
   }
 
-  // 2. Poll container status until FINISHED
+  // 3. Poll container status until FINISHED
   await pollContainer(containerId, token, baseUrl, onProgress);
 
   // 3. Publish container live

@@ -1947,8 +1947,8 @@ async function generateFeedPostOverlay(handle, options = {}) {
   } else if (isMovie) {
     // 5. Authentic Cinema Picks / Movie Recommendations Floating Header Box
     // Matches target aesthetic (media_1794133162089.jpg) directly above the video frame
-    const handleText = cleanHandle.startsWith('@') ? cleanHandle : `@${cleanHandle}`;
-    const badgeText1 = handleText;
+    const pageName = (options.pageName || options.page?.name || (cleanHandle.includes('movie') ? 'Movie Series 365' : cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))).trim();
+    const badgeText1 = pageName;
     const badgeSep = '  |  ';
     const badgeText2 = 'Cinema Picks';
 
@@ -1992,11 +1992,11 @@ async function generateFeedPostOverlay(handle, options = {}) {
     ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, 6);
     ctx.stroke();
 
-    // Text rendering: @movie_series_365 | Cinema Picks
+    // Text rendering: Movie Series 365 | Cinema Picks
     let curX = boxX + padX;
     const textCenterY = boxY + boxH / 2 + 1;
 
-    // Part 1: Handle in crisp white
+    // Part 1: Page Name in crisp white
     ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'left';
@@ -2218,109 +2218,75 @@ async function generateFeedPostOverlay(handle, options = {}) {
       });
       ctx.restore();
     } else {
-      // Full-bleed vertical video (cardY < 350): Render a floating frosted glass banner at top
-      const bannerY = 120;
-      const bannerH = 92;
-      const bannerW = width - (marginX * 2);
-      const bannerX = marginX;
-      const bannerRadius = 22;
+      // 5. Sleek Floating Header Box for Full-Bleed Vertical Video (GTA 6 & Other Themes)
+      // Matches the clean centered floating aesthetic without covering the video with a bulky banner
+      const badgeText1 = pageName;
+      const badgeSep = '  |  ';
+      const badgeText2 = isGTA6 ? 'GTA VI' : (cleanHandle.startsWith('@') ? cleanHandle : `@${cleanHandle}`);
 
       ctx.save();
-      // Frosted obsidian glass
-      ctx.fillStyle = isMovie ? 'rgba(16, 10, 6, 0.90)' : (isGTA6 ? 'rgba(14, 4, 26, 0.90)' : 'rgba(8, 12, 20, 0.90)');
-      ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.5)' : (isGTA6 ? 'rgba(247, 37, 133, 0.6)' : 'rgba(56, 189, 248, 0.5)');
-      ctx.shadowBlur = 20;
+      ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
+      const w1 = ctx.measureText(badgeText1).width;
+      ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
+      const wSep = ctx.measureText(badgeSep).width;
+      ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+      const w2 = ctx.measureText(badgeText2).width;
+
+      const padX = 26;
+      const boxW = Math.round(w1 + wSep + w2 + padX * 2);
+      const boxH = 48;
+      const boxX = Math.round((width - boxW) / 2);
+      const boxY = (cardY >= 200) ? Math.max(130, cardY - boxH - 14) : 140;
+
+      // Obsidian glass box
+      ctx.shadowColor = isGTA6 ? 'rgba(0, 240, 255, 0.75)' : 'rgba(56, 189, 248, 0.7)';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = isGTA6 ? 'rgba(14, 4, 26, 0.94)' : 'rgba(8, 12, 20, 0.94)';
       ctx.beginPath();
-      ctx.roundRect(bannerX, bannerY, bannerW, bannerH, bannerRadius);
+      ctx.roundRect(boxX, boxY, boxW, boxH, 8);
       ctx.fill();
 
-      // Gradient border
-      const bGrad = ctx.createLinearGradient(bannerX, bannerY, bannerX + bannerW, bannerY + bannerH);
+      // Cyber/theme gradient border (2.5px)
+      const bGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
       bGrad.addColorStop(0, highlightColor);
-      bGrad.addColorStop(1, secondaryColor);
+      bGrad.addColorStop(0.5, secondaryColor);
+      bGrad.addColorStop(1, highlightColor);
       ctx.strokeStyle = bGrad;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
       // Inner subtle border
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.roundRect(bannerX + 2, bannerY + 2, bannerW - 4, bannerH - 4, bannerRadius - 2);
+      ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, 6);
       ctx.stroke();
 
-      // Compact Avatar (64px)
-      const avSize = 64;
-      const avX = bannerX + 16;
-      const avY = bannerY + 14;
-      const avCx = avX + avSize / 2;
-      const avCy = avY + avSize / 2;
+      // Text rendering: [Page Name] | [Vice City / @handle]
+      let curX = boxX + padX;
+      const textCenterY = boxY + boxH / 2 + 1;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(avCx, avCy, avSize / 2, 0, Math.PI * 2);
-      ctx.clip();
-      if (existingAvatarPath) {
-        try {
-          const avatarImg = await loadImage(existingAvatarPath);
-          ctx.drawImage(avatarImg, avX, avY, avSize, avSize);
-        } catch (_) {}
-      } else {
-        ctx.fillStyle = isMovie ? '#2D1B06' : '#240046';
-        ctx.fill();
-        ctx.fillStyle = highlightColor;
-        ctx.font = '900 24px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(pageName.slice(0, 2).toUpperCase(), avCx, avCy);
-      }
-      ctx.restore();
-
-      // Avatar neon ring
-      ctx.strokeStyle = highlightColor;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(avCx, avCy, avSize / 2 + 1, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Page Name + Verified Badge
-      const tX = avX + avSize + 18;
-      ctx.font = 'bold 28px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      // Part 1: Page Name in crisp white
+      ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(pageName, tX, bannerY + 33);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(badgeText1, curX, textCenterY);
+      curX += w1;
 
-      const pWidth = ctx.measureText(pageName).width;
-      drawVerifiedBadge(ctx, tX + pWidth + 10, bannerY + 21, 22);
-
-      // Handle below name
-      ctx.font = '500 20px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
-      ctx.fillStyle = '#A0A0AB';
-      const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
-      ctx.fillText(displayHandle, tX, bannerY + 65);
-
-      // Right-aligned theme badge
-      const tagText = isMovie ? 'CINEMA PICKS' : (isGTA6 ? 'GTA VI' : 'OFFICIAL');
-      ctx.font = '900 16px "Arial Black", Arial, sans-serif';
-      const tagW = ctx.measureText(tagText).width + 24;
-      const tagH = 32;
-      const tagX = bannerX + bannerW - tagW - 20;
-      const tagY = bannerY + (bannerH - tagH) / 2;
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.beginPath();
-      ctx.roundRect(tagX, tagY, tagW, tagH, 8);
-      ctx.fill();
-      ctx.strokeStyle = highlightColor;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
+      // Part 2: Separator in accent color
+      ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
       ctx.fillStyle = highlightColor;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 1);
+      ctx.fillText(badgeSep, curX, textCenterY);
+      curX += wSep;
+
+      // Part 3: Subtitle/Handle in secondary accent / crisp white
+      ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+      ctx.fillStyle = highlightColor;
+      ctx.fillText(badgeText2, curX, textCenterY);
 
       ctx.restore();
     }
@@ -2569,7 +2535,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     }
   }
 
-  const overlayPngPath = await generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, ...options });
+  const overlayPngPath = await generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, pageName: options.pageName || options.page?.name, ...options });
 
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);
@@ -2580,9 +2546,10 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
   // Build filter graph combining video framing and audio normalization in ONE pass
+  // Guarantees compliant stereo 44.1kHz AAC audio stream for Meta Graph API Reel ingestion
   const fullFilter = hasAudio
-    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15[outa]`
-    : videoFilter;
+    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
+    : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
 
   return new Promise((resolve) => {
     const args = [
@@ -2591,13 +2558,16 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       '-i', overlayPngPath,
       '-filter_complex', fullFilter,
       '-map', '[outv]',
-      ...(hasAudio ? ['-map', '[outa]'] : ['-map', '0:a?']),
+      '-map', '[outa]',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
       '-preset', 'veryfast',
       '-crf', '20',
       '-c:a', 'aac',
       '-b:a', '192k',
+      '-ar', '44100',
+      '-ac', '2',
+      '-shortest',
       '-movflags', '+faststart',
       framedOutput
     ];

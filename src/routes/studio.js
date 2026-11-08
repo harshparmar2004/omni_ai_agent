@@ -142,6 +142,7 @@ router.post('/jobs/:id/re-render', async (req, res) => {
     const framed = await prepareVideoForFeedCard(rawInput, {
       handle: page.handle,
       page,
+      pageName: page.name,
       theme,
       hookHeadline
     });

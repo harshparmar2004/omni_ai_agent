@@ -317,6 +317,7 @@ class JobWorkerPool {
             const framed = await prepareVideoForFeedCard(mediaPaths[0], {
               handle: page.handle,
               page,
+              pageName: page.name,
               theme: pageTheme,
               hookHeadline,
               template: savedTemplate
