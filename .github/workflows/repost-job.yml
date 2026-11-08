@@ -110,12 +110,20 @@ jobs:
         if: steps.node-cache.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit --no-fund
 
+      - name: 💾 Cache Cloudflared Binary
+        uses: actions/cache@v4
+        id: cloudflared-cache
+        with:
+          path: /usr/local/bin/cloudflared
+          key: ${{ runner.os }}-cloudflared-bin-v2
+
       - name: ⚡ Ensure Native Cloudflared Executable
+        if: steps.cloudflared-cache.outputs.cache-hit != 'true'
         continue-on-error: true
         run: |
           if ! command -v cloudflared &> /dev/null; then
             echo "[Cloud Runner] Installing native Cloudflared binary..."
-            sudo curl --retry 5 --retry-delay 2 -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared || true
+            sudo curl -fsSL --connect-timeout 8 --max-time 25 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared || true
             sudo chmod +x /usr/local/bin/cloudflared || true
           fi
           cloudflared --version || echo "Native cloudflared not present, will use npx fallback"

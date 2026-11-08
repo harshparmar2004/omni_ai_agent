@@ -82,7 +82,7 @@ class NotifierService extends EventEmitter {
         `https://api.telegram.org/bot${token}/editMessageText`,
         {
           chat_id: chatId,
-          message_id: messageId,
+          message_id: parseInt(messageId, 10),
           text,
           parse_mode: options.parse_mode || 'HTML',
           disable_web_page_preview: options.disable_web_page_preview !== undefined ? options.disable_web_page_preview : true,

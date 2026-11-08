@@ -104,6 +104,8 @@ class JobWorkerPool {
         });
         if (res) return res;
       } catch (e) {}
+      // Message ID exists; do not spawn a second duplicate message in the chat
+      return null;
     }
     const res = await notifier.sendTelegramMessage(chatId, text, {
       reply_markup: replyMarkup
@@ -168,13 +170,13 @@ class JobWorkerPool {
 
     const shortcode = job.shortcode || 'reel';
     const renderStepperMsg = (stepNum, statusLine, subDetail = '') => [
-      `⚡ <b>OmniStudio Pipeline:</b> <code>#${shortcode}</code>`,
-      `📱 <b>Target Page:</b> <code>${page.handle}</code>`,
+      `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>`,
+      `📱 <b>Destination:</b> <code>${page.handle}</code> (${escapeHtml(page.name)})`,
       ``,
-      `✅ <b>1. Ingest:</b> Cloud runner active`,
-      `▶ <b>2. Download:</b> ${stepNum > 2 ? '✅ 1080p MP4 Ready' : (stepNum === 2 ? '⏳ Downloading & transcoding...' : '⚪ Waiting')}`,
-      `▶ <b>3. AI Copy:</b> ${stepNum > 3 ? '✅ Hook & Attribution Ready' : (stepNum === 3 ? '⏳ Crafting viral caption...' : '⚪ Waiting')}`,
-      `▶ <b>4. Publishing:</b> ${stepNum === 4 ? (subDetail || '⏳ Publishing Feed & Story in parallel...') : '⚪ Waiting'}`,
+      `✅ <b>1. Ingest:</b> Cloud runner connected & active`,
+      `${stepNum > 2 ? '✅' : (stepNum === 2 ? '⏳' : '⚪')} <b>2. Download:</b> ${stepNum > 2 ? '1080p Media Transcoded' : (stepNum === 2 ? 'Downloading & transcoding...' : 'Waiting')}`,
+      `${stepNum > 3 ? '✅' : (stepNum === 3 ? '⏳' : '⚪')} <b>3. AI Hook & Copy:</b> ${stepNum > 3 ? 'Viral Caption & Hooks Ready' : (stepNum === 3 ? 'Crafting viral hook & copy...' : 'Waiting')}`,
+      `${stepNum >= 4 ? (stepNum === 5 ? '✅' : '⏳') : '⚪'} <b>4. Publishing:</b> ${stepNum === 5 ? 'Published to Feed & Story' : (stepNum === 4 ? (subDetail || 'Publishing Reel & Story...') : 'Waiting (Reel & Story)')}`,
       ``,
       statusLine ? `<i>Status: ${statusLine}</i>` : ''
     ].filter(Boolean);
@@ -259,12 +261,17 @@ class JobWorkerPool {
       job = updateJobProgress(jobId, 'publishing', 'meta_upload');
       await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading Feed container to Instagram...', '⏳ Ingesting Reel video...'));
 
+      let lastProgressUpdate = 0;
       const onProgress = (step, current, total) => {
         if (step === 'polling') {
-          this.updateTelegramProgress(
-            job,
-            renderStepperMsg(4, 'Processing media container on Instagram...', `⏳ Verifying Meta container (${current}/${total})...`)
-          ).catch(() => {});
+          const now = Date.now();
+          if (now - lastProgressUpdate > 3000 || current === 1 || current === total) {
+            lastProgressUpdate = now;
+            this.updateTelegramProgress(
+              job,
+              renderStepperMsg(4, 'Processing media container on Instagram...', `⏳ Verifying Meta container (${current}/${total})...`)
+            ).catch(() => {});
+          }
         }
       };
 
@@ -410,16 +417,17 @@ class JobWorkerPool {
       }
 
       const initialSuccessLines = [
-        `🎉 <b>Published Live to Instagram!</b>`,
-        `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
-        `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
+        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>`,
+        `📱 <b>Destination:</b> <code>${page.handle}</code> (${escapeHtml(page.name)})`,
         ``,
-        `✅ <b>Feed Reel Published Live</b>`,
+        `✅ <b>1. Ingest:</b> Cloud runner connected & active`,
+        `✅ <b>2. Download:</b> 1080p Media Transcoded`,
+        `✅ <b>3. AI Hook & Copy:</b> Viral Caption & Hooks Ready`,
+        `✅ <b>4. Publishing:</b> Feed Reel Published Live`,
         autoPostStory ? `⏳ <i>Publishing companion Instagram Story...</i>` : '',
         ``,
+        `🎉 <b>Published Live to Instagram!</b>`,
         `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
-        ``,
-        `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`,
         ``,
         `📝 <b>Instagram Post Caption:</b>`,
         `<blockquote>${escapeHtml(finalCaption)}</blockquote>`
@@ -449,18 +457,17 @@ class JobWorkerPool {
             });
 
             const finalSuccessLines = [
+              `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>`,
+              `📱 <b>Destination:</b> <code>${page.handle}</code> (${escapeHtml(page.name)})`,
+              ``,
+              `✅ <b>1. Ingest:</b> Cloud runner connected & active`,
+              `✅ <b>2. Download:</b> 1080p Media Transcoded`,
+              `✅ <b>3. AI Hook & Copy:</b> Viral Caption & Hooks Ready`,
+              `✅ <b>4. Publishing:</b> Reel & Story Published Live`,
+              ``,
               `🎉 <b>Published Live to Instagram!</b>`,
-              `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
-              `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
-              ``,
-              `✅ <b>Feed Reel Published Live</b>`,
-              `✅ <b>Instagram Story Published Live</b>`,
-              ``,
               `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>`,
               `🌟 <b>Story:</b> <a href="${storyResult.story_url}">View on Instagram Story</a>`,
-              ``,
-              `🆔 <b>Media ID:</b> <code>${pubResult.ig_media_id}</code>`,
-              `🆔 <b>Story ID:</b> <code>${storyResult.ig_media_id}</code>`,
               ``,
               `📝 <b>Instagram Post Caption:</b>`,
               `<blockquote>${escapeHtml(finalCaption)}</blockquote>`
