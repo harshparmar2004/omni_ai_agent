@@ -5,16 +5,111 @@
  * and end-to-end stage telemetry.
  */
 window.studioView = (function() {
+  const DEFAULT_PRESETS = [
+    {
+      id: 'cinema',
+      slug: 'movies',
+      name: 'Movie Series 365',
+      handle: '@movie_series_365',
+      niche: 'Cinema & TV Series',
+      primaryColor: '#F59E0B',
+      badgeText: 'CINEMA PIC',
+      logo: '/branding/movie_series_365_avatar.png',
+      font: 'Cinzel / Inter',
+      frameStyle: 'Golden Cinema Frame',
+      hookSample: 'DUNE PART TWO: HOW DENIS VILLENEUVE DIRECTED THIS SCENE',
+      description: 'Warm golden amber glow, compact cinema badge, and bold high-contrast headline for movie scenes & breakdowns.',
+      features: ['Golden Glow Border', 'Compact Cinema Badge', 'Safe-Zone Padding', 'Competitor Watermark Stripping']
+    },
+    {
+      id: 'neon',
+      slug: 'clubbing',
+      name: 'Clubbing Cult',
+      handle: '@clubbingcult',
+      niche: 'Nightlife & EDM / Rave',
+      primaryColor: '#00FF66',
+      badgeText: 'NIGHTLIFE',
+      logo: '/branding/clubbingcult_avatar.png',
+      font: 'Outfit / Sans',
+      frameStyle: 'Cyberpunk Neon',
+      hookSample: 'THE MOMENT CHARLOTTE DE WITTE DROPPED THIS UNRELEASED ID',
+      description: 'Electric neon green glow, punchy rave typography, and high-energy festival atmosphere styling.',
+      features: ['Electric Neon Green Glow', 'Rave Nightlife Badge', 'Safe-Zone Padding', 'Competitor Watermark Stripping']
+    },
+    {
+      id: 'video_essay',
+      slug: 'cult_information',
+      name: 'Cult Information',
+      handle: '@cult_information',
+      niche: 'Deep Knowledge & Essays',
+      primaryColor: '#E2E8F0',
+      badgeText: 'DEEP LORE',
+      logo: '/branding/cult_information_avatar.png',
+      font: 'Plus Jakarta Sans',
+      frameStyle: 'Editorial Minimalist',
+      hookSample: 'WHY THE WEALTHIEST FAMILIES SECRETLY BOUGHT THIS LAND',
+      description: 'Clean minimalist white editorial card with intellectual hook headline phrasing.',
+      features: ['Editorial Clean Card', 'Intellectual Hook Phrasing', 'Safe-Zone Padding', 'Clean Neutral Glow']
+    },
+    {
+      id: 'gta6',
+      slug: 'gta6',
+      name: 'GTA 6 Updates 007',
+      handle: '@gta6_updates_007',
+      niche: 'Gaming & GTA Leaks',
+      primaryColor: '#FF007F',
+      badgeText: 'LEAKS & INTEL',
+      logo: '/branding/gta6_updates_007_avatar.png',
+      font: 'Pricedown / Montserrat',
+      frameStyle: 'Vice City Synthwave',
+      hookSample: 'NEW GTA 6 MAP DETAIL LEAKED FROM ROCKSTAR SERVERS',
+      description: 'Vice City neon pink glow, gaming title badge, and dynamic crest styling.',
+      features: ['Vice City Magenta Neon', 'Gaming Title Badge', 'Safe-Zone Padding', 'Competitor Watermark Stripping']
+    }
+  ];
+
   let activeSubtab = 'studio'; // 'studio' | 'pipeline' | 'calibration'
-  let presets = [];
+  let presets = [...DEFAULT_PRESETS];
   let recentEdits = [];
-  let activePresetId = 'neon';
+  let activePresetId = 'cinema';
   let activePhoneMode = 'letterbox'; // 'letterbox' | 'full' | 'story'
   let activeReRenderJobId = null;
   let showSafeZoneGuides = false;
   let isLiked = false;
   let isPlaying = true;
   let customHookText = '';
+
+  function renderPresetsHtml(presetList) {
+    return (presetList || []).map(p => {
+      const isSelected = p.id === activePresetId;
+      return `
+        <div class="card preset-card ${isSelected ? 'active' : ''}" onclick="studioView.selectPreset('${p.id}')" style="padding: 0.85rem; border-radius: 10px; border: ${isSelected ? `2px solid ${p.primaryColor}` : '1px solid var(--border-subtle)'}; background: var(--bg-canvas); cursor: pointer; transition: all 0.15s; ${isSelected ? `box-shadow: 0 0 12px ${p.primaryColor}33;` : ''}">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <img src="${p.logo || '/logos/default.png'}" style="width: 26px; height: 26px; border-radius: 50%; object-fit: cover; border: 1px solid rgba(255,255,255,0.2);" onerror="this.src='/logos/default.png'; this.onerror=null;">
+              <div>
+                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">
+                  ${escapeHtml(p.name)}
+                </div>
+                <div style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
+                  ${escapeHtml(p.handle || '')}
+                </div>
+              </div>
+            </div>
+            <div style="width: 14px; height: 14px; border-radius: 50%; background: ${p.primaryColor}; border: 1px solid rgba(0,0,0,0.2); box-shadow: 0 0 6px ${p.primaryColor};"></div>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.35; margin-top: 4px;">
+            ${escapeHtml(p.description)}
+          </div>
+          ${isSelected ? `
+            <div style="margin-top: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; font-weight: 700; color: ${p.primaryColor};">
+              ✓ Active Channel Preview
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+  }
 
   // Pipeline Tracker State (Stepper & Stage Deck matching Agent 1 & 2)
   let pipelineJobs = [];
@@ -61,14 +156,14 @@ window.studioView = (function() {
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <h2 style="font-size: 1.35rem; font-weight: 700; margin: 0; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">
-                Agent 3: Video Studio & Pipeline Tracker
+                Agent 3: Automated Video Editor & Styler
               </h2>
-              <span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #7C3AED; font-weight: 600; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem;">
-                Autonomous Creative Engine
+              <span class="badge" style="background: rgba(16, 185, 129, 0.12); color: #10B981; font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem;">
+                Video Engine
               </span>
             </div>
             <p class="text-sm text-muted" style="margin: 0.25rem 0 0 0;">
-              AI video framing, competitor stripping, contextual hook generation, companion stories, and unified stage tracking
+              Automatically cleans raw video, generates viral hook titles, and stamps your channel's branding before posting.
             </p>
           </div>
 
@@ -76,15 +171,15 @@ window.studioView = (function() {
           <div class="flex items-center gap-2" style="flex-wrap: wrap;">
             <div class="btn-group" style="display: flex; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 2px;">
               <button class="btn btn-sm ${activeSubtab === 'studio' ? 'btn-primary' : 'btn-ghost'}" onclick="studioView.setSubtab('studio')" style="padding: 5px 12px; font-size: 0.8rem; font-weight: 600;">
-                🎬 Studio & Mockup
+                📱 Live Video Preview
               </button>
               <button class="btn btn-sm ${activeSubtab === 'pipeline' ? 'btn-primary' : 'btn-ghost'}" onclick="studioView.setSubtab('pipeline')" style="padding: 5px 12px; font-size: 0.8rem; font-weight: 600;">
-                📊 Pipeline Tracker
+                📊 Live Queue & Progress
               </button>
             </div>
 
             <button class="btn btn-primary btn-sm" onclick="studioView.openReRenderModal()">
-              🎨 Re-Render Reel
+              🎨 Re-Render a Reel
             </button>
             <button class="btn btn-secondary btn-sm" onclick="studioView.refresh()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
@@ -96,84 +191,101 @@ window.studioView = (function() {
         <!-- SUBTAB 1: Studio & High-Fidelity Mobile Reel Player -->
         <div id="studio-subtab-studio" class="${activeSubtab === 'studio' ? '' : 'hidden'}">
           
-          <!-- Architecture Flow Banner -->
-          <div class="card mb-4" style="padding: 1.15rem; border-radius: 12px; border: 1px solid var(--border-card); background: var(--bg-card);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+          <!-- Beginner-Friendly Explainer Banner: How Agent 3 Works -->
+          <div class="card mb-4" style="padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-card); background: var(--bg-card);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
               <div>
-                <h3 style="font-size: 0.95rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                  Agent 3 Reel Processing Architecture
+                <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                  🎬 How Agent 3 Automatically Edits Your Reels
                 </h3>
-                <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
-                  How raw competitor reels are analyzed, cleaned, styled, and rendered for your Instagram brand
+                <p style="font-size: 0.78rem; color: var(--text-muted); margin: 3px 0 0 0;">
+                  When a reel comes in from Telegram or competitor monitoring, Agent 3 transforms it in 3 automated steps:
                 </p>
               </div>
-              <span class="badge" style="font-size: 0.7rem; background: var(--bg-canvas); color: var(--text-secondary); padding: 2px 8px; border-radius: 999px;">
-                Autonomous 5-Stage Synthesis
+              <span class="badge" style="font-size: 0.72rem; background: rgba(16, 185, 129, 0.12); color: #10B981; font-weight: 700; padding: 4px 10px; border-radius: 999px;">
+                ⚡ 100% Automated 3-Step Process
               </span>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.65rem;">
-              <div style="background: var(--bg-canvas); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #2563EB;">1 · RATIO GUARD</div>
-                <div style="font-weight: 600; font-size: 0.82rem; margin: 2px 0;">Safe-Zone Padding</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
-                  Detects 9:16 vs letterbox. Lifts video upward so captions never overlap visuals.
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem;">
+              
+              <!-- Step 1 -->
+              <div style="background: var(--bg-canvas); padding: 0.95rem; border-radius: 10px; border: 1px solid var(--border-subtle);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <span style="font-size: 1.15rem;">✂️</span>
+                  <div>
+                    <div style="font-size: 0.68rem; font-weight: 800; color: #2563EB; text-transform: uppercase;">Step 1 · Clean Video</div>
+                    <div style="font-weight: 700; font-size: 0.85rem;">Safe-Zone Framing & Watermark Masking</div>
+                  </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                  Removes competitor tags and fits the video into Instagram's 9:16 safe area so captions, likes, and music tags never block the visuals.
                 </div>
               </div>
 
-              <div style="background: var(--bg-canvas); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #D97757;">2 · SMART OCR</div>
-                <div style="font-weight: 600; font-size: 0.82rem; margin: 2px 0;">Competitor Stripping</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
-                  Detects competitor watermarks and overlays; crops and masks them completely.
+              <!-- Step 2 -->
+              <div style="background: var(--bg-canvas); padding: 0.95rem; border-radius: 10px; border: 1px solid var(--border-subtle);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <span style="font-size: 1.15rem;">✨</span>
+                  <div>
+                    <div style="font-size: 0.68rem; font-weight: 800; color: #F59E0B; text-transform: uppercase;">Step 2 · Brand Identity</div>
+                    <div style="font-weight: 700; font-size: 0.85rem;">AI Hook Headline & Page Logo</div>
+                  </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                  AI generates a punchy, curiosity-driven headline on top and stamps your channel's original logo and glowing color theme.
                 </div>
               </div>
 
-              <div style="background: var(--bg-canvas); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #7C3AED;">3 · AI HOOK LINE</div>
-                <div style="font-weight: 600; font-size: 0.82rem; margin: 2px 0;">Contextual 1-Liner</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
-                  Synthesizes a punchy headline matching the reel theme instead of copying bio text.
+              <!-- Step 3 -->
+              <div style="background: var(--bg-canvas); padding: 0.95rem; border-radius: 10px; border: 1px solid var(--border-subtle);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                  <span style="font-size: 1.15rem;">🚀</span>
+                  <div>
+                    <div style="font-size: 0.68rem; font-weight: 800; color: #10B981; text-transform: uppercase;">Step 3 · Render & Publish</div>
+                    <div style="font-weight: 700; font-size: 0.85rem;">Fast 1080p MP4 & Auto-Post</div>
+                  </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;">
+                  High-speed FFmpeg encodes the finished 1080p Reel in ~12 seconds, then publishes it directly to Instagram with tailored captions.
                 </div>
               </div>
 
-              <div style="background: var(--bg-canvas); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #16A34A;">4 · PAGE TEMPLATE</div>
-                <div style="font-weight: 600; font-size: 0.82rem; margin: 2px 0;">Dynamic Branding</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
-                  Loads branding from <code>page_templates</code>: Neon, Video Essay, Cinema, GTA6, or Minimal.
-                </div>
-              </div>
+            </div>
 
-              <div style="background: var(--bg-canvas); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
-                <div style="font-size: 0.7rem; font-weight: 700; color: #E11D48;">5 · COMPANION STORY</div>
-                <div style="font-weight: 600; font-size: 0.82rem; margin: 2px 0;">Our Edited Story</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.3;">
-                  Renders our own 1080x1920 9:16 story layout with zero competitor tags.
-                </div>
-              </div>
+            <!-- Helpful Interactive Callout -->
+            <div style="margin-top: 0.85rem; padding: 0.6rem 0.85rem; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1rem;">💡</span>
+              <span style="font-size: 0.78rem; color: var(--text-primary);">
+                <strong>Interactive Simulator:</strong> Click any channel below to immediately preview how Agent 3 styles reels with that channel's real logo, colors, and title on the mobile phone!
+              </span>
             </div>
           </div>
 
           <!-- Studio Main Deck: Live Configurator + Realistic Mobile Phone Preview -->
           <div style="display: grid; grid-template-columns: 1fr 380px; gap: 1.5rem; align-items: flex-start; margin-bottom: 2rem;">
             
-            <!-- Left: Preset Lab & Customizer Controls -->
+            <!-- Left: Channel Selector & Customizer Controls -->
             <div style="display: flex; flex-direction: column; gap: 1.25rem;">
               
-              <!-- 1. Presets Selector -->
+              <!-- 1. Channel Selector -->
               <div class="card" style="padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border-card); background: var(--bg-card);">
-                <div style="margin-bottom: 0.85rem;">
-                  <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                    Brand Aesthetic Design Systems
-                  </h3>
-                  <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
-                    Select a preset to dynamically preview colors, safe zones, typography, and framing on the mobile phone
-                  </p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                  <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
+                      Select Channel to Preview
+                    </h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
+                      Click a channel to see its authentic logo, color theme, and template on the phone
+                    </p>
+                  </div>
+                  <span class="badge" style="font-size: 0.7rem; background: var(--bg-canvas); color: var(--text-secondary); padding: 2px 8px; border-radius: 999px;">
+                    ${presets.length} Channels
+                  </span>
                 </div>
 
                 <div id="studio-presets-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem;">
-                  <div style="color: var(--text-muted); font-size: 0.82rem; padding: 1.5rem;">Loading aesthetic presets...</div>
+                  ${renderPresetsHtml(presets)}
                 </div>
 
                 <div id="studio-preset-detail" style="margin-top: 1rem; padding: 0.85rem; background: var(--bg-canvas); border-radius: 8px; border: 1px solid var(--border-subtle);">
@@ -186,20 +298,20 @@ window.studioView = (function() {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
                   <div>
                     <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif;">
-                      Live Hook Headline & Phone Controls
+                      Live Hook Title Sandbox
                     </h3>
                     <p style="font-size: 0.75rem; color: var(--text-muted); margin: 2px 0 0 0;">
-                      Type any headline below to see it format live inside the mobile reel player
+                      Type any headline below to preview it live inside the mobile phone on the right
                     </p>
                   </div>
-                  <button class="btn btn-secondary btn-sm" onclick="studioView.synthesizeSampleHook()" style="font-size: 0.75rem; padding: 4px 10px;">
-                    ✨ AI Sample Hook
+                  <button class="btn btn-secondary btn-sm" onclick="studioView.synthesizeSampleHook()" style="font-size: 0.75rem; padding: 4px 10px; font-weight: 600;">
+                    ✨ AI Hook Idea
                   </button>
                 </div>
 
                 <div class="form-group mb-3">
-                  <label class="form-label font-bold" style="font-size: 0.8rem;">Custom Eye-Catching Hook Headline</label>
-                  <input type="text" id="live-hook-input" class="form-input" placeholder="Type a hook headline (e.g. THE UNRELEASED TRACK THAT BROKE THE INTERNET)..." oninput="studioView.onLiveHookChange(this.value)" style="border-radius: 8px; font-size: 0.85rem; font-weight: 600;">
+                  <label class="form-label font-bold" style="font-size: 0.8rem;">Custom Reel Headline</label>
+                  <input type="text" id="live-hook-input" class="form-input" placeholder="Type a headline or click 'AI Hook Idea'..." oninput="studioView.onLiveHookChange(this.value)" style="border-radius: 8px; font-size: 0.85rem; font-weight: 600;">
                 </div>
 
                 <!-- Display Mode Toggle -->
@@ -287,18 +399,27 @@ window.studioView = (function() {
                     <!-- Mode A: Safe-Zone Letterbox (Top Hook Headline + Center Video) -->
                     <div id="stage-letterbox" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; position: relative; background: #08080C;">
                       
-                      <!-- TOP SAFE ZONE: Hook Headline Card -->
-                      <div id="phone-hook-header" style="padding: 12px 14px 8px 14px; text-align: center; z-index: 10;">
-                        <div id="phone-brand-tag" style="display: inline-block; font-size: 0.62rem; font-weight: 800; color: #00FF66; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px;">
-                          CLUBBING CULT
+                      <!-- TOP SAFE ZONE: Hook Headline Card with Channel Branding -->
+                      <div id="phone-hook-header" style="padding: 10px 14px 6px 14px; text-align: center; z-index: 10;">
+                        <!-- Channel Logo & Name Badge -->
+                        <div id="phone-brand-badge" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.7); border: 1px solid #F59E0B; padding: 3px 10px 3px 6px; border-radius: 999px; margin-bottom: 6px; box-shadow: 0 0 12px rgba(245,158,11,0.35);">
+                          <img id="phone-brand-logo-img" src="/logos/movie_series_365.jpg" style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover; border: 1px solid #FFF;" onerror="this.src='/logos/default.png'; this.onerror=null;">
+                          <span id="phone-brand-tag" style="font-size: 0.62rem; font-weight: 800; color: #F59E0B; letter-spacing: 0.06em; text-transform: uppercase;">
+                            MOVIE SERIES 365
+                          </span>
+                          <span id="phone-brand-pill" style="font-size: 0.52rem; font-weight: 700; background: #F59E0B; color: #000; padding: 1px 5px; border-radius: 4px; text-transform: uppercase;">
+                            CINEMA PIC
+                          </span>
                         </div>
-                        <div id="phone-hook-text" style="font-size: 0.88rem; font-weight: 800; color: #FFFFFF; line-height: 1.25; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.8);">
-                          THE MOMENT CHARLOTTE DE WITTE DROPPED THIS UNRELEASED ID
+
+                        <!-- Hook Headline -->
+                        <div id="phone-hook-text" style="font-size: 0.88rem; font-weight: 800; color: #FFFFFF; line-height: 1.25; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.85); letter-spacing: -0.01em;">
+                          DUNE PART TWO: HOW DENIS VILLENEUVE DIRECTED THIS SCENE
                         </div>
                       </div>
 
                       <!-- CENTER VIDEO BOX -->
-                      <div id="phone-video-box" style="margin: 0 8px; flex: 1; max-height: 280px; background: #161622; border-radius: 8px; border: 1.5px solid #00FF66; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
+                      <div id="phone-video-box" style="margin: 0 8px; flex: 1; max-height: 280px; background: #161622; border-radius: 8px; border: 1.5px solid #F59E0B; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
                         <div style="text-align: center; color: #888;">
                           <div id="play-ripple" style="width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 6px auto;">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="#FFF"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -308,23 +429,23 @@ window.studioView = (function() {
                         </div>
                         <!-- Video Progress Scrubber Bar -->
                         <div style="position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.2);">
-                          <div style="width: 45%; height: 100%; background: #00FF66;"></div>
+                          <div id="phone-progress-bar" style="width: 45%; height: 100%; background: #F59E0B;"></div>
                         </div>
                       </div>
 
                       <!-- BOTTOM WATERMARK STRIP (Masks competitor watermark) -->
                       <div id="phone-bottom-watermark" style="padding: 6px 14px 10px 14px; display: flex; justify-content: space-between; align-items: center; z-index: 10;">
                         <span id="phone-watermark-text" style="font-size: 0.65rem; font-weight: 700; color: #888; font-family: var(--font-mono);">
-                          @clubbingcult
+                          @movie_series_365
                         </span>
-                        <span id="phone-watermark-badge" class="badge" style="font-size: 0.58rem; background: rgba(0,255,102,0.15); color: #00FF66; padding: 1px 6px; border-radius: 4px; font-weight: 700;">
+                        <span id="phone-watermark-badge" class="badge" style="font-size: 0.58rem; background: rgba(245,158,11,0.15); color: #F59E0B; padding: 1px 6px; border-radius: 4px; font-weight: 700;">
                           ORIGINAL CURATION
                         </span>
                       </div>
                     </div>
 
                     <!-- Mode B: Full 9:16 Vertical Reel (Hidden by default) -->
-                    <div id="stage-full" style="display: none; flex: 1; position: relative; background: #12131A; display: flex; align-items: center; justify-content: center;">
+                    <div id="stage-full" style="display: none; flex: 1; position: relative; background: #12131A; align-items: center; justify-content: center;">
                       <div style="text-align: center; color: #FFF;">
                         <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; margin: 0 auto 8px auto;">
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="#FFF"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -335,7 +456,7 @@ window.studioView = (function() {
                     </div>
 
                     <!-- Mode C: 9:16 Companion Story (Hidden by default) -->
-                    <div id="stage-story" style="display: none; flex: 1; position: relative; background: linear-gradient(180deg, #1A1A24 0%, #0D0D12 100%); padding: 8px 12px; display: flex; flex-direction: column;">
+                    <div id="stage-story" style="display: none; flex: 1; position: relative; background: linear-gradient(180deg, #1A1A24 0%, #0D0D12 100%); padding: 8px 12px; flex-direction: column;">
                       <!-- Segmented Story Bars -->
                       <div style="display: flex; gap: 4px; margin-bottom: 8px;">
                         <div style="flex: 1; height: 2px; background: #FFF; border-radius: 2px;"></div>
@@ -612,32 +733,49 @@ window.studioView = (function() {
   }
 
   async function loadStudioData(silent = false) {
-    try {
-      const [presetsRes, recentRes, jobsRes] = await Promise.all([
-        fetch('/api/studio/presets'),
-        fetch('/api/studio/recent'),
-        fetch('/api/jobs?limit=30')
-      ]);
+    // 1. Immediately render fallback channel presets into DOM
+    renderPresets(presets);
+    selectPreset(activePresetId);
 
+    // 2. Fetch API asynchronously without blocking UI
+    try {
+      const presetsRes = await fetch('/api/studio/presets');
       if (presetsRes.ok) {
         const pData = await presetsRes.json();
-        presets = pData.presets || [];
-        renderPresets(presets);
-        selectPreset(activePresetId);
+        if (pData.presets && pData.presets.length > 0) {
+          presets = DEFAULT_PRESETS.map(dp => {
+            const match = pData.presets.find(bp => bp.id === dp.id || bp.slug === dp.slug);
+            return match ? { ...dp, ...match, logo: dp.logo, badgeText: dp.badgeText } : dp;
+          });
+          renderPresets(presets);
+          selectPreset(activePresetId);
+        }
       }
+    } catch (e) {
+      if (!silent) console.warn('[Studio Presets Fetch]', e.message);
+    }
 
+    try {
+      const recentRes = await fetch('/api/studio/recent');
       if (recentRes.ok) {
         const rData = await recentRes.json();
         recentEdits = rData.recent || rData.jobs || [];
         renderRecentEdits(recentEdits);
       }
+    } catch (e) {
+      if (!silent) console.warn('[Studio Recent Fetch]', e.message);
+    }
 
+    try {
+      const jobsRes = await fetch('/api/jobs?limit=30');
       if (jobsRes.ok) {
         const jobsList = await jobsRes.json();
-        populateJobSelect(jobsList);
+        if (typeof populateJobSelect === 'function') {
+          populateJobSelect(jobsList);
+        }
       }
-    } catch (err) {
-      if (!silent) console.error('[Studio loadStudioData error]:', err);
+    } catch (e) {
+      if (!silent) console.warn('[Studio Jobs Fetch]', e.message);
     }
   }
 
@@ -675,31 +813,12 @@ window.studioView = (function() {
   function renderPresets(presetList) {
     const grid = document.getElementById('studio-presets-grid');
     if (!grid) return;
-
-    grid.innerHTML = presetList.map(p => {
-      const isSelected = p.id === activePresetId;
-      return `
-        <div class="card preset-card ${isSelected ? 'active' : ''}" onclick="studioView.selectPreset('${p.id}')" style="padding: 0.85rem; border-radius: 10px; border: ${isSelected ? '2px solid var(--accent-primary)' : '1px solid var(--border-subtle)'}; background: var(--bg-canvas); cursor: pointer; transition: all 0.15s;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-            <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">
-              ${escapeHtml(p.name)}
-            </span>
-            <div style="width: 14px; height: 14px; border-radius: 50%; background: ${p.primaryColor}; border: 1px solid rgba(0,0,0,0.2);"></div>
-          </div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.4rem;">
-            ${escapeHtml(p.niche)}
-          </div>
-          <div style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
-            ${escapeHtml(p.description)}
-          </div>
-        </div>
-      `;
-    }).join('');
+    grid.innerHTML = renderPresetsHtml(presetList);
   }
 
   function selectPreset(presetId) {
     activePresetId = presetId;
-    const p = presets.find(item => item.id === presetId);
+    const p = presets.find(item => item.id === presetId) || presets[0];
     if (!p) return;
 
     // Highlight card
@@ -711,15 +830,18 @@ window.studioView = (function() {
       detail.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(p.name)}</div>
-            <div style="font-size: 0.74rem; color: var(--text-muted);">${escapeHtml(p.description)}</div>
+            <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+              <span>${escapeHtml(p.name)} Branding Setup</span>
+              <span class="badge" style="font-size: 0.65rem; background: ${p.primaryColor}22; color: ${p.primaryColor}; font-weight: 700; border-radius: 4px;">${escapeHtml(p.badgeText || 'ACTIVE')}</span>
+            </div>
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">${escapeHtml(p.description)}</div>
           </div>
           <div style="display: flex; gap: 6px;">
-            <span class="badge" style="font-size: 0.68rem; background: rgba(0,0,0,0.05); color: var(--text-secondary); padding: 2px 6px;">
-              ${escapeHtml(p.font)}
+            <span class="badge" style="font-size: 0.68rem; background: rgba(255,255,255,0.06); color: var(--text-secondary); padding: 2px 6px;">
+              ${escapeHtml(p.font || 'Default Sans')}
             </span>
-            <span class="badge" style="font-size: 0.68rem; background: rgba(0,0,0,0.05); color: var(--text-secondary); padding: 2px 6px;">
-              ${escapeHtml(p.frameStyle)}
+            <span class="badge" style="font-size: 0.68rem; background: rgba(255,255,255,0.06); color: var(--text-secondary); padding: 2px 6px;">
+              ${escapeHtml(p.frameStyle || 'Branded Border')}
             </span>
           </div>
         </div>
@@ -739,59 +861,77 @@ window.studioView = (function() {
   }
 
   function updatePhoneMockup(p) {
+    if (!p) return;
+    const brandBadge = document.getElementById('phone-brand-badge');
+    const brandLogoImg = document.getElementById('phone-brand-logo-img');
     const brandTag = document.getElementById('phone-brand-tag');
+    const brandPill = document.getElementById('phone-brand-pill');
     const hookText = document.getElementById('phone-hook-text');
     const videoBox = document.getElementById('phone-video-box');
+    const progressBar = document.getElementById('phone-progress-bar');
     const watermarkText = document.getElementById('phone-watermark-text');
     const watermarkBadge = document.getElementById('phone-watermark-badge');
     const authorHandle = document.getElementById('phone-author-handle');
     const audioTicker = document.getElementById('phone-audio-ticker');
     const audioDiscCenter = document.getElementById('audio-disc-center');
     const avatar = document.getElementById('phone-avatar');
+    const avatarImg = document.getElementById('phone-avatar-img');
     const storyHandle = document.getElementById('story-handle');
     const storyHook = document.getElementById('story-hook-text');
+    const liveHookInput = document.getElementById('live-hook-input');
 
-    let handle = 'clubbingcult';
-    let hook = customHookText || 'THE MOMENT CHARLOTTE DE WITTE DROPPED THIS UNRELEASED ID';
-    let brand = 'CLUBBING CULT';
+    const handle = p.handle ? p.handle.replace(/^@/, '') : 'movie_series_365';
+    const brandName = p.name ? p.name.toUpperCase() : 'MOVIE SERIES 365';
+    const hook = customHookText || p.hookSample || 'DUNE PART TWO: HOW DENIS VILLENEUVE DIRECTED THIS SCENE';
+    const color = p.primaryColor || '#F59E0B';
 
-    if (p.id === 'video_essay') {
-      handle = 'cultinformation';
-      brand = 'CULT INFORMATION';
-      if (!customHookText) hook = 'WHY THE MOST ICONIC CLUBS IN BERLIN ARE CLOSING DOWN';
-    } else if (p.id === 'cinema') {
-      handle = 'cinematic.breakdowns';
-      brand = 'CINEMA ARCHIVE';
-      if (!customHookText) hook = 'DUNE PART TWO: HOW DENIS VILLENEUVE DIRECTED THIS SCENE';
-    } else if (p.id === 'gta6') {
-      handle = 'gta6_updates_007';
-      brand = 'GTA 6 VICE CITY';
-      if (!customHookText) hook = 'NEW GTA 6 MAP DETAIL LEAKED FROM ROCKSTAR SERVERS';
-    } else if (p.id === 'minimal') {
-      handle = 'omnistudio.media';
-      brand = 'OMNISTUDIO';
-      if (!customHookText) hook = 'HOW THE NEW GENERATION OF AI PRODUCERS CREATE MUSIC';
+    if (liveHookInput && !customHookText) {
+      liveHookInput.placeholder = p.hookSample || 'Type a reel headline...';
     }
 
+    if (brandBadge) {
+      brandBadge.style.borderColor = color;
+      brandBadge.style.boxShadow = `0 0 12px ${color}55`;
+    }
+    if (brandLogoImg) {
+      brandLogoImg.src = p.logo || '/logos/default.png';
+      brandLogoImg.style.display = 'block';
+    }
     if (brandTag) {
-      brandTag.style.color = p.primaryColor;
-      brandTag.textContent = brand;
+      brandTag.style.color = color;
+      brandTag.textContent = brandName;
+    }
+    if (brandPill) {
+      brandPill.textContent = p.badgeText || 'OFFICIAL';
+      brandPill.style.background = color;
+      brandPill.style.color = (color === '#E2E8F0' || color === '#00FF66' || color === '#F59E0B') ? '#000000' : '#FFFFFF';
     }
     if (hookText) {
       hookText.textContent = hook.toUpperCase();
     }
     if (videoBox) {
-      videoBox.style.borderColor = p.primaryColor;
+      videoBox.style.borderColor = color;
+      videoBox.style.boxShadow = `0 4px 20px rgba(0,0,0,0.6), 0 0 10px ${color}33`;
+    }
+    if (progressBar) {
+      progressBar.style.background = color;
     }
     if (watermarkText) {
       watermarkText.textContent = `@${handle}`;
     }
     if (watermarkBadge) {
-      watermarkBadge.style.color = p.primaryColor;
-      watermarkBadge.style.background = `${p.primaryColor}22`;
+      watermarkBadge.style.color = color;
+      watermarkBadge.style.background = `${color}22`;
     }
     if (authorHandle) {
       authorHandle.textContent = handle;
+    }
+    if (avatar) {
+      avatar.style.background = color;
+    }
+    if (avatarImg) {
+      avatarImg.src = p.logo || '/logos/default.png';
+      avatarImg.style.display = 'block';
     }
     if (storyHandle) {
       storyHandle.textContent = handle;
@@ -803,10 +943,7 @@ window.studioView = (function() {
       audioTicker.textContent = `Original Audio · ${handle}`;
     }
     if (audioDiscCenter) {
-      audioDiscCenter.style.background = p.primaryColor;
-    }
-    if (avatar) {
-      avatar.style.background = p.primaryColor;
+      audioDiscCenter.style.background = color;
     }
   }
 
@@ -875,18 +1012,54 @@ window.studioView = (function() {
   }
 
   function synthesizeSampleHook() {
-    const samples = [
-      'THE 3-SECOND TRANSITION THAT SHOCKED THE WHOLE FESTIVAL',
-      'THE SECRET TECHNIQUE TOP PRODUCERS NEVER SHARE ONLINE',
-      'WHY EVERYONE IN THE CROWD FROZE AT THIS EXACT DROP',
-      'THE REAL TRUTH BEHIND THIS VIRAL RECORDING',
-      'HOW THIS DJ SAVED THE ENTIRE NIGHT WITH ONE RECORD'
-    ];
+    const p = presets.find(item => item.id === activePresetId) || presets[0] || {};
+    let samples = [];
+
+    if (p.id === 'cinema') {
+      samples = [
+        'DUNE PART TWO: HOW DENIS VILLENEUVE DIRECTED THIS SCENE',
+        'THE IMPROVISED LINE THAT MADE THIS THE BEST TAKE IN FILM HISTORY',
+        'THE CHILLING DETAIL EVERYONE MISSED IN THIS SCENE',
+        'WHY THIS 4-MINUTE SCENE TOOK 6 MONTHS TO REHEARSE',
+        'THE PSYCHOLOGICAL SECRET BEHIND THIS VILLAIN\'S PERFORMANCE'
+      ];
+    } else if (p.id === 'neon') {
+      samples = [
+        'THE MOMENT CHARLOTTE DE WITTE DROPPED THIS UNRELEASED ID',
+        'THE 3-SECOND TRANSITION THAT SHOCKED THE WHOLE FESTIVAL',
+        'WHY EVERYONE IN THE CROWD FROZE AT THIS EXACT DROP',
+        'THE SECRET SYNTH PLUCK TOP PRODUCERS WON\'T REVEAL',
+        'HOW THIS DJ SAVED THE ENTIRE NIGHT WITH ONE RECORD'
+      ];
+    } else if (p.id === 'video_essay') {
+      samples = [
+        'WHY THE WEALTHIEST FAMILIES SECRETLY BOUGHT THIS LAND',
+        'THE UNTOLD HISTORICAL DISCOVERY THAT BAFFLED ARCHAEOLOGISTS',
+        'THE FORGOTTEN EXPERIMENT THAT SCIENTISTS STILL CAN\'T EXPLAIN',
+        'WHAT REALLY HAPPENED INSIDE THIS CLASSIFIED VAULT',
+        'THE MATHEMATICAL PARADOX THAT BROKE PHILOSOPHERS'
+      ];
+    } else if (p.id === 'gta6') {
+      samples = [
+        'NEW GTA 6 MAP DETAIL LEAKED FROM ROCKSTAR SERVERS',
+        'THE DETAIL ROCKSTAR HID IN PLAIN SIGHT IN THE TRAILER',
+        'WHY LEONIDA\'S MAP IS 3X BIGGER THAN ANYONE EXPECTED',
+        'THE SECRET SUB-PLOT CONNECTING TO VICE CITY CLASSIC',
+        'CONFIRMED: THIS REAL PHYSICS ENGINE IS COMING TO GTA 6'
+      ];
+    } else {
+      samples = [
+        'THE UNEXPECTED MOMENT THAT CHANGED EVERYTHING',
+        'WHY NOBODY TALKS ABOUT WHAT HAPPENED NEXT',
+        'THE UNSEEN DETAIL THAT WENT COMPLETELY VIRAL'
+      ];
+    }
+
     const pick = samples[Math.floor(Math.random() * samples.length)];
     const input = document.getElementById('live-hook-input');
     if (input) input.value = pick;
     onLiveHookChange(pick);
-    window.app?.toast('AI Hook headline synthesized!', 'success');
+    window.app?.toast?.(`Generated hook for ${p.name}!`, 'success');
   }
 
   function renderRecentEdits(edits) {
