@@ -42,6 +42,7 @@ const chatId = getArg('--chat-id') || process.env.TELEGRAM_CHAT_ID || '544372353
 const pageId = parseInt(getArg('--page-id') || process.env.TARGET_PAGE_ID || '1', 10);
 const messageId = getArg('--message-id') || process.env.TELEGRAM_MESSAGE_ID || '';
 const isDryRun = args.includes('--dry-run');
+const isForce = args.includes('--force') || process.env.FORCE_REPUBLISH === 'true';
 
 function findOpenPort(startPort) {
   return new Promise((resolve) => {
@@ -137,14 +138,42 @@ async function main() {
 
   // 4. Ingest Link into Queue
   const { submitLink } = require('../src/agents/reposter/reposterAgent');
-  console.log(`\n[Reposter Runner] 📥 Submitting link: ${targetUrl}...`);
+  console.log(`\n[Reposter Runner] 📥 Submitting link: ${targetUrl}... (Force: ${isForce})`);
   const enqueueResult = await submitLink({
     url: targetUrl,
     pageId: pageId,
     chatId: chatId,
     messageId: messageId,
-    origin: 'telegram_cloud'
+    origin: 'telegram_cloud',
+    force: isForce
   });
+
+  const selectedPage = pages.find(p => p.id === pageId) || pages[0];
+  const targetHandle = selectedPage?.handle || `@page_${pageId}`;
+  const notifier = require('../src/core/notifier');
+
+  if (enqueueResult.duplicate && enqueueResult.alreadyPublished && !isForce) {
+    console.log(`[Reposter Runner] ⚠️ Reel #${enqueueResult.shortcode} already published on ${targetHandle}. Prompting operator for republish confirmation.`);
+    const pubDate = enqueueResult.job?.published_at ? new Date(enqueueResult.job.published_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'earlier';
+    const perma = enqueueResult.job?.permalink ? `\n🔗 <b>Live Post:</b> <a href="${enqueueResult.job.permalink}">${enqueueResult.job.permalink}</a>` : '';
+    const promptText = `⚠️ <b>Reel Already Published on ${targetHandle}!</b>\n\n` +
+      `This reel (<code>#${enqueueResult.shortcode}</code>) was already posted to <b>${selectedPage.name}</b> on <code>${pubDate}</code>.${perma}\n\n` +
+      `👉 <b>Do you want to publish it one more time on ${targetHandle}?</b>`;
+    const replyMarkup = {
+      inline_keyboard: [
+        [{ text: `🔁 Yes, Publish Again to ${targetHandle}`, callback_data: `republish:${pageId}:${enqueueResult.shortcode}` }],
+        [{ text: '✖ Cancel', callback_data: `cancel:${enqueueResult.shortcode}` }]
+      ]
+    };
+    if (messageId) {
+      await notifier.editTelegramMessage(chatId, messageId, promptText, { reply_markup: replyMarkup }).catch(() => {});
+    } else {
+      await notifier.sendTelegramMessage(chatId, promptText, { reply_markup: replyMarkup }).catch(() => {});
+    }
+    server.close();
+    if (tunnelUrl) closeTunnel();
+    process.exit(0);
+  }
 
   const job = enqueueResult.job || enqueueResult;
   const jobId = job?.id || enqueueResult.jobId;
@@ -153,8 +182,6 @@ async function main() {
   if (!jobId) {
     throw new Error(`Failed to obtain a valid jobId from submitLink (result: ${JSON.stringify(enqueueResult)})`);
   }
-
-  const notifier = require('../src/core/notifier');
 
   if (messageId) {
     db.prepare('UPDATE publish_jobs SET telegram_message_id = ? WHERE id = ?').run(messageId, jobId);

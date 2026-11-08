@@ -29,7 +29,8 @@ async function enqueueJob({
   telegramMessageId = '',
   originJobId = null,
   hookHeadline = '',
-  status = 'queued'
+  status = 'queued',
+  force = false
 }) {
   if (!pageId || !shortcode || !sourceUrl) {
     throw new Error('pageId, shortcode, and sourceUrl are required to enqueue a job');
@@ -39,6 +40,29 @@ async function enqueueJob({
   const existing = getPublishJob(pageId, shortcode);
   if (existing) {
     if (existing.status === 'published') {
+      if (force) {
+        // Operator confirmed re-publishing one more time!
+        const updated = updatePublishJob(existing.id, {
+          status: 'queued',
+          current_step: 'init',
+          error: '',
+          attempts: 0,
+          caption: caption || existing.caption,
+          origin_job_id: originJobId || existing.origin_job_id,
+          hook_headline: hookHeadline || existing.hook_headline,
+          telegram_chat_id: telegramChatId || existing.telegram_chat_id,
+          telegram_message_id: telegramMessageId || existing.telegram_message_id,
+          created_at: new Date().toISOString()
+        });
+        addJobEvent({
+          jobId: existing.id,
+          stage: 'ingest',
+          status: 'republish_forced',
+          message: 'Operator confirmed re-publishing already published reel'
+        });
+        notifier.emitDashboardEvent('job_updated', updated);
+        return { job: updated, duplicate: false, republish: true };
+      }
       return {
         job: existing,
         duplicate: true,
@@ -47,6 +71,17 @@ async function enqueueJob({
       };
     }
     if (['queued', 'downloading', 'ready', 'publishing'].includes(existing.status)) {
+      if (force) {
+        const updated = updatePublishJob(existing.id, {
+          status: 'queued',
+          current_step: 'init',
+          error: '',
+          attempts: 0,
+          created_at: new Date().toISOString()
+        });
+        notifier.emitDashboardEvent('job_updated', updated);
+        return { job: updated, duplicate: false, forced: true };
+      }
       return {
         job: existing,
         duplicate: true,

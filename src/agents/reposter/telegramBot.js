@@ -8,6 +8,7 @@ const {
   getLastPublishedTimestamp,
   listPublishJobs,
   updatePublishJob,
+  getPublishJob,
   getPageGroups,
   getGroupMembers,
   getPageGroupById
@@ -375,9 +376,14 @@ async function handleMessage(msg) {
     const isClub = page.slug === 'clubbing' || (page.handle && page.handle.includes('clubbing'));
     const isMovie = page.slug === 'movies' || (page.handle && page.handle.includes('movie'));
     const icon = isCultInfo ? '⚡' : (isAi ? '🤖' : (isClub ? '🪩' : (isMovie ? '🍿' : '🚀')));
+
+    const existing = getPublishJob(page.id, shortcode);
+    const isAlreadyPub = existing && existing.status === 'published';
+    const statusTag = isAlreadyPub ? ' (Already Posted ✅)' : '';
+
     buttons.push([{
-      text: `${icon} Post to ${page.name} (${page.handle})`,
-      callback_data: `post:${page.id}:${shortcode}`
+      text: `${icon} Post to ${page.name} (${page.handle})${statusTag}`,
+      callback_data: isAlreadyPub ? `ask_republish:${page.id}:${shortcode}` : `post:${page.id}:${shortcode}`
     }]);
   }
 
@@ -485,14 +491,78 @@ async function handleCallbackQuery(cb) {
     return;
   }
 
-  if (action === 'post' || action === 'review') {
+  if (action === 'ask_republish') {
     const pageId = parseInt(parts[1], 10);
     const shortcode = parts[2];
+    const page = getPageById(pageId);
+    if (!page) {
+      await notifier.editTelegramMessage(chatId, messageId, '⚠️ Selected page no longer exists.');
+      return;
+    }
+    const existing = getPublishJob(page.id, shortcode);
+    const pubDate = existing?.published_at ? new Date(existing.published_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'earlier';
+    const perma = existing?.permalink ? `\n🔗 <b>Live Post:</b> <a href="${existing.permalink}">${existing.permalink}</a>` : '';
+
+    await notifier.editTelegramMessage(
+      chatId,
+      messageId,
+      `⚠️ <b>Reel Already Published on ${escapeHtml(page.handle)}!</b>\n\n` +
+      `This reel (<code>#${shortcode}</code>) was already posted to <b>${escapeHtml(page.name)}</b> on <code>${pubDate}</code>.${perma}\n\n` +
+      `👉 <b>Do you want to publish it one more time on ${escapeHtml(page.handle)}?</b>`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: `🔁 Yes, Publish Again to ${page.handle}`, callback_data: `republish:${page.id}:${shortcode}` }
+            ],
+            [
+              { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
+            ]
+          ]
+        }
+      }
+    );
+    return;
+  }
+
+  if (action === 'post' || action === 'review' || action === 'republish') {
+    const pageId = parseInt(parts[1], 10);
+    const shortcode = parts[2];
+    const isRepublish = action === 'republish';
     const page = getPageById(pageId);
 
     if (!page) {
       await notifier.editTelegramMessage(chatId, messageId, '⚠️ Selected page no longer exists.');
       return;
+    }
+
+    // Safety gate: if already published and operator didn't explicitly tap republish, ask first!
+    if (!isRepublish) {
+      const existing = getPublishJob(page.id, shortcode);
+      if (existing && existing.status === 'published') {
+        const pubDate = existing.published_at ? new Date(existing.published_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'earlier';
+        const perma = existing.permalink ? `\n🔗 <b>Live Post:</b> <a href="${existing.permalink}">${existing.permalink}</a>` : '';
+        await notifier.editTelegramMessage(
+          chatId,
+          messageId,
+          `⚠️ <b>Reel Already Published on ${escapeHtml(page.handle)}!</b>\n\n` +
+          `This reel (<code>#${shortcode}</code>) was already posted to <b>${escapeHtml(page.name)}</b> on <code>${pubDate}</code>.${perma}\n\n` +
+          `👉 <b>Do you want to publish it one more time on ${escapeHtml(page.handle)}?</b>`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: `🔁 Yes, Publish Again to ${page.handle}`, callback_data: `republish:${page.id}:${shortcode}` }
+                ],
+                [
+                  { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
+                ]
+              ]
+            }
+          }
+        );
+        return;
+      }
     }
 
     const reviewCaption = action === 'review';
@@ -503,13 +573,13 @@ async function handleCallbackQuery(cb) {
       chatId,
       messageId,
       [
-        `🎬 <b>REPOST PIPELINE: ${page.handle}</b>`,
+        `🎬 <b>REPOST PIPELINE: ${page.handle}${isRepublish ? ' (RE-PUBLISHING)' : ''}</b>`,
         `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
         `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
         `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,
         ``,
-        `▶ <b>1. Ingestion:</b> ✅ Received from Telegram`,
+        `▶ <b>1. Ingestion:</b> ✅ ${isRepublish ? 'Re-publish approved by operator' : 'Received from Telegram'}`,
         `▶ <b>2. Download:</b> ⏳ Initializing 1080p fetch...`,
         `▶ <b>3. AI Copy:</b> ⚪ Waiting`,
         `▶ <b>4. Meta Live:</b> ⚪ Waiting`
@@ -523,18 +593,29 @@ async function handleCallbackQuery(cb) {
         origin: 'telegram',
         chatId: String(chatId),
         messageId: String(messageId),
-        reviewCaption
+        reviewCaption,
+        force: isRepublish
       });
 
-      if (res.duplicate && res.alreadyPublished) {
+      if (res.duplicate && res.alreadyPublished && !isRepublish) {
+        const pubDate = res.job?.published_at ? new Date(res.job.published_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'earlier';
+        const perma = res.job?.permalink ? `\n🔗 <b>Live Post:</b> <a href="${res.job.permalink}">${res.job.permalink}</a>` : '';
         await notifier.editTelegramMessage(
           chatId,
           messageId,
-          `⚠️ <b>Already Published!</b>\n\n` +
-          `This reel was already posted to ${page.handle} on ${res.job?.published_at}.\n` +
-          `👉 <a href="${res.job?.permalink}">${res.job?.permalink}</a>`
+          `⚠️ <b>Reel Already Published on ${escapeHtml(page.handle)}!</b>\n\n` +
+          `This reel was already posted to ${page.handle} on ${pubDate}.${perma}\n\n` +
+          `👉 <b>Do you want to publish it one more time on ${escapeHtml(page.handle)}?</b>`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: `🔁 Yes, Publish Again to ${page.handle}`, callback_data: `republish:${page.id}:${shortcode}` }],
+                [{ text: '✖ Cancel', callback_data: `cancel:${shortcode}` }]
+              ]
+            }
+          }
         );
-      } else if (res.duplicate && res.inProgress) {
+      } else if (res.duplicate && res.inProgress && !isRepublish) {
         await notifier.editTelegramMessage(
           chatId,
           messageId,

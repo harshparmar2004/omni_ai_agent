@@ -13,7 +13,8 @@ async function submitLink({
   origin = 'dashboard',
   chatId = '',
   messageId = '',
-  reviewCaption = false
+  reviewCaption = false,
+  force = false
 }) {
   if (!url || typeof url !== 'string') {
     throw new Error('Valid Instagram URL is required');
@@ -47,7 +48,8 @@ async function submitLink({
     caption: '',
     status: reviewCaption ? 'pending_review' : 'queued',
     telegramChatId: chatId ? String(chatId) : '',
-    telegramMessageId: messageId ? String(messageId) : ''
+    telegramMessageId: messageId ? String(messageId) : '',
+    force
   });
 
   return {

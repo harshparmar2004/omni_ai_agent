@@ -164,7 +164,32 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    if (action === 'post' || action === 'retry') {
+    if (action === 'ask_republish') {
+      const pageId = parts[1] || '1';
+      const shortcode = parts[2];
+      const pages = await getPagesList();
+      const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };
+
+      await editTelegram(
+        chatId,
+        messageId,
+        `⚠️ <b>Reel Already Published on ${targetPage.handle}!</b>\n\n` +
+        `This reel (<code>#${shortcode}</code>) was previously posted to <b>${targetPage.name}</b>.\n\n` +
+        `👉 <b>Do you want to publish it one more time on ${targetPage.handle}?</b>`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: `🔁 Yes, Publish Again to ${targetPage.handle}`, callback_data: `republish:${pageId}:${shortcode}` }],
+              [{ text: '✖ Cancel', callback_data: `cancel:${shortcode}` }]
+            ]
+          }
+        }
+      );
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'post' || action === 'retry' || action === 'republish') {
+      const isForce = action === 'republish';
       const pageId = parts[1] || '1';
       const shortcode = parts[2];
       const pages = await getPagesList();
@@ -177,9 +202,9 @@ module.exports = async function handler(req, res) {
       await editTelegram(
         chatId,
         messageId,
-        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>\n` +
+        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>${isForce ? ' (RE-PUBLISHING)' : ''}\n` +
         `📱 <b>Destination:</b> <code>${targetPage.handle}</code> (${targetPage.name})\n\n` +
-        `⏳ <b>1. Ingest:</b> ${isCloudRun ? 'Cloud Run worker connecting...' : 'Cloud runner initializing...'}\n` +
+        `⏳ <b>1. Ingest:</b> ${isForce ? 'Re-publish approved by operator...' : (isCloudRun ? 'Cloud Run worker connecting...' : 'Cloud runner initializing...')}\n` +
         `⚪ <b>2. Download:</b> Waiting\n` +
         `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
         `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
@@ -189,7 +214,7 @@ module.exports = async function handler(req, res) {
       // 1. Direct Cloud Run Dispatch (if configured)
       if (cloudRunUrl) {
         try {
-          console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}...`);
+          console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}... (Force: ${isForce})`);
           await axios.post(
             `${cloudRunUrl}/api/reposter/jobs`,
             {
@@ -200,7 +225,8 @@ module.exports = async function handler(req, res) {
               page_id: parseInt(pageId, 10),
               messageId: String(messageId),
               message_id: String(messageId),
-              origin: 'telegram_cloud'
+              origin: 'telegram_cloud',
+              force: isForce
             },
             { timeout: 10000 }
           );
@@ -232,7 +258,8 @@ module.exports = async function handler(req, res) {
               url: `https://www.instagram.com/reel/${shortcode}/`,
               chat_id: String(chatId),
               page_id: String(pageId),
-              message_id: String(messageId)
+              message_id: String(messageId),
+              force: isForce ? 'true' : 'false'
             }
           },
           {
@@ -245,7 +272,7 @@ module.exports = async function handler(req, res) {
           }
         );
 
-        console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} on Page #${pageId} (Message ID: ${messageId})`);
+        console.log(`[Webhook] GitHub Actions Dispatched for #${shortcode} on Page #${pageId} (Force: ${isForce}, Message ID: ${messageId})`);
       } catch (err) {
         console.error('[Webhook Dispatch Error]:', err.response?.data || err.message);
         const detail = err.response?.data?.message || err.message;
