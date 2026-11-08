@@ -258,20 +258,22 @@ function synthesizeOfflineHook(rawText, pageName = '') {
  * @returns {Promise<{ caption: string, provider: string, model: string }>}
  */
 async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '' }) {
-  const isClubbing = (page.slug && page.slug.includes('club')) ||
-                     (page.handle && page.handle.includes('club')) ||
-                     (page.name && /club|rave|party|dance|edm|techno|concert/i.test(page.name)) ||
-                     page.id === 3 || String(page.id) === '3';
+  const isClubbing = (page.slug && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.slug)) ||
+                     (page.handle && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.handle)) ||
+                     (page.name && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.name)) ||
+                     page.id === 3 || String(page.id) === '3' ||
+                     page.template_preset === 'cyber_hud' || page.brand_theme === 'cyberpunk_green';
 
-  const isMovie = (page.slug && page.slug.includes('movie')) ||
-                  (page.handle && page.handle.includes('movie')) ||
-                  (page.name && /movie|series|film|cinema/i.test(page.name)) ||
-                  page.id === 2 || String(page.id) === '2';
+  const isMovie = (page.slug && /movie|series|film|cinema|show/i.test(page.slug)) ||
+                  (page.handle && /movie|series|film|cinema|show/i.test(page.handle)) ||
+                  (page.name && /movie|series|film|cinema|show/i.test(page.name)) ||
+                  page.id === 2 || String(page.id) === '2' ||
+                  page.template_preset === 'cinematic' || page.brand_theme === 'cinematic_gold';
 
-  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || page.slug.includes('cult_info') || page.slug.includes('evolving') || /(?:^|_)(?:ai|cult)(?:_|$)/i.test(page.slug))) ||
-                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving') || /(?:^|@)(?:ai|cult)(?:_|$)/i.test(page.handle))) ||
+  const isVideoEssay = (page.slug && (page.slug === 'cult_information' || page.slug === 'ai_curation' || /cult.*info|evolving/i.test(page.slug))) ||
+                       (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || /cult.*info|evolving/i.test(page.handle))) ||
                        (page.name && ((/\bcult\b/i.test(page.name) && /\binfo/i.test(page.name)) || /video[- ]essay/i.test(page.name) || /editorial/i.test(page.name))) ||
-                       page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' ||
+                       page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' ||
                        page.id === 4 || String(page.id) === '4';
 
   const defaultHandle = isClubbing ? 'clubbingcult' : (isMovie ? 'movie_series_365' : (isVideoEssay ? 'cult_information' : 'gta6_updates_007'));

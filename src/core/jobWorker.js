@@ -6,6 +6,7 @@ const { downloadInstagramMedia } = require('./downloader');
 const { buildCaption, buildAiCaption, buildAiCaptionDetails } = require('./captionBuilder');
 const { publishReel, publishCarousel, publishImage, publishStory } = require('./publisher');
 const notifier = require('./notifier');
+const { resolvePageTheme } = require('../utils/ffmpegHelper');
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -289,18 +290,8 @@ class JobWorkerPool {
           savedTemplate = getPageTemplate(page.id, page.template_slug || 'default') || getPageTemplate(page.id, 'default');
         } catch (_) {}
 
-        pageTheme = savedTemplate?.template_type || page.template_slug;
-        if (page.template_preset === 'cinematic' || page.brand_theme === 'cinematic_gold' || pageTheme === 'cinema' || pageTheme === 'movies') pageTheme = 'movies';
-        else if (page.template_preset === 'cyber_hud' || page.brand_theme === 'cyberpunk_green' || pageTheme === 'neon' || pageTheme === 'clubbing') pageTheme = 'clubbing';
-        else if (page.template_preset === 'video_essay' || page.brand_theme === 'electric_lime' || pageTheme === 'editorial' || pageTheme === 'video_essay' || pageTheme === 'cult_information') pageTheme = 'video_essay';
-        else if (pageTheme === 'gta6' || pageTheme === 'vice_city') pageTheme = 'gta6';
-        else if (!pageTheme || pageTheme === 'default') {
-          // Heuristic fallback for legacy pages
-          const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('clubbing'));
-          const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
-          const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving')));
-          pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
-        }
+        const explicitTheme = savedTemplate?.template_type || page.template_slug || page.template_preset || page.brand_theme;
+        pageTheme = resolvePageTheme(page, explicitTheme);
 
         const themeLabels = {
           clubbing: 'Clubbing Cult Neon Green',
