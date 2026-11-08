@@ -90,7 +90,7 @@ class JobWorkerPool {
 
   async updateTelegramProgress(job, lines, replyMarkup = null) {
     // Agent 2 (Watchtower) uses the dedicated 2-message lifecycle (Selection -> Published) in cron_runner.js
-    if (job.agent === 'watchtower') {
+    if (!job || job.agent === 'watchtower') {
       return null;
     }
     const { getSetting } = require('../database');
@@ -485,21 +485,21 @@ class JobWorkerPool {
       } catch (distE) {}
 
     } catch (err) {
-      console.error(`[Job Worker Error] Job #${job.id} failed: ${err.message}`);
-      const attempts = (job.attempts || 0) + 1;
+      console.error(`[Job Worker Error] Job #${job?.id || jobId} failed: ${err.message}`);
+      const attempts = ((job && job.attempts) || 0) + 1;
       const isTransient = /ECONNRESET|ETIMEDOUT|timeout|502|503|504|2207001|2207003/i.test(err.message);
 
       if (isTransient && attempts < 3) {
-        console.log(`[Job Worker] ⚠️ Transient error on #${job.id}. Re-queuing (attempt ${attempts}/3)...`);
+        console.log(`[Job Worker] ⚠️ Transient error on #${job?.id || jobId}. Re-queuing (attempt ${attempts}/3)...`);
         job = updateJobProgress(jobId, 'queued', 'retry_wait', {
           attempts,
           error: `Transient error (attempt ${attempts}): ${err.message}`
-        });
+        }) || job;
       } else {
         job = updateJobProgress(jobId, 'failed', 'failed', {
           attempts,
           error: err.message
-        });
+        }) || job;
 
         // Record notification flag so GitHub Actions failure step doesn't overwrite it
         try {
@@ -529,7 +529,8 @@ class JobWorkerPool {
         }
 
         // Surface exact failure in Telegram with Retry button
-        await this.updateTelegramProgress(job, [
+        const notifyJob = job || { id: jobId, page_id: page.id, agent: 'reposter' };
+        await this.updateTelegramProgress(notifyJob, [
           `❌ <b>Publishing Could Not Be Completed</b>`,
           `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
           `🔗 <b>Reel:</b> <code>#${shortcode}</code>`,
