@@ -587,9 +587,12 @@ window.watchtowerView = (function() {
                 ${pages.map(p => `<option value="${p.id}" ${selectedPageId === p.id ? 'selected' : ''}>Target: ${escapeHtml(p.handle || ('@' + p.slug))} (${escapeHtml(p.name)})</option>`).join('')}
               </select>
             </div>
-            <div style="min-width: 130px;">
-              <button type="submit" id="wt-btn-add-source" class="btn btn-primary btn-sm" style="height: 36px; padding: 0 1.15rem; font-size: 0.82rem; font-weight: 600; white-space: nowrap; width: 100%;">
+            <div style="min-width: 130px; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="submit" id="wt-btn-add-source" class="btn btn-primary btn-sm" style="height: 36px; padding: 0 1.15rem; font-size: 0.82rem; font-weight: 600; white-space: nowrap;">
                 + Track Creator
+              </button>
+              <button type="button" onclick="watchtowerView.openBulkSourcesModal()" class="btn btn-secondary btn-sm" style="height: 36px; padding: 0 1rem; font-size: 0.82rem; font-weight: 600; white-space: nowrap;">
+                ⚡ Bulk Add (15-16 Clubs)
               </button>
             </div>
           </form>
@@ -849,10 +852,17 @@ window.watchtowerView = (function() {
 
                       <!-- 2. Reel ID & Creator -->
                       <td>
-                        <div style="margin-bottom: 3px; display: flex; align-items: center; gap: 6px;">
-                          <a href="${reelUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="Open original reel on Instagram">
+                        <div style="margin-bottom: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                          <a href="${reelUrl}" target="_blank" class="text-link" style="font-weight: 700; font-family: var(--font-mono); font-size: 0.84rem;" title="Open original media on Instagram">
                             #${p.shortcode} ↗
                           </a>
+                          ${p.media_type === 'image' ? `
+                            <span class="badge" style="font-size: 0.68rem; background: rgba(59, 130, 246, 0.12); color: #3b82f6; border-radius: 4px; padding: 1px 5px; font-weight: 600;">🖼️ Flyer</span>
+                          ` : (p.media_type === 'carousel' ? `
+                            <span class="badge" style="font-size: 0.68rem; background: rgba(168, 85, 247, 0.12); color: #a855f7; border-radius: 4px; padding: 1px 5px; font-weight: 600;">📑 Lineup</span>
+                          ` : `
+                            <span class="badge" style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.12); color: #10b981; border-radius: 4px; padding: 1px 5px; font-weight: 600;">🎬 Reel</span>
+                          `)}
                         </div>
                         <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">
                           <a href="https://instagram.com/${p.source_username || ''}" target="_blank" style="text-decoration: none; color: var(--text-primary);">
@@ -990,9 +1000,18 @@ window.watchtowerView = (function() {
                     <span style="font-size: 0.75rem; color: var(--text-muted);">
                       Virality Score: <b style="color: var(--success); font-weight: 700;">${Math.round(p.score)}</b>
                     </span>
-                    <a href="${p.url}" target="_blank" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); text-decoration: none;">
-                      #${p.shortcode} ↗
-                    </a>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      <a href="${p.url}" target="_blank" style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono); text-decoration: none;">
+                        #${p.shortcode} ↗
+                      </a>
+                      ${p.media_type === 'image' ? `
+                        <span class="badge" style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.12); color: #3b82f6; border-radius: 4px; padding: 1px 4px; font-weight: 600;">Flyer</span>
+                      ` : (p.media_type === 'carousel' ? `
+                        <span class="badge" style="font-size: 0.65rem; background: rgba(168, 85, 247, 0.12); color: #a855f7; border-radius: 4px; padding: 1px 4px; font-weight: 600;">Lineup</span>
+                      ` : `
+                        <span class="badge" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.12); color: #10b981; border-radius: 4px; padding: 1px 4px; font-weight: 600;">Reel</span>
+                      `)}
+                    </div>
                   </div>
 
                   <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">
@@ -1012,7 +1031,7 @@ window.watchtowerView = (function() {
 
                 <div class="flex items-center gap-2">
                   <button class="btn btn-primary btn-sm w-full" onclick="watchtowerView.postDiscovery(${p.id})">
-                    Dispatch Reel
+                    Dispatch Content
                   </button>
                   <button class="btn btn-secondary btn-sm" onclick="watchtowerView.skipDiscovery(${p.id})" title="Skip">
                     ✕
@@ -2238,6 +2257,23 @@ window.watchtowerView = (function() {
     togglePause,
     addSource,
     bulkAddSources,
+    openBulkSourcesModal: () => {
+      if (window.pagesView && typeof window.pagesView.openBulkSourcesModal === 'function') {
+        window.pagesView.openBulkSourcesModal(selectedPageId || 1);
+      } else {
+        const text = prompt('Enter Instagram handles of clubs (separated by commas or spaces):');
+        if (text) {
+          fetch('/api/sources/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, page_id: selectedPageId || 1 })
+          }).then(r => r.json()).then(d => {
+            window.app?.toast('Added club sources!', 'success');
+            watchtowerView.renderActiveStage();
+          }).catch(e => window.app?.toast(e.message, 'danger'));
+        }
+      }
+    },
     deleteSource,
     checkSource,
     postDiscovery,

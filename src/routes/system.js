@@ -97,4 +97,90 @@ router.post('/telegram/test', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/system/vault
+ * Export consolidated token vault
+ */
+router.get('/vault', (req, res) => {
+  try {
+    const { exportVaultObject, exportVaultBase64 } = require('../core/tokenVault');
+    const vault = exportVaultObject();
+    const base64 = exportVaultBase64();
+    res.json({ ...vault, base64 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/system/vault
+ * Import / restore token vault
+ */
+router.post('/vault', (req, res) => {
+  try {
+    const { importVault } = require('../core/tokenVault');
+    const { vault } = req.body;
+    if (!vault) return res.status(400).json({ error: 'Vault content required' });
+    const result = importVault(vault);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/system/vault/sync
+ * Secure synchronization endpoint for distributed workers / cron runners
+ */
+router.get('/vault/sync', (req, res) => {
+  try {
+    const masterKey = getSetting('omni_master_key') || process.env.OMNI_MASTER_KEY || 'omni_vault_master_secret';
+    const provided = req.headers['x-master-key'] || req.query.key;
+    if (provided !== masterKey) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or missing Master Key' });
+    }
+
+    const { exportVaultObject } = require('../core/tokenVault');
+    const vault = exportVaultObject();
+    res.json(vault);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/system/vault/sync
+ * Secure synchronization endpoint to push vault updates
+ */
+router.post('/vault/sync', (req, res) => {
+  try {
+    const masterKey = getSetting('omni_master_key') || process.env.OMNI_MASTER_KEY || 'omni_vault_master_secret';
+    const provided = req.headers['x-master-key'] || req.query.key || (req.body && req.body.master_key);
+    if (provided !== masterKey) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or missing Master Key' });
+    }
+
+    const { importVault } = require('../core/tokenVault');
+    const payload = req.body.vault || req.body;
+    const result = importVault(payload);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/system/validate-tokens
+ * Bulk test all network tokens
+ */
+router.post('/validate-tokens', async (req, res) => {
+  try {
+    const { validateAllTokens } = require('../core/tokenVault');
+    const audit = await validateAllTokens();
+    res.json(audit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

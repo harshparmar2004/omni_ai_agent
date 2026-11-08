@@ -357,7 +357,7 @@ async function publishImage({ page, imagePath, caption, onProgress = null }) {
  * Meta Graph API v21.0 - media_type: 'STORIES'
  * Note: Stories do NOT accept captions.
  */
-async function publishStory({ page, videoPath = null, imagePath = null, onProgress = null }) {
+async function publishStory({ page, videoPath = null, imagePath = null, hookHeadline = '', onProgress = null }) {
   const token = sanitizeToken(page.access_token);
   const igUserId = page.ig_user_id;
   const baseUrl = getGraphBase(token);
@@ -375,15 +375,16 @@ async function publishStory({ page, videoPath = null, imagePath = null, onProgre
 
   const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
   const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
-  const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : 'gta6');
+  const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult') || page.handle.includes('evolving')));
+  const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
 
   if (isVideo) {
     const { prepareVideoForStory } = require('../utils/ffmpegHelper');
-    const safeVideoPath = await prepareVideoForStory(videoPath, { handle: page.handle, page, theme: pageTheme });
+    const safeVideoPath = await prepareVideoForStory(videoPath, { handle: page.handle, page, theme: pageTheme, hookHeadline });
     publicMediaUrl = await getPublicUrlForMedia(safeVideoPath);
   } else {
     const { prepareImageForStory } = require('../utils/ffmpegHelper');
-    const safeImagePath = await prepareImageForStory(imagePath, { handle: page.handle, page, theme: pageTheme });
+    const safeImagePath = await prepareImageForStory(imagePath, { handle: page.handle, page, theme: pageTheme, hookHeadline });
     publicMediaUrl = await getPublicUrlForMedia(safeImagePath);
   }
 

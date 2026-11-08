@@ -201,12 +201,11 @@ async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', pag
     let fallbackHook = '';
     const isVideoEssay = page && (page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.theme === 'evolving_ai' || (page.name && page.name.toLowerCase().includes('cult')));
     if (isVideoEssay && rawCaption) {
-      const clean = rawCaption.replace(/#[\w_]+/g, '').replace(/^["'“”]/, '').replace(/["'“”]$/, '').trim();
-      const sentenceMatch = clean.match(/^([^.!?\n]+(?:\.\d+[^.!?\n]*)*)(?:[.!?\n]|$)/);
-      let candidate = sentenceMatch ? sentenceMatch[1].trim() : clean;
-      if (candidate.length > 105) candidate = candidate.slice(0, 100).replace(/\s+\S*$/, '');
-      if (candidate && candidate.length >= 15) {
-        fallbackHook = candidate.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+      try {
+        const { synthesizeOfflineHook } = require('./llmService');
+        fallbackHook = synthesizeOfflineHook(rawCaption, page.name || '');
+      } catch (e) {
+        fallbackHook = 'The shocking untold truth behind this historic mystery';
       }
     }
     return {

@@ -196,8 +196,8 @@ async def scrape_profile(username, url):
         await context.add_init_script(STEALTH_JS)
         page = await context.new_page()
         try:
-            # Primary target: /{username}/reels/ to guarantee 100% video reels (and ignore photo carousels)
-            target_url = f"https://www.instagram.com/{username}/reels/"
+            # Primary target: /{username}/ to capture both Reels and Feed Posts/Carousels/Flyers
+            target_url = f"https://www.instagram.com/{username}/"
             sys.stderr.write(f"[Scraper] Navigating to {target_url}...\n")
             await page.goto(target_url, timeout=25000, wait_until="domcontentloaded")
             await page.wait_for_timeout(random.randint(2000, 3000))
@@ -251,55 +251,82 @@ async def scrape_profile(username, url):
             except Exception:
                 pass
 
-            # 1. Extract shortcodes strictly from /reel/ elements in visual reverse-chronological order
-            dom_shortcodes = await page.evaluate(r"""() => {
-                const links = Array.from(document.querySelectorAll('a[href*="/reel/"]'));
+            # 3. Extract shortcodes from both /reel/ and /p/ elements with media_type detection
+            dom_items = await page.evaluate(r"""() => {
+                const links = Array.from(document.querySelectorAll('a[href*="/reel/"], a[href*="/p/"]'));
                 const results = [];
                 for (const a of links) {
                     const href = a.getAttribute('href') || '';
-                    const m = href.match(/\/(?:[A-Za-z0-9_.-]+\/)?reel\/([A-Za-z0-9_-]{9,13})/);
-                    if (m && !results.includes(m[1])) {
-                        results.push(m[1]);
+                    const m = href.match(/\/(?:[A-Za-z0-9_.-]+\/)?(reel|p)\/([A-Za-z0-9_-]{9,13})/);
+                    if (m) {
+                        const kind = m[1];
+                        const sc = m[2];
+                        const svgLabel = (a.querySelector('svg')?.getAttribute('aria-label') || '').toLowerCase();
+                        let mediaType = (kind === 'reel') ? 'reel' : 'image';
+                        if (svgLabel.includes('clip') || svgLabel.includes('reel') || svgLabel.includes('video')) {
+                            mediaType = 'reel';
+                        } else if (svgLabel.includes('carousel') || svgLabel.includes('slides') || svgLabel.includes('multiple') || svgLabel.includes('post carousel')) {
+                            mediaType = 'carousel';
+                        }
+                        if (!results.some(r => r.shortcode === sc)) {
+                            results.push({ shortcode: sc, kind: kind, mediaType: mediaType });
+                        }
                     }
                 }
                 return results;
             }""")
 
-            # 2. Extract from raw HTML regex fallback (strictly /reel/)
+            # 4. Extract from raw HTML regex fallback (both /reel/ and /p/)
             raw_html = await page.content()
-            urls_reels = re.findall(r'/(?:[A-Za-z0-9_.-]+/)?reel/([A-Za-z0-9_-]{9,13})', raw_html)
+            html_matches = re.findall(r'/(?:[A-Za-z0-9_.-]+/)?(reel|p)/([A-Za-z0-9_-]{9,13})', raw_html)
 
             excluded = {'explore', 'reels', 'stories', 'direct', 'accounts', 'developer', 'about', 'legal', 'privacy', 'login'}
-            clean_shortcodes = []
-            
-            # Prioritize DOM elements as they are strictly in visual reverse-chronological order
-            for sc in dom_shortcodes:
-                if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
-                    clean_shortcodes.append(sc)
+            clean_candidates = []
+            seen_sc = set()
 
-            for c in urls_reels:
-                if c and c.lower() not in excluded and len(c) >= 9 and c not in clean_shortcodes:
-                    clean_shortcodes.append(c)
+            for item in dom_items:
+                sc = item.get('shortcode')
+                if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in seen_sc:
+                    seen_sc.add(sc)
+                    clean_candidates.append({
+                        "shortcode": sc,
+                        "kind": item.get('kind', 'reel'),
+                        "media_type": item.get('mediaType', 'reel' if item.get('kind') == 'reel' else 'image')
+                    })
 
-            # 3. Fallback: If 0 reels found on /reels/ tab, try main profile root
-            if len(clean_shortcodes) == 0:
-                profile_target = f"https://www.instagram.com/{username}/"
-                sys.stderr.write(f"[Scraper] 0 reels on /reels/ tab. Checking main profile: {profile_target}...\n")
+            for kind, sc in html_matches:
+                if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in seen_sc:
+                    seen_sc.add(sc)
+                    clean_candidates.append({
+                        "shortcode": sc,
+                        "kind": kind,
+                        "media_type": 'reel' if kind == 'reel' else 'image'
+                    })
+
+            # 5. Fallback: If 0 items found on main profile, try /reels/ tab
+            if len(clean_candidates) == 0:
+                reels_target = f"https://www.instagram.com/{username}/reels/"
+                sys.stderr.write(f"[Scraper] 0 items on main profile. Checking reels tab: {reels_target}...\n")
                 try:
-                    await page.goto(profile_target, timeout=20000, wait_until="domcontentloaded")
+                    await page.goto(reels_target, timeout=20000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2500)
-                    profile_dom = await page.evaluate(r"""() => {
+                    reels_dom = await page.evaluate(r"""() => {
                         const links = Array.from(document.querySelectorAll('a[href*="/reel/"]'));
                         return links.map(a => {
                             const m = (a.getAttribute('href') || '').match(/\/(?:[A-Za-z0-9_.-]+\/)?reel\/([A-Za-z0-9_-]{9,13})/);
                             return m ? m[1] : null;
                         }).filter(Boolean);
                     }""")
-                    for sc in profile_dom:
-                        if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in clean_shortcodes:
-                            clean_shortcodes.append(sc)
+                    for sc in reels_dom:
+                        if sc and sc.lower() not in excluded and len(sc) >= 9 and sc not in seen_sc:
+                            seen_sc.add(sc)
+                            clean_candidates.append({
+                                "shortcode": sc,
+                                "kind": "reel",
+                                "media_type": "reel"
+                            })
                 except Exception as p_err:
-                    sys.stderr.write(f"[Scraper] Profile fallback notice: {str(p_err)}\n")
+                    sys.stderr.write(f"[Scraper] Reels tab fallback notice: {str(p_err)}\n")
 
             meta_desc_match = re.search(r'<meta\s+(?:property|name)="(?:og:description|description)"\s+content="([^"]*)"', raw_html, re.I)
             meta_desc = meta_desc_match.group(1) if meta_desc_match else ""
@@ -309,38 +336,46 @@ async def scrape_profile(username, url):
             # Decode and sort all candidates strictly by 64-bit Snowflake Media ID (Newest timestamp first)
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             enriched_candidates = []
-            for sc in clean_shortcodes:
+            for item in clean_candidates:
+                sc = item["shortcode"]
                 mid, dt = shortcode_to_snowflake(sc)
                 if mid > 0 and dt:
                     age_hours = (now_utc - dt).total_seconds() / 3600.0
                     enriched_candidates.append({
                         "shortcode": sc,
+                        "kind": item["kind"],
+                        "media_type": item["media_type"],
                         "media_id": mid,
                         "posted_at": dt.isoformat(),
                         "age_hours": age_hours
                     })
 
-            # Sort descending by media_id (highest media_id is strictly the newest reel)
+            # Sort descending by media_id (highest media_id is strictly the newest post/reel)
             enriched_candidates.sort(key=lambda x: x["media_id"], reverse=True)
 
-            # Filter: Exclude posts older than 48 hours to eliminate pinned posts from months ago.
-            # If all are older than 48h, keep the newest available.
-            fresh_candidates = [c for c in enriched_candidates if c["age_hours"] <= 48.0]
+            # Filter: Exclude posts older than 72 hours to eliminate stale pinned posts.
+            # If all are older than 72h, keep the newest available.
+            fresh_candidates = [c for c in enriched_candidates if c["age_hours"] <= 72.0]
             if not fresh_candidates:
                 fresh_candidates = enriched_candidates
 
-            unique_posts = [f"https://www.instagram.com/reel/{c['shortcode']}/" for c in fresh_candidates[:8]]
+            unique_posts = [
+                f"https://www.instagram.com/{'reel' if c['media_type'] == 'reel' else 'p'}/{c['shortcode']}/"
+                for c in fresh_candidates[:12]
+            ]
             detailed_posts = [
                 {
                     "shortcode": c["shortcode"],
-                    "url": f"https://www.instagram.com/reel/{c['shortcode']}/",
+                    "url": f"https://www.instagram.com/{'reel' if c['media_type'] == 'reel' else 'p'}/{c['shortcode']}/",
                     "posted_at": c["posted_at"],
                     "age_hours": round(c["age_hours"], 1),
-                    "media_id": str(c["media_id"])
+                    "media_id": str(c["media_id"]),
+                    "media_type": c["media_type"],
+                    "kind": c["kind"]
                 }
-                for c in fresh_candidates[:8]
+                for c in fresh_candidates[:12]
             ]
-            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} reels (newest first, top: {fresh_candidates[0]['shortcode'] if fresh_candidates else 'None'}).\n")
+            sys.stderr.write(f"[Scraper] Finished @{username}. Current URL: {page.url}. Extracted {len(unique_posts)} posts/reels (newest first, top: {fresh_candidates[0]['shortcode'] if fresh_candidates else 'None'} [{fresh_candidates[0]['media_type'] if fresh_candidates else ''}]).\n")
 
             followers_match = re.search(r'([\d,KkMm.]+)\s+Followers', meta_desc)
             following_match = re.search(r'([\d,KkMm.]+)\s+Following', meta_desc)

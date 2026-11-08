@@ -14,9 +14,11 @@ window.app = (function() {
     'command-center': 'Command Center',
     'reposter': 'Agent 1: Reposter',
     'watchtower': 'Agent 2: Watchtower & Pipeline Engine',
+    'studio': 'Agent 3: Video Studio & Pipeline Tracker',
     'queue': 'Review & Staged Reels',
     'published': 'Published Feed',
     'pages': 'Channel Command Hub',
+    'distribution': 'Distribution Networks & Interconnected Rings',
     'settings': 'System & Security'
   };
 
@@ -70,6 +72,11 @@ window.app = (function() {
    * Navigate to a tab
    */
   function navigate(tabId, updateHash = true) {
+    let openSubtab = null;
+    if (tabId === 'pipeline') {
+      tabId = 'studio';
+      openSubtab = 'pipeline';
+    }
     if (!TAB_TITLES[tabId]) tabId = 'command-center';
     state.currentTab = tabId;
     document.body.setAttribute('data-page', tabId);
@@ -114,6 +121,9 @@ window.app = (function() {
       case 'watchtower':
         window.watchtowerView?.render();
         break;
+      case 'studio':
+        window.studioView?.render(openSubtab);
+        break;
       case 'queue':
         window.queueView?.render();
         break;
@@ -122,6 +132,9 @@ window.app = (function() {
         break;
       case 'pages':
         window.pagesView?.render();
+        break;
+      case 'distribution':
+        window.distributionView?.render();
         break;
       case 'settings':
         window.settingsView?.render();
@@ -169,12 +182,16 @@ window.app = (function() {
     // 2. Dispatch to Reposter tracker
     window.reposterView?.onEvent(event);
 
-    // 3. If matching active Repost Modal job, update modal step progress
+    // 3. Dispatch to Pipeline Tracker & Agent 3 Studio
+    window.pipelineView?.onEvent(event);
+    window.studioView?.onEvent(event);
+
+    // 4. If matching active Repost Modal job, update modal step progress
     if (state.activeModalJobId && event.jobId === state.activeModalJobId) {
       updateModalStepProgress(event);
     }
 
-    // 4. Update badge counts on significant state changes
+    // 5. Update badge counts on significant state changes
     if (['job_status', 'job_progress', 'published'].includes(event.type)) {
       updateBadgeCounts();
     }

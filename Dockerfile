@@ -17,8 +17,9 @@ RUN curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/downloa
     && chmod +x /usr/local/bin/cloudflared \
     && cloudflared --version
 
-# 3. Pre-install high-speed Python media stream downloaders
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp requests playwright
+# 3. Pre-install high-speed Python media stream downloaders & Playwright headless Chromium
+RUN pip3 install --no-cache-dir --break-system-packages yt-dlp requests playwright \
+    && python3 -m playwright install --with-deps chromium
 
 WORKDIR /app
 
@@ -29,12 +30,13 @@ RUN npm ci --prefer-offline --no-audit --no-fund
 # 5. Copy full codebase into container
 COPY . .
 
-# 6. Ensure runtime persistence directories exist
-RUN mkdir -p data public/generated/downloads public/generated/assets public/generated/carousels
+# 6. Ensure runtime persistence directories exist (supports persistent volume mount at /data)
+RUN mkdir -p /data data public/generated/downloads public/generated/assets public/generated/carousels
 
-# Default Google Cloud Run port
+# Default port and persistent volume directory
 ENV PORT=4000
 ENV NODE_ENV=production
+ENV DATA_DIR=/data
 EXPOSE 4000
 
 # Start OmniStudio 24/7 Autonomous Engine

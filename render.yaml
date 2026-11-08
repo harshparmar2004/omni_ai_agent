@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: omni-ai-studio
+    runtime: docker
+    plan: standard
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: DATA_DIR
+        value: /data
+      - key: OMNI_MASTER_KEY
+        generateValue: true
+      - key: WATCHTOWER_247_MODE
+        value: "true"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+    disk:
+      name: omni-data
+      mountPath: /data
+      sizeGB: 10

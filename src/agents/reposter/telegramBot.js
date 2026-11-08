@@ -7,10 +7,15 @@ const {
   getPublishedCountToday,
   getLastPublishedTimestamp,
   listPublishJobs,
-  updatePublishJob
+  updatePublishJob,
+  getPageGroups,
+  getGroupMembers,
+  getPageGroupById
 } = require('../../database');
 const { submitLink } = require('./reposterAgent');
 const { retryJob, updateJobProgress } = require('../../core/jobQueue');
+const { validateAllTokens } = require('../../core/tokenVault');
+const { planDistribution } = require('../../core/distributionPlanner');
 const notifier = require('../../core/notifier');
 
 /**
@@ -281,6 +286,55 @@ async function handleMessage(msg) {
     return;
   }
 
+  if (text.startsWith('/groups')) {
+    const groups = getPageGroups();
+    if (groups.length === 0) {
+      await notifier.sendTelegramMessage(chatId, 'ℹ️ No distribution groups configured yet. Create page groups in the dashboard to connect networks.');
+      return;
+    }
+
+    const lines = [
+      `🌐 <b>OmniStudio v8 Distribution Networks</b>`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``
+    ];
+
+    for (const g of groups) {
+      lines.push(`🔗 <b>${escapeHtml(g.name)}</b> (<code>${g.slug}</code>)`);
+      lines.push(`• <b>Pages Connected:</b> ${g.member_count} channels`);
+      lines.push(`• <b>Sources Tracked:</b> ${g.source_count} accounts`);
+      lines.push(`• <b>Cross-Post Mode:</b> <code>${g.cross_post_mode}</code> (delay: ${g.cross_post_delay_min}-${g.cross_post_delay_max}m)`);
+      lines.push(``);
+    }
+
+    await notifier.sendTelegramMessage(chatId, lines.join('\n'));
+    return;
+  }
+
+  if (text.startsWith('/tokens')) {
+    await notifier.sendTelegramMessage(chatId, '⏳ Checking Meta Graph API status across all connected pages...');
+    try {
+      const audit = await validateAllTokens();
+      const lines = [
+        `🔑 <b>OmniStudio Token Vault Health: ${audit.healthPct}%</b>`,
+        `━━━━━━━━━━━━━━━━━━━━`,
+        `✅ <b>Valid Accounts:</b> ${audit.valid}/${audit.total}`,
+        `❌ <b>Action Needed:</b> ${audit.invalid}`,
+        ``
+      ];
+
+      for (const p of audit.pages) {
+        const icon = p.valid ? '✅' : '❌';
+        lines.push(`${icon} <b>${escapeHtml(p.handle)}:</b> ${p.valid ? (p.category || 'Active') : (p.error || 'Expired')}`);
+      }
+
+      await notifier.sendTelegramMessage(chatId, lines.join('\n'));
+    } catch (e) {
+      await notifier.sendTelegramMessage(chatId, `⚠️ Token check failed: ${e.message}`);
+    }
+    return;
+  }
+
   // ── Instagram URL Share Handler ──────────────────────────
   const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)[^\s]*/);
   if (!match) {
@@ -294,6 +348,7 @@ async function handleMessage(msg) {
   const rawUrl = match[0];
   const shortcode = match[1];
   const activePages = getPages({ isActiveOnly: true });
+  const activeGroups = getPageGroups({ isActiveOnly: true });
 
   if (activePages.length === 0) {
     await notifier.sendTelegramMessage(chatId, '⚠️ No active destination pages found. Please configure a page in the dashboard.');
@@ -302,6 +357,18 @@ async function handleMessage(msg) {
 
   // Build direct publish destination options for Telegram sharing
   const buttons = [];
+
+  // Group Distribution Rings (if groups configured)
+  for (const group of activeGroups) {
+    if (group.member_count > 1) {
+      buttons.push([{
+        text: `🌐 Distribute to All: ${group.name} (${group.member_count} Pages)`,
+        callback_data: `dist:${group.id}:${shortcode}`
+      }]);
+    }
+  }
+
+  // Individual Pages
   for (const page of activePages) {
     const isCultInfo = page.slug === 'cult_information' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation')));
     const isAi = page.slug === 'ai_curation' || (page.handle && page.handle.includes('evolving'));
@@ -324,7 +391,7 @@ async function handleMessage(msg) {
     chatId,
     `📥 <b>Instagram Reel Received!</b>\n\n` +
     `🔗 <b>Shortcode:</b> <code>${shortcode}</code>\n` +
-    `👉 Select destination page to repost:`,
+    `👉 Select destination page or distribution network:`,
     {
       reply_markup: { inline_keyboard: buttons }
     }
@@ -362,6 +429,58 @@ async function handleCallbackQuery(cb) {
       await notifier.editTelegramMessage(chatId, messageId, `🔁 <i>Job #${jobId} re-queued for execution...</i>`);
     } catch (e) {
       await notifier.sendTelegramMessage(chatId, `⚠️ Could not retry job: ${e.message}`);
+    }
+    return;
+  }
+
+  if (action === 'dist') {
+    const groupId = parseInt(parts[1], 10);
+    const shortcode = parts[2];
+    const group = getPageGroupById(groupId);
+    if (!group) {
+      await notifier.editTelegramMessage(chatId, messageId, '⚠️ Distribution group no longer exists.');
+      return;
+    }
+
+    const members = getGroupMembers(groupId);
+    if (members.length === 0) {
+      await notifier.editTelegramMessage(chatId, messageId, `⚠️ No active pages connected to group '${group.name}'.`);
+      return;
+    }
+
+    const primaryPage = members.find(m => m.role === 'primary') || members[0];
+    const sourceUrl = `https://www.instagram.com/p/${shortcode}/`;
+
+    await notifier.editTelegramMessage(
+      chatId,
+      messageId,
+      [
+        `🌐 <b>NETWORK DISTRIBUTION: ${escapeHtml(group.name)}</b>`,
+        `📱 <b>Primary Seed Page:</b> ${escapeHtml(primaryPage.page_name)} (<code>${primaryPage.page_handle}</code>)`,
+        `👥 <b>Distribution Ring:</b> ${members.length} interconnected pages`,
+        `🔗 <b>Reel Shortcode:</b> <code>#${shortcode}</code>`,
+        ``,
+        `⏳ <i>Submitting to seed channel... Once published, reel will automatically fan out with unique branding to all ${members.length - 1} sibling channels.</i>`
+      ].join('\n')
+    );
+
+    try {
+      const res = await submitLink({
+        url: sourceUrl,
+        pageId: primaryPage.page_id,
+        origin: 'telegram',
+        chatId: String(chatId),
+        messageId: String(messageId),
+        reviewCaption: false
+      });
+
+      if (res.job) {
+        planDistribution(res.job.id, { groupId }).catch(e => {
+          console.warn('[Telegram Dist Notice]:', e.message);
+        });
+      }
+    } catch (err) {
+      await notifier.editTelegramMessage(chatId, messageId, `❌ <b>Error:</b> <i>${err.message}</i>`);
     }
     return;
   }

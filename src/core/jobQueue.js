@@ -4,6 +4,8 @@ const {
   createPublishJob,
   updatePublishJob,
   listPublishJobs,
+  addJobEvent,
+  getJobEvents,
   getDb
 } = require('../database');
 const notifier = require('./notifier');
@@ -25,6 +27,8 @@ async function enqueueJob({
   discoveredPostId = null,
   telegramChatId = '',
   telegramMessageId = '',
+  originJobId = null,
+  hookHeadline = '',
   status = 'queued'
 }) {
   if (!pageId || !shortcode || !sourceUrl) {
@@ -58,6 +62,8 @@ async function enqueueJob({
         error: '',
         attempts: 0,
         caption: caption || existing.caption,
+        origin_job_id: originJobId || existing.origin_job_id,
+        hook_headline: hookHeadline || existing.hook_headline,
         telegram_chat_id: telegramChatId || existing.telegram_chat_id,
         telegram_message_id: telegramMessageId || existing.telegram_message_id
       });
@@ -80,7 +86,9 @@ async function enqueueJob({
     current_step: 'init',
     attempts: 0,
     telegram_chat_id: telegramChatId,
-    telegram_message_id: telegramMessageId
+    telegram_message_id: telegramMessageId,
+    origin_job_id: originJobId,
+    hook_headline: hookHeadline
   });
 
   notifier.emitDashboardEvent('job_created', newJob);
@@ -93,10 +101,28 @@ function updateJobProgress(jobId, status, currentStep, extra = {}) {
     current_step: currentStep,
     ...extra
   });
+
+  try {
+    addJobEvent({
+      jobId,
+      stage: currentStep || status,
+      status: status === 'failed' ? 'failed' : (status === 'published' ? 'done' : 'started'),
+      message: extra.error || extra.message || currentStep || '',
+      meta: extra
+    });
+  } catch (e) {}
+
   if (updated) {
     notifier.emitDashboardEvent('job_updated', updated);
   }
   return updated;
+}
+
+function recordStage(jobId, stage, status = 'started', message = '', meta = {}) {
+  try {
+    addJobEvent({ jobId, stage, status, message, meta });
+    notifier.emitDashboardEvent('job_stage', { jobId, stage, status, message, meta, timestamp: new Date().toISOString() });
+  } catch (e) {}
 }
 
 function getJob(id) {
@@ -117,7 +143,11 @@ function retryJob(id) {
 }
 
 function deleteJob(id) {
-  getDb().prepare('DELETE FROM publish_jobs WHERE id = ?').run(id);
+  const db = getDb();
+  try { db.prepare('DELETE FROM job_events WHERE job_id = ?').run(id); } catch (e) {}
+  try { db.prepare('UPDATE distribution_targets SET publish_job_id = NULL WHERE publish_job_id = ?').run(id); } catch (e) {}
+  try { db.prepare('UPDATE distribution_jobs SET origin_job_id = NULL WHERE origin_job_id = ?').run(id); } catch (e) {}
+  db.prepare('DELETE FROM publish_jobs WHERE id = ?').run(id);
   notifier.emitDashboardEvent('job_deleted', { id });
   return { success: true, id };
 }
@@ -125,6 +155,7 @@ function deleteJob(id) {
 module.exports = {
   enqueueJob,
   updateJobProgress,
+  recordStage,
   getJob,
   listJobs,
   retryJob,

@@ -123,16 +123,23 @@ function getPeakWindowStatus(customTimezone = null) {
     nextWindow,
     windowStartIso,
     isNightBlackout,
+    is247Mode: enabled && getSetting('watchtower_247_mode', 'true') === 'true',
     dailyTargetTotal: 7
   };
 }
 
 async function evaluateAndSelectPosts(options = {}) {
-  const activePages = getPages({ isActiveOnly: true });
+  let activePages = getPages({ isActiveOnly: true });
+  if (options.pageId) {
+    activePages = activePages.filter(p => p.id === options.pageId || p.page_id === options.pageId);
+  }
+
   const results = [];
   const windowStatus = getPeakWindowStatus();
+  const is247 = options.is247Mode !== undefined ? options.is247Mode : (getSetting('watchtower_247_mode', 'true') === 'true');
+  const isForced = !!options.force;
 
-  console.log(`[Watchtower Selector] ⏱️ Peak Windows Active: ${windowStatus.activeWindow ? windowStatus.activeWindow.name : 'None (Outside Peak Windows)'} | Time: ${windowStatus.currentTime}`);
+  console.log(`[Watchtower Selector] ⏱️ Peak Windows Active: ${windowStatus.activeWindow ? windowStatus.activeWindow.name : 'None (Outside Peak Windows)'} | 24/7 Mode: ${is247 ? 'ON' : 'OFF'} | Time: ${windowStatus.currentTime}`);
 
   for (const page of activePages) {
     // 1. Check remaining daily quota
@@ -140,7 +147,7 @@ async function evaluateAndSelectPosts(options = {}) {
     const dailyQuota = page.daily_quota || 12;
     const dailyQuotaRemaining = Math.max(0, dailyQuota - todayCount);
 
-    if (dailyQuotaRemaining === 0) {
+    if (dailyQuotaRemaining === 0 && !isForced) {
       console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} reached daily quota (${todayCount}/${dailyQuota}).`);
       continue;
     }
@@ -148,35 +155,43 @@ async function evaluateAndSelectPosts(options = {}) {
     // 2. Determine allowed post count for this cycle
     let allowedCount = page.posts_per_cycle || 1;
 
-    // Strict Night Blackout Enforcement (20:30 PM to 08:30 AM IST)
-    if (windowStatus.isNightBlackout && !options.allowNight) {
-      console.log(`[Watchtower Selector] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Staging reels for morning peak.`);
-      continue;
-    }
-
-    if (windowStatus.enabled) {
-      if (windowStatus.activeWindow) {
-        const countInWindow = getPostsCountInWindow(page.id, windowStatus.windowStartIso);
-        const windowRemaining = Math.max(0, windowStatus.activeWindow.target - countInWindow);
-
-        console.log(`[Watchtower Selector] 🚀 Window [${windowStatus.activeWindow.name}]: ${countInWindow}/${windowStatus.activeWindow.target} posted so far.`);
-
-        if (windowRemaining === 0 && !options.force) {
-          console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} reached window target for ${windowStatus.activeWindow.name}.`);
-          continue;
-        }
-
-        allowedCount = Math.min(windowRemaining, dailyQuotaRemaining);
-      } else if (!options.force) {
-        console.log(`[Watchtower Selector] ⏳ Outside peak windows (${windowStatus.currentTime}). Staging candidate reels in reservoir for ${windowStatus.nextWindow?.name || 'next window'}.`);
+    // Strict Night Blackout Enforcement (if NOT 24/7 mode and NOT forced)
+    if (!is247 && !isForced) {
+      if (windowStatus.isNightBlackout && !options.allowNight) {
+        console.log(`[Watchtower Selector] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Staging reels for morning peak.`);
         continue;
       }
+
+      if (windowStatus.enabled) {
+        if (windowStatus.activeWindow) {
+          const countInWindow = getPostsCountInWindow(page.id, windowStatus.windowStartIso);
+          const windowRemaining = Math.max(0, windowStatus.activeWindow.target - countInWindow);
+
+          console.log(`[Watchtower Selector] 🚀 Window [${windowStatus.activeWindow.name}]: ${countInWindow}/${windowStatus.activeWindow.target} posted so far.`);
+
+          if (windowRemaining === 0) {
+            console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} reached window target for ${windowStatus.activeWindow.name}.`);
+            continue;
+          }
+
+          allowedCount = Math.min(windowRemaining, dailyQuotaRemaining);
+        } else {
+          console.log(`[Watchtower Selector] ⏳ Outside peak windows (${windowStatus.currentTime}). Staging candidate reels in reservoir for ${windowStatus.nextWindow?.name || 'next window'}.`);
+          continue;
+        }
+      }
+    } else {
+      allowedCount = Math.max(1, Math.min(allowedCount, dailyQuotaRemaining || 1));
     }
 
     // 3. Fetch candidate discoveries mapped to this page's sources (strictly video reels)
-    const rawCandidates = listDiscoveredPosts({
+    let rawCandidates = listDiscoveredPosts({
       pageId: page.id
     }).filter(c => c.status === 'new' || c.status === 'reservoir_buffer');
+
+    if (options.sourceId) {
+      rawCandidates = rawCandidates.filter(c => c.source_account_id === options.sourceId);
+    }
 
     // Strict Deduplication: Fetch all shortcodes that have already been queued or published for this page
     const existingShortcodes = new Set();
@@ -188,9 +203,8 @@ async function evaluateAndSelectPosts(options = {}) {
     const now = Date.now();
     const MAX_RESERVOIR_AGE_HOURS = 336; // 14 days backlog buffer for high-scoring evergreen reels
 
-    // Filter valid, unposted video reels within 14 days
+    // Filter valid, unposted content (reels, images, carousels) within 14 days
     const validCandidates = rawCandidates.filter(c => {
-      if (c.media_type && c.media_type !== 'reel') return false;
       if (existingShortcodes.has(c.shortcode)) return false;
 
       const parsed = shortcodeToTimestamp(c.shortcode);
@@ -204,7 +218,7 @@ async function evaluateAndSelectPosts(options = {}) {
     });
 
     if (validCandidates.length === 0) {
-      console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} has no valid candidate reels in feed or reservoir.`);
+      console.log(`[Watchtower Selector] ℹ️ Page ${page.handle} has no valid candidate posts/reels in feed or reservoir.`);
       continue;
     }
 
@@ -332,7 +346,7 @@ async function evaluateAndSelectPosts(options = {}) {
       pageId: page.id,
       handle: page.handle,
       mode: page.post_mode,
-      evaluated: scored.length,
+      evaluated: scoredCandidates.length,
       enqueued,
       reviewCount,
       winners

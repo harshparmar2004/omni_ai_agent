@@ -14,9 +14,11 @@ const { readSourcePosts } = require('../agents/watchtower/sourceReaders/guestRea
  */
 router.get('/', (req, res) => {
   try {
-    const { pageId, isActiveOnly } = req.query;
+    const { pageId, groupId, scope, isActiveOnly } = req.query;
     const filter = {};
     if (pageId) filter.pageId = parseInt(pageId, 10);
+    if (groupId) filter.groupId = parseInt(groupId, 10);
+    if (scope) filter.scope = scope;
     if (isActiveOnly) filter.isActiveOnly = isActiveOnly === 'true';
 
     const sources = getSourceAccounts(filter);
@@ -37,9 +39,9 @@ router.get('/', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { username, page_id } = req.body;
-    if (!username || !page_id) {
-      return res.status(400).json({ error: 'username and page_id are required' });
+    const { username, page_id, group_id, scope } = req.body;
+    if (!username || (!page_id && !group_id)) {
+      return res.status(400).json({ error: 'username and either page_id or group_id are required' });
     }
     const cleanUser = username
       .replace(/https?:\/\/(?:www\.)?instagram\.com\//i, '')
@@ -50,8 +52,20 @@ router.post('/', (req, res) => {
       .trim();
     const source = createSourceAccount({
       username: cleanUser,
-      page_id: parseInt(page_id, 10)
+      page_id: page_id ? parseInt(page_id, 10) : null,
+      group_id: group_id ? parseInt(group_id, 10) : null,
+      scope: scope || (group_id ? 'group' : 'page')
     });
+
+    setImmediate(async () => {
+      try {
+        const { scanSingleSource } = require('../agents/watchtower/scanner');
+        await scanSingleSource(source.id, { evaluate: true });
+      } catch (err) {
+        console.error(`[Source Auto-Scan Error]: ${err.message}`);
+      }
+    });
+
     res.json(source);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -64,8 +78,8 @@ router.post('/', (req, res) => {
  */
 router.post('/bulk', (req, res) => {
   try {
-    const { usernames, text, page_id } = req.body;
-    if (!page_id) return res.status(400).json({ error: 'page_id is required' });
+    const { usernames, text, page_id, group_id, scope } = req.body;
+    if (!page_id && !group_id) return res.status(400).json({ error: 'page_id or group_id is required' });
 
     let userList = [];
     if (Array.isArray(usernames)) {
@@ -83,7 +97,9 @@ router.post('/bulk', (req, res) => {
       try {
         const item = createSourceAccount({
           username: clean,
-          page_id: parseInt(page_id, 10)
+          page_id: page_id ? parseInt(page_id, 10) : null,
+          group_id: group_id ? parseInt(group_id, 10) : null,
+          scope: scope || (group_id ? 'group' : 'page')
         });
         added.push(item);
       } catch (err) {
@@ -91,7 +107,45 @@ router.post('/bulk', (req, res) => {
       }
     }
 
+    if (added.length > 0) {
+      setImmediate(async () => {
+        try {
+          const { scanSingleSource } = require('../agents/watchtower/scanner');
+          for (const item of added) {
+            try {
+              await scanSingleSource(item.id, { evaluate: true });
+            } catch (e) {
+              console.error(`[Bulk Source Auto-Scan] ${item.username}: ${e.message}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[Bulk Scan Error]: ${err.message}`);
+        }
+      });
+    }
+
     res.json({ success: true, addedCount: added.length, added, errors });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/sources/:id/scan
+ * Trigger an immediate on-demand scan of that specific source account
+ */
+router.post('/:id/scan', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const source = getSourceAccountById(id);
+    if (!source) return res.status(404).json({ error: 'Source account not found' });
+
+    const { scanSingleSource } = require('../agents/watchtower/scanner');
+    const result = await scanSingleSource(id, {
+      evaluate: req.body.evaluate !== false,
+      limit: req.body.limit || 12
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

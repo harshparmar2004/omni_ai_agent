@@ -26,7 +26,14 @@ function getDb() {
   if (db) return db;
 
   try {
-    const dataDir = path.join(__dirname, '..', 'data');
+    let dataDir = process.env.DATA_DIR;
+    if (!dataDir) {
+      if (fs.existsSync('/data') && fs.statSync('/data').isDirectory()) {
+        dataDir = '/data';
+      } else {
+        dataDir = path.join(__dirname, '..', 'data');
+      }
+    }
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
@@ -226,6 +233,136 @@ function initV7Schema(db) {
   } catch (e) {
     console.warn('[Database] Notice initializing cult_information page:', e.message);
   }
+
+  // ─────────────────────────────────────────────────────────────
+  // v8 Schema: Multi-Tenant Distribution Network
+  // ─────────────────────────────────────────────────────────────
+  db.exec(`
+    -- Page Groups (Distribution Rings)
+    CREATE TABLE IF NOT EXISTS page_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      niche TEXT DEFAULT '',
+      cross_post_mode TEXT DEFAULT 'auto',
+      cross_post_delay_min INTEGER DEFAULT 20,
+      cross_post_delay_max INTEGER DEFAULT 45,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pg_slug ON page_groups(slug);
+
+    -- Page-to-Group Membership (M:N)
+    CREATE TABLE IF NOT EXISTS page_group_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL REFERENCES page_groups(id) ON DELETE CASCADE,
+      page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      role TEXT DEFAULT 'member',
+      priority INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      UNIQUE(group_id, page_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pgm_group ON page_group_members(group_id);
+    CREATE INDEX IF NOT EXISTS idx_pgm_page ON page_group_members(page_id);
+
+    -- Cross-Post Distribution Jobs
+    CREATE TABLE IF NOT EXISTS distribution_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      origin_job_id INTEGER REFERENCES publish_jobs(id),
+      origin_page_id INTEGER NOT NULL REFERENCES pages(id),
+      group_id INTEGER REFERENCES page_groups(id),
+      shortcode TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      total_targets INTEGER DEFAULT 0,
+      completed_targets INTEGER DEFAULT 0,
+      failed_targets INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dist_status ON distribution_jobs(status);
+    CREATE INDEX IF NOT EXISTS idx_dist_origin ON distribution_jobs(origin_job_id);
+
+    -- Distribution Job Targets (one row per target page)
+    CREATE TABLE IF NOT EXISTS distribution_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      distribution_job_id INTEGER NOT NULL REFERENCES distribution_jobs(id) ON DELETE CASCADE,
+      target_page_id INTEGER NOT NULL REFERENCES pages(id),
+      publish_job_id INTEGER REFERENCES publish_jobs(id),
+      status TEXT DEFAULT 'queued',
+      scheduled_at TEXT,
+      error TEXT DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_dt_dist ON distribution_targets(distribution_job_id);
+    CREATE INDEX IF NOT EXISTS idx_dt_page ON distribution_targets(target_page_id);
+
+    -- Page Templates / Branding Profiles
+    CREATE TABLE IF NOT EXISTS page_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      template_type TEXT DEFAULT 'default',
+      primary_color TEXT DEFAULT '#FFFFFF',
+      accent_color TEXT DEFAULT '#00FF66',
+      background_color TEXT DEFAULT '#0D0D12',
+      font_family TEXT DEFAULT 'Inter',
+      logo_path TEXT DEFAULT '',
+      avatar_path TEXT DEFAULT '',
+      watermark_text TEXT DEFAULT '',
+      frame_style TEXT DEFAULT 'card',
+      story_template TEXT DEFAULT 'editorial',
+      custom_css TEXT DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(page_id, template_type)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pt_page ON page_templates(page_id);
+
+    -- 10. Job Stage Events (End-to-End Tracking History)
+    CREATE TABLE IF NOT EXISTS job_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id INTEGER NOT NULL REFERENCES publish_jobs(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'started',
+      message TEXT DEFAULT '',
+      meta_json TEXT DEFAULT '{}',
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_je_job ON job_events(job_id);
+    CREATE INDEX IF NOT EXISTS idx_je_stage ON job_events(stage);
+  `);
+
+  // v8 migrations for existing tables (safe ALTER — will no-op if columns exist)
+  try { db.exec('ALTER TABLE pages ADD COLUMN page_type TEXT DEFAULT \'destination\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN niche TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN timezone TEXT DEFAULT \'Asia/Kolkata\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN region TEXT DEFAULT \'IN\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN onboarding_status TEXT DEFAULT \'active\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN template_slug TEXT DEFAULT \'default\''); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN auto_story INTEGER DEFAULT 1'); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN auto_cross_post INTEGER DEFAULT 1'); } catch (e) {}
+
+  try { db.exec('ALTER TABLE source_accounts ADD COLUMN group_id INTEGER'); } catch (e) {}
+  try { db.exec('ALTER TABLE source_accounts ADD COLUMN scope TEXT DEFAULT \'page\''); } catch (e) {}
+
+  // Tracking migrations for publish_jobs
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN hook_headline TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN edited_media_path TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN edit_theme TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN edit_meta TEXT DEFAULT \'{}\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_status TEXT DEFAULT \'pending\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_ig_media_id TEXT DEFAULT \'\''); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN origin_job_id INTEGER REFERENCES publish_jobs(id)'); } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -285,8 +422,9 @@ function createPage(data) {
       slug, name, handle, ig_user_id, access_token, token_expires_at,
       caption_template, default_hashtags, attribution_enabled, watermark_enabled,
       post_mode, posts_per_cycle, daily_quota, min_spacing_minutes, is_active,
+      page_type, niche, timezone, region, onboarding_status, template_slug, auto_story, auto_cross_post,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const info = stmt.run(
     data.slug.toLowerCase().trim(),
@@ -304,6 +442,14 @@ function createPage(data) {
     data.daily_quota || 3,
     data.min_spacing_minutes || 60,
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    data.page_type || 'destination',
+    data.niche || '',
+    data.timezone || 'Asia/Kolkata',
+    data.region || 'IN',
+    data.onboarding_status || 'active',
+    data.template_slug || 'default',
+    data.auto_story !== undefined ? (data.auto_story ? 1 : 0) : 1,
+    data.auto_cross_post !== undefined ? (data.auto_cross_post ? 1 : 0) : 1,
     now,
     now
   );
@@ -320,7 +466,9 @@ function updatePage(id, data) {
   const allowed = [
     'slug', 'name', 'handle', 'ig_user_id', 'access_token', 'token_expires_at',
     'caption_template', 'default_hashtags', 'attribution_enabled', 'watermark_enabled',
-    'post_mode', 'posts_per_cycle', 'daily_quota', 'min_spacing_minutes', 'is_active'
+    'post_mode', 'posts_per_cycle', 'daily_quota', 'min_spacing_minutes', 'is_active',
+    'page_type', 'niche', 'timezone', 'region', 'onboarding_status', 'template_slug',
+    'auto_story', 'auto_cross_post'
   ];
 
   for (const key of allowed) {
@@ -343,7 +491,13 @@ function updatePage(id, data) {
 }
 
 function deletePage(id) {
-  return getDb().prepare('DELETE FROM pages WHERE id = ?').run(id);
+  const db = getDb();
+  try { db.prepare('UPDATE publish_jobs SET origin_job_id = NULL WHERE origin_job_id IN (SELECT id FROM publish_jobs WHERE page_id = ?)').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM page_group_members WHERE page_id = ?').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM page_templates WHERE page_id = ?').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM distribution_targets WHERE target_page_id = ?').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM distribution_jobs WHERE origin_page_id = ?').run(id); } catch (e) {}
+  return db.prepare('DELETE FROM pages WHERE id = ?').run(id);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -352,15 +506,25 @@ function deletePage(id) {
 
 function getSourceAccounts(options = {}) {
   let sql = `
-    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle,
+           pg.name as group_name, pg.slug as group_slug
     FROM source_accounts s
     LEFT JOIN pages p ON s.page_id = p.id
+    LEFT JOIN page_groups pg ON s.group_id = pg.id
     WHERE 1=1
   `;
   const params = [];
   if (options.pageId) {
     sql += ' AND s.page_id = ?';
     params.push(options.pageId);
+  }
+  if (options.groupId) {
+    sql += ' AND s.group_id = ?';
+    params.push(options.groupId);
+  }
+  if (options.scope) {
+    sql += ' AND s.scope = ?';
+    params.push(options.scope);
   }
   if (options.isActiveOnly) {
     sql += ' AND s.is_active = 1';
@@ -371,9 +535,11 @@ function getSourceAccounts(options = {}) {
 
 function getSourceAccountById(id) {
   return getDb().prepare(`
-    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle
+    SELECT s.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle,
+           pg.name as group_name, pg.slug as group_slug
     FROM source_accounts s
     LEFT JOIN pages p ON s.page_id = p.id
+    LEFT JOIN page_groups pg ON s.group_id = pg.id
     WHERE s.id = ?
   `).get(id);
 }
@@ -388,7 +554,9 @@ function createSourceAccount(data) {
   const existing = getSourceAccountByUsername(username);
   if (existing) {
     updateSourceAccount(existing.id, {
-      page_id: data.page_id,
+      page_id: data.page_id !== undefined ? data.page_id : existing.page_id,
+      group_id: data.group_id !== undefined ? data.group_id : existing.group_id,
+      scope: data.scope || existing.scope || 'page',
       is_active: 1,
       health: 'ok'
     });
@@ -397,13 +565,15 @@ function createSourceAccount(data) {
 
   const stmt = getDb().prepare(`
     INSERT INTO source_accounts (
-      username, page_id, is_active, health, consecutive_failures,
+      username, page_id, group_id, scope, is_active, health, consecutive_failures,
       last_error, last_checked_at, last_new_post_at, synced_posts_count, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const info = stmt.run(
     username,
-    data.page_id,
+    data.page_id || null,
+    data.group_id || null,
+    data.scope || 'page',
     data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
     data.health || 'ok',
     0,
@@ -421,7 +591,7 @@ function updateSourceAccount(id, data) {
   const params = [];
 
   const allowed = [
-    'username', 'page_id', 'is_active', 'health', 'consecutive_failures',
+    'username', 'page_id', 'group_id', 'scope', 'is_active', 'health', 'consecutive_failures',
     'last_error', 'last_checked_at', 'last_new_post_at', 'synced_posts_count'
   ];
 
@@ -520,8 +690,12 @@ function countDiscoveredPosts(options = {}) {
     params.push(options.status);
   }
   if (options.pageId) {
-    sql += ' AND s.page_id = ?';
-    params.push(options.pageId);
+    sql += ' AND (s.page_id = ? OR s.group_id IN (SELECT group_id FROM page_group_members WHERE page_id = ? AND is_active = 1))';
+    params.push(options.pageId, options.pageId);
+  }
+  if (options.groupId) {
+    sql += ' AND s.group_id = ?';
+    params.push(options.groupId);
   }
   if (options.sourceAccountId) {
     sql += ' AND d.source_account_id = ?';
@@ -547,8 +721,12 @@ function listDiscoveredPosts(options = {}) {
     params.push(options.status);
   }
   if (options.pageId) {
-    sql += ' AND s.page_id = ?';
-    params.push(options.pageId);
+    sql += ' AND (s.page_id = ? OR s.group_id IN (SELECT group_id FROM page_group_members WHERE page_id = ? AND is_active = 1))';
+    params.push(options.pageId, options.pageId);
+  }
+  if (options.groupId) {
+    sql += ' AND s.group_id = ?';
+    params.push(options.groupId);
   }
   if (options.sourceAccountId) {
     sql += ' AND d.source_account_id = ?';
@@ -593,8 +771,8 @@ function createPublishJob(data) {
       agent, page_id, discovered_post_id, shortcode, source_url,
       media_type, media_paths, caption, status, current_step,
       attempts, error, ig_media_id, permalink, telegram_chat_id,
-      telegram_message_id, created_at, published_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      telegram_message_id, origin_job_id, hook_headline, created_at, published_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const info = stmt.run(
     data.agent || 'reposter',
@@ -613,6 +791,8 @@ function createPublishJob(data) {
     data.permalink || '',
     data.telegram_chat_id || '',
     data.telegram_message_id || '',
+    data.origin_job_id || null,
+    data.hook_headline || '',
     new Date().toISOString(),
     null
   );
@@ -627,13 +807,15 @@ function updatePublishJob(id, data) {
     'status', 'current_step', 'attempts', 'error', 'media_paths',
     'caption', 'ig_media_id', 'permalink', 'telegram_chat_id',
     'telegram_message_id', 'published_at',
-    'story_ig_media_id', 'story_published_at', 'story_status'
+    'story_ig_media_id', 'story_published_at', 'story_status',
+    'hook_headline', 'edited_media_path', 'edit_theme', 'edit_meta',
+    'origin_job_id'
   ];
 
   for (const k of allowed) {
     if (data[k] !== undefined) {
       fields.push(`${k} = ?`);
-      if (k === 'media_paths' && typeof data[k] !== 'string') {
+      if ((k === 'media_paths' || k === 'edit_meta') && typeof data[k] !== 'string') {
         params.push(JSON.stringify(data[k]));
       } else {
         params.push(data[k]);
@@ -645,6 +827,26 @@ function updatePublishJob(id, data) {
   params.push(id);
   getDb().prepare(`UPDATE publish_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...params);
   return getPublishJobById(id);
+}
+
+function addJobEvent({ jobId, stage, status = 'started', message = '', meta = {} }) {
+  const metaJson = typeof meta === 'string' ? meta : JSON.stringify(meta || {});
+  const now = new Date().toISOString();
+  const stmt = getDb().prepare(`
+    INSERT INTO job_events (job_id, stage, status, message, meta_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(jobId, stage, status, message || '', metaJson, now);
+  return { id: Number(info.lastInsertRowid), jobId, stage, status, message, meta, created_at: now };
+}
+
+function getJobEvents(jobId) {
+  return getDb().prepare(`
+    SELECT * FROM job_events WHERE job_id = ? ORDER BY id ASC
+  `).all(jobId).map(e => {
+    try { e.meta = JSON.parse(e.meta_json || '{}'); } catch (_) { e.meta = {}; }
+    return e;
+  });
 }
 
 function listPublishJobs(options = {}) {
@@ -1117,6 +1319,379 @@ function getPostsCountInWindow(pageId, windowStartIso) {
   return row ? row.c : 0;
 }
 
+// ─────────────────────────────────────────────────────────────
+// v8 Page Groups Operations (Distribution Networks)
+// ─────────────────────────────────────────────────────────────
+
+function createPageGroup(data) {
+  const now = new Date().toISOString();
+  const slug = (data.slug || data.name || '').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+  const stmt = getDb().prepare(`
+    INSERT INTO page_groups (
+      slug, name, description, niche, cross_post_mode,
+      cross_post_delay_min, cross_post_delay_max, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    slug,
+    data.name.trim(),
+    data.description || '',
+    data.niche || '',
+    data.cross_post_mode || 'auto',
+    data.cross_post_delay_min !== undefined ? data.cross_post_delay_min : 20,
+    data.cross_post_delay_max !== undefined ? data.cross_post_delay_max : 45,
+    data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+    now,
+    now
+  );
+  return getPageGroupById(info.lastInsertRowid);
+}
+
+function updatePageGroup(id, data) {
+  const group = getPageGroupById(id);
+  if (!group) throw new Error(`Group #${id} not found`);
+
+  const fields = [];
+  const params = [];
+  const allowed = [
+    'slug', 'name', 'description', 'niche', 'cross_post_mode',
+    'cross_post_delay_min', 'cross_post_delay_max', 'is_active'
+  ];
+
+  for (const k of allowed) {
+    if (data[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      params.push(typeof data[k] === 'boolean' ? (data[k] ? 1 : 0) : data[k]);
+    }
+  }
+
+  if (fields.length === 0) return group;
+  fields.push('updated_at = ?');
+  params.push(new Date().toISOString());
+  params.push(id);
+
+  getDb().prepare(`UPDATE page_groups SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getPageGroupById(id);
+}
+
+function deletePageGroup(id) {
+  const db = getDb();
+  try { db.prepare('DELETE FROM page_group_members WHERE group_id = ?').run(id); } catch (e) {}
+  try { db.prepare('UPDATE source_accounts SET group_id = NULL WHERE group_id = ?').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM distribution_targets WHERE distribution_job_id IN (SELECT id FROM distribution_jobs WHERE group_id = ?)').run(id); } catch (e) {}
+  try { db.prepare('DELETE FROM distribution_jobs WHERE group_id = ?').run(id); } catch (e) {}
+  return db.prepare('DELETE FROM page_groups WHERE id = ?').run(id);
+}
+
+function getGroupMemberCount(groupId) {
+  const row = getDb().prepare('SELECT count(*) as c FROM page_group_members WHERE group_id = ? AND is_active = 1').get(groupId);
+  return row ? row.c : 0;
+}
+
+function getGroupSourceCount(groupId) {
+  const row = getDb().prepare('SELECT count(*) as c FROM source_accounts WHERE group_id = ? AND is_active = 1').get(groupId);
+  return row ? row.c : 0;
+}
+
+function getPageGroups(options = {}) {
+  let sql = 'SELECT * FROM page_groups WHERE 1=1';
+  const params = [];
+  if (options.isActiveOnly) {
+    sql += ' AND is_active = 1';
+  }
+  if (options.niche) {
+    sql += ' AND niche = ?';
+    params.push(options.niche);
+  }
+  sql += ' ORDER BY id ASC';
+  const groups = getDb().prepare(sql).all(...params);
+  return groups.map(g => ({
+    ...g,
+    member_count: getGroupMemberCount(g.id),
+    source_count: getGroupSourceCount(g.id)
+  }));
+}
+
+function getPageGroupById(id) {
+  const g = getDb().prepare('SELECT * FROM page_groups WHERE id = ?').get(id);
+  if (!g) return null;
+  return {
+    ...g,
+    member_count: getGroupMemberCount(g.id),
+    source_count: getGroupSourceCount(g.id)
+  };
+}
+
+function getPageGroupBySlug(slug) {
+  const g = getDb().prepare('SELECT * FROM page_groups WHERE slug = ?').get(slug);
+  if (!g) return null;
+  return {
+    ...g,
+    member_count: getGroupMemberCount(g.id),
+    source_count: getGroupSourceCount(g.id)
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
+// v8 Group Membership Operations
+// ─────────────────────────────────────────────────────────────
+
+function addPageToGroup(groupId, pageId, options = {}) {
+  const stmt = getDb().prepare(`
+    INSERT INTO page_group_members (group_id, page_id, role, priority, is_active, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(group_id, page_id) DO UPDATE SET
+      role = excluded.role,
+      priority = excluded.priority,
+      is_active = excluded.is_active
+  `);
+  stmt.run(
+    groupId,
+    pageId,
+    options.role || 'member',
+    options.priority !== undefined ? options.priority : 0,
+    options.is_active !== undefined ? (options.is_active ? 1 : 0) : 1,
+    new Date().toISOString()
+  );
+  return getGroupMembers(groupId);
+}
+
+function removePageFromGroup(groupId, pageId) {
+  return getDb().prepare('DELETE FROM page_group_members WHERE group_id = ? AND page_id = ?').run(groupId, pageId);
+}
+
+function getGroupMembers(groupId) {
+  return getDb().prepare(`
+    SELECT m.*, p.slug as page_slug, p.name as page_name, p.handle as page_handle,
+           p.ig_user_id, p.daily_quota, p.is_active as page_is_active,
+           p.post_mode, p.template_slug, p.access_token
+    FROM page_group_members m
+    JOIN pages p ON m.page_id = p.id
+    WHERE m.group_id = ?
+    ORDER BY m.priority ASC, m.id ASC
+  `).all(groupId);
+}
+
+function getPageGroupsForPage(pageId) {
+  return getDb().prepare(`
+    SELECT g.*, m.role, m.priority, m.is_active as membership_is_active
+    FROM page_groups g
+    JOIN page_group_members m ON g.id = m.group_id
+    WHERE m.page_id = ?
+    ORDER BY g.id ASC
+  `).all(pageId);
+}
+
+// ─────────────────────────────────────────────────────────────
+// v8 Distribution Jobs & Targets Operations
+// ─────────────────────────────────────────────────────────────
+
+function createDistributionJob(data) {
+  const now = new Date().toISOString();
+  const stmt = getDb().prepare(`
+    INSERT INTO distribution_jobs (
+      origin_job_id, origin_page_id, group_id, shortcode, source_url,
+      status, total_targets, completed_targets, failed_targets, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.origin_job_id || null,
+    data.origin_page_id,
+    data.group_id || null,
+    data.shortcode,
+    data.source_url,
+    data.status || 'pending',
+    data.total_targets || 0,
+    0,
+    0,
+    now
+  );
+  return getDistributionJobById(info.lastInsertRowid);
+}
+
+function getDistributionJobById(id) {
+  const job = getDb().prepare(`
+    SELECT dj.*, op.name as origin_page_name, op.handle as origin_page_handle,
+           pg.name as group_name, pg.slug as group_slug
+    FROM distribution_jobs dj
+    LEFT JOIN pages op ON dj.origin_page_id = op.id
+    LEFT JOIN page_groups pg ON dj.group_id = pg.id
+    WHERE dj.id = ?
+  `).get(id);
+  if (!job) return null;
+  job.targets = getDistributionTargets(id);
+  return job;
+}
+
+function updateDistributionJob(id, data) {
+  const fields = [];
+  const params = [];
+  const allowed = ['status', 'total_targets', 'completed_targets', 'failed_targets', 'completed_at'];
+
+  for (const k of allowed) {
+    if (data[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      params.push(data[k]);
+    }
+  }
+  if (fields.length === 0) return getDistributionJobById(id);
+  params.push(id);
+  getDb().prepare(`UPDATE distribution_jobs SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getDistributionJobById(id);
+}
+
+function listDistributionJobs(options = {}) {
+  let sql = `
+    SELECT dj.*, op.name as origin_page_name, op.handle as origin_page_handle,
+           pg.name as group_name, pg.slug as group_slug
+    FROM distribution_jobs dj
+    LEFT JOIN pages op ON dj.origin_page_id = op.id
+    LEFT JOIN page_groups pg ON dj.group_id = pg.id
+    WHERE 1=1
+  `;
+  const params = [];
+  if (options.status) {
+    sql += ' AND dj.status = ?';
+    params.push(options.status);
+  }
+  if (options.groupId) {
+    sql += ' AND dj.group_id = ?';
+    params.push(options.groupId);
+  }
+  if (options.originPageId) {
+    sql += ' AND dj.origin_page_id = ?';
+    params.push(options.originPageId);
+  }
+  sql += ' ORDER BY dj.id DESC';
+  if (options.limit) {
+    sql += ' LIMIT ?';
+    params.push(options.limit);
+  }
+  const jobs = getDb().prepare(sql).all(...params);
+  for (const j of jobs) {
+    j.targets = getDistributionTargets(j.id);
+  }
+  return jobs;
+}
+
+function createDistributionTarget(data) {
+  const stmt = getDb().prepare(`
+    INSERT INTO distribution_targets (
+      distribution_job_id, target_page_id, publish_job_id, status,
+      scheduled_at, error, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const info = stmt.run(
+    data.distribution_job_id,
+    data.target_page_id,
+    data.publish_job_id || null,
+    data.status || 'queued',
+    data.scheduled_at || null,
+    data.error || '',
+    new Date().toISOString()
+  );
+  return getDb().prepare('SELECT * FROM distribution_targets WHERE id = ?').get(info.lastInsertRowid);
+}
+
+function updateDistributionTarget(id, data) {
+  const fields = [];
+  const params = [];
+  const allowed = ['publish_job_id', 'status', 'scheduled_at', 'error'];
+  for (const k of allowed) {
+    if (data[k] !== undefined) {
+      fields.push(`${k} = ?`);
+      params.push(data[k]);
+    }
+  }
+  if (fields.length === 0) return getDb().prepare('SELECT * FROM distribution_targets WHERE id = ?').get(id);
+  params.push(id);
+  getDb().prepare(`UPDATE distribution_targets SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  return getDb().prepare('SELECT * FROM distribution_targets WHERE id = ?').get(id);
+}
+
+function getDistributionTargets(distributionJobId) {
+  return getDb().prepare(`
+    SELECT dt.*, p.name as target_page_name, p.handle as target_page_handle,
+           p.slug as target_page_slug, pj.status as publish_job_status,
+           pj.permalink, pj.ig_media_id
+    FROM distribution_targets dt
+    JOIN pages p ON dt.target_page_id = p.id
+    LEFT JOIN publish_jobs pj ON dt.publish_job_id = pj.id
+    WHERE dt.distribution_job_id = ?
+    ORDER BY dt.id ASC
+  `).all(distributionJobId);
+}
+
+function getPendingDistributionTargets(dueBeforeIso = null) {
+  const due = dueBeforeIso || new Date().toISOString();
+  return getDb().prepare(`
+    SELECT dt.*, dj.shortcode, dj.source_url, dj.origin_page_id, dj.origin_job_id,
+           p.slug as target_page_slug, p.handle as target_page_handle, p.daily_quota,
+           p.template_slug
+    FROM distribution_targets dt
+    JOIN distribution_jobs dj ON dt.distribution_job_id = dj.id
+    JOIN pages p ON dt.target_page_id = p.id
+    WHERE dt.status = 'scheduled' AND dt.scheduled_at <= ?
+    ORDER BY dt.scheduled_at ASC
+  `).all(due);
+}
+
+// ─────────────────────────────────────────────────────────────
+// v8 Page Templates Operations
+// ─────────────────────────────────────────────────────────────
+
+function upsertPageTemplate(data) {
+  const now = new Date().toISOString();
+  const stmt = getDb().prepare(`
+    INSERT INTO page_templates (
+      page_id, template_type, primary_color, accent_color, background_color,
+      font_family, logo_path, avatar_path, watermark_text, frame_style,
+      story_template, custom_css, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(page_id, template_type) DO UPDATE SET
+      primary_color = excluded.primary_color,
+      accent_color = excluded.accent_color,
+      background_color = excluded.background_color,
+      font_family = excluded.font_family,
+      logo_path = excluded.logo_path,
+      avatar_path = excluded.avatar_path,
+      watermark_text = excluded.watermark_text,
+      frame_style = excluded.frame_style,
+      story_template = excluded.story_template,
+      custom_css = excluded.custom_css,
+      updated_at = excluded.updated_at
+  `);
+  stmt.run(
+    data.page_id,
+    data.template_type || 'default',
+    data.primary_color || '#FFFFFF',
+    data.accent_color || '#00FF66',
+    data.background_color || '#0D0D12',
+    data.font_family || 'Inter',
+    data.logo_path || '',
+    data.avatar_path || '',
+    data.watermark_text || '',
+    data.frame_style || 'card',
+    data.story_template || 'editorial',
+    data.custom_css || '',
+    now,
+    now
+  );
+  return getPageTemplate(data.page_id, data.template_type || 'default');
+}
+
+function getPageTemplate(pageId, templateType = 'default') {
+  return getDb().prepare('SELECT * FROM page_templates WHERE page_id = ? AND template_type = ?').get(pageId, templateType);
+}
+
+function listPageTemplates(pageId) {
+  return getDb().prepare('SELECT * FROM page_templates WHERE page_id = ?').all(pageId);
+}
+
+function deletePageTemplate(id) {
+  return getDb().prepare('DELETE FROM page_templates WHERE id = ?').run(id);
+}
+
 module.exports = {
   getDb,
   // Settings
@@ -1151,6 +1726,8 @@ module.exports = {
   updatePublishJob,
   listPublishJobs,
   countPublishJobs,
+  addJobEvent,
+  getJobEvents,
   getPublishedCountToday,
   getLastPublishedTimestamp,
   getPostsCountInWindow,
@@ -1166,5 +1743,29 @@ module.exports = {
   // Pipeline
   getPipelineSummary,
   getReposterPipelineSummary,
-  getGlobalPublishingStats
+  getGlobalPublishingStats,
+  // v8 Distribution Networks
+  createPageGroup,
+  updatePageGroup,
+  deletePageGroup,
+  getPageGroups,
+  getPageGroupById,
+  getPageGroupBySlug,
+  addPageToGroup,
+  removePageFromGroup,
+  getGroupMembers,
+  getPageGroupsForPage,
+  createDistributionJob,
+  getDistributionJobById,
+  updateDistributionJob,
+  listDistributionJobs,
+  createDistributionTarget,
+  updateDistributionTarget,
+  getDistributionTargets,
+  getPendingDistributionTargets,
+  // v8 Page Templates
+  upsertPageTemplate,
+  getPageTemplate,
+  listPageTemplates,
+  deletePageTemplate
 };

@@ -46,206 +46,86 @@ async function main() {
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
-  // 1b. Ensure destination Page #1 (@gta6_updates_007) and Page #2 (@movie_series_365) exist in database
-  const { createPage } = require('../src/database');
-  let page1 = db.prepare('SELECT * FROM pages WHERE id = 1').get();
-  if (!page1) {
-    console.log('📄 Creating default Page #1 (@gta6_updates_007)...');
-    createPage({
-      slug: 'gta6',
-      name: 'GTA 6 Updates 007',
-      handle: '@gta6_updates_007',
-      ig_user_id: process.env.IG_USER_ID || '17841428668115319',
-      access_token: process.env.META_ACCESS_TOKEN || '',
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 7,
-      min_spacing_minutes: 90,
-      is_active: 1
-    });
+  // 1b. Remote Vault Sync (Optional: pull pages from Render/Railway if running as secondary runner)
+  const vaultSyncUrl = process.env.OMNI_VAULT_SYNC_URL;
+  const masterKey = process.env.OMNI_MASTER_KEY;
+  if (vaultSyncUrl && masterKey) {
+    try {
+      console.log(`🔑 Fetching active pages dynamically from central vault: ${vaultSyncUrl}...`);
+      const axios = require('axios');
+      const { importVault } = require('../src/core/tokenVault');
+      const vaultRes = await axios.get(vaultSyncUrl, {
+        headers: { 'x-master-key': masterKey },
+        timeout: 10000
+      });
+      if (vaultRes.data && vaultRes.data.pages) {
+        const importRes = importVault(vaultRes.data);
+        console.log(`✓ Vault synced dynamically: ${importRes.created} created, ${importRes.updated} updated.`);
+      }
+    } catch (vErr) {
+      console.warn(`[Vault Sync Warning]: ${vErr.message}`);
+    }
   }
 
-  let page2 = db.prepare('SELECT * FROM pages WHERE id = 2').get();
-  if (!page2) {
-    console.log('📄 Creating default Page #2 (@movie_series_365)...');
-    createPage({
-      slug: 'movies',
-      name: 'Movie Recommendations',
-      handle: '@movie_series_365',
-      ig_user_id: process.env.MOVIE_IG_USER_ID || '29048404444808513',
-      access_token: process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFTS1JKMnExVzFCWm9vaDQ2aE9PVlN3UjZApWUNtQ3VrZAUpCa2x2b19pbEI1ZA3gxWldtY1BVUFNHYTBfVFQ3LWV5UEozVlVwS2plV0w3d1lJRU04QzF0cmRNcEY2cHgtbDREeHNYU0thX2txNFdySEFxOU96awZDZD',
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 7,
-      min_spacing_minutes: 90,
-      is_active: 1
-    });
+  // Ensure initial default pages exist only if DB is completely empty
+  const { createPage, createSourceAccount, getSourceAccounts } = require('../src/database');
+  let pages = getPages({ isActiveOnly: true });
+
+  if (pages.length === 0) {
+    console.log('📄 No pages found in database. Initializing default baseline channels...');
+    const defaultPages = [
+      { slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', ig_user_id: process.env.IG_USER_ID || '17841428668115319', access_token: process.env.META_ACCESS_TOKEN || '', default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' },
+      { slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', ig_user_id: process.env.MOVIE_IG_USER_ID || '29048404444808513', access_token: process.env.MOVIE_META_ACCESS_TOKEN || '', default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies' },
+      { slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', ig_user_id: process.env.CLUBBING_IG_USER_ID || '29109331262052643', access_token: process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || '', default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult' },
+      { slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', ig_user_id: process.env.CULT_INFO_IG_USER_ID || '17841462998491309', access_token: process.env.CULT_INFO_META_ACCESS_TOKEN || '', default_hashtags: '#cultinformation #ai #tech #breakdown #videoessay' }
+    ];
+
+    for (const p of defaultPages) {
+      createPage({
+        ...p,
+        post_mode: 'auto',
+        daily_quota: 7,
+        min_spacing_minutes: 90,
+        attribution_enabled: 0,
+        watermark_enabled: 0,
+        is_active: 1
+      });
+    }
+    pages = getPages({ isActiveOnly: true });
   }
 
-  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
-  const clubbingToken = sanitizeToken(process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
-  const clubbingIgId = (process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
-
-  let page3 = db.prepare('SELECT * FROM pages WHERE id = 3 OR slug = "clubbing" OR slug = "techguy"').get();
-  if (!page3) {
-    console.log('🪩 Creating default Page #3 (@clubbingcult)...');
-    createPage({
-      slug: 'clubbing',
-      name: 'Clubbing Cult',
-      handle: '@clubbingcult',
-      ig_user_id: clubbingIgId,
-      access_token: clubbingToken,
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 7,
-      min_spacing_minutes: 90,
-      is_active: 1
-    });
-  }
-
-  // Force pages to 100% autonomous mode & verified credentials
+  // Safe housekeeping: Expire stale queued jobs (>12h old) and stale discoveries (>24h old)
   try {
-    // Purge any stale non-reel discoveries from cached DB
-    db.prepare("DELETE FROM discovered_posts WHERE media_type != 'reel' AND media_type != ''").run();
-    // Expire any queued jobs older than 12 hours so stale backlog NEVER blocks or runs
     const expiredJobs = db.prepare("UPDATE publish_jobs SET status = 'failed', error = 'Expired: stale queued job (>12h old)' WHERE status = 'queued' AND created_at < datetime('now', '-12 hours')").run();
     if (expiredJobs.changes > 0) {
       console.log(`[Database Cleanup] 🧹 Purged ${expiredJobs.changes} stale queued jobs older than 12 hours.`);
     }
-    // Expire old discovered posts
     db.prepare("UPDATE discovered_posts SET status = 'stale_expired' WHERE status = 'new' AND created_at < datetime('now', '-24 hours')").run();
-    db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks', is_active = 1 WHERE id = 1").run();
-    db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
-    db.prepare("UPDATE pages SET slug = 'clubbing', name = 'Clubbing Cult', handle = '@clubbingcult', post_mode = 'auto', daily_quota = 7, min_spacing_minutes = 90, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult', is_active = 1 WHERE id = 3 OR slug = 'techguy' OR slug = 'clubbing'").run();
   } catch (e) {
     console.warn(`[Database Cleanup Warning] ${e.message}`);
   }
 
-  function sanitizeToken(token) {
-    if (!token) return '';
-    return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
-  }
-
-  const defaultGtaToken = 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD';
-  const gtaToken = sanitizeToken(process.env.META_ACCESS_TOKEN || defaultGtaToken);
-  db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(gtaToken);
-
-  const defaultMovieToken = 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD';
-  const movieToken = sanitizeToken(process.env.MOVIE_META_ACCESS_TOKEN || defaultMovieToken);
-  const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
-  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
-
-  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
-  const clubbingToken = sanitizeToken(process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
-  const clubbingIgId = (process.env.CLUBBING_CULT_IG_USER_ID || process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
-  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
-
-  const defaultCultInfoToken = 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD';
-  const cultInfoToken = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || defaultCultInfoToken);
-  const cultInfoIgId = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
-  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ?, is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoToken, cultInfoIgId);
-
-  let pages = getPages({ isActiveOnly: true });
-
-  // 1c. Sync Competitor Accounts from database + config/competitors.json + COMPETITOR_ACCOUNTS env var
-  const { createSourceAccount } = require('../src/database');
-  let gtaCompetitors = ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'];
-  let movieCompetitors = [];
-  let clubbingCompetitors = ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'];
-  let cultCompetitors = ['evolving.ai'];
-
-  const competitorsJsonPath = path.join(__dirname, '..', 'config', 'competitors.json');
-  if (fs.existsSync(competitorsJsonPath)) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(competitorsJsonPath, 'utf8'));
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        if (parsed.gta6 && Array.isArray(parsed.gta6)) gtaCompetitors = parsed.gta6;
-        if (parsed.movies && Array.isArray(parsed.movies)) movieCompetitors = parsed.movies;
-        if (parsed.clubbing && Array.isArray(parsed.clubbing)) clubbingCompetitors = parsed.clubbing;
-        if (parsed.cult_information && Array.isArray(parsed.cult_information)) cultCompetitors = parsed.cult_information;
-      } else if (Array.isArray(parsed)) {
-        gtaCompetitors = parsed;
+  // Seed default competitor sources ONLY for channels that currently have 0 sources monitored
+  // NEVER delete user-added competitor sources!
+  for (const page of pages) {
+    const existingSources = getSourceAccounts({ pageId: page.id });
+    if (existingSources.length === 0) {
+      const defaultMap = {
+        gta6: ['grandtheftauto6', 'gta6.only', 'paradoks.plays', 'gta6latest', 'rockstargames'],
+        clubbing: ['tomorrowland', 'ultra', 'edc_lasvegas', 'boilerroomtv', 'cerclemusic', 'elrowofficial', 'ushuaiaibiza', 'defectedrecords'],
+        cult_information: ['evolving.ai']
+      };
+      const defaults = defaultMap[page.slug] || [];
+      for (const comp of defaults) {
+        try {
+          createSourceAccount({ username: comp, page_id: page.id, is_active: 1 });
+        } catch (e) {}
       }
-    } catch (e) {
-      console.warn(`[Config Warning] Could not parse config/competitors.json: ${e.message}`);
     }
   }
 
-  if (process.env.COMPETITOR_ACCOUNTS) {
-    const fromEnv = process.env.COMPETITOR_ACCOUNTS.split(',').map(s => s.trim()).filter(Boolean);
-    gtaCompetitors.push(...fromEnv);
-  }
-
-  // Register GTA 6 sources for Page 1
-  const cleanGta = [...new Set(gtaCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-  try {
-    const placeholders = cleanGta.map(() => '?').join(',');
-    db.prepare(`DELETE FROM source_accounts WHERE page_id = 1 AND username NOT IN (${placeholders})`).run(...cleanGta);
-  } catch (e) {}
-  for (const comp of cleanGta) {
-    createSourceAccount({ username: comp, page_id: 1, is_active: 1 });
-    try { db.prepare('UPDATE source_accounts SET page_id = 1, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
-  }
-
-  // Register Movie sources for Page 2
-  const cleanMovies = [...new Set(movieCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-  if (cleanMovies.length === 0) {
-    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 2').run(); } catch (e) {}
-  } else {
-    try {
-      const placeholders = cleanMovies.map(() => '?').join(',');
-      db.prepare(`DELETE FROM source_accounts WHERE page_id = 2 AND username NOT IN (${placeholders})`).run(...cleanMovies);
-    } catch (e) {}
-    for (const comp of cleanMovies) {
-      createSourceAccount({ username: comp, page_id: 2, is_active: 1 });
-      try { db.prepare('UPDATE source_accounts SET page_id = 2, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
-    }
-  }
-
-  // Register Clubbing sources for Page 3
-  const cleanClubbing = [...new Set(clubbingCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-  if (cleanClubbing.length === 0) {
-    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 3').run(); } catch (e) {}
-  } else {
-    try {
-      const placeholders = cleanClubbing.map(() => '?').join(',');
-      db.prepare(`DELETE FROM source_accounts WHERE page_id = 3 AND username NOT IN (${placeholders})`).run(...cleanClubbing);
-    } catch (e) {}
-    for (const comp of cleanClubbing) {
-      createSourceAccount({ username: comp, page_id: 3, is_active: 1 });
-      try { db.prepare('UPDATE source_accounts SET page_id = 3, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
-    }
-  }
-
-  // Register Cult Information sources for Page 4
-  const cleanCult = [...new Set(cultCompetitors.map(c => c.replace(/^@/, '').toLowerCase().trim()))].filter(Boolean);
-  if (cleanCult.length === 0) {
-    try { db.prepare('DELETE FROM source_accounts WHERE page_id = 4').run(); } catch (e) {}
-  } else {
-    try {
-      const placeholders = cleanCult.map(() => '?').join(',');
-      db.prepare(`DELETE FROM source_accounts WHERE page_id = 4 AND username NOT IN (${placeholders})`).run(...cleanCult);
-    } catch (e) {}
-    for (const comp of cleanCult) {
-      createSourceAccount({ username: comp, page_id: 4, is_active: 1 });
-      try { db.prepare('UPDATE source_accounts SET page_id = 4, is_active = 1 WHERE username = ?').run(comp); } catch (e) {}
-    }
-  }
-
-  const allActiveSources = [...cleanGta, ...cleanMovies, ...cleanClubbing, ...cleanCult];
-  console.log(`🎯 Active tracked competitors (${allActiveSources.length}): GTA 6: [${cleanGta.map(c => '@' + c).join(', ')}] | Movies: [${cleanMovies.map(c => '@' + c).join(', ')}] | Clubbing: [${cleanClubbing.map(c => '@' + c).join(', ')}] | Cult Information: [${cleanCult.map(c => '@' + c).join(', ')}]`);
+  const allActiveSources = getSourceAccounts({ isActiveOnly: true });
+  console.log(`🎯 Active tracked competitor accounts in surveillance database: ${allActiveSources.length} accounts across ${pages.length} active channels.`);
 
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);

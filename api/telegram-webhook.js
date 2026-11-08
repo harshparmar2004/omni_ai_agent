@@ -57,15 +57,57 @@ async function answerCallbackQuery(queryId, text = '') {
   } catch (err) {}
 }
 
-function getPagesList() {
+let cachedPages = null;
+let lastPagesFetch = 0;
+
+async function getPagesList() {
+  const now = Date.now();
+  if (cachedPages && (now - lastPagesFetch < 60000)) {
+    return cachedPages;
+  }
+
+  // 1. If OMNI_SERVER_URL is provided, fetch dynamic pages from live backend vault
+  const serverUrl = (process.env.OMNI_SERVER_URL || process.env.OMNI_API_URL || '').trim().replace(/\/$/, '');
+  const masterKey = (process.env.OMNI_MASTER_KEY || 'omni_vault_master_secret').trim();
+
+  if (serverUrl) {
+    try {
+      const res = await axios.get(`${serverUrl}/api/system/vault/sync`, {
+        headers: { 'x-master-key': masterKey },
+        timeout: 4000
+      });
+      if (res.data && res.data.pages) {
+        const pagesArray = Object.values(res.data.pages).filter(p => p.is_active !== false).map(p => ({
+          id: String(p.id),
+          slug: p.slug || p.handle?.replace(/^@/, ''),
+          name: p.name,
+          handle: p.handle,
+          icon: p.slug?.includes('gta') ? '🎮' : (p.slug?.includes('club') ? '🪩' : (p.slug?.includes('movie') ? '🍿' : '💡'))
+        }));
+        if (pagesArray.length > 0) {
+          cachedPages = pagesArray;
+          lastPagesFetch = now;
+          return pagesArray;
+        }
+      }
+    } catch (e) {
+      console.warn('[Webhook] Remote vault pages fetch failed, falling back to local:', e.message);
+    }
+  }
+
+  // 2. Local config/pages.json
   try {
     const fs = require('fs');
     const path = require('path');
     const cfgPath = path.join(process.cwd(), 'config', 'pages.json');
     if (fs.existsSync(cfgPath)) {
-      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      cachedPages = parsed;
+      lastPagesFetch = now;
+      return parsed;
     }
   } catch (e) {}
+
   return [
     { id: '1', slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', icon: '🎮' },
     { id: '2', slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', icon: '🍿' },
@@ -125,7 +167,7 @@ module.exports = async function handler(req, res) {
     if (action === 'post' || action === 'retry') {
       const pageId = parts[1] || '1';
       const shortcode = parts[2];
-      const pages = getPagesList();
+      const pages = await getPagesList();
       const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };
 
       const cloudRunUrl = (process.env.CLOUD_RUN_WORKER_URL || process.env.CLOUD_RUN_URL || '').trim().replace(/\/$/, '');
@@ -243,7 +285,7 @@ module.exports = async function handler(req, res) {
   }
 
   if (text.startsWith('/pages')) {
-    const pages = getPagesList();
+    const pages = await getPagesList();
     let msg = `📱 <b>Connected OmniStudio Instagram Destinations (${pages.length}/4):</b>\n\n`;
     for (const p of pages) {
       msg += `${p.icon || '📱'} <b>${p.name}</b> (Page #${p.id})\n`;
@@ -371,7 +413,7 @@ module.exports = async function handler(req, res) {
   console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
 
   // Build Interactive Destination Page Selection Keyboard
-  const pages = getPagesList();
+  const pages = await getPagesList();
   const keyboard = [];
   for (const p of pages) {
     keyboard.push([

@@ -51,3 +51,4 @@ Thumbs.db
 *.traineddata
 test.png
 test.svg
+scripts/update_github_secrets.js

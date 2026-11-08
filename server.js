@@ -32,6 +32,10 @@ app.use('/api/watchtower', require('./src/routes/watchtower'));
 app.use('/api/sources', require('./src/routes/sources'));
 app.use('/api/discoveries', require('./src/routes/discoveries'));
 app.use('/api/pages', require('./src/routes/pages'));
+app.use('/api/groups', require('./src/routes/groups'));
+app.use('/api/distribution', require('./src/routes/distribution'));
+app.use('/api/pipeline', require('./src/routes/pipeline'));
+app.use('/api/studio', require('./src/routes/studio'));
 app.use('/api/system', require('./src/routes/system'));
 app.use('/api/settings', require('./src/routes/settings'));
 
@@ -63,6 +67,7 @@ if (require.main === module) {
     const jobWorkerPool = require('./src/core/jobWorker');
     const { startTelegramBot } = require('./src/agents/reposter/telegramBot');
     const watchtowerScheduler = require('./src/agents/watchtower/scheduler');
+    const distributionWorker = require('./src/core/distributionWorker');
     const { pruneExpiredMediaCache } = require('./src/core/mediaCleaner');
 
     // 1. Start self-healing Cloudflare public tunnel for Meta Graph API uploads
@@ -71,10 +76,13 @@ if (require.main === module) {
     // 2. Start shared publishing core job worker pool
     jobWorkerPool.start(3000);
 
-    // 3. Start Agent 1: Reposter Telegram bot listener
+    // 3. Start Multi-Page Distribution cross-post worker
+    distributionWorker.start(6000);
+
+    // 4. Start Agent 1: Reposter Telegram bot listener
     startTelegramBot().catch(e => console.warn('[Telegram Bot Boot Notice]:', e.message));
 
-    // 4. Start Agent 2: Watchtower 24/7 surveillance scheduler
+    // 5. Start Agent 2: Watchtower 24/7 surveillance scheduler
     watchtowerScheduler.start();
 
     // 5. Initial cleanup of expired temporary media

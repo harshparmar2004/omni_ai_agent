@@ -450,9 +450,14 @@ function generateStoryOverlay(handle, options = {}) {
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
   const typeLabel = options.typeLabel || 'NEW REEL';
-  const theme = options.theme || (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' : (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' : 'gta6'));
+  const theme = options.theme || (
+    cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
+    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' :
+    (cleanHandle.includes('cult') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation') ? 'video_essay' : 'gta6'))
+  );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+  const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
 
   // Compute or inherit dynamic geometry
   const computed = computeStoryCardGeometry(options.inputWidth || 1080, options.inputHeight || 1920);
@@ -479,6 +484,10 @@ function generateStoryOverlay(handle, options = {}) {
     bgGrad.addColorStop(0, 'rgba(8, 8, 12, 0.78)');
     bgGrad.addColorStop(0.5, 'rgba(22, 14, 18, 0.65)');
     bgGrad.addColorStop(1, 'rgba(6, 6, 8, 0.85)');
+  } else if (isVideoEssay) {
+    bgGrad.addColorStop(0, 'rgba(10, 10, 14, 0.96)');
+    bgGrad.addColorStop(0.5, 'rgba(18, 18, 24, 0.88)');
+    bgGrad.addColorStop(1, 'rgba(8, 8, 10, 0.96)');
   } else {
     bgGrad.addColorStop(0, 'rgba(10, 4, 24, 0.80)');
     bgGrad.addColorStop(0.5, 'rgba(28, 8, 45, 0.65)');
@@ -490,7 +499,7 @@ function generateStoryOverlay(handle, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.70)');
+  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.70)'));
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 
@@ -520,6 +529,11 @@ function generateStoryOverlay(handle, options = {}) {
     borderGrad.addColorStop(0.5, 'rgba(212, 175, 55, 0.55)'); // Amber Gold
     borderGrad.addColorStop(1, 'rgba(193, 18, 31, 0.75)');   // Velvet Crimson accent
     ctx.shadowColor = 'rgba(212, 175, 55, 0.40)';
+  } else if (isVideoEssay) {
+    borderGrad.addColorStop(0, '#CCFF00');   // Electric Lime
+    borderGrad.addColorStop(0.5, '#FFFFFF'); // Clean White Accent
+    borderGrad.addColorStop(1, '#A6FF00');   // Vivid Lime
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.50)';
   } else {
     borderGrad.addColorStop(0, '#00F0FF');   // Cyan glow
     borderGrad.addColorStop(0.5, '#F72585'); // Neon Pink
@@ -541,8 +555,8 @@ function generateStoryOverlay(handle, options = {}) {
 
   // 4. Top Header: Minimal Frosted Glass Badge
   ctx.save();
-  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : 'rgba(14, 14, 18, 0.88)';
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)');
+  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : (isVideoEssay ? 'rgba(14, 14, 18, 0.95)' : 'rgba(14, 14, 18, 0.88)');
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.60)' : 'rgba(247, 37, 133, 0.35)'));
   ctx.lineWidth = 1.5;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
   ctx.shadowBlur = 12;
@@ -565,6 +579,8 @@ function generateStoryOverlay(handle, options = {}) {
     ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, headerY + headerH / 2);
   } else if (isMovie) {
     ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
+  } else if (isVideoEssay) {
+    ctx.fillText(`⚡ ${cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'}  |  Daily Knowledge`, width / 2, headerY + headerH / 2);
   } else {
     ctx.fillText(`@${cleanHandle}  |  Official News & Leaks`, width / 2, headerY + headerH / 2);
   }
@@ -580,6 +596,10 @@ function generateStoryOverlay(handle, options = {}) {
     ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
     ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
     ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
+  } else if (isVideoEssay) {
+    ctaGrad.addColorStop(0, '#CCFF00');
+    ctaGrad.addColorStop(1, '#99E600');
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.60)';
   } else {
     ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.90)');
     ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.90)');
@@ -587,7 +607,7 @@ function generateStoryOverlay(handle, options = {}) {
   }
   ctx.shadowBlur = 14;
   ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : 'rgba(255, 255, 255, 0.25)';
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.8)' : 'rgba(255, 255, 255, 0.25)');
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   if (ctx.roundRect) {
@@ -599,14 +619,16 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.stroke();
   ctx.restore();
 
-  ctx.fillStyle = isClubbing ? '#051209' : '#FFFFFF';
-  ctx.font = 'bold 19px Arial, sans-serif';
+  ctx.fillStyle = isClubbing ? '#051209' : (isVideoEssay ? '#000000' : '#FFFFFF');
+  ctx.font = isVideoEssay ? '900 20px Arial, sans-serif' : 'bold 19px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (isClubbing) {
     ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
   } else if (isMovie) {
     ctx.fillText('Watch Full Scene  >', width / 2, ctaY + ctaH / 2);
+  } else if (isVideoEssay) {
+    ctx.fillText('⚡ Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
   } else {
     ctx.fillText('Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
   }
@@ -914,7 +936,8 @@ function generateClubbingCyberOverlay(handle, options = {}) {
   drawChamferedRect(ctx, badgeX + 4, headerY + 4, badgeW - 8, badgeH - 8, headerCut - 2);
   ctx.stroke();
 
-  const topBadgeText = isVertical ? `@ C L U B B I N G C U L T` : `C L U B B I N G   C U L T`;
+  const rawClubName = (options.page?.name || (cleanHandle.includes('clubbing') ? 'Clubbing Cult' : cleanHandle.replace(/_/g, ' '))).trim();
+  const topBadgeText = isVertical ? `@ ${rawClubName.toUpperCase().split('').join(' ')}` : rawClubName.toUpperCase().split('').join('   ');
   ctx.font = '900 21px "Arial Black", Arial, sans-serif';
   ctx.fillStyle = '#E8FFF4';
   ctx.textAlign = 'center';
@@ -1101,7 +1124,7 @@ function parseHeadlineTokens(rawHeadline) {
     const words = clean.split(/\s+/);
     let highlightCount = 0;
     const maxAutoHighlights = 2;
-    const viralPattern = /^(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\d+[-a-zA-Z0-9]+|world's|first|secret|unveiled|record|million|billion|trillion|blackwell|breakthrough)$/i;
+    const viralPattern = /^(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|revolution|future)$/i;
 
     const stopWords = new Set([
       'about','above','after','again','against','all','also','and','any','because','been',
@@ -1386,14 +1409,14 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   // 3. Ergonomic Downward Layout & Spacing:
   // Dynamically position Cult Information logo & headline closer to the video (cardY),
   // leaving comfortable top margin below Instagram chrome and ensuring 100% black belt coverage!
-  const marginX = 56;
+  const marginX = 54;
   const maxTextWidth = width - (marginX * 2);
-  const avatarSize = 84;
-  const lineHeight = 56;
-  const spaceAboveVideo = 44; // Comfortable space between headline bottom and video top
-  const spaceBetweenHeaderAndHeadline = 24;
+  const avatarSize = 118; // Prominent, high-impact brand logo (was 84px)
+  const lineHeight = 62;
+  const spaceAboveVideo = 36;
+  const spaceBetweenHeaderAndHeadline = 28;
 
-  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1407,24 +1430,40 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   const lines = wrapTokens(ctx, tokens, maxTextWidth);
   const totalTextHeight = lines.length * lineHeight;
 
-  // Calculate dynamic downward anchor:
-  // Headline ends spaceAboveVideo (44px) above the video cutout (cardY)
-  const defaultHeadlineY = cardY - spaceAboveVideo - totalTextHeight;
-  const headlineY = options.headlineY !== undefined ? options.headlineY : Math.max(380, defaultHeadlineY);
+  // 3. Ergonomic Top-Anchored & Responsive Ratio Layout:
+  const minSafeTopMargin = 124; // Clean margin below Instagram's top header bar
+  const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
 
-  // Position Cult Information logo/header above the headline (shifted downward from top edge)
-  const defaultHeaderTopY = headlineY - spaceBetweenHeaderAndHeadline - avatarSize;
-  const headerTopY = options.headerTopY !== undefined ? options.headerTopY : Math.max(260, defaultHeaderTopY);
+  let headerTopY;
+  let headlineY;
 
-  // Circular Logo Avatar (84px diameter)
+  if (options.headerTopY !== undefined && options.headlineY !== undefined) {
+    headerTopY = options.headerTopY;
+    headlineY = options.headlineY;
+  } else {
+    const availableTopSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+
+    if (availableTopSpace >= totalBrandingHeight + 30) {
+      const idealHeaderY = minSafeTopMargin + Math.round((availableTopSpace - totalBrandingHeight) / 2);
+      headerTopY = Math.min(Math.max(minSafeTopMargin, idealHeaderY), 190);
+      headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+    } else {
+      headerTopY = Math.max(100, Math.min(minSafeTopMargin, cardY - totalBrandingHeight - spaceAboveVideo));
+      headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+    }
+  }
+
+  // Circular Logo Avatar (118px diameter)
   const avatarCenter = marginX + avatarSize / 2;
   const avatarCenterY = headerTopY + avatarSize / 2;
   const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
   const candidateAvatarPaths = [
     options.avatarPath,
+    options.page?.avatar_path,
     path.join(brandingDir, `${cleanHandle}_avatar.png`),
     path.join(brandingDir, `${cleanHandle}_avatar.jpg`),
     path.join(brandingDir, 'cult_information_avatar.png'),
+    path.join(brandingDir, 'cult_information_avatar.jpg'),
     path.join(brandingDir, 'cult_information_logo_master.png'),
     path.join(brandingDir, 'cult_avatar.png'),
     path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.png`),
@@ -1432,6 +1471,14 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   ].filter(Boolean);
 
   const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
+
+  // Solid dark backdrop for avatar circle
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#08080A';
+  ctx.fill();
+  ctx.restore();
 
   ctx.save();
   ctx.beginPath();
@@ -1449,55 +1496,59 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   } else {
     // Dynamic Modern Monogram based on actual page name
     const bgGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
-    bgGrad.addColorStop(0, '#1C1C1E');
-    bgGrad.addColorStop(1, '#0C0C0E');
+    bgGrad.addColorStop(0, '#1E1E24');
+    bgGrad.addColorStop(1, '#0A0A0F');
     ctx.fillStyle = bgGrad;
     ctx.fill();
 
     const words = (pageName || 'Channel').trim().split(/\s+/);
     const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 
-    ctx.fillStyle = '#c1d82f'; // Cult signature lime
-    ctx.font = '900 30px "Arial Black", -apple-system, sans-serif';
+    ctx.fillStyle = options.highlightColor || '#c1d82f'; // Cult signature lime
+    ctx.font = '900 42px "Arial Black", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, avatarCenter, avatarCenterY);
   }
   ctx.restore();
 
-  // Avatar border ring with brand lime accent & subtle ambient glow
+  // Signature Cult Neon Lime Double Glow Border Ring
+  const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult neon lime green
   ctx.save();
   ctx.beginPath();
-  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
-  ctx.strokeStyle = '#c1d82f';
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = 'rgba(193, 216, 47, 0.4)';
-  ctx.shadowBlur = 8;
+  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
+  ctx.strokeStyle = highlightColor;
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = 'rgba(193, 216, 47, 0.5)';
+  ctx.shadowBlur = 14;
   ctx.stroke();
   ctx.restore();
 
   // Page Name + Verified Badge
-  const textLeftX = marginX + avatarSize + 20;
+  const textLeftX = marginX + avatarSize + 22;
   ctx.save();
-  ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = 'bold 36px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'middle';
-  ctx.fillText(pageName, textLeftX, headerTopY + 26);
+  const nameCenterY = headerTopY + 38;
+  ctx.fillText(pageName, textLeftX, nameCenterY);
 
   const nameWidth = ctx.measureText(pageName).width;
-  drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, headerTopY + 14, 22);
+  const badgeSize = 24;
+  drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
 
   // Handle below name
-  ctx.font = '500 21px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  ctx.fillStyle = '#999999'; // iOS muted gray
-  ctx.fillText(cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle, textLeftX, headerTopY + 62);
+  ctx.font = '500 24px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  ctx.fillStyle = '#A0A0AB'; // Sleek iOS silver
+  ctx.textBaseline = 'middle';
+  const handleCenterY = headerTopY + 80;
+  const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
+  ctx.fillText(displayHandle, textLeftX, handleCenterY);
   ctx.restore();
 
   // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
-  const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult lime green
-
   ctx.save();
-  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
   ctx.textBaseline = 'top';
   const spaceWidth = ctx.measureText(' ').width;
 
@@ -1527,7 +1578,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
  * Theme-aware: 'movies' (cinematic gold/amber/crimson) vs 'gta6' (Vice City neon cyan/pink) vs 'clubbing' (Cyberpunk HUD) vs 'evolving_ai' (Minimalist Video-Essay).
  */
 async function generateFeedPostOverlay(handle, options = {}) {
-  const { createCanvas } = require('@napi-rs/canvas');
+  const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const width = 1080;
   const height = 1920;
   const canvas = createCanvas(width, height);
@@ -1544,11 +1595,11 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
   const theme = options.theme || (
     (cleanHandle.includes('clubbing') || (options.page && options.page.slug === 'clubbing')) ? 'clubbing' :
-    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies')) ? 'movies' :
+    (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') || options.page?.slug === 'cinema') ? 'movies' :
     (cleanHandle.includes('cult_info') || cleanHandle.includes('cultinformation') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation')) ? 'video_essay' : 'gta6'
   );
-  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
-  const isMovie = theme === 'movies';
+  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult' || theme === 'neon';
+  const isMovie = theme === 'movies' || theme === 'cinema' || theme === 'movie';
   const isVideoEssay = theme === 'video_essay' || theme === 'evolving_ai' || theme === 'cult_information' || theme === 'ai_curation';
 
   if (isClubbing) {
@@ -1799,61 +1850,289 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
     ctx.restore();
   } else {
-    // Existing Top Account Badge for Movies & GTA 6
-    const badgeY = isVertical ? 145 : Math.max(90, cardY - 60);
-    const text = isMovie ? `@${cleanHandle.toLowerCase()}  |  Cinema Picks` : '@' + cleanHandle.toLowerCase();
+    // 5. Top Safe-Zone Header for GTA 6, Movies, and Other Custom Themes
+    const isGTA6 = theme === 'gta6' || theme === 'gta' || (!isMovie && !isClubbing && !isVideoEssay);
+    const highlightColor = isMovie ? '#FFD166' : (isGTA6 ? '#00F0FF' : (options.highlightColor || '#38BDF8'));
+    const secondaryColor = isMovie ? '#FFB703' : (isGTA6 ? '#F72585' : '#0284C7');
 
-    ctx.save();
-    ctx.font = isMovie ? 'bold 20px "Helvetica Neue", Arial, sans-serif' : '900 24px Impact, Arial Black, sans-serif';
-    const textMetrics = ctx.measureText(text);
-    const padX = 28;
-    const boxW = textMetrics.width + padX * 2;
-    const boxH = 50;
-    const boxX = (width - boxW) / 2;
-    const boxY = badgeY - boxH / 2;
-    const radius = 6;
+    const defaultNames = {
+      gta6: 'GTA 6 Updates 007',
+      movies: 'Cinema & Movie Picks',
+      cinema: 'Cinema & Movie Picks',
+      clubbing: 'Clubbing Cult',
+      video_essay: 'Cult Information',
+      default: cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    };
+    const pageName = options.pageName || options.page?.name || defaultNames[theme] || (isMovie ? defaultNames.movies : (isGTA6 ? defaultNames.gta6 : defaultNames.default));
 
-    // Outer glow
-    ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.65)' : 'rgba(247, 37, 133, 0.7)';
-    ctx.shadowBlur = 18;
+    const defaultHooks = {
+      gta6: 'Rockstar Just Confirmed A **Massive New Feature** For GTA VI',
+      movies: 'The **Most Mind-Bending** Cinematic Thriller You Cannot Miss',
+      cinema: 'The **Most Mind-Bending** Cinematic Thriller You Cannot Miss',
+      clubbing: 'The **Wildest Underground Festival** Moment That Went Viral',
+      video_essay: 'Breakthrough AI Technology Is Evolving Faster Than **Anyone Expected**',
+      default: 'The **Biggest Announcement** That Everyone Is Talking About'
+    };
+    const rawHook = options.hookHeadline || options.headline || defaultHooks[theme] || (isMovie ? defaultHooks.movies : (isGTA6 ? defaultHooks.gta6 : defaultHooks.default));
+    const cleanHeadline = (rawHook || '')
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
+      .replace(/\n+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^["'“”\s]+/, '')
+      .replace(/["'“”\s]+$/, '')
+      .trim();
 
-    // Dark glass background
-    ctx.fillStyle = isMovie ? 'rgba(12, 10, 14, 0.94)' : 'rgba(10, 3, 24, 0.94)';
-    ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, radius);
-    ctx.fill();
+    const marginX = 54;
+    const maxTextWidth = width - (marginX * 2);
+    const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
+    const candidateAvatarPaths = [
+      options.avatarPath,
+      options.page?.avatar_path,
+      path.join(brandingDir, `${cleanHandle}_avatar.png`),
+      path.join(brandingDir, `${cleanHandle}_avatar.jpg`),
+      path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.png`),
+      path.join(brandingDir, `${options.page?.slug || 'page'}_avatar.jpg`),
+      path.join(brandingDir, isMovie ? 'movies_avatar.png' : 'gta6_avatar.png'),
+      path.join(brandingDir, isMovie ? 'movie_series_365_avatar.png' : 'gta6_updates_007_avatar.png'),
+      path.join(brandingDir, 'cult_information_avatar.png')
+    ].filter(Boolean);
 
-    // Border (3.5px)
-    const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
-    if (isMovie) {
-      boxGrad.addColorStop(0, '#FFD166');
-      boxGrad.addColorStop(0.5, '#FFB703');
-      boxGrad.addColorStop(1, '#E5A93C');
+    const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
+
+    // When cardY is >= 350 (standard feed card layout, landscape, square, or letterboxed reels)
+    if (cardY >= 350) {
+      const avatarSize = 118;
+      const lineHeight = 62;
+      const spaceAboveVideo = 36;
+      const spaceBetweenHeaderAndHeadline = 26;
+
+      ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      const tokens = parseHeadlineTokens(cleanHeadline);
+      const lines = wrapTokens(ctx, tokens, maxTextWidth);
+      const totalTextHeight = lines.length * lineHeight;
+      const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
+
+      const minSafeTopMargin = 124;
+      const availableTopSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+      let headerTopY, headlineY;
+
+      if (availableTopSpace >= totalBrandingHeight + 30) {
+        const idealHeaderY = minSafeTopMargin + Math.round((availableTopSpace - totalBrandingHeight) / 2);
+        headerTopY = Math.min(Math.max(minSafeTopMargin, idealHeaderY), 190);
+        headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+      } else {
+        headerTopY = Math.max(100, Math.min(minSafeTopMargin, cardY - totalBrandingHeight - spaceAboveVideo));
+        headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+      }
+
+      const avatarCenter = marginX + avatarSize / 2;
+      const avatarCenterY = headerTopY + avatarSize / 2;
+
+      // 1. Avatar Backdrop & Clipping
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+      ctx.fillStyle = isMovie ? '#1A0E04' : (isGTA6 ? '#130424' : '#0B0F19');
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      if (existingAvatarPath) {
+        try {
+          const avatarImg = await loadImage(existingAvatarPath);
+          ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
+        } catch (e) {
+          console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
+        }
+      } else {
+        const bgGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
+        if (isMovie) {
+          bgGrad.addColorStop(0, '#2D1B06');
+          bgGrad.addColorStop(1, '#0F0903');
+        } else if (isGTA6) {
+          bgGrad.addColorStop(0, '#240046');
+          bgGrad.addColorStop(1, '#090212');
+        } else {
+          bgGrad.addColorStop(0, '#1E293B');
+          bgGrad.addColorStop(1, '#0F172A');
+        }
+        ctx.fillStyle = bgGrad;
+        ctx.fill();
+
+        const words = (pageName || 'Channel').trim().split(/\s+/);
+        const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
+        ctx.fillStyle = highlightColor;
+        ctx.font = '900 44px "Arial Black", Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initials, avatarCenter, avatarCenterY);
+      }
+      ctx.restore();
+
+      // 2. Dual-Glow Neon Avatar Ring
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
+      const ringGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
+      ringGrad.addColorStop(0, highlightColor);
+      ringGrad.addColorStop(1, secondaryColor);
+      ctx.strokeStyle = ringGrad;
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.75)' : (isGTA6 ? 'rgba(247, 37, 133, 0.8)' : 'rgba(56, 189, 248, 0.7)');
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Page Name & Verified Badge
+      const textLeftX = marginX + avatarSize + 22;
+      ctx.save();
+      ctx.font = 'bold 36px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textBaseline = 'middle';
+      const nameCenterY = headerTopY + 38;
+      ctx.fillText(pageName, textLeftX, nameCenterY);
+
+      const nameWidth = ctx.measureText(pageName).width;
+      const badgeSize = 24;
+      drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
+
+      // 4. Handle below Page Name
+      ctx.font = '500 24px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#A0A0AB';
+      ctx.textBaseline = 'middle';
+      const handleCenterY = headerTopY + 80;
+      const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
+      ctx.fillText(displayHandle, textLeftX, handleCenterY);
+      ctx.restore();
+
+      // 5. Punchy Viral Hook Headline with Theme Highlight
+      ctx.save();
+      ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.textBaseline = 'top';
+      const spaceWidth = ctx.measureText(' ').width;
+
+      lines.forEach((lineTokens, lineIdx) => {
+        let currentX = marginX;
+        const currentY = headlineY + (lineIdx * lineHeight);
+        for (const token of lineTokens) {
+          ctx.fillStyle = token.highlight ? highlightColor : '#FFFFFF';
+          ctx.fillText(token.text, currentX, currentY);
+          currentX += ctx.measureText(token.text).width + spaceWidth;
+        }
+      });
+      ctx.restore();
     } else {
-      boxGrad.addColorStop(0, '#00F0FF');
-      boxGrad.addColorStop(0.5, '#F72585');
-      boxGrad.addColorStop(1, '#FF8A00');
+      // Full-bleed vertical video (cardY < 350): Render a floating frosted glass banner at top
+      const bannerY = 120;
+      const bannerH = 92;
+      const bannerW = width - (marginX * 2);
+      const bannerX = marginX;
+      const bannerRadius = 22;
+
+      ctx.save();
+      // Frosted obsidian glass
+      ctx.fillStyle = isMovie ? 'rgba(16, 10, 6, 0.90)' : (isGTA6 ? 'rgba(14, 4, 26, 0.90)' : 'rgba(8, 12, 20, 0.90)');
+      ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.5)' : (isGTA6 ? 'rgba(247, 37, 133, 0.6)' : 'rgba(56, 189, 248, 0.5)');
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.roundRect(bannerX, bannerY, bannerW, bannerH, bannerRadius);
+      ctx.fill();
+
+      // Gradient border
+      const bGrad = ctx.createLinearGradient(bannerX, bannerY, bannerX + bannerW, bannerY + bannerH);
+      bGrad.addColorStop(0, highlightColor);
+      bGrad.addColorStop(1, secondaryColor);
+      ctx.strokeStyle = bGrad;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Inner subtle border
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(bannerX + 2, bannerY + 2, bannerW - 4, bannerH - 4, bannerRadius - 2);
+      ctx.stroke();
+
+      // Compact Avatar (64px)
+      const avSize = 64;
+      const avX = bannerX + 16;
+      const avY = bannerY + 14;
+      const avCx = avX + avSize / 2;
+      const avCy = avY + avSize / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avCx, avCy, avSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      if (existingAvatarPath) {
+        try {
+          const avatarImg = await loadImage(existingAvatarPath);
+          ctx.drawImage(avatarImg, avX, avY, avSize, avSize);
+        } catch (_) {}
+      } else {
+        ctx.fillStyle = isMovie ? '#2D1B06' : '#240046';
+        ctx.fill();
+        ctx.fillStyle = highlightColor;
+        ctx.font = '900 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(pageName.slice(0, 2).toUpperCase(), avCx, avCy);
+      }
+      ctx.restore();
+
+      // Avatar neon ring
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(avCx, avCy, avSize / 2 + 1, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Page Name + Verified Badge
+      const tX = avX + avSize + 18;
+      ctx.font = 'bold 28px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(pageName, tX, bannerY + 33);
+
+      const pWidth = ctx.measureText(pageName).width;
+      drawVerifiedBadge(ctx, tX + pWidth + 10, bannerY + 21, 22);
+
+      // Handle below name
+      ctx.font = '500 20px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.fillStyle = '#A0A0AB';
+      const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
+      ctx.fillText(displayHandle, tX, bannerY + 65);
+
+      // Right-aligned theme badge
+      const tagText = isMovie ? 'CINEMA PICKS' : (isGTA6 ? 'GTA VI' : 'OFFICIAL');
+      ctx.font = '900 16px "Arial Black", Arial, sans-serif';
+      const tagW = ctx.measureText(tagText).width + 24;
+      const tagH = 32;
+      const tagX = bannerX + bannerW - tagW - 20;
+      const tagY = bannerY + (bannerH - tagH) / 2;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(tagX, tagY, tagW, tagH, 8);
+      ctx.fill();
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = highlightColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 1);
+
+      ctx.restore();
     }
-    ctx.strokeStyle = boxGrad;
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    // Inner subtle accent
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(boxX + 3, boxY + 3, boxW - 6, boxH - 6, Math.max(2, radius - 2));
-    ctx.stroke();
-
-    // Account text
-    ctx.fillStyle = '#FFFFFF';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-    ctx.shadowBlur = 5;
-    ctx.fillText(text, width / 2, badgeY);
-    ctx.restore();
   }
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -1929,9 +2208,10 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
         cardW = 1080;
         cardH = Math.round(cardW / activeAspect);
+        if (cardH > 1150) cardH = 1150;
         cardH = Math.floor(cardH / 2) * 2;
         cardX = 0;
-        cardY = Math.round((1920 - cardH) / 2); // 656px for 16:9
+        cardY = Math.max(380, Math.round((1920 - cardH) / 2)); // Guaranteed safe top space for branding
 
         console.log(`[FFmpeg Helper] ✂️ Auto-Cropped active video bounds: Y=${cropY} H=${cropH} -> Framed to ${cardW}x${cardH} at Y=${cardY}`);
         videoFilter = [
@@ -1974,13 +2254,13 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
         '[v1][1:v]overlay=0:0[outv]'
       ].join(';');
     } else {
-      // 4:5 or standard portrait
+      // 4:5 or standard portrait: ensure zero collision with top branding
       cardW = 1080;
       cardH = Math.round(cardW / aspect);
-      if (cardH > 1300) cardH = 1300;
+      if (cardH > 1150) cardH = 1150;
       cardH = Math.floor(cardH / 2) * 2;
       cardX = 0;
-      cardY = Math.round((1920 - cardH) / 2);
+      cardY = Math.max(380, Math.round((1920 - cardH) / 2));
 
       videoFilter = [
         `[0:v]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},pad=1080:1920:${cardX}:${cardY}:color=black[v1]`,
@@ -2000,16 +2280,42 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
         '[v1][1:v]overlay=0:0[outv]'
       ].join(';');
     } else {
-      // 9:16 Full Screen Immersion with narrow boundaries
-      cardW = 1032;
-      cardH = 1872;
-      cardX = 24;
-      cardY = 24;
+      const bounds = await detectActiveVideoBounds(absPath);
+      if (bounds && bounds.isLetterboxed && bounds.height > 100) {
+        // Letterboxed video (e.g. movie/gameplay clip with black bars):
+        // Automatically crop active video window to eliminate competitor black bars/headers
+        const cropY = Math.max(0, Math.floor(bounds.startY / 2) * 2);
+        const cropH = Math.floor(bounds.height / 2) * 2;
+        const activeAspect = inW / cropH;
 
-      videoFilter = [
-        '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
-        '[v1][1:v]overlay=0:0[outv]'
-      ].join(';');
+        cardW = 1032;
+        cardH = Math.round(cardW / activeAspect);
+        if (cardH > 1150) cardH = 1150;
+        cardH = Math.floor(cardH / 2) * 2;
+        cardX = Math.round((1080 - cardW) / 2);
+        cardY = Math.max(420, Math.round((1920 - cardH) / 2));
+
+        console.log(`[FFmpeg Helper] ✂️ Auto-Cropped active bounds for ${theme}: Y=${cropY} H=${cropH} -> Framed to ${cardW}x${cardH} at Y=${cardY}`);
+        videoFilter = [
+          `[0:v]crop=in_w:${cropH}:0:${cropY}[cropped]`,
+          `[cropped]split=2[bg_raw][fg_raw]`,
+          `[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]`,
+          `[fg_raw]scale=${cardW}:${cardH}[card]`,
+          `[bg][card]overlay=${cardX}:${cardY}[v1]`,
+          `[v1][1:v]overlay=0:0[outv]`
+        ].join(';');
+      } else {
+        // 9:16 Full Screen Immersion with narrow boundaries
+        cardW = 1032;
+        cardH = 1872;
+        cardX = 24;
+        cardY = 24;
+
+        videoFilter = [
+          '[0:v]scale=1032:1872:force_original_aspect_ratio=increase,crop=1032:1872,pad=1080:1920:24:24:color=black[v1]',
+          '[v1][1:v]overlay=0:0[outv]'
+        ].join(';');
+      }
     }
   } else {
     // Landscape (16:9) or Square (1:1) / Portrait (4:5)
@@ -2044,7 +2350,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       cardW = Math.floor(cardW / 2) * 2;
       cardH = Math.floor(cardH / 2) * 2;
       cardX = Math.round((1080 - cardW) / 2);
-      cardY = Math.round((1920 - cardH) / 2);
+      cardY = Math.max(420, Math.round((1920 - cardH) / 2));
 
       videoFilter = [
         '[0:v]split=2[bg_raw][fg_raw]',
@@ -2132,9 +2438,14 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   }
 
   const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
-  const theme = options.theme || (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' : 'gta6'));
+  const theme = options.theme || (
+    handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' :
+    (handle.includes('cult') || options.page?.slug === 'cult_information' || handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6'))
+  );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+  const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
 
   const { execSync } = require('child_process');
   let duration = 0;
@@ -2163,7 +2474,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   const base = path.basename(absPath, ext);
   const storyOutput = path.join(dir, `${base}_story_card.mp4`);
 
-  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : 'GTA 6');
+  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Editorial' : 'GTA 6'));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Instagram Story Reel Card for @${handle} (${videoWidth}x${videoHeight} -> Card ${geom.cardW}x${geom.cardH} @ ${geom.cardX},${geom.cardY})...`);
 
   const filter = [
@@ -2238,9 +2549,14 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const cleanHandle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
-  const theme = options.theme || (cleanHandle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' : (options.page?.slug === 'movies' || cleanHandle.includes('movie') ? 'movies' : 'gta6'));
+  const theme = options.theme || (
+    cleanHandle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    (options.page?.slug === 'movies' || cleanHandle.includes('movie') ? 'movies' :
+    (cleanHandle.includes('cult') || options.page?.slug === 'cult_information' || cleanHandle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6'))
+  );
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
+  const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
 
   const width = 1080;
   const height = 1920;

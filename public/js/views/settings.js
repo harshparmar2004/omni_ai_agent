@@ -11,6 +11,7 @@ window.settingsView = (function() {
   let activePostMode = 'review';
   let activeNightCooldown = '1';
   let activeSurveillanceState = '0';
+  let active247Mode = '1';
 
   /**
    * Reusable Settings Section Component
@@ -246,6 +247,34 @@ window.settingsView = (function() {
               </div>
             </div>
           `
+        }),
+        createSettingRow({
+          title: '24/7 Autonomous Publishing Mode',
+          description: 'When enabled, newly discovered viral competitor reels are paced and published 24/7 round the clock without waiting for daytime peak windows.',
+          hint: '24/7 mode bypasses night blackout pauses so your pages publish continuously.',
+          control: `
+            <div class="settings-choice-segmented">
+              <div class="settings-choice-btn active" id="card-247-1" onclick="settingsView.select247Mode('1')">
+                <div class="settings-choice-label">24/7 Continuous</div>
+                <div class="settings-choice-sub">Post anytime reels appear</div>
+              </div>
+              <div class="settings-choice-btn" id="card-247-0" onclick="settingsView.select247Mode('0')">
+                <div class="settings-choice-label">Peak Windows Only</div>
+                <div class="settings-choice-sub">Paced into Indian prime time</div>
+              </div>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Instagram Scout Session ID (Cloud Scraper Bypass)',
+          description: 'Session cookie from a secondary scout Instagram account. Allows headless browser scraping on Render, Railway, or AWS datacenter IPs without getting redirected to login.',
+          hint: 'Grab the sessionid cookie value from instagram.com via browser DevTools (Application > Cookies).',
+          control: `
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <input type="password" id="st-ig-session-id" class="settings-input settings-input-mono" placeholder="Paste sessionid cookie value">
+              <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-ig-session-id', this)">Show</button>
+            </div>
+          `
         })
       ].join('')
     });
@@ -429,6 +458,40 @@ window.settingsView = (function() {
       ].join('')
     });
 
+    // ── SECTION 06: Zero-Env Multi-Tenant Credential Vault ───────
+    const sectionVaultHtml = createSettingsSection({
+      title: 'Zero-Env Multi-Tenant Credential Vault',
+      description: 'Single-source-of-truth credential management for 50-100+ pages. Deploy on Render or Railway without configuring separate env vars for each page.',
+      content: [
+        createSettingRow({
+          title: 'Master API Secret Key',
+          description: 'Authenticate remote cron runners, distributed workers, and cloud instances to pull page access tokens from this server via /api/system/vault/sync.',
+          hint: 'Keep this private. Setting OMNI_MASTER_KEY on remote workers syncs all 50-100+ pages instantly.',
+          control: `
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <input type="password" id="st-master-key" class="settings-input settings-input-mono" placeholder="omni_vault_master_secret">
+              <button type="button" class="settings-btn-outlined" style="height: 40px; padding: 0 14px;" onclick="settingsView.togglePassword('st-master-key', this)">Show</button>
+            </div>
+          `
+        }),
+        createSettingRow({
+          title: 'Vault Backup & Portability',
+          description: 'Export all connected destination accounts, credentials, and templates in an encrypted JSON snapshot to restore anywhere in 1 click.',
+          hint: 'Restore on Render, Railway, or local testing instantly without re-typing page tokens.',
+          control: `
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-outline" onclick="settingsView.exportVault()" style="height: 40px; font-size: 0.82rem; padding: 0 14px;">
+                📥 Export Vault JSON
+              </button>
+              <button type="button" class="btn btn-outline" onclick="settingsView.importVaultPrompt()" style="height: 40px; font-size: 0.82rem; padding: 0 14px;">
+                📤 Import Vault
+              </button>
+            </div>
+          `
+        })
+      ].join('')
+    });
+
     container.innerHTML = `
       <div class="settings-container">
         <!-- Clean Header -->
@@ -453,6 +516,7 @@ window.settingsView = (function() {
         ${section3Html}
         ${section4Html}
         ${section5Html}
+        ${sectionVaultHtml}
 
         <!-- Bottom Save Bar -->
         <div class="settings-card-v2" style="padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px;">
@@ -516,6 +580,21 @@ window.settingsView = (function() {
     }
   }
 
+  function select247Mode(val) {
+    active247Mode = val;
+    const card1 = document.getElementById('card-247-1');
+    const card0 = document.getElementById('card-247-0');
+    if (card1 && card0) {
+      if (val === '1') {
+        card1.classList.add('active');
+        card0.classList.remove('active');
+      } else {
+        card0.classList.add('active');
+        card1.classList.remove('active');
+      }
+    }
+  }
+
   function updateCadenceButtons(hours) {
     const segmented = document.getElementById('st-cadence-segmented');
     if (!segmented) return;
@@ -575,6 +654,10 @@ window.settingsView = (function() {
 
       selectNightCooldown(s.watchtower_night_cooldown === '0' ? '0' : '1');
       selectSurveillanceState(s.watchtower_paused === '1' ? '1' : '0');
+      select247Mode(s.watchtower_247_mode === 'false' ? '0' : '1');
+
+      const igSession = document.getElementById('st-ig-session-id');
+      if (igSession && s.instagram_session_id) igSession.value = s.instagram_session_id;
 
       // 3. Cloudflare Tunnel
       const tunnelUrl = document.getElementById('st-tunnel-url');
@@ -605,6 +688,10 @@ window.settingsView = (function() {
       const groqKey = document.getElementById('st-groq-key');
       if (geminiKey && s.gemini_api_key) geminiKey.value = s.gemini_api_key;
       if (groqKey && s.groq_api_key) groqKey.value = s.groq_api_key;
+
+      // 6. Zero-Env Vault
+      const masterKey = document.getElementById('st-master-key');
+      if (masterKey) masterKey.value = s.omni_master_key || 'omni_vault_master_secret';
 
       // Run health check
       await runDiagnostics();
@@ -706,6 +793,10 @@ window.settingsView = (function() {
     if (wtMinScore) payload.min_score_threshold = wtMinScore;
     payload.watchtower_paused = activeSurveillanceState;
     payload.watchtower_night_cooldown = activeNightCooldown;
+    payload.watchtower_247_mode = active247Mode === '1' ? 'true' : 'false';
+
+    const igSession = document.getElementById('st-ig-session-id')?.value?.trim();
+    if (igSession) payload.instagram_session_id = igSession;
 
     // 3. Storage
     const retention = document.getElementById('st-retention-hours')?.value?.trim();
@@ -723,6 +814,7 @@ window.settingsView = (function() {
     const aiProvider = document.getElementById('st-ai-provider')?.value;
     const geminiKey = document.getElementById('st-gemini-key')?.value?.trim();
     const groqKey = document.getElementById('st-groq-key')?.value?.trim();
+    const masterKey = document.getElementById('st-master-key')?.value?.trim();
 
     if (contentType) payload.default_content_type = contentType;
     if (brandHandle) payload.brand_handle = brandHandle;
@@ -733,6 +825,7 @@ window.settingsView = (function() {
     if (aiProvider) payload.default_provider = aiProvider;
     if (geminiKey) payload.gemini_api_key = geminiKey;
     if (groqKey) payload.groq_api_key = groqKey;
+    if (masterKey) payload.omni_master_key = masterKey;
 
     try {
       const res = await fetch('/api/settings', {
@@ -895,12 +988,51 @@ window.settingsView = (function() {
     }
   }
 
+  async function exportVault() {
+    try {
+      const res = await fetch('/api/system/vault');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `omni-vault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      app.toast('Vault backup exported successfully!', 'success');
+    } catch (err) {
+      app.toast('Vault export failed: ' + err.message, 'error');
+    }
+  }
+
+  async function importVaultPrompt() {
+    const jsonStr = prompt('Paste your Vault JSON or Base64 string to import all pages and credentials:');
+    if (!jsonStr) return;
+    try {
+      const res = await fetch('/api/system/vault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vault: jsonStr })
+      });
+      const data = await res.json();
+      if (data.success) {
+        app.toast(`Vault imported! ${data.updated} pages updated, ${data.created} created.`, 'success');
+        if (window.pagesView?.refresh) window.pagesView.refresh();
+      } else {
+        app.toast(data.error || 'Failed to import vault', 'error');
+      }
+    } catch (err) {
+      app.toast('Import error: ' + err.message, 'error');
+    }
+  }
+
   return {
     render,
     saveSettings,
     selectPostMode,
     selectNightCooldown,
     selectSurveillanceState,
+    select247Mode,
     updateCadenceButtons,
     setCadence,
     togglePassword,
@@ -909,6 +1041,8 @@ window.settingsView = (function() {
     testTelegram,
     pruneMedia,
     submitQuickPost,
+    exportVault,
+    importVaultPrompt,
     runDiagnostics,
     refresh: loadSettings
   };

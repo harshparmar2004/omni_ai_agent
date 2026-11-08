@@ -122,6 +122,131 @@ async function callOllama(prompt) {
 }
 
 /**
+ * Intelligent Offline Hook Synthesizer (Zero-Slice Heuristic Engine)
+ * Replaces naive character slicing by deeply analyzing the caption,
+ * stripping away all creator bios, follow pleas, promo CTAs, and credits,
+ * and identifying the core thesis statement or shocking metric.
+ */
+function synthesizeOfflineHook(rawText, pageName = '') {
+  const pLower = (pageName || '').toLowerCase();
+  const isCult = pLower.includes('cult');
+  const isMovie = pLower.includes('movie') || pLower.includes('cinema');
+  const isGta = pLower.includes('gta');
+
+  const defaultThemeHook = isCult
+    ? 'The **Shocking Untold Truth** Behind This Historic Mystery'
+    : (isMovie
+      ? 'The **Most Mind-Bending** Cinematic Thriller You Cannot Miss'
+      : (isGta
+        ? 'Rockstar Just Confirmed A **Massive New Feature** For GTA VI'
+        : 'Breakthrough Development Is Evolving Faster Than **Anyone Expected**'));
+
+  if (!rawText) {
+    return defaultThemeHook;
+  }
+
+  // 1. Clean out social noise, bios, URLs, and creator promos
+  let text = rawText
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/@[\w.]+/g, '')
+    .replace(/#[\w_]+/g, '')
+    .replace(/(?:follow|subscribe|credit|credits|via|source|all rights|link in bio|dm for|turn on notifications|share with|drop your thoughts|save this)[^\n.!?]*/gi, '')
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, ' ')
+    .replace(/["'“”]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 2. Split into sentences (decimal-safe)
+  const rawSentences = text
+    .split(/(?<=[.!?\n])\s+/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 18 && !/^(?:hi|hey|hello|welcome|check out|read below|part \d|view all)/i.test(s));
+
+  // Detect and normalize sentences with heavy name-lists (e.g. "Sam Altman, Elon Musk, Mark Zuckerberg...")
+  const sentences = rawSentences.map(s => {
+    if (/(?:[A-Z][a-z]+\s+[A-Z][a-z]+,\s*){2,}/.test(s) || /the rest of the (?:tech )?elite/i.test(s)) {
+      const match = s.match(/(?:come together for|released|created|joined forces for|unveiled|dropped)\s+(.*)/i);
+      if (match) {
+        return `Tech Billionaires Unite For ${match[1]}`;
+      }
+      const stripped = s
+        .replace(/^(?:[A-Z][a-z]+\s+[A-Z][a-z]+(?:,\s*|\s+and\s+))+/i, '')
+        .replace(/^(?:and\s+)?the rest of the (?:tech\s+)?elite\s+/i, '');
+      if (stripped.length >= 15) {
+        return `Tech Billionaires ${stripped.charAt(0).toUpperCase() + stripped.slice(1)}`;
+      }
+    }
+    return s;
+  });
+
+  let candidate = '';
+
+  // 3. Score sentences based on impactful, viral editorial hooks
+  if (sentences.length > 0) {
+    const scored = sentences.map(s => {
+      let score = 0;
+      // High-impact conceptual words (satire, anthem, secret, controversy, truth)
+      if (/\b(?:satire|anthem|parody|exposed|unveiled|revealed|secret|secrets|truth|shocking|banned|warning|mystery|scandal|classified|breakthrough|billionaires|silicon valley|principles|overnight|danger|leaked|illegal|world's first|ancient|anomalies)\b/i.test(s)) score += 8;
+      // Numbers, currency, percentages, metrics
+      if (/\$?\d+(?:,\d+)*(?:\.\d+)?(?:\s*(?:billion|million|trillion|percent|%|k|m|b))?/i.test(s)) score += 5;
+      // Action verbs / conflict words
+      if (/\b(?:shattered|destroyed|built|created|invented|poking fun|changing|disrupting|hidden|proves|discovered|unite)\b/i.test(s)) score += 4;
+      // Questions
+      if (/\?$/.test(s) || /^(?:why|how|what|is this|could this|did you know)/i.test(s)) score += 3;
+      // Optimal length bonus (35 to 85 characters)
+      if (s.length >= 35 && s.length <= 85) score += 4;
+      return { s, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    candidate = scored[0].s;
+  } else {
+    candidate = text.slice(0, 85);
+  }
+
+  // 4. Clean candidate sentence
+  candidate = candidate
+    .replace(/^[^a-zA-Z0-9]+/, '')
+    .replace(/[.!?]+$/, '')
+    .replace(/\s+(?:and the rest of[^\n]*|and the\s*$|with a\s*$|for a\s*$|by a\s*$)/i, '')
+    .trim();
+
+  // If candidate is too long, trim cleanly at word boundary
+  if (candidate.length > 85) {
+    candidate = candidate.slice(0, 82).replace(/\s+\S*$/, '').trim();
+    candidate = candidate.replace(/\s+(?:and|with|for|by|to|of|in|at|the|a|an|beneath)$/i, '');
+  }
+
+  // Format into Title Case for punchy viral aesthetic
+  candidate = candidate.split(' ').map((word, i) => {
+    const lower = word.toLowerCase();
+    const minorWords = new Set(['a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from', 'by', 'in', 'of']);
+    if (i > 0 && minorWords.has(lower)) return lower;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+
+  // Fallback if candidate is too brief or ambiguous
+  if (!candidate || candidate.length < 18) {
+    candidate = defaultThemeHook;
+  }
+
+  // 5. Wrap high-impact keywords in double asterisks for Cult Lime brand highlight
+  if (!candidate.includes('**')) {
+    // Numbers, currencies, percentages, decades (e.g. 80s, 90s) or hyphenated numbers
+    candidate = candidate.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+    // High-energy viral trigger words
+    if (!candidate.includes('**')) {
+      const strongWords = candidate.match(/\b(Satire|Anthem|Parody|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Silicon Valley|Unite)\b/i);
+      if (strongWords) {
+        candidate = candidate.replace(strongWords[0], `**${strongWords[0]}**`);
+      }
+    }
+  }
+
+  return candidate;
+}
+
+/**
  * Core AI Caption Generator
  *
  * @param {Object} options
@@ -239,7 +364,9 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
   if (isVideoEssay) {
     console.log(`[LLM Service] 📰 Video-Essay Account detected (${pageName}): Generating viral hook headline & breakdown.`);
 
-    const defaultAiHeadline = 'The next generation of AI is evolving faster than anyone expected';
+    const defaultAiHeadline = pageName.toLowerCase().includes('cult')
+      ? 'The shocking untold truth behind this historic mystery'
+      : 'The next generation of AI is evolving faster than anyone expected';
     let headline = defaultAiHeadline;
     let aiBreakdown = cleanedSource || 'Breakthrough development in artificial intelligence model reasoning and computing hardware.';
     let usedProvider = 'deterministic';
@@ -264,31 +391,33 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
       }
     }
 
-    // 2. If no on-screen title was detected, extract a punchy first sentence from caption (decimal-safe)
+    // 2. Intelligent Offline Fallback Synthesizer (never slice competitor bio)
     if (headline === defaultAiHeadline && cleanedSource) {
-      const clean = cleanedSource.replace(/^["'“”]/, '').replace(/["'“”]$/, '').trim();
-      // Match up to first sentence ending (. ! ? or newline) but DO NOT split on decimal digits (e.g. $12.93 or $1.12)
-      const sentenceMatch = clean.match(/^([^.!?\n]+(?:\.\d+[^.!?\n]*)*)(?:[.!?\n]|$)/);
-      let candidate = sentenceMatch ? sentenceMatch[1].trim() : clean;
-      if (candidate.length > 105) {
-        candidate = candidate.slice(0, 100).replace(/\s+\S*$/, '');
-      }
-      if (candidate && candidate.length >= 15) {
-        if (!candidate.includes('**')) {
-          candidate = candidate.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
-        }
-        headline = candidate;
-      }
+      headline = synthesizeOfflineHook(cleanedSource, pageName);
     }
 
-    const aiPrompt = `You are the lead content creator and writer for "${pageName}" (${handle}), an elite Instagram channel producing viral high-retention video-essays.
-Analyze the source description and generate two items in strict JSON format:
-1. "headline": A punchy, curiosity-driven viral hook headline for the top video overlay. Must be 8 to 15 words, high-impact, attention-grabbing, with NO emojis and NO hashtags. Wrap 1 to 3 of the most critical impact words, numbers, or amounts in double asterisks **like this** so they are highlighted in the brand's signature lime accent color on the reel. (Example: "The most expensive AI chips in the world are now worth more than **$10,000,000,000**" or "NVIDIA Just Unveiled The World's First **1-Million-Token** Neural Supercluster").
-2. "breakdown": A high-energy 2-3 sentence video-essay post body explaining the significance, scale, or mind-blowing reality of this topic.
+    const isCultPage = pageName.toLowerCase().includes('cult') || (page.slug && page.slug.includes('cult'));
+    const channelNiche = isCultPage 
+      ? 'an elite curation platform uncovering shocking untold history, cultural secrets, scientific anomalies, and mind-bending phenomena'
+      : 'an elite Instagram channel producing viral high-retention video-essays on breakthrough technology and intelligence';
+
+    const aiPrompt = `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
+CRITICAL INSTRUCTION: Do NOT summarize the creator's social bio, do NOT copy follower pleas, credits, or promo links.
+Read the source content below to understand the CENTRAL REVELATION, SURPRISING METRIC, OR SHOCKING FACT of the video.
+
+Generate two items in strict JSON format:
+1. "headline": A punchy, curiosity-driven viral hook headline for the top video overlay.
+   - Must be 8 to 14 words long.
+   - High-impact, irresistible, creating intense curiosity.
+   - Absolutely NO emojis, NO hashtags, NO creator handles.
+   - Wrap 1 to 3 of the most critical impact words, numbers, or amounts in double asterisks **like this** for brand color highlighting.
+   - (Example: "Scientists Discovered An Underground Ocean Containing **More Water** Than All Surface Oceans")
+   - (Example: "The World's Most Classified Facility Has Been Operating In Secret For Over **70 Years**")
+2. "breakdown": A high-energy 2 to 3 sentence post body explaining the reality, significance, and intrigue of this story.
 
 Source Content:
 """
-${cleanedSource || 'Groundbreaking development and high-impact industry highlights.'}
+${cleanedSource || 'Groundbreaking discovery and high-impact investigative highlights.'}
 """
 
 Respond ONLY with valid JSON in this exact structure:
@@ -313,17 +442,18 @@ Respond ONLY with valid JSON in this exact structure:
 
     for (const provider of providersToTry) {
       try {
-        console.log(`[LLM Service] Querying ${provider.name} for Evolving AI copy...`);
+        console.log(`[LLM Service] Querying ${provider.name} for ${pageName} copy...`);
         const rawOutput = await provider.fn();
         if (rawOutput) {
           try {
             const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
             const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
             if (parsed && parsed.headline) {
-              headline = parsed.headline.trim();
-              if (!headline.includes('**')) {
-                headline = headline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+              let candidateHeadline = parsed.headline.trim();
+              if (!candidateHeadline.includes('**')) {
+                candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
               }
+              headline = candidateHeadline;
               if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();
               usedProvider = provider.name;
               usedModel = provider.model;
@@ -338,20 +468,30 @@ Respond ONLY with valid JSON in this exact structure:
       }
     }
 
-    const aiEngagement = [
-      "💬 Will this change everything, or is it overhyped? Drop your thoughts below 👇",
-      "💾 Save this reel & share with someone following the AI revolution! 🚀"
-    ].join('\n');
+    const aiEngagement = isCultPage
+      ? [
+          "💬 What's your perspective on this? Drop your thoughts below 👇",
+          "💾 Save this reel & share with someone who loves deep knowledge! 🧠"
+        ].join('\n')
+      : [
+          "💬 Will this change everything, or is it overhyped? Drop your thoughts below 👇",
+          "💾 Save this reel & share with someone following the AI revolution! 🚀"
+        ].join('\n');
 
-    const aiFollowLine = `🤖 Follow ${handle} for daily breakthrough AI updates & tech breakdowns!`;
+    const aiFollowLine = isCultPage
+      ? `💡 Follow ${handle} for daily mind-bending history, untold phenomena & deep knowledge!`
+      : `🤖 Follow ${handle} for daily breakthrough AI updates & tech breakdowns!`;
 
     const originalTags = extractHashtags(rawCaption);
-    const defaultTags = extractHashtags(page.default_hashtags || '#ai #technology #artificialintelligence #tech #future #innovation #evolvingai');
-    const nicheAiTags = ['#ai', '#technology', '#artificialintelligence', '#tech', '#future', '#innovation', '#evolvingai'];
+    const defaultTagStr = page.default_hashtags || (isCultPage ? '#cultinformation #information #culture #knowledge #curation #mustknow #explore' : '#ai #technology #artificialintelligence #tech #future #innovation');
+    const defaultTags = extractHashtags(defaultTagStr);
+    const nicheTags = isCultPage
+      ? ['#cultinformation', '#information', '#knowledge', '#culture', '#curation', '#mustknow']
+      : ['#ai', '#technology', '#artificialintelligence', '#tech', '#future', '#innovation'];
 
     const tagSet = new Set();
     const mergedTags = [];
-    for (const tag of [...nicheAiTags, ...defaultTags, ...originalTags]) {
+    for (const tag of [...nicheTags, ...defaultTags, ...originalTags]) {
       const lower = tag.toLowerCase();
       if (!tagSet.has(lower) && tagSet.size < 6) {
         tagSet.add(lower);
@@ -487,5 +627,6 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
 
 module.exports = {
   generateAiCaption,
-  sanitizeLlmOutput
+  sanitizeLlmOutput,
+  synthesizeOfflineHook
 };

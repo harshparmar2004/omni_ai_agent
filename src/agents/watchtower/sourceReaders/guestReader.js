@@ -60,14 +60,27 @@ function updateReservoir(username, urls) {
   }
 }
 
+const { getSetting } = require('../../../database');
+
 function readSourcePosts(username, limit = 6) {
   return new Promise((resolve) => {
     const cleanUser = username.replace(/^@/, '').toLowerCase().trim();
     const scriptPath = path.resolve(__dirname, '../../../../scripts/instagram_scraper.py');
     const profileUrl = `https://www.instagram.com/${cleanUser}/`;
-    const command = `python "${scriptPath}" "${profileUrl}"`;
+    const pyBin = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
+    const command = `${pyBin} "${scriptPath}" "${profileUrl}"`;
 
-    exec(command, { timeout: 75000 }, (error, stdout, stderr) => {
+    let sessionId = '';
+    try {
+      sessionId = getSetting('instagram_session_id', '') || process.env.INSTAGRAM_SESSION_ID || '';
+    } catch (e) {}
+
+    const customEnv = {
+      ...process.env,
+      INSTAGRAM_SESSION_ID: sessionId
+    };
+
+    exec(command, { timeout: 75000, env: customEnv }, (error, stdout, stderr) => {
       let data = null;
       if (error) {
         console.warn(`[Watchtower Guest Reader] @${cleanUser} scraper error: ${error.message}`);
@@ -91,8 +104,8 @@ function readSourcePosts(username, limit = 6) {
       if (Array.isArray(data?.posts) && data.posts.length > 0) {
         candidatePosts = data.posts.map(p => ({
           shortcode: p.shortcode,
-          url: p.url,
-          mediaType: 'reel',
+          url: p.url || `https://www.instagram.com/${p.media_type === 'reel' ? 'reel' : 'p'}/${p.shortcode}/`,
+          mediaType: p.media_type || p.mediaType || (p.url && p.url.includes('/reel/') ? 'reel' : 'image'),
           caption: '',
           likes: 0,
           comments: 0,
@@ -109,13 +122,14 @@ function readSourcePosts(username, limit = 6) {
           const m = url.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
           if (m) {
             const shortcode = m[1];
+            const isReel = url.includes('/reel/');
             const parsed = shortcodeToTimestamp(shortcode);
             const postedDate = parsed?.date || new Date();
             const ageHours = (Date.now() - postedDate.getTime()) / (1000 * 60 * 60);
             candidatePosts.push({
               shortcode,
-              url: `https://www.instagram.com/reel/${shortcode}/`,
-              mediaType: 'reel',
+              url: `https://www.instagram.com/${isReel ? 'reel' : 'p'}/${shortcode}/`,
+              mediaType: isReel ? 'reel' : 'image',
               caption: '',
               likes: 0,
               comments: 0,
@@ -131,24 +145,25 @@ function readSourcePosts(username, limit = 6) {
       // If live scrape succeeded, update reservoir
       if (candidatePosts.length > 0) {
         updateReservoir(cleanUser, candidatePosts.map(p => p.url));
-        console.log(`[Watchtower Guest Reader] @${cleanUser}: Scraper returned ${candidatePosts.length} recent reels (top: ${candidatePosts[0].shortcode}, age: ${candidatePosts[0].ageHours}h).`);
+        console.log(`[Watchtower Guest Reader] @${cleanUser}: Scraper returned ${candidatePosts.length} recent posts/reels (top: ${candidatePosts[0].shortcode} [${candidatePosts[0].mediaType}], age: ${candidatePosts[0].ageHours}h).`);
       } else {
         // Fallback: Check reservoir if live scrape returned 0 (e.g. cloud datacenter IP wall)
         const reservoir = loadReservoir();
         const fallbackUrls = reservoir[cleanUser] || [];
         if (fallbackUrls.length > 0) {
-          console.log(`[Watchtower Guest Reader] 🛡️ Datacenter fallback engaged for @${cleanUser}: Loaded ${fallbackUrls.length} candidate reels from reservoir.`);
+          console.log(`[Watchtower Guest Reader] 🛡️ Datacenter fallback engaged for @${cleanUser}: Loaded ${fallbackUrls.length} candidate posts from reservoir.`);
           for (const url of fallbackUrls) {
             const m = url.match(/\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
             if (m) {
               const shortcode = m[1];
+              const isReel = url.includes('/reel/');
               const parsed = shortcodeToTimestamp(shortcode);
               const postedDate = parsed?.date || new Date();
               const ageHours = (Date.now() - postedDate.getTime()) / (1000 * 60 * 60);
               candidatePosts.push({
                 shortcode,
-                url: `https://www.instagram.com/reel/${shortcode}/`,
-                mediaType: 'reel',
+                url: `https://www.instagram.com/${isReel ? 'reel' : 'p'}/${shortcode}/`,
+                mediaType: isReel ? 'reel' : 'image',
                 caption: '',
                 likes: 0,
                 comments: 0,
@@ -160,7 +175,7 @@ function readSourcePosts(username, limit = 6) {
             }
           }
         } else {
-          console.log(`[Watchtower Guest Reader] @${cleanUser}: Scraper returned 0 recent reels.`);
+          console.log(`[Watchtower Guest Reader] @${cleanUser}: Scraper returned 0 recent posts/reels.`);
         }
       }
 

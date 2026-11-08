@@ -1,6 +1,6 @@
 const path = require('path');
 const fs = require('fs');
-const { getPageById, updateDiscoveredPost, getPublishedCountToday, getLastPublishedTimestamp, getSetting } = require('../database');
+const { getPageById, updateDiscoveredPost, getPublishedCountToday, getLastPublishedTimestamp, getSetting, getPageTemplate, getPublishJobById } = require('../database');
 const { updateJobProgress, getJob, listJobs } = require('./jobQueue');
 const { downloadInstagramMedia } = require('./downloader');
 const { buildCaption, buildAiCaption, buildAiCaptionDetails } = require('./captionBuilder');
@@ -211,17 +211,7 @@ class JobWorkerPool {
         sourceUploader = dl.uploader;
         if (!rawCaption) rawCaption = dl.caption;
 
-        if (job.agent === 'watchtower' && mediaType !== 'reel') {
-          console.warn(`[Job Worker] ⚠️ Post #${job.shortcode} downloaded as '${mediaType}', not a video reel. Skipping for Watchtower.`);
-          updateJobProgress(jobId, 'failed', 'not_a_reel', { error: 'Candidate is not a video reel' });
-          if (job.discovered_post_id) {
-            updateDiscoveredPost(job.discovered_post_id, { status: 'skipped_not_reel' });
-          }
-          if (job.telegram_chat_id) {
-            notifier.sendTelegramMessage(job.telegram_chat_id, `⚠️ <b>Watchtower Notice:</b> Competitor post <code>#${job.shortcode}</code> was an image/carousel, not a video reel. Skipped to maintain 100% video feed quality. Next reel will be processed in the upcoming cycle.`).catch(() => {});
-          }
-          return;
-        }
+        console.log(`[Job Worker] 📦 Media downloaded for #${job.shortcode} as '${mediaType}'. Proceeding with pipeline.`);
 
         job = updateJobProgress(jobId, 'downloading', 'download_complete', {
           media_paths: mediaPaths,
@@ -233,8 +223,19 @@ class JobWorkerPool {
 
       // ── Step 2: Build Caption ───────────────────────────────
       job = updateJobProgress(jobId, 'ready', 'caption_building');
-      let hookHeadline = '';
+      let hookHeadline = job.hook_headline || '';
       let finalCaption = '';
+
+      // Check if this job inherits from an origin job (multi-page distribution network)
+      if (!hookHeadline && job.origin_job_id) {
+        try {
+          const origin = getPublishJobById(job.origin_job_id);
+          if (origin && origin.hook_headline) {
+            hookHeadline = origin.hook_headline;
+            console.log(`[Job Worker] 🔗 Reusing master hook headline from origin Job #${job.origin_job_id}: "${hookHeadline}"`);
+          }
+        } catch (_) {}
+      }
 
       if (job.caption && job.caption !== rawCaption) {
         finalCaption = job.caption;
@@ -246,10 +247,13 @@ class JobWorkerPool {
           videoPath: (mediaPaths && mediaPaths[0]) || ''
         });
         finalCaption = copyDetails.caption;
-        hookHeadline = copyDetails.hookHeadline || '';
+        if (!hookHeadline) hookHeadline = copyDetails.hookHeadline || '';
       }
 
-      job = updateJobProgress(jobId, 'ready', 'caption_ready', { caption: finalCaption });
+      job = updateJobProgress(jobId, 'ready', 'caption_ready', {
+        caption: finalCaption,
+        hook_headline: hookHeadline
+      });
 
       // ── Step 3: Meta Graph API Publishing (Feed first, then Story) ──
       job = updateJobProgress(jobId, 'publishing', 'meta_upload');
@@ -267,26 +271,63 @@ class JobWorkerPool {
       const autoPostStory = getSetting('auto_post_to_story', 'true') === 'true';
 
       let pubResult = null;
+      let processedMediaPaths = [...mediaPaths];
+      let feedVideoPath = mediaPaths[0];
+      let pageTheme = 'gta6';
+
       if (mediaType === 'reel') {
-        let feedVideoPath = mediaPaths[0];
-        const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('clubbing'));
-        const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
-        const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving')));
-        const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
-        const themeLabel = isClubbingPage ? 'Clubbing Cult Neon Green' : (isMoviePage ? 'Cinematic Movie' : (isVideoEssayPage ? 'Cult Information Video-Essay' : 'GTA 6 Vice City'));
+        // Dynamic template resolution from page_templates table
+        let savedTemplate = null;
+        try {
+          savedTemplate = getPageTemplate(page.id, page.template_slug || 'default') || getPageTemplate(page.id, 'default');
+        } catch (_) {}
+
+        pageTheme = savedTemplate?.template_type || page.template_slug;
+        if (pageTheme === 'neon' || pageTheme === 'clubbing') pageTheme = 'clubbing';
+        else if (pageTheme === 'editorial' || pageTheme === 'video_essay' || pageTheme === 'cult_information') pageTheme = 'video_essay';
+        else if (pageTheme === 'cinema' || pageTheme === 'movies') pageTheme = 'movies';
+        else if (pageTheme === 'gta6' || pageTheme === 'vice_city') pageTheme = 'gta6';
+        else if (!pageTheme || pageTheme === 'default') {
+          // Heuristic fallback for legacy pages
+          const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('clubbing'));
+          const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
+          const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation') || page.handle.includes('evolving')));
+          pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
+        }
+
+        const themeLabels = {
+          clubbing: 'Clubbing Cult Neon Green',
+          movies: 'Cinematic Movie',
+          video_essay: 'Editorial Video-Essay',
+          gta6: 'GTA 6 Vice City',
+          minimal: 'Minimalist Clean'
+        };
+        const themeLabel = themeLabels[pageTheme] || `${pageTheme} Preset`;
         const brandingMode = process.env.FEED_BRANDING_MODE || getSetting('feed_branding_mode') || 'frame';
+
+        updateJobProgress(jobId, 'ready', 'rendering', {
+          hook_headline: hookHeadline,
+          edit_theme: pageTheme
+        });
 
         if (brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying ${themeLabel} Framed Template to Feed Reel for ${page.handle}...`);
-            const framed = await prepareVideoForFeedCard(mediaPaths[0], { handle: page.handle, page, theme: pageTheme, hookHeadline });
+            const framed = await prepareVideoForFeedCard(mediaPaths[0], {
+              handle: page.handle,
+              page,
+              theme: pageTheme,
+              hookHeadline,
+              template: savedTemplate
+            });
             if (framed) {
               const absCandidate = (path.isAbsolute(framed) && fs.existsSync(framed))
                 ? framed
                 : path.join(__dirname, '..', '..', 'public', framed.replace(/^[/\\]+/, ''));
               if (fs.existsSync(absCandidate)) {
                 feedVideoPath = absCandidate;
+                processedMediaPaths[0] = absCandidate;
               }
             }
           } catch (frameErr) {
@@ -303,12 +344,26 @@ class JobWorkerPool {
                 : path.join(__dirname, '..', '..', 'public', branded.replace(/^[/\\]+/, ''));
               if (fs.existsSync(absCandidate)) {
                 feedVideoPath = absCandidate;
+                processedMediaPaths[0] = absCandidate;
               }
             }
           } catch (wmErr) {
             console.warn(`[Job Worker] Watermark notice: ${wmErr.message}`);
           }
         }
+
+        updateJobProgress(jobId, 'ready', 'render_complete', {
+          edited_media_path: feedVideoPath,
+          edit_theme: pageTheme,
+          edit_meta: {
+            theme: pageTheme,
+            themeLabel,
+            brandingMode,
+            hookHeadline,
+            originalVideo: mediaPaths[0],
+            renderedVideo: feedVideoPath
+          }
+        });
 
         pubResult = await publishReel({
           page,
@@ -374,13 +429,14 @@ class JobWorkerPool {
 
       // ── Step 3c: Publish Instagram Story ──
       let storyResult = null;
-      if (autoPostStory && mediaPaths[0]) {
+      if (autoPostStory && processedMediaPaths[0]) {
         try {
-          console.log(`[Job Worker] 🌟 Auto-publishing content to Instagram Story for ${page.handle}...`);
+          console.log(`[Job Worker] 🌟 Auto-publishing edited branded content to Instagram Story for ${page.handle}...`);
           storyResult = await publishStory({
             page,
-            videoPath: mediaType === 'reel' ? mediaPaths[0] : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? mediaPaths[0] : null
+            videoPath: mediaType === 'reel' ? processedMediaPaths[0] : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? processedMediaPaths[0] : null,
+            hookHeadline
           });
           console.log(`[Job Worker] ✅ Instagram Story published live! Story Media ID: ${storyResult?.ig_media_id}`);
 
@@ -417,6 +473,15 @@ class JobWorkerPool {
       }
 
       console.log(`[Job Worker] ✅ Job #${job.id} completed! Live at: ${pubResult.permalink}`);
+
+      // v8 Multi-Tenant Distribution Trigger:
+      // If this page belongs to any interconnected distribution groups, fan out to sibling pages!
+      try {
+        const { planDistribution } = require('./distributionPlanner');
+        planDistribution(job.id).catch(distErr => {
+          console.warn(`[Job Worker] Distribution fan-out notice on job #${job.id}:`, distErr.message);
+        });
+      } catch (distE) {}
 
     } catch (err) {
       console.error(`[Job Worker Error] Job #${job.id} failed: ${err.message}`);

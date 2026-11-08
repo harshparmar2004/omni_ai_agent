@@ -72,130 +72,30 @@ async function main() {
   const db = getDb();
   console.log('✅ SQLite Database connected.');
 
-  // Ensure Page #1 (GTA 6 Updates 007) and Page #2 (Movie Recommendations) exist
-  let pages = getPages();
-  const hasGtaPage = pages.some(p => p.id === 1 || p.slug === 'gta6');
-  if (!hasGtaPage) {
-    console.log('📄 Creating Page #1 (@gta6_updates_007)...');
-    createPage({
-      slug: 'gta6',
-      name: 'GTA 6 Updates 007',
-      handle: '@gta6_updates_007',
-      ig_user_id: '17841428668115319',
-      access_token: process.env.META_ACCESS_TOKEN || '',
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 10,
-      min_spacing_minutes: 0,
-      is_active: 1
-    });
-  }
-
-  const hasMoviePage = pages.some(p => p.id === 2 || p.slug === 'movies');
-  if (!hasMoviePage) {
-    console.log('🎬 Creating Page #2 (@movie_series_365)...');
-    createPage({
-      slug: 'movies',
-      name: 'Movie Recommendations',
-      handle: '@movie_series_365',
-      ig_user_id: process.env.MOVIE_IG_USER_ID || '',
-      access_token: process.env.MOVIE_META_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || '',
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 10,
-      min_spacing_minutes: 0,
-      is_active: 1
-    });
-  }
-
-  const defaultClubbingToken = 'IGAAYJvfGkRZCRBZAFpmY2lqSjhabXJrV09CalRjVzlnSU9tSjNRWktVTi1POU9WNUtlaFJyOTNmM05sRFY5ZAU94cHB4akl0eDJVRmNHaW96d0NwWV9QNnFOc2pzUUpYM1dKS19ENTY5aEo0NG9aeV8xbm1Ra2h5bWdvZA0paRFMwbwZDZD';
-  const clubbingToken = sanitizeToken(process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || process.env.TECH_META_ACCESS_TOKEN || defaultClubbingToken);
-  const clubbingIgId = (process.env.CLUBBING_CULT_IG_USER_ID || process.env.CLUBBING_IG_USER_ID || process.env.TECH_IG_USER_ID || '29109331262052643').trim();
-
-  const hasClubbingPage = pages.some(p => p.id === 3 || p.slug === 'clubbing' || p.handle === '@clubbingcult');
-  if (!hasClubbingPage) {
-    console.log('🪩 Creating Page #3 (@clubbingcult)...');
-    createPage({
-      slug: 'clubbing',
-      name: 'Clubbing Cult',
-      handle: '@clubbingcult',
-      ig_user_id: clubbingIgId,
-      access_token: clubbingToken,
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 10,
-      min_spacing_minutes: 0,
-      is_active: 1
-    });
-  }
-  const defaultCultInfoToken = 'IGAAYJvfGkRZCRBZAFpza2tBLUtNSHNIR0pyQXRzcU45dlJ0QWZAhTUR2bzFOTkZAXNm9qTFVfLUZA3b1FsdWRXRlUzbmNlMGhQcUEydkFGVWIwdzlIcFN3cXhwUWt1M1FsTFRWOFIzeXBvV296UTZAMMkh4OWc1eWJKUnVPRlR2MzBPdwZDZD';
-  const cultInfoToken = sanitizeToken(process.env.CULT_INFO_META_ACCESS_TOKEN || process.env.CULT_INFORMATION_META_ACCESS_TOKEN || defaultCultInfoToken);
-  const cultInfoIgId = (process.env.CULT_INFO_IG_USER_ID || process.env.CULT_INFORMATION_IG_USER_ID || '17841462998491309').trim();
-
-  const hasCultPage = pages.some(p => p.id === 4 || p.slug === 'cult_information' || p.handle === '@cult_information');
-  if (!hasCultPage) {
-    console.log('💡 Creating Page #4 (@cult_information)...');
-    createPage({
-      slug: 'cult_information',
-      name: 'Cult Information',
-      handle: '@cult_information',
-      ig_user_id: cultInfoIgId,
-      access_token: cultInfoToken,
-      caption_template: '{caption}\n\n{hashtags}',
-      default_hashtags: '#ai #artificialintelligence #tech #innovation #future #cultinformation',
-      attribution_enabled: 0,
-      watermark_enabled: 0,
-      post_mode: 'auto',
-      posts_per_cycle: 1,
-      daily_quota: 10,
-      min_spacing_minutes: 0,
-      is_active: 1
-    });
-  }
-  pages = getPages();
-
-  try {
-    db.prepare("UPDATE pages SET slug = 'gta6', name = 'GTA 6 Updates 007', handle = '@gta6_updates_007', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' WHERE id = 1").run();
-    db.prepare("UPDATE pages SET slug = 'movies', name = 'Movie Recommendations', handle = '@movie_series_365', attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies', is_active = 1 WHERE id = 2").run();
-    db.prepare("UPDATE pages SET slug = 'clubbing', name = 'Clubbing Cult', handle = '@clubbingcult', ig_user_id = ?, access_token = ?, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult', is_active = 1 WHERE id = 3 OR slug = 'techguy' OR slug = 'clubbing'").run(clubbingIgId, clubbingToken);
-    db.prepare("UPDATE pages SET slug = 'cult_information', name = 'Cult Information', handle = '@cult_information', ig_user_id = ?, access_token = ?, attribution_enabled = 0, watermark_enabled = 0, default_hashtags = '#ai #artificialintelligence #tech #innovation #future #cultinformation', is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoIgId, cultInfoToken);
-  } catch (e) {}
-
-  function sanitizeToken(token) {
-    if (!token) return '';
-    return String(token).trim().split(/\s+/)[0].replace(/['"]/g, '');
-  }
-
-  // Inject Environment Secrets
-  const defaultGtaToken = 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD';
-  const gtaToken = sanitizeToken(process.env.META_ACCESS_TOKEN || defaultGtaToken);
-  db.prepare('UPDATE pages SET access_token = ? WHERE id = 1').run(gtaToken);
-  for (const p of pages) {
-    if (p.is_active && (!p.access_token || p.access_token.length < 20)) {
-      db.prepare('UPDATE pages SET access_token = ? WHERE id = ?').run(gtaToken, p.id);
+  // 1b. Remote Vault Sync (Optional: pull pages from central Render/Railway instance if running in external runner)
+  const vaultSyncUrl = process.env.OMNI_VAULT_SYNC_URL;
+  const masterKey = process.env.OMNI_MASTER_KEY;
+  if (vaultSyncUrl && masterKey) {
+    try {
+      console.log(`🔑 Fetching active pages dynamically from central vault: ${vaultSyncUrl}...`);
+      const axios = require('axios');
+      const { importVault } = require('../src/core/tokenVault');
+      const vaultRes = await axios.get(vaultSyncUrl, {
+        headers: { 'x-master-key': masterKey },
+        timeout: 10000
+      });
+      if (vaultRes.data && vaultRes.data.pages) {
+        importVault(vaultRes.data);
+      }
+    } catch (vErr) {
+      console.warn(`[Vault Sync Warning]: ${vErr.message}`);
     }
   }
 
-  const defaultMovieToken = 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD';
-  const movieToken = sanitizeToken(process.env.MOVIE_META_ACCESS_TOKEN || defaultMovieToken);
-  const movieIgId = (process.env.MOVIE_IG_USER_ID || '29048404444808513').trim();
-  db.prepare('UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 2').run(movieToken, movieIgId);
-
-  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ? WHERE id = 3 OR slug = 'clubbing'").run(clubbingToken, clubbingIgId);
-  db.prepare("UPDATE pages SET access_token = ?, ig_user_id = ?, is_active = 1 WHERE id = 4 OR slug = 'cult_information'").run(cultInfoToken, cultInfoIgId);
-  pages = getPages();
+  let pages = getPages();
+  if (pages.length === 0) {
+    throw new Error('No Instagram pages configured in database. Please onboard a page via dashboard.');
+  }
   if (process.env.TELEGRAM_BOT_TOKEN) {
     setSetting('telegram_bot_token', process.env.TELEGRAM_BOT_TOKEN);
   }
