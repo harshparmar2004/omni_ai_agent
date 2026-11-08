@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: 📡 Notify Telegram: Cloud Runner Online
+      - name: 📡 Notify Telegram Cloud Runner Online
         if: github.event.inputs.message_id != ''
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN || '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI' }}
