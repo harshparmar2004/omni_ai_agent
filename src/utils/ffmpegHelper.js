@@ -2,6 +2,18 @@ const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
+// Initialize GlobalFonts for cross-platform Linux (Ubuntu) & Windows typography
+try {
+  const { GlobalFonts } = require('@napi-rs/canvas');
+  const fontsDir = path.join(__dirname, '..', '..', 'public', 'fonts');
+  const boldPath = path.join(fontsDir, 'Roboto-Bold.ttf');
+  const medPath = path.join(fontsDir, 'Roboto-Medium.ttf');
+  const blackPath = path.join(fontsDir, 'Roboto-Black.ttf');
+  if (fs.existsSync(boldPath)) GlobalFonts.registerFromPath(boldPath, 'RobotoBold');
+  if (fs.existsSync(medPath)) GlobalFonts.registerFromPath(medPath, 'RobotoMedium');
+  if (fs.existsSync(blackPath)) GlobalFonts.registerFromPath(blackPath, 'RobotoBlack');
+} catch (_) {}
+
 /**
  * Renders a 9:16 vertical MP4 reel using FFmpeg
  * Combines image/slides, audio track, and kinetic subtitle text
@@ -930,11 +942,11 @@ async function generateClubbingCyberOverlay(handle, options = {}) {
 
   // Measure content widths
   ctx.save();
-  ctx.font = '900 24px "Arial Black", Arial, sans-serif';
+  ctx.font = '900 24px RobotoBlack, "Arial Black", Arial, sans-serif';
   const nameW = ctx.measureText(rawClubName).width;
-  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.font = 'bold 20px RobotoMedium, Arial, sans-serif';
   const sepW = ctx.measureText('  |  ').width;
-  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.font = 'bold 22px RobotoBold, Arial, sans-serif';
   const handleW = ctx.measureText(displayHandle).width;
   ctx.restore();
 
@@ -1018,7 +1030,7 @@ async function generateClubbingCyberOverlay(handle, options = {}) {
   ctx.textBaseline = 'middle';
 
   // Page Name in bold crisp white
-  ctx.font = '900 24px "Arial Black", Arial, sans-serif';
+  ctx.font = '900 24px RobotoBlack, "Arial Black", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.shadowColor = 'rgba(0, 255, 163, 0.6)';
   ctx.shadowBlur = 8;
@@ -1026,14 +1038,14 @@ async function generateClubbingCyberOverlay(handle, options = {}) {
   textX += nameW;
 
   // Separator in neon cyan
-  ctx.font = 'bold 20px Arial, sans-serif';
+  ctx.font = 'bold 20px RobotoMedium, Arial, sans-serif';
   ctx.fillStyle = 'rgba(0, 255, 163, 0.55)';
   ctx.shadowBlur = 0;
   ctx.fillText('  |  ', textX, badgeCenterY + 1);
   textX += sepW;
 
   // Handle in electric neon lime
-  ctx.font = 'bold 22px Arial, sans-serif';
+  ctx.font = 'bold 22px RobotoBold, Arial, sans-serif';
   ctx.fillStyle = neonLime;
   ctx.shadowColor = 'rgba(57, 255, 20, 0.7)';
   ctx.shadowBlur = 8;
@@ -1479,13 +1491,13 @@ async function detectActiveVideoBounds(videoOrImagePath) {
  */
 async function generateEvolvingAiOverlay(handle, options = {}) {
   const cleanHandle = (handle || 'cult_information').replace(/^@/, '');
+  const pageName = (options.pageName || options.page?.name || (cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI')).trim();
+  const hookHeadline = options.hookHeadline || options.headline || 'The next generation of AI is evolving faster than anyone expected';
   const {
     cardX = 0,
     cardY = 640,
     cardW = 1080,
-    cardH = 608,
-    pageName = options.page?.name || (cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'),
-    hookHeadline = options.hookHeadline || options.headline || 'The next generation of AI is evolving faster than anyone expected'
+    cardH = 608
   } = options;
 
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
@@ -1511,7 +1523,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   const spaceAboveVideo = 36;
   const spaceBetweenHeaderAndHeadline = 28;
 
-  ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  ctx.font = '900 48px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1622,28 +1634,29 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   // Page Name + Verified Badge
   const textLeftX = marginX + avatarSize + 22;
   ctx.save();
-  ctx.font = 'bold 36px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  ctx.font = 'bold 36px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'middle';
   const nameCenterY = headerTopY + 38;
   ctx.fillText(pageName, textLeftX, nameCenterY);
 
-  const nameWidth = ctx.measureText(pageName).width;
+  const rawNameWidth = ctx.measureText(pageName).width;
+  const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 450) ? rawNameWidth : 260;
   const badgeSize = 24;
   drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
 
   // Handle below name
-  ctx.font = '500 24px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  ctx.font = '500 24px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
   ctx.fillStyle = '#A0A0AB'; // Sleek iOS silver
   ctx.textBaseline = 'middle';
   const handleCenterY = headerTopY + 80;
-  const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
+  const displayHandle = cleanHandle.includes('cult') ? '@cult_information' : (cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle);
   ctx.fillText(displayHandle, textLeftX, handleCenterY);
   ctx.restore();
 
   // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
   ctx.save();
-  ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+  ctx.font = '900 48px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
   ctx.textBaseline = 'top';
   const spaceWidth = ctx.measureText(' ').width;
 
@@ -1957,11 +1970,11 @@ async function generateFeedPostOverlay(handle, options = {}) {
     const badgeText2 = 'Cinema Picks';
 
     ctx.save();
-    ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = 'bold 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     const w1 = ctx.measureText(badgeText1).width;
-    ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     const wSep = ctx.measureText(badgeSep).width;
-    ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     const w2 = ctx.measureText(badgeText2).width;
 
     const padX = 26;
@@ -2001,7 +2014,7 @@ async function generateFeedPostOverlay(handle, options = {}) {
     const textCenterY = boxY + boxH / 2 + 1;
 
     // Part 1: Page Name in crisp white
-    ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = 'bold 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -2011,13 +2024,13 @@ async function generateFeedPostOverlay(handle, options = {}) {
     curX += w1;
 
     // Part 2: Separator in amber gold
-    ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     ctx.fillStyle = '#FFB703';
     ctx.fillText(badgeSep, curX, textCenterY);
     curX += wSep;
 
     // Part 3: "Cinema Picks" in champagne gold / crisp white
-    ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+    ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
     ctx.fillStyle = '#FFD166';
     ctx.fillText(badgeText2, curX, textCenterY);
 
@@ -2229,11 +2242,11 @@ async function generateFeedPostOverlay(handle, options = {}) {
       const badgeText2 = isGTA6 ? 'GTA VI' : (cleanHandle.startsWith('@') ? cleanHandle : `@${cleanHandle}`);
 
       ctx.save();
-      ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = 'bold 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       const w1 = ctx.measureText(badgeText1).width;
-      ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       const wSep = ctx.measureText(badgeSep).width;
-      ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       const w2 = ctx.measureText(badgeText2).width;
 
       const padX = 26;
@@ -2272,7 +2285,7 @@ async function generateFeedPostOverlay(handle, options = {}) {
       const textCenterY = boxY + boxH / 2 + 1;
 
       // Part 1: Page Name in crisp white
-      ctx.font = 'bold 22px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = 'bold 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
@@ -2282,13 +2295,13 @@ async function generateFeedPostOverlay(handle, options = {}) {
       curX += w1;
 
       // Part 2: Separator in accent color
-      ctx.font = 'bold 20px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       ctx.fillStyle = highlightColor;
       ctx.fillText(badgeSep, curX, textCenterY);
       curX += wSep;
 
       // Part 3: Subtitle/Handle in secondary accent / crisp white
-      ctx.font = '600 22px Arial, "Helvetica Neue", sans-serif';
+      ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
       ctx.fillStyle = highlightColor;
       ctx.fillText(badgeText2, curX, textCenterY);
 

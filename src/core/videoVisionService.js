@@ -239,7 +239,8 @@ async function localOcrHeadlineDetection(framePath) {
     title = title.replace(/[\s.,;:!\-—|]+$/, '').trim();
 
     const wordCount = title.split(/\s+/).length;
-    if (wordCount >= 2 && wordCount <= 18) {
+    const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
+    if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
       const { parseHeadlineTokens } = require('../utils/ffmpegHelper');
       const tokens = parseHeadlineTokens(title);
       const highlightedTitle = tokens.map(t => t.highlight ? `**${t.text}**` : t.text).join(' ');
@@ -292,8 +293,10 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
         try {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with Gemini Vision OCR...`);
           const result = await callGeminiVision(framePath, geminiKey);
-          if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
-            let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+          const hCandidate = result?.headline?.trim() || '';
+          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate);
+          if (result && result.hasTitle && isHValid) {
+            let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {
               cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
             }
@@ -317,8 +320,10 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
         try {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with OpenAI Vision...`);
           const result = await callOpenAiVision(framePath, openAiKey);
-          if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
-            let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+          const hCandidate = result?.headline?.trim() || '';
+          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate);
+          if (result && result.hasTitle && isHValid) {
+            let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {
               cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
             }

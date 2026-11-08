@@ -149,6 +149,13 @@ jobs:
           ffmpeg -version | head -n 1
           ffprobe -version | head -n 1
 
+      - name: 🔤 Install System Fonts for Canvas Typography
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq || true
+          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-liberation fontconfig || true
+          fc-cache -fv || true
+
       - name: 💾 Cache Pip Packages
         uses: actions/cache@v4
         id: pip-cache

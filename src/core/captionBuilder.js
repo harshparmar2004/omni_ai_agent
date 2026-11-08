@@ -12,11 +12,14 @@ const CTA_PATTERNS = [
   /link\s+in\s+bio[^\n.]*/gi,
   /check\s+(?:the\s+)?link\s+in\s+(?:my\s+)?bio[^\n.]*/gi,
   /(?:dm|message)\s+(?:me|us)\s+["'“‘]?[a-zA-Z0-9_-]+["'”’]?[^\n.]*/gi,
-  /(?:check\s+out|follow)\s+(?:our\s+page\s+)?@?[\w._-]*\s*(?:for\s+more[^\n.]*)?/gi,
+  /(?:check\s+out|follow)\s+(?:our\s+page\s+)?@?[a-zA-Z0-9_.-]*\s*(?:for\s+more[^\n.]*)?/gi,
   /save\s+this\s+reel\s+(?:for\s+later|and\s+share)[^\n.]*/gi,
-  /follow\s+@[\w._-]+\s+for\s+more[^\n.]*/gi,
+  /follow\s+@?[a-zA-Z0-9_.-]+\s+for\s+more[^\n.]*/gi,
   /follow\s+us\s+for\s+more[^\n.]*/gi,
-  /check\s+out\s+for\s+more[^\n.]*/gi
+  /check\s+out\s+for\s+more[^\n.]*/gi,
+  /(?:view\s+)?all\s+\d+\s+comments[^\n.]*/gi,
+  /\b\d+\s+comments?\b/gi,
+  /(?:view|see)\s+translation/gi
 ];
 
 function cleanRawCaption(rawCaption, competitorHandles = []) {
@@ -45,6 +48,8 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
   });
 
   // 3. Normalise multiple empty newlines & clean dangling punctuation
+  text = text.replace(/^(?:view\s+)?(?:all\s+)?\d+\s+comments?$/gim, '');
+  text = text.replace(/^(?:view|see)\s+translation$/gim, '');
   text = text.replace(/([!?:;])\s*\./g, '$1');
   text = text.replace(/\s+([.,;:])/g, '$1');
   text = text.replace(/^\s*[.,;:–-]+\s*$/gm, '');

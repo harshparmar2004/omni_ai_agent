@@ -151,6 +151,7 @@ function synthesizeOfflineHook(rawText, pageName = '') {
     .replace(/@[\w.]+/g, '')
     .replace(/#[\w_]+/g, '')
     .replace(/(?:follow|subscribe|credit|credits|via|source|all rights|link in bio|dm for|turn on notifications|share with|drop your thoughts|save this)[^\n.!?]*/gi, '')
+    .replace(/(?:(?:view\s+)?all\s+\d+\s+comments?|\b\d+\s+comments?|(?:view|see)\s+translation)[^\n.!?]*/gi, '')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, ' ')
     .replace(/["'“”]/g, '')
     .replace(/\s+/g, ' ')
@@ -160,7 +161,7 @@ function synthesizeOfflineHook(rawText, pageName = '') {
   const rawSentences = text
     .split(/(?<=[.!?\n])\s+/)
     .map(s => s.trim())
-    .filter(s => s.length >= 18 && !/^(?:hi|hey|hello|welcome|check out|read below|part \d|view all)/i.test(s));
+    .filter(s => s.length >= 20 && s.split(/\s+/).length >= 4 && !/^(?:hi|hey|hello|welcome|check out|read below|part \d|view all|all \d|comments?)/i.test(s));
 
   // Detect and normalize sentences with heavy name-lists (e.g. "Sam Altman, Elon Musk, Mark Zuckerberg...")
   const sentences = rawSentences.map(s => {
@@ -225,8 +226,9 @@ function synthesizeOfflineHook(rawText, pageName = '') {
     return word.charAt(0).toUpperCase() + word.slice(1);
   }).join(' ');
 
-  // Fallback if candidate is too brief or ambiguous
-  if (!candidate || candidate.length < 18) {
+  // Fallback if candidate is too brief, pure digits, or comment debris
+  const isJunkCandidate = !candidate || candidate.length < 20 || candidate.split(/\s+/).length < 4 || /^[\d\s.,\-+]+$/.test(candidate) || /all \d+ comments/i.test(candidate) || /comments?/i.test(candidate);
+  if (isJunkCandidate) {
     candidate = defaultThemeHook;
   }
 
@@ -461,10 +463,13 @@ Respond ONLY with valid JSON in this exact structure:
             if (parsed) {
               if (!hasDetectedOnScreenHook && parsed.headline) {
                 let candidateHeadline = parsed.headline.trim();
-                if (!candidateHeadline.includes('**')) {
-                  candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+                const isCandValid = candidateHeadline.length >= 20 && candidateHeadline.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(candidateHeadline) && !/^(?:all\s+)?\d+\s+comments?$/i.test(candidateHeadline);
+                if (isCandValid) {
+                  if (!candidateHeadline.includes('**')) {
+                    candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+                  }
+                  headline = candidateHeadline;
                 }
-                headline = candidateHeadline;
               }
               if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();
               usedProvider = provider.name;
