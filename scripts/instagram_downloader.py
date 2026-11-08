@@ -484,6 +484,8 @@ def download_instagram_media(url, output_dir):
             sys.executable, "-m", "yt_dlp",
             "-f", "bv*+ba/b",
             "--merge-output-format", "mp4",
+            "--concurrent-fragments", "4",
+            "--no-mtime",
             "-o", output_template,
             "--print-json",
             "--no-playlist"

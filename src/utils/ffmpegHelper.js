@@ -2534,7 +2534,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
         videoFilter = [
           `[0:v]crop=in_w:${cropH}:0:${cropY}[cropped]`,
           `[cropped]split=2[bg_raw][fg_raw]`,
-          `[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]`,
+          `[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:1,scale=1080:1920:flags=fast_bilinear[bg]`,
           `[fg_raw]scale=${cardW}:${cardH}[card]`,
           `[bg][card]overlay=${cardX}:${cardY}[v1]`,
           `[v1][1:v]overlay=0:0[outv]`
@@ -2549,7 +2549,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
           videoFilter = [
             '[0:v]split=2[bg_raw][fg_raw]',
-            '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+            '[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:1,scale=1080:1920:flags=fast_bilinear[bg]',
             `[fg_raw]scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH}[card]`,
             `[bg][card]overlay=${cardX}:${cardY}[v1]`,
             '[v1][1:v]overlay=0:0[outv]'
@@ -2585,7 +2585,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
       videoFilter = [
         '[0:v]split=2[bg_raw][fg_raw]',
-        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:4[bg]',
+        '[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=10:1,scale=1080:1920:flags=fast_bilinear[bg]',
         `[fg_raw]scale=${cardW}:${cardH}[card]`,
         `[bg][card]overlay=${cardX}:${cardY}[v1]`,
         '[v1][1:v]overlay=0:0[outv]'
@@ -2605,7 +2605,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
 
       videoFilter = [
         '[0:v]split=2[bg_raw][fg_raw]',
-        '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=24:4[bg]',
+        '[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=8:1,scale=1080:1920:flags=fast_bilinear[bg]',
         `[fg_raw]scale=${cardW}:${cardH}[card]`,
         `[bg][card]overlay=${cardX}:${cardY}[v1]`,
         '[v1][1:v]overlay=0:0[outv]'
@@ -2639,8 +2639,9 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       '-map', '[outa]',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'veryfast',
-      '-crf', '20',
+      '-preset', 'superfast',
+      '-crf', '22',
+      '-threads', '0',
       '-c:a', 'aac',
       '-b:a', '192k',
       '-ar', '44100',
@@ -2734,7 +2735,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
 
   const filter = [
     '[0:v]split=2[bg_raw][fg_raw]',
-    '[bg_raw]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=32:5,eq=brightness=-0.32:contrast=0.94[bg]',
+    '[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=10:1,eq=brightness=-0.32:contrast=0.94,scale=1080:1920:flags=fast_bilinear[bg]',
     `[fg_raw]scale=${geom.cardW}:${geom.cardH}[card]`,
     `[bg][card]overlay=${geom.cardX}:${geom.cardY}[v1]`,
     '[v1][1:v]overlay=0:0[outv]'
@@ -2754,8 +2755,9 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
       '-map', '0:a?',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'veryfast',
-      '-crf', '20',
+      '-preset', 'superfast',
+      '-crf', '22',
+      '-threads', '0',
       '-c:a', 'aac',
       '-b:a', '192k',
       '-movflags', '+faststart',

@@ -159,9 +159,10 @@ jobs:
       - name: 🔤 Install System Fonts for Canvas Typography
         continue-on-error: true
         run: |
-          sudo apt-get update -qq || true
-          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-liberation fontconfig || true
-          fc-cache -fv || true
+          if ! fc-list : family | grep -qi "liberation\|dejavu"; then
+            sudo apt-get update -qq || true
+            sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-liberation fontconfig || true
+          fi
 
       - name: 💾 Cache Pip Packages
         uses: actions/cache@v4
@@ -180,7 +181,7 @@ jobs:
           key: ${{ runner.os }}-playwright-chromium-v1
 
       - name: 🌐 Install Fast Media Stream Downloader
-        run: pip install --quiet yt-dlp requests playwright
+        run: pip install --quiet --prefer-binary --no-compile yt-dlp requests playwright
 
       - name: 🚀 Run Autonomous Reposter Engine
         env:
