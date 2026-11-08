@@ -1857,13 +1857,13 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
     const defaultNames = {
       gta6: 'GTA 6 Updates 007',
-      movies: 'Cinema & Movie Picks',
-      cinema: 'Cinema & Movie Picks',
+      movies: 'Movie Series 365',
+      cinema: 'Movie Series 365',
       clubbing: 'Clubbing Cult',
       video_essay: 'Cult Information',
       default: cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     };
-    const pageName = options.pageName || options.page?.name || defaultNames[theme] || (isMovie ? defaultNames.movies : (isGTA6 ? defaultNames.gta6 : defaultNames.default));
+    const pageName = options.pageName || (cleanHandle.includes('movie') ? 'Movie Series 365' : (options.page?.name || defaultNames[theme] || (isMovie ? defaultNames.movies : (isGTA6 ? defaultNames.gta6 : defaultNames.default))));
 
     const defaultHooks = {
       gta6: 'Rockstar Just Confirmed A **Massive New Feature** For GTA VI',
@@ -2008,6 +2008,28 @@ async function generateFeedPostOverlay(handle, options = {}) {
       const handleCenterY = headerTopY + 80;
       const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
       ctx.fillText(displayHandle, textLeftX, handleCenterY);
+
+      // Right-aligned theme badge in small box
+      const tagText = isMovie ? 'CINEMA PICKS' : (isGTA6 ? 'GTA VI' : 'OFFICIAL');
+      ctx.font = '900 16px "Arial Black", Arial, sans-serif';
+      const tagW = ctx.measureText(tagText).width + 24;
+      const tagH = 34;
+      const tagX = width - marginX - tagW;
+      const tagY = headerTopY + 28;
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(tagX, tagY, tagW, tagH, 8);
+      ctx.fill();
+      ctx.strokeStyle = highlightColor;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = highlightColor;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 1);
+
       ctx.restore();
 
       // 5. Punchy Viral Hook Headline with Theme Highlight
