@@ -3506,6 +3506,110 @@ table.data-table tr:hover td {
   font-weight: 600;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   OmniStudio Channel Hub & Fleet Directory
+   ───────────────────────────────────────────────────────────── */
+.channel-directory-modal-content {
+  max-width: 1140px;
+  width: 95%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+}
+
+.channel-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.channel-directory-card {
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.9rem;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.channel-directory-card:hover {
+  border-color: var(--accent-primary);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.channel-directory-card.active-workspace {
+  border-color: var(--accent-primary);
+  background: var(--accent-soft);
+}
+
+.niche-filter-chip {
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.niche-filter-chip:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.niche-filter-chip.active {
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  border-color: var(--accent-primary);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.25);
+}
+
+.channel-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+
+.channel-avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--border-subtle);
+  background: var(--bg-canvas);
+}
+
+.channel-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+
+.channel-status-dot.online {
+  background: #10B981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.channel-status-dot.warning {
+  background: #EF4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}
+
 
 
 

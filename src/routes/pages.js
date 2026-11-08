@@ -21,15 +21,38 @@ const {
 const { validatePageToken, maskToken } = require('../core/tokenManager');
 const scheduler = require('../agents/watchtower/scheduler');
 
+function resolvePageLogo(p) {
+  if (p && p.brand_logo_path && p.brand_logo_path.trim()) {
+    return p.brand_logo_path;
+  }
+  const cleanHandle = (p?.handle || '').replace('@', '').toLowerCase();
+  const slug = (p?.slug || '').toLowerCase();
+
+  if (cleanHandle === 'gta6_updates_007' || slug.includes('gta6')) {
+    return '/branding/gta6_updates_007_avatar.png';
+  }
+  if (cleanHandle === 'movie_series_365' || slug.includes('movie')) {
+    return '/branding/movie_series_365_avatar.png';
+  }
+  if (cleanHandle === 'clubbingcult' || slug.includes('clubbing')) {
+    return '/branding/clubbingcult_avatar.png';
+  }
+  if (cleanHandle === 'cult_information' || slug.includes('cult_information') || slug === 'cult') {
+    return '/branding/cult_information_avatar.png';
+  }
+  return '';
+}
+
 /**
  * GET /api/pages
- * Returns pages with masked tokens and today's quota usage
+ * Returns pages with masked tokens, resolved logo, and today's quota usage
  */
 router.get('/', (req, res) => {
   try {
     const pages = getPages();
     const result = pages.map(p => ({
       ...p,
+      brand_logo_path: resolvePageLogo(p),
       access_token_masked: maskToken(p.access_token),
       has_valid_token: Boolean(p.access_token && p.access_token.length > 20),
       today_published_count: getPublishedCountToday(p.id)
@@ -49,6 +72,7 @@ router.get('/:id', (req, res) => {
     if (!page) return res.status(404).json({ error: 'Page not found' });
     res.json({
       ...page,
+      brand_logo_path: resolvePageLogo(page),
       access_token_masked: maskToken(page.access_token),
       today_published_count: getPublishedCountToday(page.id)
     });
@@ -241,6 +265,7 @@ router.get('/:id/workspace', (req, res) => {
     res.json({
       page: {
         ...page,
+        brand_logo_path: resolvePageLogo(page),
         access_token_masked: maskToken(page.access_token),
         has_valid_token: Boolean(page.access_token && page.access_token.length > 20),
         today_published_count: todayCount

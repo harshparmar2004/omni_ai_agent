@@ -468,7 +468,8 @@ function updatePage(id, data) {
     'caption_template', 'default_hashtags', 'attribution_enabled', 'watermark_enabled',
     'post_mode', 'posts_per_cycle', 'daily_quota', 'min_spacing_minutes', 'is_active',
     'page_type', 'niche', 'timezone', 'region', 'onboarding_status', 'template_slug',
-    'auto_story', 'auto_cross_post'
+    'auto_story', 'auto_cross_post', 'brand_logo_path', 'brand_theme', 'brand_accent_color',
+    'brand_font', 'template_preset'
   ];
 
   for (const key of allowed) {

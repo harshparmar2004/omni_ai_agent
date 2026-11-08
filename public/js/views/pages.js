@@ -10,9 +10,81 @@ window.pagesView = (function() {
   let currentWorkspaceData = null;
   let currentEditingPageId = null;
   let pageSearchQuery = '';
+  let selectedNicheFilter = 'all';
+  let directorySearchQuery = '';
+  let directoryNicheFilter = 'all';
+  let directoryStatusFilter = 'all';
+  let directoryViewMode = 'grid'; // 'grid' | 'table'
 
-  function getPageIcon(slug) {
+  function getPageLogoUrl(p) {
+    if (!p) return '';
+    if (p.brand_logo_path && p.brand_logo_path.trim()) {
+      return p.brand_logo_path.trim();
+    }
+    const handle = (p.handle || '').replace('@', '').toLowerCase();
+    const slug = (p.slug || '').toLowerCase();
+    if (handle === 'gta6_updates_007' || slug.includes('gta6')) {
+      return '/branding/gta6_updates_007_avatar.png';
+    }
+    if (handle === 'movie_series_365' || slug.includes('movie')) {
+      return '/branding/movie_series_365_avatar.png';
+    }
+    if (handle === 'clubbingcult' || slug.includes('clubbing')) {
+      return '/branding/clubbingcult_avatar.png';
+    }
+    if (handle === 'cult_information' || slug.includes('cult_information') || slug === 'cult') {
+      return '/branding/cult_information_avatar.png';
+    }
     return '';
+  }
+
+  function renderPageAvatar(p, size = 36) {
+    if (!p) return '';
+    const logoUrl = getPageLogoUrl(p);
+    const hasValid = p.has_valid_token !== false;
+    const dotSize = Math.max(8, Math.round(size / 4));
+    const statusDot = `<span class="channel-status-dot ${hasValid ? 'online' : 'warning'}" style="width: ${dotSize}px; height: ${dotSize}px;" title="${hasValid ? 'Operational' : 'Token Required'}"></span>`;
+
+    const initials = (p.name || p.slug || 'CH')
+      .split(' ')
+      .map(w => w[0])
+      .filter(Boolean)
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+
+    const colors = [
+      'linear-gradient(135deg, #10B981, #047857)',
+      'linear-gradient(135deg, #F59E0B, #B45309)',
+      'linear-gradient(135deg, #8B5CF6, #6D28D9)',
+      'linear-gradient(135deg, #EC4899, #BE185D)',
+      'linear-gradient(135deg, #06B6D4, #0E7490)',
+      'linear-gradient(135deg, #6366F1, #4338CA)'
+    ];
+    const colorIndex = (p.id || 1) % colors.length;
+
+    if (logoUrl) {
+      return `
+        <div class="channel-avatar-wrapper" style="width: ${size}px; height: ${size}px;">
+          <img src="${logoUrl}" alt="${escapeHtml(p.name)}" class="channel-avatar-img"
+               style="width: ${size}px; height: ${size}px;"
+               onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';" />
+          <div style="display: none; width: ${size}px; height: ${size}px; border-radius: 50%; background: ${colors[colorIndex]}; color: white; font-weight: 700; font-size: ${Math.round(size * 0.38)}px; align-items: center; justify-content: center; border: 1.5px solid var(--border-subtle);">
+            ${initials}
+          </div>
+          ${statusDot}
+        </div>
+      `;
+    }
+
+    return `
+      <div class="channel-avatar-wrapper" style="width: ${size}px; height: ${size}px;">
+        <div style="width: ${size}px; height: ${size}px; border-radius: 50%; background: ${colors[colorIndex]}; color: #FFFFFF; font-weight: 700; font-size: ${Math.round(size * 0.38)}px; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--border-subtle); letter-spacing: -0.5px;">
+          ${initials}
+        </div>
+        ${statusDot}
+      </div>
+    `;
   }
 
   function escapeHtml(str) {
@@ -42,6 +114,10 @@ window.pagesView = (function() {
             </p>
           </div>
           <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="pagesView.openDirectoryModal()" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent-primary);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <span>🗂️ All Channels Directory</span>
+            </button>
             <button class="btn btn-primary btn-sm" onclick="pagesView.openWizardModal()">
               ✨ Page Builder Wizard
             </button>
@@ -62,7 +138,7 @@ window.pagesView = (function() {
         </div>
 
         <!-- Channel Filter & Search Bar for 50-100 accounts -->
-        <div class="card mb-3" style="padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-card); background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+        <div class="card mb-2" style="padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-card); background: var(--bg-card); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
           <div class="flex items-center gap-2" style="flex: 1;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="pages-search-input" class="form-input" placeholder="Search 50-100+ channels by name, @handle, or slug..." oninput="pagesView.filterPages(this.value)" style="border: none; background: transparent; padding: 2px 4px; font-size: 0.82rem; width: 100%;">
@@ -74,6 +150,11 @@ window.pagesView = (function() {
           </div>
         </div>
 
+        <!-- Niche Quick Filter Pills -->
+        <div id="pages-niche-filters" class="flex items-center gap-1.5 mb-3" style="flex-wrap: wrap; overflow-x: auto; padding-bottom: 2px;">
+          <!-- Dynamically populated -->
+        </div>
+
         <!-- 1. Top Page Switcher Bar -->
         <div id="workspace-switcher-bar" class="workspace-switcher" style="margin-bottom: 1.5rem;">
           <div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">Loading connected pages...</div>
@@ -82,6 +163,67 @@ window.pagesView = (function() {
         <!-- 2. Selected Page Active Workspace -->
         <div id="workspace-content-area">
           <div style="color: var(--text-muted); padding: 3rem; text-align: center;">Loading page workspace...</div>
+        </div>
+
+        <!-- All Channels Network Directory Modal -->
+        <div id="page-directory-modal" class="modal-overlay hidden" style="display: none;" onclick="if (event.target === this) pagesView.closeDirectoryModal()">
+          <div class="channel-directory-modal-content" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between mb-3" style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.85rem;">
+              <div class="flex items-center gap-2.5">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-primary); display: flex; align-items: center; justify-content: center;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </div>
+                <div>
+                  <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-primary); font-family: 'Plus Jakarta Sans', sans-serif;">
+                    Channel Network Directory
+                  </h3>
+                  <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+                    Visual control center for 100+ connected channels — instant search, original logo previews, and health status
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="pagesView.closeDirectoryModal()" style="padding: 4px 10px; font-size: 0.9rem;">✕</button>
+            </div>
+
+            <!-- Directory Fleet Stats -->
+            <div id="directory-stats-row" class="flex items-center gap-2 mb-3" style="flex-wrap: wrap;"></div>
+
+            <!-- Search, Filters, and View Switcher -->
+            <div class="flex items-center justify-between gap-3 mb-3" style="flex-wrap: wrap; background: var(--bg-canvas); padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid var(--border-subtle);">
+              <div class="flex items-center gap-2" style="flex: 1; min-width: 240px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="dir-search-input" class="form-input" placeholder="Search by channel name, @handle, or niche..." oninput="pagesView.filterDirectory(this.value)" style="border: none; background: transparent; padding: 2px 6px; font-size: 0.84rem; width: 100%;">
+              </div>
+              <div class="flex items-center gap-2" style="flex-wrap: wrap;">
+                <select id="dir-niche-select" class="form-input form-input-sm" onchange="pagesView.setDirectoryNicheFilter(this.value)" style="font-size: 0.78rem; padding: 4px 8px;">
+                  <option value="all">All Niches</option>
+                  <option value="movies">🎬 Movies & TV</option>
+                  <option value="gaming">🎮 Gaming & GTA 6</option>
+                  <option value="concert">🎵 Nightlife & EDM</option>
+                  <option value="tech">📰 Video Essays & Tech</option>
+                </select>
+                <select id="dir-status-select" class="form-input form-input-sm" onchange="pagesView.setDirectoryStatusFilter(this.value)" style="font-size: 0.78rem; padding: 4px 8px;">
+                  <option value="all">All Status</option>
+                  <option value="active">Operational Only</option>
+                  <option value="warning">⚠️ Token Required</option>
+                </select>
+                <div class="flex items-center" style="border: 1px solid var(--border-card); border-radius: 6px; overflow: hidden;">
+                  <button id="dir-btn-grid" class="btn btn-sm" onclick="pagesView.setDirectoryViewMode('grid')" style="border: none; border-radius: 0; padding: 4px 8px; background: var(--accent-primary); color: white;" title="Grid View">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                  </button>
+                  <button id="dir-btn-table" class="btn btn-sm" onclick="pagesView.setDirectoryViewMode('table')" style="border: none; border-radius: 0; padding: 4px 8px; background: var(--bg-card); color: var(--text-muted);" title="Dense Table View">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Directory Content (Scrollable Grid or Table) -->
+            <div id="directory-content-scroll" style="flex: 1; overflow-y: auto; max-height: calc(90vh - 220px); padding-right: 4px;">
+              <div id="directory-pages-container"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Edit / Connect Page Modal -->
@@ -98,6 +240,14 @@ window.pagesView = (function() {
             <div class="form-group mb-3">
               <label class="form-label font-bold" style="font-size: 0.8rem; font-weight: 600;">Display Name</label>
               <input type="text" id="pem-name" class="form-input" placeholder="e.g. GTA 6 Updates 007" style="border-radius: 8px;">
+            </div>
+
+            <div class="form-group mb-3">
+              <label class="form-label font-bold" style="font-size: 0.8rem; font-weight: 600;">Channel Logo / Avatar URL</label>
+              <div class="flex items-center gap-2">
+                <input type="text" id="pem-logo" class="form-input" placeholder="e.g. /branding/gta6_updates_007_avatar.png" oninput="pagesView.previewEditLogo(this.value)" style="border-radius: 8px; flex: 1;">
+                <div id="pem-logo-preview" style="width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--bg-canvas); flex-shrink: 0;"></div>
+              </div>
             </div>
 
             <div class="form-group mb-3">
@@ -489,38 +639,107 @@ window.pagesView = (function() {
 
       const countBadge = document.getElementById('pages-count-badge');
       if (countBadge) countBadge.textContent = `${pagesList.length} Channels Connected`;
+      const headerCount = document.getElementById('header-channels-count');
+      if (headerCount) headerCount.textContent = `${pagesList.length}`;
 
-      // Filter pages based on search query
-      const displayList = pageSearchQuery ? pagesList.filter(p =>
-        (p.name && p.name.toLowerCase().includes(pageSearchQuery.toLowerCase())) ||
-        (p.handle && p.handle.toLowerCase().includes(pageSearchQuery.toLowerCase())) ||
-        (p.slug && p.slug.toLowerCase().includes(pageSearchQuery.toLowerCase()))
-      ) : pagesList;
+      // Populate niche filter pills
+      const nicheContainer = document.getElementById('pages-niche-filters');
+      if (nicheContainer) {
+        const counts = {
+          all: pagesList.length,
+          movies: pagesList.filter(p => (p.niche === 'movies' || (p.slug && p.slug.includes('movie')) || (p.name && p.name.toLowerCase().includes('movie')))).length,
+          gaming: pagesList.filter(p => (p.niche === 'gaming' || (p.slug && p.slug.includes('gta')) || (p.name && p.name.toLowerCase().includes('gta')))).length,
+          concert: pagesList.filter(p => (p.niche === 'concert' || (p.slug && (p.slug.includes('club') || p.slug.includes('concert'))) || (p.name && p.name.toLowerCase().includes('cult')))).length,
+          tech: pagesList.filter(p => (p.niche === 'tech' || (p.slug && p.slug.includes('info')) || (p.name && p.name.toLowerCase().includes('info')))).length,
+          warning: pagesList.filter(p => p.has_valid_token === false).length
+        };
+
+        nicheContainer.innerHTML = `
+          <button class="niche-filter-chip ${selectedNicheFilter === 'all' ? 'active' : ''}" onclick="pagesView.setNicheFilter('all')">
+            All Channels (${counts.all})
+          </button>
+          ${counts.movies > 0 ? `
+            <button class="niche-filter-chip ${selectedNicheFilter === 'movies' ? 'active' : ''}" onclick="pagesView.setNicheFilter('movies')">
+              🎬 Movies & TV (${counts.movies})
+            </button>
+          ` : ''}
+          ${counts.gaming > 0 ? `
+            <button class="niche-filter-chip ${selectedNicheFilter === 'gaming' ? 'active' : ''}" onclick="pagesView.setNicheFilter('gaming')">
+              🎮 Gaming & GTA (${counts.gaming})
+            </button>
+          ` : ''}
+          ${counts.concert > 0 ? `
+            <button class="niche-filter-chip ${selectedNicheFilter === 'concert' ? 'active' : ''}" onclick="pagesView.setNicheFilter('concert')">
+              🎵 Nightlife & EDM (${counts.concert})
+            </button>
+          ` : ''}
+          ${counts.tech > 0 ? `
+            <button class="niche-filter-chip ${selectedNicheFilter === 'tech' ? 'active' : ''}" onclick="pagesView.setNicheFilter('tech')">
+              📰 Video Essays & Tech (${counts.tech})
+            </button>
+          ` : ''}
+          ${counts.warning > 0 ? `
+            <button class="niche-filter-chip ${selectedNicheFilter === 'warning' ? 'active' : ''}" onclick="pagesView.setNicheFilter('warning')" style="color: ${selectedNicheFilter === 'warning' ? '#FFF' : '#EF4444'}; border-color: #EF4444;">
+              ⚠️ Needs Token (${counts.warning})
+            </button>
+          ` : ''}
+        `;
+      }
+
+      // Filter pages based on search query and niche filter
+      let displayList = pagesList;
+      if (pageSearchQuery) {
+        const q = pageSearchQuery.toLowerCase();
+        displayList = displayList.filter(p =>
+          (p.name && p.name.toLowerCase().includes(q)) ||
+          (p.handle && p.handle.toLowerCase().includes(q)) ||
+          (p.slug && p.slug.toLowerCase().includes(q))
+        );
+      }
+      if (selectedNicheFilter !== 'all') {
+        displayList = displayList.filter(p => {
+          if (selectedNicheFilter === 'movies') return p.niche === 'movies' || (p.slug && p.slug.includes('movie')) || (p.name && p.name.toLowerCase().includes('movie'));
+          if (selectedNicheFilter === 'gaming') return p.niche === 'gaming' || (p.slug && p.slug.includes('gta')) || (p.name && p.name.toLowerCase().includes('gta'));
+          if (selectedNicheFilter === 'concert') return p.niche === 'concert' || (p.slug && (p.slug.includes('club') || p.slug.includes('concert'))) || (p.name && p.name.toLowerCase().includes('cult'));
+          if (selectedNicheFilter === 'tech') return p.niche === 'tech' || (p.slug && p.slug.includes('info')) || (p.name && p.name.toLowerCase().includes('info'));
+          if (selectedNicheFilter === 'warning') return p.has_valid_token === false;
+          return true;
+        });
+      }
 
       // Default to first page if current selection is invalid
       if (!selectedPageId || !pagesList.find(p => p.id === selectedPageId)) {
         selectedPageId = pagesList[0].id;
       }
 
-      // Render Switcher Bar (Clean, no dots, plain text)
+      // Render Switcher Bar (with Original Logos & Quotas)
       const buttonsHtml = displayList.map(p => {
         const isActive = p.id === selectedPageId;
         return `
-          <button class="workspace-tab-btn ${isActive ? 'active' : ''}" onclick="pagesView.selectPage(${p.id})" style="border-radius: 10px; box-shadow: none; padding: 0.6rem 0.95rem;">
-            <div style="text-align: left;">
-              <div style="font-weight: ${isActive ? '600' : '500'}; font-size: 0.85rem; line-height: 1.2; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-primary)'};">
+          <button class="workspace-tab-btn ${isActive ? 'active' : ''}" onclick="pagesView.selectPage(${p.id})" style="border-radius: 10px; box-shadow: none; padding: 0.55rem 0.85rem; display: flex; align-items: center; gap: 0.75rem;">
+            ${renderPageAvatar(p, 36)}
+            <div style="text-align: left; min-width: 0;">
+              <div style="font-weight: ${isActive ? '700' : '600'}; font-size: 0.85rem; line-height: 1.25; color: ${isActive ? 'var(--accent-primary)' : 'var(--text-primary)'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
                 ${escapeHtml(p.name)}
               </div>
-              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">
-                ${p.handle || '@' + p.slug} · Quota: ${p.today_published_count || 0}/${p.daily_quota || 3}
+              <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 3px; display: flex; align-items: center; gap: 6px;">
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">${p.handle || '@' + p.slug}</span>
+                <span style="display: inline-block; padding: 1px 5px; border-radius: 4px; background: var(--bg-canvas); font-size: 0.68rem; font-weight: 600; color: ${p.today_published_count >= p.daily_quota ? '#10B981' : 'var(--text-secondary)'};">
+                  ${p.today_published_count || 0}/${p.daily_quota || 3}
+                </span>
               </div>
             </div>
           </button>
         `;
       }).join('') + `
-        <button class="workspace-tab-btn" style="border-style: dashed; color: var(--accent-primary); background: transparent; border-radius: 10px; box-shadow: none;" onclick="pagesView.openAddModal()">
+        <button class="workspace-tab-btn" style="border-style: dashed; color: var(--accent-primary); background: transparent; border-radius: 10px; box-shadow: none; padding: 0.55rem 0.85rem;" onclick="pagesView.openAddModal()">
           <span>+ Connect Page</span>
         </button>
+        ${pagesList.length > 4 ? `
+          <button class="workspace-tab-btn" style="border: 1px solid var(--border-card); background: var(--bg-canvas); border-radius: 10px; box-shadow: none; padding: 0.55rem 0.85rem; font-weight: 600;" onclick="pagesView.openDirectoryModal()">
+            <span>📚 Browse All (${pagesList.length}) →</span>
+          </button>
+        ` : ''}
       `;
 
       if (switcherBar) switcherBar.innerHTML = buttonsHtml;
@@ -586,17 +805,21 @@ window.pagesView = (function() {
       <div class="workspace-hero-card">
         <div class="flex items-center justify-between" style="flex-wrap: wrap; gap: 1.25rem;">
           <div class="flex items-center gap-3.5">
+            ${renderPageAvatar(page, 52)}
             <div>
               <div class="flex items-center gap-2.5" style="flex-wrap: wrap;">
-                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary);">
+                <h3 style="margin: 0; font-size: 1.35rem; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text-primary);">
                   ${escapeHtml(page.name)}
                 </h3>
-                <a href="https://instagram.com/${page.handle ? page.handle.replace('@', '') : ''}" target="_blank" style="color: var(--accent-primary); text-decoration: none; font-size: 0.85rem; font-weight: 500; font-family: var(--font-mono);">
+                <a href="https://instagram.com/${page.handle ? page.handle.replace('@', '') : ''}" target="_blank" style="color: var(--accent-primary); text-decoration: none; font-size: 0.85rem; font-weight: 600; font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 3px;">
                   ${page.handle || '@' + page.slug} ↗
                 </a>
+                <span class="badge" style="background: var(--bg-card); border: 1px solid var(--border-card); font-size: 0.72rem; text-transform: uppercase; font-weight: 600;">
+                  ${page.niche || 'GENERAL'}
+                </span>
               </div>
               <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.35rem; line-height: 1.4;">
-                slug: ${page.slug} · ${page.post_mode === 'auto' ? 'Autonomous Publishing' : 'Review & Approval'} · Meta Graph API v21.0: <span class="status-text ${page.has_valid_token ? 'status-text-success' : 'status-text-danger'}">${page.has_valid_token ? 'Operational' : 'Token Required'}</span>
+                slug: <code>${page.slug}</code> · ${page.post_mode === 'auto' ? '⚡ Autonomous Publishing' : '👁️ Review & Approval'} · Meta Graph API: <span class="status-text ${page.has_valid_token ? 'status-text-success' : 'status-text-danger'}">${page.has_valid_token ? 'Operational' : 'Token Required'}</span>
               </div>
             </div>
           </div>
@@ -1533,6 +1756,11 @@ window.pagesView = (function() {
     currentEditingPageId = pageId;
     document.getElementById('pem-title').textContent = `Configure @${page.slug}`;
     document.getElementById('pem-name').value = page.name || '';
+    const logoInput = document.getElementById('pem-logo');
+    if (logoInput) {
+      logoInput.value = page.brand_logo_path || '';
+      previewEditLogo(page.brand_logo_path || getPageLogoUrl(page));
+    }
     document.getElementById('pem-slug').value = page.slug || '';
     document.getElementById('pem-username').value = page.handle || page.username || '';
     document.getElementById('pem-ig-user-id').value = page.ig_user_id || '';
@@ -1552,6 +1780,11 @@ window.pagesView = (function() {
     currentEditingPageId = null;
     document.getElementById('pem-title').textContent = 'Connect New Instagram Page';
     document.getElementById('pem-name').value = '';
+    const logoInput = document.getElementById('pem-logo');
+    if (logoInput) {
+      logoInput.value = '';
+      previewEditLogo('');
+    }
     document.getElementById('pem-slug').value = '';
     document.getElementById('pem-username').value = '';
     document.getElementById('pem-ig-user-id').value = '';
@@ -1577,6 +1810,7 @@ window.pagesView = (function() {
 
   async function saveEditModal() {
     const name = document.getElementById('pem-name')?.value?.trim();
+    const logo = document.getElementById('pem-logo')?.value?.trim();
     const slug = document.getElementById('pem-slug')?.value?.trim();
     const handle = document.getElementById('pem-username')?.value?.trim();
     const igUserId = document.getElementById('pem-ig-user-id')?.value?.trim();
@@ -1598,6 +1832,10 @@ window.pagesView = (function() {
       default_hashtags: hashtags,
       post_mode: postMode
     };
+
+    if (logo !== undefined) {
+      payload.brand_logo_path = logo;
+    }
 
     if (igUserId) {
       payload.ig_user_id = igUserId;
@@ -1923,6 +2161,263 @@ window.pagesView = (function() {
     loadPages();
   }
 
+  function setNicheFilter(niche) {
+    selectedNicheFilter = niche || 'all';
+    loadPages();
+  }
+
+  function previewEditLogo(url) {
+    const preview = document.getElementById('pem-logo-preview');
+    if (!preview) return;
+    if (url && url.trim()) {
+      preview.innerHTML = `<img src="${url.trim()}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.parentElement.innerHTML='🖼️'" />`;
+    } else {
+      preview.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted);">📷</span>';
+    }
+  }
+
+  function openDirectoryModal() {
+    const modal = document.getElementById('page-directory-modal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.setProperty('display', 'flex', 'important');
+      renderDirectoryGrid();
+    }
+  }
+
+  function closeDirectoryModal() {
+    const modal = document.getElementById('page-directory-modal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  function filterDirectory(query) {
+    directorySearchQuery = query ? query.trim() : '';
+    renderDirectoryGrid();
+  }
+
+  function setDirectoryNicheFilter(niche) {
+    directoryNicheFilter = niche || 'all';
+    renderDirectoryGrid();
+  }
+
+  function setDirectoryStatusFilter(status) {
+    directoryStatusFilter = status || 'all';
+    renderDirectoryGrid();
+  }
+
+  function setDirectoryViewMode(mode) {
+    directoryViewMode = mode;
+    const btnGrid = document.getElementById('dir-btn-grid');
+    const btnTable = document.getElementById('dir-btn-table');
+    if (btnGrid && btnTable) {
+      if (mode === 'grid') {
+        btnGrid.style.background = 'var(--accent-primary)';
+        btnGrid.style.color = 'white';
+        btnTable.style.background = 'var(--bg-card)';
+        btnTable.style.color = 'var(--text-muted)';
+      } else {
+        btnTable.style.background = 'var(--accent-primary)';
+        btnTable.style.color = 'white';
+        btnGrid.style.background = 'var(--bg-card)';
+        btnGrid.style.color = 'var(--text-muted)';
+      }
+    }
+    renderDirectoryGrid();
+  }
+
+  function renderDirectoryGrid() {
+    const container = document.getElementById('directory-pages-container');
+    const statsRow = document.getElementById('directory-stats-row');
+    if (!container) return;
+
+    // Filter pages
+    let list = pagesList.slice();
+    if (directorySearchQuery) {
+      const q = directorySearchQuery.toLowerCase();
+      list = list.filter(p =>
+        (p.name && p.name.toLowerCase().includes(q)) ||
+        (p.handle && p.handle.toLowerCase().includes(q)) ||
+        (p.slug && p.slug.toLowerCase().includes(q)) ||
+        (p.niche && p.niche.toLowerCase().includes(q))
+      );
+    }
+    if (directoryNicheFilter !== 'all') {
+      list = list.filter(p => {
+        if (directoryNicheFilter === 'movies') return p.niche === 'movies' || (p.slug && p.slug.includes('movie')) || (p.name && p.name.toLowerCase().includes('movie'));
+        if (directoryNicheFilter === 'gaming') return p.niche === 'gaming' || (p.slug && p.slug.includes('gta')) || (p.name && p.name.toLowerCase().includes('gta'));
+        if (directoryNicheFilter === 'concert') return p.niche === 'concert' || (p.slug && (p.slug.includes('club') || p.slug.includes('concert'))) || (p.name && p.name.toLowerCase().includes('cult'));
+        if (directoryNicheFilter === 'tech') return p.niche === 'tech' || (p.slug && p.slug.includes('info')) || (p.name && p.name.toLowerCase().includes('info'));
+        return true;
+      });
+    }
+    if (directoryStatusFilter !== 'all') {
+      if (directoryStatusFilter === 'active') list = list.filter(p => p.has_valid_token !== false);
+      if (directoryStatusFilter === 'warning') list = list.filter(p => p.has_valid_token === false);
+    }
+
+    // Render Stats
+    if (statsRow) {
+      const activeCount = pagesList.filter(p => p.has_valid_token !== false).length;
+      const warningCount = pagesList.filter(p => p.has_valid_token === false).length;
+      const autoCount = pagesList.filter(p => p.post_mode === 'auto').length;
+      const todayTotal = pagesList.reduce((acc, p) => acc + (p.today_published_count || 0), 0);
+
+      statsRow.innerHTML = `
+        <span class="badge" style="background: var(--bg-canvas); border: 1px solid var(--border-card); font-size: 0.78rem; padding: 4px 10px;">
+          📊 <b>${pagesList.length}</b> Connected Channels
+        </span>
+        <span class="badge" style="background: rgba(16,185,129,0.1); color: #10B981; border: 1px solid rgba(16,185,129,0.25); font-size: 0.78rem; padding: 4px 10px;">
+          🟢 <b>${activeCount}</b> Operational
+        </span>
+        ${warningCount > 0 ? `
+          <span class="badge" style="background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.25); font-size: 0.78rem; padding: 4px 10px;">
+            ⚠️ <b>${warningCount}</b> Token Needs Attention
+          </span>
+        ` : ''}
+        <span class="badge" style="background: var(--bg-canvas); border: 1px solid var(--border-card); font-size: 0.78rem; padding: 4px 10px;">
+          ⚡ <b>${autoCount}</b> Autonomous
+        </span>
+        <span class="badge" style="background: var(--bg-canvas); border: 1px solid var(--border-card); font-size: 0.78rem; padding: 4px 10px;">
+          🎯 <b>${todayTotal}</b> Reels Published Today
+        </span>
+      `;
+    }
+
+    if (list.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🔍</div>
+          <div style="font-weight: 600; font-size: 0.95rem;">No channels matched your filters</div>
+          <div style="font-size: 0.8rem; margin-top: 4px;">Try clearing your search query or switching niche filters</div>
+        </div>
+      `;
+      return;
+    }
+
+    if (directoryViewMode === 'table') {
+      container.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); text-align: left;">
+              <th style="padding: 8px 10px;">Channel</th>
+              <th style="padding: 8px 10px;">Handle</th>
+              <th style="padding: 8px 10px;">Niche</th>
+              <th style="padding: 8px 10px;">Status</th>
+              <th style="padding: 8px 10px;">Today's Quota</th>
+              <th style="padding: 8px 10px; text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(p => {
+              const isSelected = p.id === selectedPageId;
+              const hasToken = p.has_valid_token !== false;
+              const quotaMax = p.daily_quota || 3;
+              const quotaUsed = p.today_published_count || 0;
+              return `
+                <tr style="border-bottom: 1px solid var(--border-subtle); ${isSelected ? 'background: var(--accent-soft);' : ''}">
+                  <td style="padding: 8px 10px; display: flex; align-items: center; gap: 8px;">
+                    ${renderPageAvatar(p, 30)}
+                    <span style="font-weight: 600; color: var(--text-primary);">${escapeHtml(p.name)}</span>
+                  </td>
+                  <td style="padding: 8px 10px; font-family: var(--font-mono); color: var(--text-secondary);">
+                    ${p.handle || '@' + p.slug}
+                  </td>
+                  <td style="padding: 8px 10px; text-transform: uppercase; font-size: 0.72rem; color: var(--text-muted);">
+                    ${p.niche || 'GENERAL'}
+                  </td>
+                  <td style="padding: 8px 10px;">
+                    <span class="badge" style="font-size: 0.7rem; background: ${hasToken ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; color: ${hasToken ? '#10B981' : '#EF4444'};">
+                      ${hasToken ? 'Operational' : 'Token Required'}
+                    </span>
+                  </td>
+                  <td style="padding: 8px 10px;">
+                    <span style="font-weight: 600;">${quotaUsed}/${quotaMax}</span>
+                  </td>
+                  <td style="padding: 8px 10px; text-align: right;">
+                    <button class="btn btn-primary btn-sm" onclick="pagesView.closeDirectoryModal(); pagesView.selectPage(${p.id});" style="padding: 3px 8px; font-size: 0.75rem;">
+                      ${isSelected ? 'Active' : 'Open'}
+                    </button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } else {
+      // Grid Cards
+      container.innerHTML = `
+        <div class="channel-directory-grid">
+          ${list.map(p => {
+            const isSelected = p.id === selectedPageId;
+            const hasToken = p.has_valid_token !== false;
+            const quotaMax = p.daily_quota || 3;
+            const quotaUsed = p.today_published_count || 0;
+            const quotaPct = Math.min(100, Math.round((quotaUsed / quotaMax) * 100));
+
+            return `
+              <div class="channel-directory-card ${isSelected ? 'active-workspace' : ''}">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2.5">
+                      ${renderPageAvatar(p, 44)}
+                      <div style="min-width: 0;">
+                        <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+                          ${escapeHtml(p.name)}
+                        </div>
+                        <a href="https://instagram.com/${p.handle ? p.handle.replace('@', '') : ''}" target="_blank" onclick="event.stopPropagation()" style="font-size: 0.75rem; color: var(--accent-primary); text-decoration: none; font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 2px;">
+                          ${p.handle || '@' + p.slug} ↗
+                        </a>
+                      </div>
+                    </div>
+                    <span class="badge" style="font-size: 0.68rem; text-transform: uppercase; background: var(--bg-card); border: 1px solid var(--border-card);">
+                      ${p.niche || 'GENERAL'}
+                    </span>
+                  </div>
+
+                  <!-- Quota & Health Row -->
+                  <div style="margin: 0.75rem 0 0.5rem 0;">
+                    <div class="flex items-center justify-between" style="font-size: 0.72rem; margin-bottom: 3px;">
+                      <span style="color: var(--text-muted);">Daily Pipeline Quota</span>
+                      <span style="font-weight: 600; color: ${quotaUsed >= quotaMax ? '#10B981' : 'var(--text-primary)'};">${quotaUsed}/${quotaMax} Reels</span>
+                    </div>
+                    <div style="height: 5px; width: 100%; background: var(--border-subtle); border-radius: 3px; overflow: hidden;">
+                      <div style="height: 100%; width: ${quotaPct}%; background: var(--accent-primary); border-radius: 3px;"></div>
+                    </div>
+                  </div>
+
+                  <!-- Status Line -->
+                  <div class="flex items-center justify-between" style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem;">
+                    <span>Mode: <b>${p.post_mode === 'auto' ? 'Autonomous' : 'Review'}</b></span>
+                    <span style="font-weight: 600; color: ${hasToken ? '#10B981' : '#EF4444'};">
+                      ${hasToken ? '● Operational' : '⚠️ Token Required'}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-1.5" style="border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; margin-top: 0.25rem;">
+                  <button class="btn btn-primary btn-sm" onclick="pagesView.closeDirectoryModal(); pagesView.selectPage(${p.id});" style="flex: 1; padding: 4px 8px; font-size: 0.78rem; font-weight: 600;">
+                    ${isSelected ? '✓ In Workspace' : '⚡ Open Workspace'}
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="pagesView.openTokenModal(${p.id})" style="padding: 4px 8px; font-size: 0.78rem;" title="Update Meta Token">
+                    🔑
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="pagesView.openEditModal(${p.id})" style="padding: 4px 8px; font-size: 0.78rem;" title="Channel Settings">
+                    ⚙️
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+  }
+
   function openTokenModal(pageId) {
     const page = pagesList.find(p => p.id === pageId);
     if (!page) return;
@@ -2225,6 +2720,14 @@ window.pagesView = (function() {
     leaveRing,
     // Token & Bulk & Search
     filterPages,
+    setNicheFilter,
+    openDirectoryModal,
+    closeDirectoryModal,
+    filterDirectory,
+    setDirectoryNicheFilter,
+    setDirectoryStatusFilter,
+    setDirectoryViewMode,
+    previewEditLogo,
     openTokenModal,
     closeTokenModal,
     submitTokenUpdate,
