@@ -2021,55 +2021,35 @@ async function generateFeedPostOverlay(handle, options = {}) {
     ctx.restore();
   } else if (isMovie) {
     // 5. Authentic Cinema Picks / Movie Recommendations Floating Header Box
-    // Elevated upwards into safe upper margin with cinema avatar, verified badge, and clean dynamic page name
-    const rawPageName = (options.pageName || options.page?.name || cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).trim();
-    const displayPageName = rawPageName.replace(/^@+/, '');
-    const rawHandle = (options.page?.handle || cleanHandle).trim();
-    const displayHandle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle.replace(/^@+/, '')}`;
-
-    const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
-    const candidateAvatarPaths = [
-      options.avatarPath,
-      options.page?.avatar_path,
-      options.page?.brand_logo_path,
-      path.join(brandingDir, `${cleanHandle}_avatar.png`),
-      path.join(brandingDir, `${cleanHandle}_avatar.jpg`),
-      path.join(brandingDir, 'movie_series_365_avatar.png'),
-      path.join(brandingDir, 'movies_avatar.png'),
-      path.join(brandingDir, 'cinema_avatar.png')
-    ].filter(Boolean);
-    const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
-
-    const avSize = 36;
-    const avGap = 12;
+    // Sleek, compact little box with golden glow matching target design (media_1794145464149.jpg)
+    // No avatar circle, no blue tick — clean handle/page + Cinema Picks
+    const rawHandle = (options.page?.handle || cleanHandle || 'movie_series_365').trim();
+    const handleText = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle.replace(/^@+/, '')}`;
+    const badgeText1 = handleText;
     const badgeSep = '  |  ';
     const badgeText2 = 'Cinema Picks';
 
     ctx.save();
-    ctx.font = 'bold 24px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-    const nameW = ctx.measureText(displayPageName).width;
-    const badgeW24 = 24; // verified checkmark
-    const badgeGap = 8;
-    ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-    const sepW = ctx.measureText(badgeSep).width;
-    ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-    const subW = ctx.measureText(badgeText2).width;
+    ctx.font = 'bold 22px Arial, "Helvetica Neue", Roboto, sans-serif';
+    const w1 = ctx.measureText(badgeText1).width;
+    ctx.font = 'bold 20px Arial, "Helvetica Neue", Roboto, sans-serif';
+    const wSep = ctx.measureText(badgeSep).width;
+    ctx.font = '600 22px Arial, "Helvetica Neue", Roboto, sans-serif';
+    const w2 = ctx.measureText(badgeText2).width;
 
-    const padX = 24;
-    const totalContentW = avSize + avGap + nameW + badgeGap + badgeW24 + sepW + subW;
-    const boxW = Math.min(width - 60, Math.round(totalContentW + padX * 2));
-    const boxH = 58;
+    const padX = 26;
+    const boxW = Math.round(w1 + wSep + w2 + padX * 2);
+    const boxH = 48;
     const boxX = Math.round((width - boxW) / 2);
-    // Elevated upwards cleanly as requested by user (Y ~ 92-96px)
-    const boxY = isVertical ? Math.max(86, Math.min(96, cardY - boxH - 24)) : 96;
-    const radius = 12;
+    // Position floating directly above cardY with clean clearance
+    const boxY = (cardY >= 200) ? Math.max(120, cardY - boxH - 18) : 140;
 
     // Glowing obsidian glass box
-    ctx.shadowColor = 'rgba(255, 183, 3, 0.75)';
+    ctx.shadowColor = 'rgba(255, 183, 3, 0.85)';
     ctx.shadowBlur = 18;
-    ctx.fillStyle = 'rgba(10, 10, 16, 0.94)';
+    ctx.fillStyle = 'rgba(10, 10, 14, 0.94)';
     ctx.beginPath();
-    ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+    ctx.roundRect(boxX, boxY, boxW, boxH, 8);
     ctx.fill();
 
     // Golden gradient border (2.5px)
@@ -2086,82 +2066,34 @@ async function generateFeedPostOverlay(handle, options = {}) {
     ctx.strokeStyle = 'rgba(255, 209, 102, 0.25)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, radius - 2);
+    ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, 6);
     ctx.stroke();
 
-    // Content Start X
-    const contentStartX = boxX + (boxW - totalContentW) / 2;
-    const centerY = boxY + boxH / 2;
+    // Text rendering: @movie_series_365 | Cinema Picks
+    let curX = boxX + padX;
+    const textCenterY = boxY + boxH / 2 + 1;
 
-    // 1. Cinema Avatar Logo on Left
-    const avX = contentStartX;
-    const avY = centerY - avSize / 2;
-    const avCx = avX + avSize / 2;
-    const avCy = centerY;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(avCx, avCy, avSize / 2, 0, Math.PI * 2);
-    ctx.clip();
-
-    if (existingAvatarPath) {
-      try {
-        const avatarImg = await loadImage(existingAvatarPath);
-        ctx.drawImage(avatarImg, avX, avY, avSize, avSize);
-      } catch (_) {
-        ctx.fillStyle = '#1A0E04';
-        ctx.fill();
-      }
-    } else {
-      ctx.fillStyle = '#1A0E04';
-      ctx.fill();
-      ctx.fillStyle = '#FFD166';
-      ctx.font = '900 16px RobotoBlack, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const words = displayPageName.split(/\s+/).filter(Boolean);
-      const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
-      ctx.fillText(initials || 'MS', avCx, avCy);
-    }
-    ctx.restore();
-
-    // Golden Avatar Ring
-    ctx.save();
-    ctx.strokeStyle = '#FFD166';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(255, 183, 3, 0.8)';
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    ctx.arc(avCx, avCy, avSize / 2 + 1, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-
-    // 2. Page Name in crisp white
-    let curX = avX + avSize + avGap;
-    ctx.save();
-    ctx.font = 'bold 24px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+    // Part 1: Handle in crisp white
+    ctx.font = 'bold 22px Arial, "Helvetica Neue", Roboto, sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
     ctx.shadowBlur = 4;
-    ctx.fillText(displayPageName, curX, centerY + 1);
-    curX += nameW + badgeGap;
+    ctx.fillText(badgeText1, curX, textCenterY);
+    curX += w1;
 
-    // 3. Verified Badge
-    drawVerifiedBadge(ctx, curX, centerY - (badgeW24 / 2), badgeW24);
-    curX += badgeW24;
-
-    // 4. Separator in amber gold
-    ctx.font = 'bold 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+    // Part 2: Separator in amber gold
+    ctx.font = 'bold 20px Arial, "Helvetica Neue", Roboto, sans-serif';
     ctx.fillStyle = '#FFB703';
-    ctx.fillText(badgeSep, curX, centerY + 1);
-    curX += sepW;
+    ctx.fillText(badgeSep, curX, textCenterY);
+    curX += wSep;
 
-    // 5. "Cinema Picks" in champagne gold
-    ctx.font = '600 22px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+    // Part 3: "Cinema Picks" in champagne gold
+    ctx.font = '600 22px Arial, "Helvetica Neue", Roboto, sans-serif';
     ctx.fillStyle = '#FFD166';
-    ctx.fillText(badgeText2, curX, centerY + 1);
+    ctx.fillText(badgeText2, curX, textCenterY);
+
     ctx.restore();
   } else {
     // 5. Top Safe-Zone Header for GTA 6, and Other Custom Themes
