@@ -183,16 +183,16 @@ class JobWorkerPool {
 
     try {
       // ── Step 1: Download Media ──────────────────────────────
-      job = updateJobProgress(jobId, 'downloading', 'download_starting');
+      job = updateJobProgress(jobId, 'downloading', 'download_starting') || job;
       await this.updateTelegramProgress(job, renderStepperMsg(2, 'Downloading media & applying anti-duplicate transcode...'));
 
       let mediaPaths = [];
-      let rawCaption = job.caption || '';
+      let rawCaption = job?.caption || '';
       let sourceUploader = '';
-      let mediaType = job.media_type || 'reel';
+      let mediaType = job?.media_type || 'reel';
 
       try {
-        mediaPaths = JSON.parse(job.media_paths || '[]');
+        mediaPaths = JSON.parse(job?.media_paths || '[]');
       } catch (e) {
         mediaPaths = [];
       }
@@ -218,18 +218,18 @@ class JobWorkerPool {
         job = updateJobProgress(jobId, 'downloading', 'download_complete', {
           media_paths: mediaPaths,
           media_type: mediaType
-        });
+        }) || job;
       }
 
       await this.updateTelegramProgress(job, renderStepperMsg(3, `1080p ${mediaType.toUpperCase()} ready. Generating viral caption...`));
 
       // ── Step 2: Build Caption ───────────────────────────────
-      job = updateJobProgress(jobId, 'ready', 'caption_building');
-      let hookHeadline = job.hook_headline || '';
+      job = updateJobProgress(jobId, 'ready', 'caption_building') || job;
+      let hookHeadline = job?.hook_headline || '';
       let finalCaption = '';
 
       // Check if this job inherits from an origin job (multi-page distribution network)
-      if (!hookHeadline && job.origin_job_id) {
+      if (!hookHeadline && job?.origin_job_id) {
         try {
           const origin = getPublishJobById(job.origin_job_id);
           if (origin && origin.hook_headline) {
@@ -239,7 +239,7 @@ class JobWorkerPool {
         } catch (_) {}
       }
 
-      if (job.caption && job.caption !== rawCaption) {
+      if (job?.caption && job.caption !== rawCaption) {
         finalCaption = job.caption;
       } else {
         const copyDetails = await buildAiCaptionDetails({
@@ -255,10 +255,10 @@ class JobWorkerPool {
       job = updateJobProgress(jobId, 'ready', 'caption_ready', {
         caption: finalCaption,
         hook_headline: hookHeadline
-      });
+      }) || job;
 
       // ── Step 3: Meta Graph API Publishing (Feed first, then Story) ──
-      job = updateJobProgress(jobId, 'publishing', 'meta_upload');
+      job = updateJobProgress(jobId, 'publishing', 'meta_upload') || job;
       await this.updateTelegramProgress(job, renderStepperMsg(4, 'Uploading Feed container to Instagram...', '⏳ Ingesting Reel video...'));
 
       let lastProgressUpdate = 0;
@@ -407,10 +407,10 @@ class JobWorkerPool {
         permalink: pubResult.permalink,
         published_at: publishedAt,
         error: ''
-      });
+      }) || job;
 
       // Update discovered_posts row if linked
-      if (job.discovered_post_id) {
+      if (job?.discovered_post_id) {
         try {
           updateDiscoveredPost(job.discovered_post_id, { status: 'published' });
         } catch (e) {}
@@ -454,7 +454,7 @@ class JobWorkerPool {
               story_ig_media_id: storyResult.ig_media_id || '',
               story_published_at: storyResult.published_at || null,
               story_status: 'published'
-            });
+            }) || job;
 
             const finalSuccessLines = [
               `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>`,
