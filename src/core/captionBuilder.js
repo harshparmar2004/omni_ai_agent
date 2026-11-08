@@ -200,12 +200,23 @@ async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', pag
     console.warn(`[Caption Builder] AI generation fallback: ${err.message}`);
     let fallbackHook = '';
     const isVideoEssay = page && (page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.theme === 'evolving_ai' || (page.name && page.name.toLowerCase().includes('cult')));
-    if (isVideoEssay && rawCaption) {
-      try {
-        const { synthesizeOfflineHook } = require('./llmService');
-        fallbackHook = synthesizeOfflineHook(rawCaption, page.name || '');
-      } catch (e) {
-        fallbackHook = 'The shocking untold truth behind this historic mystery';
+    if (isVideoEssay) {
+      if (videoPath) {
+        try {
+          const { detectOnScreenHeadline } = require('./videoVisionService');
+          const visionResult = await detectOnScreenHeadline(videoPath);
+          if (visionResult && visionResult.found && visionResult.headline) {
+            fallbackHook = visionResult.headline;
+          }
+        } catch (_) {}
+      }
+      if (!fallbackHook && rawCaption) {
+        try {
+          const { synthesizeOfflineHook } = require('./llmService');
+          fallbackHook = synthesizeOfflineHook(rawCaption, page.name || '');
+        } catch (e) {
+          fallbackHook = 'The shocking untold truth behind this historic mystery';
+        }
       }
     }
     return {

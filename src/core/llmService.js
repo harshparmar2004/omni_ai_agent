@@ -372,6 +372,8 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
     let usedProvider = 'deterministic';
     let usedModel = 'none';
 
+    let hasDetectedOnScreenHook = false;
+
     // 1. Check On-Screen Reel Vision OCR first if video is provided (reads text written on the reel!)
     if (videoPath) {
       try {
@@ -380,6 +382,7 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
         if (visionResult && visionResult.found && visionResult.headline) {
           console.log(`[LLM Service] 👁️ On-Screen Reel Vision detected hook: "${visionResult.headline}"`);
           headline = visionResult.headline;
+          hasDetectedOnScreenHook = true;
           if (visionResult.breakdown) {
             aiBreakdown = visionResult.breakdown;
           }
@@ -392,7 +395,7 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
     }
 
     // 2. Intelligent Offline Fallback Synthesizer (never slice competitor bio)
-    if (headline === defaultAiHeadline && cleanedSource) {
+    if (!hasDetectedOnScreenHook && headline === defaultAiHeadline && cleanedSource) {
       headline = synthesizeOfflineHook(cleanedSource, pageName);
     }
 
@@ -401,7 +404,14 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
       ? 'an elite curation platform uncovering shocking untold history, cultural secrets, scientific anomalies, and mind-bending phenomena'
       : 'an elite Instagram channel producing viral high-retention video-essays on breakthrough technology and intelligence';
 
-    const aiPrompt = `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
+    const cleanHookNoStars = headline.replace(/\*\*/g, '');
+    const aiPrompt = hasDetectedOnScreenHook
+      ? `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
+The video reel has this EXACT on-screen headline displayed on the video: "${cleanHookNoStars}".
+Generate a high-energy 2 to 3 sentence post body ("breakdown") for this video explaining the reality, significance, and intrigue of this story.
+Respond ONLY with valid JSON in this exact structure:
+{"headline": "${cleanHookNoStars}", "breakdown": "..."}`
+      : `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
 CRITICAL INSTRUCTION: Do NOT summarize the creator's social bio, do NOT copy follower pleas, credits, or promo links.
 Read the source content below to understand the CENTRAL REVELATION, SURPRISING METRIC, OR SHOCKING FACT of the video.
 
@@ -448,12 +458,14 @@ Respond ONLY with valid JSON in this exact structure:
           try {
             const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
             const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-            if (parsed && parsed.headline) {
-              let candidateHeadline = parsed.headline.trim();
-              if (!candidateHeadline.includes('**')) {
-                candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+            if (parsed) {
+              if (!hasDetectedOnScreenHook && parsed.headline) {
+                let candidateHeadline = parsed.headline.trim();
+                if (!candidateHeadline.includes('**')) {
+                  candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+                }
+                headline = candidateHeadline;
               }
-              headline = candidateHeadline;
               if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();
               usedProvider = provider.name;
               usedModel = provider.model;

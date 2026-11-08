@@ -174,31 +174,72 @@ async function localOcrHeadlineDetection(framePath) {
     const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
     const img = await loadImage(framePath);
-    // Crop the upper-middle region where reel titles are located (Y=20% to Y=48%)
-    const cropY = Math.floor(img.height * 0.20);
-    const cropH = Math.floor(img.height * 0.28);
+    // Crop the upper reel region where titles and headlines are located (Y=4% to Y=42%)
+    const cropY = Math.floor(img.height * 0.04);
+    const cropH = Math.floor(img.height * 0.40);
     const canvas = createCanvas(img.width, cropH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, cropY, img.width, cropH, 0, 0, img.width, cropH);
+
+    // Preprocessing: High-contrast binarization to make text pop against video background
+    try {
+      const imgData = ctx.getImageData(0, 0, img.width, cropH);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+        const v = lum > 135 ? 255 : (lum < 75 ? 0 : lum);
+        d[i] = v;
+        d[i + 1] = v;
+        d[i + 2] = v;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    } catch (_) {}
 
     const res = await Tesseract.recognize(canvas.toBuffer('image/png'), 'eng');
     const rawLines = (res.data?.text || '').split('\n')
       .map(l => l.trim())
       .filter(l => l.length >= 4)
-      .filter(l => !/cult|information|reels|share|comment|nobody can fly|every great thing/i.test(l))
-      .filter(l => !/^[0-9:\s=D+&©@#]+$/.test(l))
-      .filter(l => /^[A-Z]/.test(l)); // Must start with capitalized letter
+      .filter(l => !/cult|information|reels|share|comment|nobody can fly|every great thing|instagram|audio/i.test(l))
+      .filter(l => !/^[0-9:\s=D+&©@#_.\-]+$/.test(l))
+      .filter(l => !/^(am|pm|\d{1,2}:\d{2})$/i.test(l));
 
     if (rawLines.length === 0) return null;
 
-    let title = rawLines.slice(0, 2).join(' ')
-      .replace(/[©®™]/g, '')
-      .replace(/^["'“”]/, '')
-      .replace(/["'“”]$/, '')
+    // Filter out competitor account branding headers (e.g. "Creator Name" and "@creator.handle")
+    const filteredLines = [];
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      // If line is or contains an account handle (e.g. @evolving.ai)
+      if (/@\w+/.test(line)) {
+        // If the preceding line was a short 1-3 word account name (e.g. "Evolving AI"), drop it
+        if (filteredLines.length > 0 && filteredLines[filteredLines.length - 1].split(/\s+/).length <= 3) {
+          filteredLines.pop();
+        }
+        continue;
+      }
+      filteredLines.push(line);
+    }
+
+    const candidateLines = filteredLines.length > 0 ? filteredLines : rawLines;
+    let title = candidateLines[0] || '';
+    if (candidateLines.length > 1 && title.split(/\s+/).length < 7) {
+      title += ' ' + candidateLines[1];
+    }
+    title = title
+      .replace(/[©®™|]/g, '')
+      .replace(/^.*?@\w+[\s:]*/i, '') // Strip any remaining leading handle
+      .replace(/[\/\\|<=>~_—\-+=:;`^•*]+/g, ' ')
+      .replace(/^["'“”\s]+/, '')
+      .replace(/["'“”\s]+$/, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
+    // Remove trailing noise fragments (e.g. random 1-2 char noise or symbols at the end)
+    title = title.replace(/(?:\s+[a-z0-9]{1,2})+\s*$/i, '').trim();
+    title = title.replace(/[\s.,;:!\-—|]+$/, '').trim();
+
     const wordCount = title.split(/\s+/).length;
-    if (wordCount >= 2 && wordCount <= 14) {
+    if (wordCount >= 2 && wordCount <= 18) {
       const { parseHeadlineTokens } = require('../utils/ffmpegHelper');
       const tokens = parseHeadlineTokens(title);
       const highlightedTitle = tokens.map(t => t.highlight ? `**${t.text}**` : t.text).join(' ');
@@ -218,6 +259,7 @@ async function localOcrHeadlineDetection(framePath) {
 
 /**
  * Detects and extracts on-screen title text from a video or image file
+ * Supports multi-timestamp frame sampling (1.2s, 2.0s, 0.6s) to ensure no intro fade is missed.
  * @param {string} videoOrImagePath - Path to the video or image
  * @param {Object} options
  * @returns {Promise<{ found: boolean, headline?: string, rawTitle?: string, provider?: string }>}
@@ -227,97 +269,99 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
     return { found: false, reason: 'file_not_found' };
   }
 
-  let framePath = videoOrImagePath;
-  let isTempFrame = false;
-
   const ext = path.extname(videoOrImagePath).toLowerCase();
   const isVideo = ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(ext);
 
-  try {
-    if (isVideo) {
-      console.log(`[Video Vision] 📹 Extracting snapshot frame from video: ${path.basename(videoOrImagePath)}...`);
-      framePath = await extractSnapshotFrame(videoOrImagePath);
-      isTempFrame = true;
-    }
+  const sampleTimestamps = isVideo ? ['00:00:01.200', '00:00:02.000', '00:00:00.600'] : [null];
+  const geminiKey = getSetting('gemini_api_key', '') || process.env.GEMINI_API_KEY || '';
+  const openAiKey = getSetting('openai_api_key', '') || process.env.OPENAI_API_KEY || '';
 
-    const geminiKey = getSetting('gemini_api_key', '') || process.env.GEMINI_API_KEY || '';
-    const openAiKey = getSetting('openai_api_key', '') || process.env.OPENAI_API_KEY || '';
+  for (const ts of sampleTimestamps) {
+    let framePath = videoOrImagePath;
+    let isTempFrame = false;
 
-    // 1. Try Gemini Vision (Free Tier / Ultra Fast)
-    if (geminiKey) {
-      try {
-        console.log('[Video Vision] 👁️ Scanning video frame with Gemini Vision OCR...');
-        const result = await callGeminiVision(framePath, geminiKey);
-        if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
-          let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
-          if (!cleanHeadline.includes('**')) {
-            cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
-          }
-          console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
-          return {
-            found: true,
-            headline: cleanHeadline,
-            rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
-            breakdown: result.topicBreakdown || '',
-            hasCompetitorHeader: Boolean(result.hasCompetitorHeader),
-            provider: 'gemini_vision'
-          };
-        }
-      } catch (geminiErr) {
-        console.warn(`[Video Vision] Gemini Vision attempt failed: ${geminiErr.message}`);
-      }
-    }
-
-    // 2. Try OpenAI Vision
-    if (openAiKey) {
-      try {
-        console.log('[Video Vision] 👁️ Scanning video frame with OpenAI Vision...');
-        const result = await callOpenAiVision(framePath, openAiKey);
-        if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
-          let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
-          if (!cleanHeadline.includes('**')) {
-            cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
-          }
-          console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
-          return {
-            found: true,
-            headline: cleanHeadline,
-            rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
-            provider: 'openai_vision'
-          };
-        }
-      } catch (openAiErr) {
-        console.warn(`[Video Vision] OpenAI Vision attempt failed: ${openAiErr.message}`);
-      }
-    }
-
-    // 3. Try Local Offline OCR (Zero API Key Required)
     try {
-      console.log('[Video Vision] 👁️ Scanning video frame with high-precision Local OCR...');
-      const localResult = await localOcrHeadlineDetection(framePath);
-      if (localResult && localResult.hasTitle && localResult.headline) {
-        console.log(`[Video Vision] ✅ Found On-Screen Hook via Local OCR: "${localResult.headline}"`);
-        return {
-          found: true,
-          headline: localResult.headline,
-          rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
-          hasCompetitorHeader: true,
-          provider: 'local_ocr'
-        };
+      if (isVideo) {
+        console.log(`[Video Vision] 📹 Extracting snapshot frame at ${ts} from video: ${path.basename(videoOrImagePath)}...`);
+        framePath = await extractSnapshotFrame(videoOrImagePath, { timestamp: ts });
+        isTempFrame = true;
       }
-    } catch (localErr) {
-      console.warn(`[Video Vision] Local OCR attempt notice: ${localErr.message}`);
-    }
 
-    return { found: false, reason: 'no_title_detected_or_no_vision_key' };
-  } catch (err) {
-    console.warn(`[Video Vision] Headline detection error: ${err.message}`);
-    return { found: false, error: err.message };
-  } finally {
-    if (isTempFrame && fs.existsSync(framePath)) {
-      try { fs.unlinkSync(framePath); } catch (_) {}
+      // 1. Try Gemini Vision (Free Tier / Multimodal OCR)
+      if (geminiKey) {
+        try {
+          console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with Gemini Vision OCR...`);
+          const result = await callGeminiVision(framePath, geminiKey);
+          if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
+            let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+            if (!cleanHeadline.includes('**')) {
+              cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+            }
+            console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
+            return {
+              found: true,
+              headline: cleanHeadline,
+              rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
+              breakdown: result.topicBreakdown || '',
+              hasCompetitorHeader: Boolean(result.hasCompetitorHeader),
+              provider: 'gemini_vision'
+            };
+          }
+        } catch (geminiErr) {
+          console.warn(`[Video Vision] Gemini Vision attempt failed: ${geminiErr.message}`);
+        }
+      }
+
+      // 2. Try OpenAI Vision
+      if (openAiKey) {
+        try {
+          console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with OpenAI Vision...`);
+          const result = await callOpenAiVision(framePath, openAiKey);
+          if (result && result.hasTitle && result.headline && result.headline.trim().length >= 8) {
+            let cleanHeadline = result.headline.trim().replace(/^["'“”]/, '').replace(/["'“”]$/, '');
+            if (!cleanHeadline.includes('**')) {
+              cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+            }
+            console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
+            return {
+              found: true,
+              headline: cleanHeadline,
+              rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
+              provider: 'openai_vision'
+            };
+          }
+        } catch (openAiErr) {
+          console.warn(`[Video Vision] OpenAI Vision attempt failed: ${openAiErr.message}`);
+        }
+      }
+
+      // 3. Try Local Offline OCR (Zero API Key Required)
+      try {
+        console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with high-precision Local OCR...`);
+        const localResult = await localOcrHeadlineDetection(framePath);
+        if (localResult && localResult.hasTitle && localResult.headline) {
+          console.log(`[Video Vision] ✅ Found On-Screen Hook via Local OCR: "${localResult.headline}"`);
+          return {
+            found: true,
+            headline: localResult.headline,
+            rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
+            hasCompetitorHeader: true,
+            provider: 'local_ocr'
+          };
+        }
+      } catch (localErr) {
+        console.warn(`[Video Vision] Local OCR attempt notice: ${localErr.message}`);
+      }
+    } catch (err) {
+      console.warn(`[Video Vision] Headline detection notice at ${ts}: ${err.message}`);
+    } finally {
+      if (isTempFrame && fs.existsSync(framePath)) {
+        try { fs.unlinkSync(framePath); } catch (_) {}
+      }
     }
   }
+
+  return { found: false, reason: 'no_title_detected_or_no_vision_key' };
 }
 
 module.exports = {
