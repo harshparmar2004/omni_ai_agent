@@ -82,7 +82,7 @@ async function getPagesList() {
           slug: p.slug || p.handle?.replace(/^@/, ''),
           name: p.name,
           handle: p.handle,
-          icon: p.slug?.includes('gta') ? '🎮' : (p.slug?.includes('club') ? '🪩' : (p.slug?.includes('movie') ? '🍿' : '💡'))
+          icon: p.slug?.includes('gta') ? '🎮' : (p.slug?.includes('club') ? '🍸' : (p.slug?.includes('movie') ? '🎬' : '🧠'))
         }));
         if (pagesArray.length > 0) {
           cachedPages = pagesArray;
@@ -110,9 +110,9 @@ async function getPagesList() {
 
   return [
     { id: '1', slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', icon: '🎮' },
-    { id: '2', slug: 'movies', name: 'Movie Series 365', handle: '@movie_series_365', icon: '🍿' },
-    { id: '3', slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', icon: '🪩' },
-    { id: '4', slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', icon: '💡' }
+    { id: '2', slug: 'movies', name: 'Movie Series 365', handle: '@movie_series_365', icon: '🎬' },
+    { id: '3', slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', icon: '🍸' },
+    { id: '4', slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', icon: '🧠' }
   ];
 }
 

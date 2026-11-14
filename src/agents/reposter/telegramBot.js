@@ -45,6 +45,28 @@ function isChatAuthorized(chatId) {
   return allowedList.includes(String(chatId));
 }
 
+function getPageIcon(page) {
+  const handle = (page.handle || '').toLowerCase();
+  const slug = (page.slug || '').toLowerCase();
+  if (slug === 'movies' || handle.includes('movie_series_365')) return '🎬';
+  if (slug === 'clubbing' || handle.includes('clubbingcult')) return '🍸';
+  if (slug === 'cult_information' || handle.includes('cult_information')) return '🧠';
+  if (slug === 'gta6' || handle.includes('gta6_updates_007')) return '🎮';
+  return '📱';
+}
+
+function sortPages(pages) {
+  const order = ['movies', 'clubbing', 'cult_information', 'gta6'];
+  return [...pages].sort((a, b) => {
+    const idxA = order.indexOf(a.slug);
+    const idxB = order.indexOf(b.slug);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.id - b.id;
+  });
+}
+
 function getTelegramToken() {
   const t = (getSetting('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN || '').trim();
   if (!t || t.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || t.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || t.length < 20) {
@@ -180,26 +202,25 @@ async function handleMessage(msg) {
 
   // ── Command Handlers ─────────────────────────────────────
   if (text.startsWith('/start') || text.startsWith('/help')) {
-    const pages = getPages({ isActiveOnly: true });
+    const pages = sortPages(getPages({ isActiveOnly: true }));
     const pagesListStr = pages.length > 0
-      ? pages.map(p => `• <b>${escapeHtml(p.name)}</b> (${p.handle}) — Quota: ${p.daily_quota}/day`).join('\n')
-      : '<i>No pages configured yet. Add one in the dashboard!</i>';
+      ? pages.map(p => `${getPageIcon(p)} <b>${escapeHtml(p.name)}</b> (<code>${p.handle}</code>) — Quota: ${p.daily_quota}/day`).join('\n')
+      : '<i>No pages configured yet.</i>';
 
     const welcome = [
       `👋 <b>Welcome to OmniStudio v7 AI Engine</b>`,
       ``,
       `<b>Agent 1 — Reposter:</b>`,
-      `Share any Instagram Reel or Post link here. Choose your destination page and it will be published live via Meta Graph API v21.0 within ~2 minutes!`,
+      `Share any Instagram Reel or Post link here. Choose your destination channel and it will be processed and published live via Meta Graph API v21.0 within ~2 minutes!`,
       ``,
-      `<b>Connected Destination Pages:</b>`,
+      `<b>Connected Channels:</b>`,
       pagesListStr,
       ``,
       `<b>Quick Commands:</b>`,
-      `• <code>/pages</code> — Inspect page tokens & today's quotas`,
+      `• <code>/pages</code> — Inspect channel tokens & today's quotas`,
+      `• <code>/tokens</code> — Meta Graph API token status`,
       `• <code>/status</code> — System health & Watchtower status`,
       `• <code>/queue</code> — Pending review items`,
-      `• <code>/pause watchtower</code> — Pause 24/7 background scanner`,
-      `• <code>/resume watchtower</code> — Resume 24/7 background scanner`,
       ``,
       `<i>Tip: Just share any Instagram Reel link to get started!</i>`
     ].join('\n');
@@ -209,18 +230,19 @@ async function handleMessage(msg) {
   }
 
   if (text.startsWith('/pages')) {
-    const pages = getPages();
+    const pages = sortPages(getPages());
     if (pages.length === 0) {
       await notifier.sendTelegramMessage(chatId, '⚠️ No destination pages configured.');
       return;
     }
 
-    const lines = [`📱 <b>Destination Instagram Pages (${pages.length})</b>`, ``];
+    const lines = [`📱 <b>Destination Channels (${pages.length})</b>`, `━━━━━━━━━━━━━━━━━━━━`, ``];
     for (const p of pages) {
+      const icon = getPageIcon(p);
       const todayCount = getPublishedCountToday(p.id);
       const mode = (p.post_mode || 'review').toUpperCase();
-      lines.push(`• <b>${escapeHtml(p.name)}</b> (<code>${p.handle}</code>)`);
-      lines.push(`  Mode: <b>${mode}</b> | Today: <b>${todayCount}/${p.daily_quota}</b> posts | Active: ${p.is_active ? '✅' : '⏸️'}`);
+      lines.push(`${icon} <b>${escapeHtml(p.name)}</b> (<code>${p.handle}</code>)`);
+      lines.push(`  • Mode: <b>${mode}</b> | Today: <b>${todayCount}/${p.daily_quota}</b> posts | Active: ${p.is_active ? '✅' : '⏸️'}`);
       lines.push(``);
     }
     await notifier.sendTelegramMessage(chatId, lines.join('\n'));
@@ -348,56 +370,38 @@ async function handleMessage(msg) {
 
   const rawUrl = match[0];
   const shortcode = match[1];
-  const activePages = getPages({ isActiveOnly: true });
-  const activeGroups = getPageGroups({ isActiveOnly: true });
+  const activePages = sortPages(getPages({ isActiveOnly: true }));
 
   if (activePages.length === 0) {
-    await notifier.sendTelegramMessage(chatId, '⚠️ No active destination pages found. Please configure a page in the dashboard.');
+    await notifier.sendTelegramMessage(chatId, '⚠️ No active destination channels found. Please configure a page in the dashboard.');
     return;
   }
 
-  // Build direct publish destination options for Telegram sharing
+  // Build clean direct publish destination options
   const buttons = [];
 
-  // Group Distribution Rings (if groups configured)
-  for (const group of activeGroups) {
-    if (group.member_count > 1) {
-      buttons.push([{
-        text: `🌐 Distribute to All: ${group.name} (${group.member_count} Pages)`,
-        callback_data: `dist:${group.id}:${shortcode}`
-      }]);
-    }
-  }
-
-  // Individual Pages
   for (const page of activePages) {
-    const isCultInfo = page.slug === 'cult_information' || (page.handle && (page.handle.includes('cult_info') || page.handle.includes('cultinformation')));
-    const isAi = page.slug === 'ai_curation' || (page.handle && page.handle.includes('evolving'));
-    const isClub = page.slug === 'clubbing' || (page.handle && page.handle.includes('clubbing'));
-    const isMovie = page.slug === 'movies' || (page.handle && page.handle.includes('movie'));
-    const icon = isCultInfo ? '⚡' : (isAi ? '🤖' : (isClub ? '🪩' : (isMovie ? '🍿' : '🚀')));
-
+    const icon = getPageIcon(page);
     const existing = getPublishJob(page.id, shortcode);
     const isAlreadyPub = existing && existing.status === 'published';
-    const statusTag = isAlreadyPub ? ' (Already Posted ✅)' : '';
+    const statusTag = isAlreadyPub ? ' (Posted ✅)' : '';
 
     buttons.push([{
-      text: `${icon} Post to ${page.name} (${page.handle})${statusTag}`,
+      text: `${icon} ${page.name} (${page.handle})${statusTag}`,
       callback_data: isAlreadyPub ? `ask_republish:${page.id}:${shortcode}` : `post:${page.id}:${shortcode}`
     }]);
   }
 
-  // Add auxiliary options
+  // Auxiliary Cancel option
   buttons.push([
-    { text: '✏️ Review Caption First', callback_data: `review:${activePages[0].id}:${shortcode}` },
     { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
   ]);
 
   await notifier.sendTelegramMessage(
     chatId,
     `📥 <b>Instagram Reel Received!</b>\n\n` +
-    `🔗 <b>Shortcode:</b> <code>${shortcode}</code>\n` +
-    `👉 Select destination page or distribution network:`,
+    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n\n` +
+    `👉 <b>Select destination channel to publish:</b>`,
     {
       reply_markup: { inline_keyboard: buttons }
     }
@@ -573,8 +577,8 @@ async function handleCallbackQuery(cb) {
       chatId,
       messageId,
       [
-        `🎬 <b>REPOST PIPELINE: ${page.handle}${isRepublish ? ' (RE-PUBLISHING)' : ''}</b>`,
-        `📱 <b>Destination:</b> ${escapeHtml(page.name)} (<code>${page.handle}</code>)`,
+        `${getPageIcon(page)} <b>REPOST PIPELINE: ${escapeHtml(page.name)}${isRepublish ? ' (RE-PUBLISHING)' : ''}</b>`,
+        `📱 <b>Channel:</b> <code>${page.handle}</code>`,
         `🔗 <b>Source Reel:</b> <code>#${shortcode}</code>`,
         ``,
         `<code>[1. Ingest] ──> [2. Download] ──> [3. AI Copy] ──> [4. Live]</code>`,

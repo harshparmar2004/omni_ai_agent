@@ -110,7 +110,7 @@ async function main() {
       name: 'Movie Series 365',
       handle: '@movie_series_365',
       ig_user_id: process.env.MOVIE_IG_USER_ID || '29048404444808513',
-      access_token: process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGFYZAk5SOS11akl1RHBDM0czM1FvVGhUUGJPdmxXYXdjQ1N1S2ZAHZAlNfYnBCbmNOS1o3dmI4dHY1YS14X08yVVZAKRDdHZAGxlYmQ4UzZAvWEE2YzU5elNaYUljMmdzTjFZAMW9Fb0Q5OGdrejExS0ZAUamdGZAk93VQZDZD',
+      access_token: process.env.MOVIE_META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAGJfdXc3bHVkeG9MN2RFcWVEdTVkRlcxV3dUZAkFobGhNTl85LUw4Qk55RlpJT3ZAYYmJZAd29McF8waE5Wa05GcnJJZA0oxRGdzdDFpcDZARVy1sSlFtYlNqV2d6bzM4am1XRWpNZAmxjaWRR',
       default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies'
     },
     {

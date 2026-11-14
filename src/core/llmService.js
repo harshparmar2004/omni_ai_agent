@@ -442,7 +442,9 @@ Respond ONLY with valid JSON in this exact structure:
     const groqKey = getSetting('groq_api_key', '') || process.env.GROQ_API_KEY || '';
 
     const providersToTry = [];
-    if (preferredProvider === 'groq') {
+    if (preferredProvider === 'deterministic' || preferredProvider === 'offline') {
+      // Zero-latency: skip LLM network roundtrips and use high-impact offline synthesis
+    } else if (preferredProvider === 'groq') {
       if (groqKey) providersToTry.push({ name: 'groq', fn: () => callGroq(aiPrompt, groqKey), model: 'llama-3.3-70b-versatile' });
       if (geminiKey) providersToTry.push({ name: 'gemini', fn: () => callGemini(aiPrompt, geminiKey), model: 'gemini-1.5-flash' });
     } else if (preferredProvider === 'ollama') {
@@ -560,7 +562,9 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
 
   // Determine provider trial order
   const providersToTry = [];
-  if (preferredProvider === 'groq') {
+  if (preferredProvider === 'deterministic' || preferredProvider === 'offline') {
+    // Zero-latency: skip LLM network attempts and use deterministic copywriting
+  } else if (preferredProvider === 'groq') {
     if (groqKey) providersToTry.push({ name: 'groq', fn: () => callGroq(prompt, groqKey), model: 'llama-3.3-70b-versatile' });
     if (geminiKey) providersToTry.push({ name: 'gemini', fn: () => callGemini(prompt, geminiKey), model: 'gemini-1.5-flash' });
   } else if (preferredProvider === 'ollama') {

@@ -11,7 +11,7 @@
     "slug": "movies",
     "name": "Movie Series 365",
     "handle": "@movie_series_365",
-    "icon": "🍿"
+    "icon": "🎬"
   },
   {
     "id": "3",
@@ -19,7 +19,7 @@
     "name": "Clubbing Cult",
     "handle": "@clubbingcult",
     "ig_user_id": "29109331262052643",
-    "icon": "🪩"
+    "icon": "🍸"
   },
   {
     "id": "4",
@@ -27,6 +27,6 @@
     "name": "Cult Information",
     "handle": "@cult_information",
     "ig_user_id": "17841462998491309",
-    "icon": "💡"
+    "icon": "🧠"
   }
 ]
