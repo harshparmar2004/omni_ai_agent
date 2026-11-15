@@ -1581,13 +1581,13 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 3. Ergonomic & Responsive Layout
   const marginX = 64;
-  const maxTextWidth = 820; // Balanced 2-line layout matching viral reel aesthetic
-  const spaceAboveVideo = 30; // Clean breathing room right above video card
-  const spaceBetweenHeaderAndHeadline = 24;
+  const maxTextWidth = 860; // Wide, screen-filling hook without touching side edges
+  const spaceAboveVideo = 26; // Snug, ergonomic breathing room right above video card
+  const spaceBetweenHeaderAndHeadline = 22;
 
   const headerAlign = options.headerAlign || options.page?.header_align || 'center';
   const isCentered = headerAlign === 'center';
-  const avatarSize = isCentered ? 72 : 80;
+  const avatarSize = 84; // Prominent, clear 84px avatar diameter
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1597,15 +1597,15 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     .replace(/["'“”\s]+$/, '')
     .trim();
 
-  // Responsive headline font: 44px default for punchy 2-line hooks, scaling gracefully for long text
+  // Responsive headline font: 48px default for bold, screen-filling hooks
   const wordsCount = cleanHeadline.split(/\s+/).length;
-  let fontSize = 44;
-  if (cleanHeadline.length > 90 || wordsCount > 18) {
-    fontSize = 34;
-  } else if (cleanHeadline.length > 76 || wordsCount > 15) {
+  let fontSize = 48;
+  if (cleanHeadline.length > 85 || wordsCount > 17) {
     fontSize = 38;
+  } else if (cleanHeadline.length > 70 || wordsCount > 14) {
+    fontSize = 44;
   }
-  const lineHeight = Math.round(fontSize * 1.28); // 44px-56px clean vertical rhythm
+  const lineHeight = Math.round(fontSize * 1.25); // ~60px clean vertical rhythm
 
   ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 
@@ -1615,8 +1615,8 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
 
   // 4. Flexible Dynamic Positioning based on Video Bounds (cardY)
-  // For 1:1 square video (cardY ~ 420), position comfortably right above video rather than pinned high up
-  const minSafeTopMargin = 136; // Clean clearance below Instagram's top chrome (audio, camera, back)
+  // Anchors right above video card ("a little bit bottom") rather than being pinned to the top!
+  const minSafeTopMargin = 120; // Safe clearance below Instagram's top chrome
   let headerTopY;
   let headlineY;
 
@@ -1624,23 +1624,18 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     headerTopY = options.headerTopY;
     headlineY = options.headlineY;
   } else {
-    if (cardY >= 350) {
-      const spaceAbove = cardY - spaceAboveVideo;
-      const desiredTopY = spaceAbove - totalBrandingHeight;
-      if (desiredTopY >= minSafeTopMargin) {
-        if (cardY > 520) {
-          // When cardY is low (e.g. 16:9 at Y=656), center smoothly in available top zone with slight bottom weight
-          const availableSpace = cardY - spaceAboveVideo - minSafeTopMargin;
-          headerTopY = minSafeTopMargin + Math.round((availableSpace - totalBrandingHeight) * 0.60);
-        } else {
-          // For 1:1 square video (cardY ~ 420), position comfortably right above video!
-          headerTopY = desiredTopY;
-        }
+    const idealTopY = cardY - spaceAboveVideo - totalBrandingHeight;
+    if (idealTopY >= minSafeTopMargin) {
+      if (cardY > 600) {
+        // When cardY is low (e.g. 16:9 landscape at cardY=656), weight 75% toward video so branding sits comfortably bottom
+        const availableSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+        headerTopY = minSafeTopMargin + Math.round((availableSpace - totalBrandingHeight) * 0.75);
       } else {
-        headerTopY = Math.max(100, cardY - totalBrandingHeight - spaceAboveVideo);
+        // For 1:1 square video (cardY=420) and 9:16 vertical card (cardY=520), place comfortably right above video!
+        headerTopY = idealTopY;
       }
     } else {
-      headerTopY = minSafeTopMargin;
+      headerTopY = Math.max(90, cardY - spaceAboveVideo - totalBrandingHeight);
     }
     headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
   }
@@ -1667,9 +1662,9 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   if (isCentered) {
     // 5A. Centered Middle Header: [ (Cult Logo)  @cult_information  ✔ ]
-    ctx.font = 'bold 26px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
     const handleW = ctx.measureText(displayHandle).width;
-    const badgeSize = 20;
+    const badgeSize = 22;
     const gap = 14;
     const totalHeaderW = avatarSize + gap + handleW + 10 + badgeSize;
     const headerStartX = Math.round((width - totalHeaderW) / 2);
@@ -1732,7 +1727,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
     // Centered Handle + Blue Verified Badge
     ctx.save();
-    ctx.font = 'bold 26px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textBaseline = 'middle';
     const textX = avatarX + avatarSize + gap;

@@ -174,12 +174,12 @@ async function localOcrHeadlineDetection(framePath) {
     const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
     const img = await loadImage(framePath);
-    // Crop the upper reel region where titles and headlines are located (Y=4% to Y=42%)
-    const cropY = Math.floor(img.height * 0.04);
-    const cropH = Math.floor(img.height * 0.40);
+    // Crop the upper reel region where titles and headlines are located (Y=0% to Y=70%)
+    // Covers top hooks, mid-screen text boxes, and center-aligned reel title cards
+    const cropH = Math.floor(img.height * 0.70);
     const canvas = createCanvas(img.width, cropH);
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, cropY, img.width, cropH, 0, 0, img.width, cropH);
+    ctx.drawImage(img, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
 
     // Preprocessing: High-contrast binarization to make text pop against video background
     try {
@@ -198,34 +198,26 @@ async function localOcrHeadlineDetection(framePath) {
     const res = await Tesseract.recognize(canvas.toBuffer('image/png'), 'eng');
     const rawLines = (res.data?.text || '').split('\n')
       .map(l => l.trim())
-      .filter(l => l.length >= 4)
+      .filter(l => l.length >= 2)
       .filter(l => !/cult|information|reels|share|comment|nobody can fly|every great thing|instagram|audio/i.test(l))
       .filter(l => !/^[0-9:\s=D+&©@#_.\-]+$/.test(l))
       .filter(l => !/^(am|pm|\d{1,2}:\d{2})$/i.test(l));
 
     if (rawLines.length === 0) return null;
 
-    // Filter out competitor account branding headers (e.g. "Creator Name" and "@creator.handle")
-    const filteredLines = [];
-    for (let i = 0; i < rawLines.length; i++) {
-      const line = rawLines[i];
-      // If line is or contains an account handle (e.g. @evolving.ai)
-      if (/@\w+/.test(line)) {
-        // If the preceding line was a short 1-3 word account name (e.g. "Evolving AI"), drop it
-        if (filteredLines.length > 0 && filteredLines[filteredLines.length - 1].split(/\s+/).length <= 3) {
-          filteredLines.pop();
-        }
+    const validLines = [];
+    for (const raw of rawLines) {
+      // If credit, source, or edit attribution line reached, stop extraction immediately
+      if (/^(credit|source|via|edit|by)[\s:]/i.test(raw) || /credit:\s*/i.test(raw) || /studio/i.test(raw)) break;
+      // Skip creator handles
+      if (/@\w+/.test(raw)) continue;
+
+      // Check alphanumeric character ratio to drop pure video background noise
+      const alphaChars = (raw.match(/[a-zA-Z0-9]/g) || []).length;
+      if (raw.length === 0 || (alphaChars / raw.length) < 0.50) {
+        if (validLines.length >= 1) break;
         continue;
       }
-      filteredLines.push(line);
-    }
-
-    const candidateLines = filteredLines.length > 0 ? filteredLines : rawLines;
-    const cleanLines = [];
-    for (const raw of candidateLines) {
-      // Check alphanumeric character ratio to drop video background noise
-      const alphaChars = (raw.match(/[a-zA-Z0-9]/g) || []).length;
-      if (raw.length === 0 || (alphaChars / raw.length) < 0.55) break;
 
       let l = raw
         .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]]/g, ' ')
@@ -234,20 +226,34 @@ async function localOcrHeadlineDetection(framePath) {
         .replace(/\s+/g, ' ')
         .trim();
 
-      // Strip trailing single noise characters or symbols (e.g. "Pro 8", "Pro &", "Pro >")
-      l = l.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
+      // Strip trailing single noise characters or short artifacts (e.g. " Hs", " |", " .", " 8")
+      l = l.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-zA-Z0-9]{1,2}\s*$/g, '').trim();
 
-      if (l.length >= 4) {
-        cleanLines.push(l);
+      // Do not start the headline with a 1-word or short artifact (e.g. "Rio", "FRE.", "RPE")
+      const words = l.split(/\s+/).filter(Boolean);
+      if (validLines.length === 0 && (words.length < 2 || l.length < 8)) {
+        continue;
       }
-      // If we have collected 8-16 words, we have a complete viral heading
-      const currentWordCount = cleanLines.join(' ').split(/\s+/).length;
-      if (currentWordCount >= 9) break;
+
+      if (l.length >= 3) {
+        validLines.push(l);
+      }
+
+      // If we have collected 10-18 words, we have a complete viral heading
+      const currentWordCount = validLines.join(' ').split(/\s+/).length;
+      if (currentWordCount >= 11) break;
     }
 
-    let title = cleanLines.join(' ');
-    // Fix OCR misreads of "AI" (e.g. "Al Table Tennis" -> "AI Table Tennis", "Al servers" -> "AI servers")
-    title = title.replace(/\bAl\b/g, 'AI').replace(/\bAl's\b/g, "AI's").trim();
+    let title = validLines.join(' ');
+    // Fix OCR misreads of common vocabulary
+    title = title
+      .replace(/\bAl\b/g, 'AI')
+      .replace(/\bAl's\b/g, "AI's")
+      .replace(/\bRohotic\b/gi, 'Robotic')
+      .replace(/\bpowered\s+hy\b/gi, 'powered by')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .trim();
+
     // Strip trailing single noise tokens and punctuation artifacts
     title = title.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
     title = title.replace(/[\s.,;:!\-—|§°_~>#+=&\\\/]+$/, '').trim();
@@ -258,8 +264,8 @@ async function localOcrHeadlineDetection(framePath) {
       // Smart brand highlighting on numbers, percentages, and high-impact viral words
       let highlightedTitle = title;
       highlightedTitle = highlightedTitle.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion|hundred)\b)/gi, '**$1**');
-      
-      const viralTerms = title.match(/\b(World's|First|Human Pro|Robot|Robots|Human|Living Thing|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Neural|Underground|Ocean|Antarctic)\b/i);
+
+      const viralTerms = title.match(/\b(World's|First|Human Pro|Robot|Robots|Human|Living Thing|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Neural|Underground|Ocean|Antarctic|Algae)\b/i);
       if (viralTerms && !highlightedTitle.includes(`**${viralTerms[0]}**`)) {
         highlightedTitle = highlightedTitle.replace(viralTerms[0], `**${viralTerms[0]}**`);
       } else if (!highlightedTitle.includes('**')) {
@@ -286,7 +292,7 @@ async function localOcrHeadlineDetection(framePath) {
 
 /**
  * Detects and extracts on-screen title text from a video or image file
- * Supports multi-timestamp frame sampling (1.2s, 2.0s, 0.6s) to ensure no intro fade is missed.
+ * Supports multi-timestamp frame sampling (0.8s, 1.2s, 1.8s, 0.5s) to ensure no intro fade is missed.
  * @param {string} videoOrImagePath - Path to the video or image
  * @param {Object} options
  * @returns {Promise<{ found: boolean, headline?: string, rawTitle?: string, provider?: string }>}
@@ -299,7 +305,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
   const ext = path.extname(videoOrImagePath).toLowerCase();
   const isVideo = ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(ext);
 
-  const sampleTimestamps = isVideo ? ['00:00:01.200', '00:00:02.000', '00:00:00.600'] : [null];
+  const sampleTimestamps = isVideo ? ['00:00:00.800', '00:00:01.200', '00:00:01.800', '00:00:00.500'] : [null];
   const geminiKey = getSetting('gemini_api_key', '') || process.env.GEMINI_API_KEY || '';
   const openAiKey = getSetting('openai_api_key', '') || process.env.OPENAI_API_KEY || '';
 
