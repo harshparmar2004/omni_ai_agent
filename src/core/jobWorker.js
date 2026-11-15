@@ -254,6 +254,36 @@ class JobWorkerPool {
         } catch (_) {}
       }
 
+      const isVideoEssay = page && (
+        page.slug === 'cult_information' ||
+        page.handle?.includes('cult_information') ||
+        page.content_type === 'feed_card' ||
+        page.content_type === 'video-essay' ||
+        page.theme === 'video_essay'
+      );
+
+      // Resolve videoPath safely to disk
+      let localVideoPath = (mediaPaths && mediaPaths[0]) || '';
+      if (localVideoPath && !fs.existsSync(localVideoPath)) {
+        const cleanRel = localVideoPath.replace(/^[/\\]+/, '');
+        const cand = path.join(__dirname, '..', '..', 'public', cleanRel);
+        if (fs.existsSync(cand)) localVideoPath = cand;
+      }
+
+      // For video-essay (Cult Information), prioritize detecting the EXACT on-screen headline from the reel
+      if (isVideoEssay && localVideoPath) {
+        try {
+          const { detectOnScreenHeadline } = require('./videoVisionService');
+          const visionRes = await detectOnScreenHeadline(localVideoPath);
+          if (visionRes && visionRes.found && visionRes.headline) {
+            hookHeadline = visionRes.headline;
+            console.log(`[Job Worker] 👁️ Set exact on-screen reel headline: "${hookHeadline}"`);
+          }
+        } catch (vErr) {
+          console.warn(`[Job Worker] On-screen vision check notice: ${vErr.message}`);
+        }
+      }
+
       if (job?.caption && job.caption !== rawCaption) {
         finalCaption = job.caption;
       } else {
@@ -261,7 +291,7 @@ class JobWorkerPool {
           rawCaption,
           sourceUsername: sourceUploader,
           page,
-          videoPath: (mediaPaths && mediaPaths[0]) || ''
+          videoPath: localVideoPath
         });
         finalCaption = copyDetails.caption;
         if (!hookHeadline) hookHeadline = copyDetails.hookHeadline || '';

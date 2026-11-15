@@ -6,15 +6,32 @@ const axios = require('axios');
 const { getSetting } = require('../database');
 
 /**
+ * Resolves relative, absolute, or public-relative media paths safely across platforms
+ */
+function resolveLocalMediaPath(inputPath) {
+  if (!inputPath || typeof inputPath !== 'string') return '';
+  if (fs.existsSync(inputPath)) return inputPath;
+  const cleanRel = inputPath.replace(/^[/\\]+/, '');
+  const candidate1 = path.join(__dirname, '..', '..', 'public', cleanRel);
+  if (fs.existsSync(candidate1)) return candidate1;
+  const candidate2 = path.join(process.cwd(), 'public', cleanRel);
+  if (fs.existsSync(candidate2)) return candidate2;
+  const candidate3 = path.join(process.cwd(), cleanRel);
+  if (fs.existsSync(candidate3)) return candidate3;
+  return inputPath;
+}
+
+/**
  * Extracts a high-quality snapshot frame from a video file using FFmpeg
- * @param {string} videoPath - Absolute path to the video file
+ * @param {string} videoPath - Absolute or relative path to the video file
  * @param {Object} options
  * @param {string} [options.timestamp='00:00:01.200'] - Timestamp to extract (1.2s avoids black fade-in)
  * @returns {Promise<string>} Path to the extracted frame JPEG
  */
 function extractSnapshotFrame(videoPath, options = {}) {
+  const resolvedPath = resolveLocalMediaPath(videoPath);
   return new Promise((resolve, reject) => {
-    if (!videoPath || !fs.existsSync(videoPath)) {
+    if (!resolvedPath || !fs.existsSync(resolvedPath)) {
       return reject(new Error(`Video file does not exist: ${videoPath}`));
     }
 
@@ -28,7 +45,7 @@ function extractSnapshotFrame(videoPath, options = {}) {
 
     const args = [
       '-ss', timestamp,
-      '-i', videoPath,
+      '-i', resolvedPath,
       '-vframes', '1',
       '-q:v', '2',
       '-y',
@@ -48,7 +65,7 @@ function extractSnapshotFrame(videoPath, options = {}) {
       }
       // Fallback: try frame 0 if timestamp seek failed
       const fallbackArgs = [
-        '-i', videoPath,
+        '-i', resolvedPath,
         '-vframes', '1',
         '-q:v', '2',
         '-y',
@@ -173,7 +190,8 @@ async function localOcrHeadlineDetection(framePath) {
     const Tesseract = require('tesseract.js');
     const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
-    const img = await loadImage(framePath);
+    const resolved = resolveLocalMediaPath(framePath);
+    const img = await loadImage(resolved);
     // Crop the upper reel region where titles and headlines are located (Y=0% to Y=70%)
     // Covers top hooks, mid-screen text boxes, and center-aligned reel title cards
     const cropH = Math.floor(img.height * 0.70);
@@ -298,11 +316,12 @@ async function localOcrHeadlineDetection(framePath) {
  * @returns {Promise<{ found: boolean, headline?: string, rawTitle?: string, provider?: string }>}
  */
 async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
-  if (!videoOrImagePath || !fs.existsSync(videoOrImagePath)) {
+  const resolvedPath = resolveLocalMediaPath(videoOrImagePath);
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) {
     return { found: false, reason: 'file_not_found' };
   }
 
-  const ext = path.extname(videoOrImagePath).toLowerCase();
+  const ext = path.extname(resolvedPath).toLowerCase();
   const isVideo = ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(ext);
 
   const sampleTimestamps = isVideo ? ['00:00:00.800', '00:00:01.200', '00:00:01.800', '00:00:00.500'] : [null];
@@ -310,13 +329,13 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
   const openAiKey = getSetting('openai_api_key', '') || process.env.OPENAI_API_KEY || '';
 
   for (const ts of sampleTimestamps) {
-    let framePath = videoOrImagePath;
+    let framePath = resolvedPath;
     let isTempFrame = false;
 
     try {
       if (isVideo) {
-        console.log(`[Video Vision] 📹 Extracting snapshot frame at ${ts} from video: ${path.basename(videoOrImagePath)}...`);
-        framePath = await extractSnapshotFrame(videoOrImagePath, { timestamp: ts });
+        console.log(`[Video Vision] 📹 Extracting snapshot frame at ${ts} from video: ${path.basename(resolvedPath)}...`);
+        framePath = await extractSnapshotFrame(resolvedPath, { timestamp: ts });
         isTempFrame = true;
       }
 

@@ -207,7 +207,15 @@ async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', pag
   } catch (err) {
     console.warn(`[Caption Builder] AI generation fallback: ${err.message}`);
     let fallbackHook = '';
-    const isVideoEssay = page && (page.content_type === 'feed_card' || page.content_type === 'video-essay' || page.theme === 'evolving_ai' || (page.name && page.name.toLowerCase().includes('cult')));
+    const isVideoEssay = page && (
+      page.slug === 'cult_information' ||
+      page.handle?.includes('cult_information') ||
+      page.content_type === 'feed_card' ||
+      page.content_type === 'video-essay' ||
+      page.theme === 'video_essay' ||
+      page.theme === 'evolving_ai' ||
+      (page.name && page.name.toLowerCase().includes('cult'))
+    );
     if (isVideoEssay) {
       if (videoPath) {
         try {

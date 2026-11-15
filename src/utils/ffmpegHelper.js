@@ -1268,6 +1268,8 @@ function parseHeadlineTokens(rawHeadline) {
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
     .replace(/\n+/g, ' ')
     .replace(/\s+/g, ' ')
+    .replace(/\*\*\s+([.,;:!?])/g, '**$1')
+    .replace(/\s+([.,;:!?])/g, '$1')
     .replace(/^["'“”\s]+/, '')
     .replace(/["'“”\s]+$/, '')
     .trim();
@@ -1276,15 +1278,21 @@ function parseHeadlineTokens(rawHeadline) {
   const tokens = [];
 
   if (hasExplicitMarkup) {
-    const regex = /(\*\*([^*]+)\*\*|\*([^*]+)\*|<hl>([^<]+)<\/hl>|\S+)/g;
+    const regex = /(\*\*([^*]+)\*\*([.,;:!?]*)|<hl>([^<]+)<\/hl>([.,;:!?]*)|\S+)/g;
     let match;
     while ((match = regex.exec(clean)) !== null) {
       if (match[2]) {
-        match[2].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
-      } else if (match[3]) {
-        match[3].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
+        const punct = match[3] || '';
+        const words = match[2].trim().split(/\s+/);
+        words.forEach((w, idx) => {
+          tokens.push({ text: idx === words.length - 1 ? (w + punct) : w, highlight: true });
+        });
       } else if (match[4]) {
-        match[4].trim().split(/\s+/).forEach(w => tokens.push({ text: w, highlight: true }));
+        const punct = match[5] || '';
+        const words = match[4].trim().split(/\s+/);
+        words.forEach((w, idx) => {
+          tokens.push({ text: idx === words.length - 1 ? (w + punct) : w, highlight: true });
+        });
       } else {
         tokens.push({ text: match[0], highlight: false });
       }
@@ -2745,6 +2753,18 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
     }
   }
 
+  // For Video-Essay (Cult Information), guarantee on-screen headline OCR from reel if not already provided
+  if (isVideoEssay && (!options.hookHeadline || options.hookHeadline.includes('The next generation of AI is evolving'))) {
+    try {
+      const { detectOnScreenHeadline } = require('../core/videoVisionService');
+      const visionRes = await detectOnScreenHeadline(absPath);
+      if (visionRes && visionRes.found && visionRes.headline) {
+        options.hookHeadline = visionRes.headline;
+        console.log(`[FFmpeg Helper] 👁️ Auto-detected on-screen hook headline from reel: "${options.hookHeadline}"`);
+      }
+    } catch (_) {}
+  }
+
   const overlayPngPath = await generateFeedPostOverlay(handle, { cardX, cardY, cardW, cardH, isVertical, theme, pageName: options.pageName || options.page?.name, ...options });
 
   const dir = path.dirname(absPath);
@@ -2755,51 +2775,11 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Video-Essay' : 'GTA 6 Vice City'));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
-  // Generate Intro Hook Voiceover for Video-Essay / Informative Reels (e.g. Cult Information)
-  let voiceoverPath = null;
-  let ttsDuration = 0;
-  const hookHeadline = (options.hookHeadline || options.headline || '').trim();
-  if (isVideoEssay && hookHeadline && options.includeVoiceover !== false) {
-    try {
-      const { generateSpeechAudio } = require('./ttsHelper');
-      const cleanVoiceText = hookHeadline.replace(/\*\*/g, '').replace(/["'“”]/g, '').replace(/\s+/g, ' ').trim();
-      if (cleanVoiceText.length >= 8) {
-        const ttsOut = path.join(dir, `${base}_hook_voiceover.mp3`);
-        const ttsRes = await generateSpeechAudio(cleanVoiceText, ttsOut);
-        if (ttsRes && ttsRes.success && fs.existsSync(ttsOut)) {
-          voiceoverPath = ttsOut;
-          try {
-            const probe = JSON.parse(execSync(`ffprobe -v error -show_entries format=duration -of json "${ttsOut}"`).toString());
-            ttsDuration = parseFloat(probe.format?.duration) || 4.5;
-          } catch (_) {
-            ttsDuration = 4.5;
-          }
-          console.log(`[FFmpeg Helper] 🎙️ Intro voiceover generated (${ttsDuration.toFixed(1)}s) for headline: "${cleanVoiceText}"`);
-        }
-      }
-    } catch (ttsErr) {
-      console.warn(`[FFmpeg Helper] Voiceover synthesis notice: ${ttsErr.message}`);
-    }
-  }
-
-  // Build filter graph combining video framing, intro voiceover, and audio normalization
-  let fullFilter;
+  // Clean original audio preservation & normalization (preserves authentic original video audio)
   const inputArgs = ['-y', '-i', absPath, '-i', overlayPngPath];
-
-  if (voiceoverPath) {
-    inputArgs.push('-i', voiceoverPath);
-    const duckDur = Math.max(2.5, Math.min(8.0, ttsDuration + 0.3));
-    if (hasAudio) {
-      // Intro voiceover with smooth audio ducking of background video audio:
-      fullFilter = `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume='if(lt(t,${duckDur}),0.25,1.15)':eval=frame[bga];[2:a]volume=1.45,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[voice];[bga][voice]amix=inputs=2:duration=first:dropout_transition=2[outa]`;
-    } else {
-      fullFilter = `${videoFilter};[2:a]volume=1.45,apad=whole_dur=60,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`;
-    }
-  } else {
-    fullFilter = hasAudio
-      ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
-      : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
-  }
+  const fullFilter = hasAudio
+    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
+    : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
 
   return new Promise((resolve) => {
     const args = [
