@@ -270,6 +270,7 @@ async function localOcrHeadlineDetection(framePath) {
       .replace(/\bRohotic\b/gi, 'Robotic')
       .replace(/\bpowered\s+hy\b/gi, 'powered by')
       .replace(/\s+([.,;:!?])/g, '$1')
+      .replace(/^[a-zA-Z0-9]{1,3}\s+(?=[A-Z])/g, '')
       .trim();
 
     // Strip trailing single noise tokens and punctuation artifacts
@@ -309,8 +310,46 @@ async function localOcrHeadlineDetection(framePath) {
 }
 
 /**
+ * Runs Python OpenCV to isolate and enhance the headline text ROI from video frames
+ * @param {string} videoPath - Path to video file
+ * @returns {Promise<string|null>} Path to the high-contrast extracted ROI image, or null
+ */
+function extractOpenCvHeadlineRoi(videoPath) {
+  return new Promise((resolve) => {
+    try {
+      const { execFile } = require('child_process');
+      const scriptPath = path.join(__dirname, '..', 'utils', 'opencvTextDetector.py');
+      const resolved = resolveLocalMediaPath(videoPath);
+      if (!fs.existsSync(scriptPath) || !fs.existsSync(resolved)) {
+        return resolve(null);
+      }
+
+      const tmpDir = path.join(os.tmpdir(), 'omnistudio_opencv');
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const outRoi = path.join(tmpDir, `roi_${Date.now()}_${Math.random().toString(36).substring(7)}.png`);
+
+      execFile('python', [scriptPath, resolved, outRoi], { timeout: 8000 }, (err, stdout) => {
+        if (!err && fs.existsSync(outRoi) && fs.statSync(outRoi).size > 500) {
+          try {
+            const parsed = JSON.parse(stdout.trim());
+            if (parsed && parsed.success) {
+              console.log(`[Video Vision] 🎯 OpenCV localized headline ROI: ${parsed.boxes_detected} text boxes detected`);
+              return resolve(outRoi);
+            }
+          } catch (_) {}
+          return resolve(outRoi);
+        }
+        resolve(null);
+      });
+    } catch (_) {
+      resolve(null);
+    }
+  });
+}
+
+/**
  * Detects and extracts on-screen title text from a video or image file
- * Supports multi-timestamp frame sampling (0.8s, 1.2s, 1.8s, 0.5s) to ensure no intro fade is missed.
+ * Supports OpenCV contour bounding box isolation, Gemini/OpenAI Vision, and high-precision OCR.
  * @param {string} videoOrImagePath - Path to the video or image
  * @param {Object} options
  * @returns {Promise<{ found: boolean, headline?: string, rawTitle?: string, provider?: string }>}
@@ -323,6 +362,31 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
 
   const ext = path.extname(resolvedPath).toLowerCase();
   const isVideo = ['.mp4', '.mov', '.mkv', '.webm', '.avi'].includes(ext);
+
+  // 0. Primary High-Precision Engine: OpenCV Contour Bounding Box Localization & ROI Isolation
+  if (isVideo) {
+    try {
+      console.log(`[Video Vision] 📹 Inspecting video frames with OpenCV Computer Vision: ${path.basename(resolvedPath)}...`);
+      const opencvRoi = await extractOpenCvHeadlineRoi(resolvedPath);
+      if (opencvRoi && fs.existsSync(opencvRoi)) {
+        console.log(`[Video Vision] 👁️ Scanning OpenCV-isolated headline ROI with high-precision OCR...`);
+        const localResult = await localOcrHeadlineDetection(opencvRoi);
+        try { fs.unlinkSync(opencvRoi); } catch (_) {}
+        if (localResult && localResult.hasTitle && localResult.headline) {
+          console.log(`[Video Vision] ✅ Found On-Screen Hook via OpenCV Text Detection: "${localResult.headline}"`);
+          return {
+            found: true,
+            headline: localResult.headline,
+            rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
+            hasCompetitorHeader: true,
+            provider: 'opencv_ocr'
+          };
+        }
+      }
+    } catch (opencvErr) {
+      console.warn(`[Video Vision] OpenCV detection notice: ${opencvErr.message}`);
+    }
+  }
 
   const sampleTimestamps = isVideo ? ['00:00:00.800', '00:00:01.200', '00:00:01.800', '00:00:00.500'] : [null];
   const geminiKey = getSetting('gemini_api_key', '') || process.env.GEMINI_API_KEY || '';
