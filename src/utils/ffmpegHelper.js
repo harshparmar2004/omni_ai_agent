@@ -2755,17 +2755,55 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Video-Essay' : 'GTA 6 Vice City'));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Framed Feed Reel for @${handle} (${isVertical ? '9:16 Full Immersion' : `${inW}x${inH} Adaptive`} ${cardW}x${cardH})...`);
 
-  // Build filter graph combining video framing and audio normalization in ONE pass
-  // Guarantees compliant stereo 44.1kHz AAC audio stream for Meta Graph API Reel ingestion
-  const fullFilter = hasAudio
-    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
-    : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
+  // Generate Intro Hook Voiceover for Video-Essay / Informative Reels (e.g. Cult Information)
+  let voiceoverPath = null;
+  let ttsDuration = 0;
+  const hookHeadline = (options.hookHeadline || options.headline || '').trim();
+  if (isVideoEssay && hookHeadline && options.includeVoiceover !== false) {
+    try {
+      const { generateSpeechAudio } = require('./ttsHelper');
+      const cleanVoiceText = hookHeadline.replace(/\*\*/g, '').replace(/["'“”]/g, '').replace(/\s+/g, ' ').trim();
+      if (cleanVoiceText.length >= 8) {
+        const ttsOut = path.join(dir, `${base}_hook_voiceover.mp3`);
+        const ttsRes = await generateSpeechAudio(cleanVoiceText, ttsOut);
+        if (ttsRes && ttsRes.success && fs.existsSync(ttsOut)) {
+          voiceoverPath = ttsOut;
+          try {
+            const probe = JSON.parse(execSync(`ffprobe -v error -show_entries format=duration -of json "${ttsOut}"`).toString());
+            ttsDuration = parseFloat(probe.format?.duration) || 4.5;
+          } catch (_) {
+            ttsDuration = 4.5;
+          }
+          console.log(`[FFmpeg Helper] 🎙️ Intro voiceover generated (${ttsDuration.toFixed(1)}s) for headline: "${cleanVoiceText}"`);
+        }
+      }
+    } catch (ttsErr) {
+      console.warn(`[FFmpeg Helper] Voiceover synthesis notice: ${ttsErr.message}`);
+    }
+  }
+
+  // Build filter graph combining video framing, intro voiceover, and audio normalization
+  let fullFilter;
+  const inputArgs = ['-y', '-i', absPath, '-i', overlayPngPath];
+
+  if (voiceoverPath) {
+    inputArgs.push('-i', voiceoverPath);
+    const duckDur = Math.max(2.5, Math.min(8.0, ttsDuration + 0.3));
+    if (hasAudio) {
+      // Intro voiceover with smooth audio ducking of background video audio:
+      fullFilter = `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume='if(lt(t,${duckDur}),0.25,1.15)':eval=frame[bga];[2:a]volume=1.45,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[voice];[bga][voice]amix=inputs=2:duration=first:dropout_transition=2[outa]`;
+    } else {
+      fullFilter = `${videoFilter};[2:a]volume=1.45,apad=whole_dur=60,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`;
+    }
+  } else {
+    fullFilter = hasAudio
+      ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
+      : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
+  }
 
   return new Promise((resolve) => {
     const args = [
-      '-y',
-      '-i', absPath,
-      '-i', overlayPngPath,
+      ...inputArgs,
       '-filter_complex', fullFilter,
       '-map', '[outv]',
       '-map', '[outa]',
