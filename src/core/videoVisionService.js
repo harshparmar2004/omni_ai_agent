@@ -280,19 +280,35 @@ async function localOcrHeadlineDetection(framePath) {
     const wordCount = title.split(/\s+/).length;
     const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
     if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
-      // Smart brand highlighting on numbers, percentages, and high-impact viral words
+      // Smart brand highlighting on numbers, percentages, and high-impact viral words (2 to 3 highlights)
       let highlightedTitle = title;
       highlightedTitle = highlightedTitle.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion|hundred)\b)/gi, '**$1**');
 
-      const viralTerms = title.match(/\b(World's|First|Human Pro|Robot|Robots|Human|Living Thing|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Neural|Underground|Ocean|Antarctic|Algae)\b/i);
-      if (viralTerms && !highlightedTitle.includes(`**${viralTerms[0]}**`)) {
-        highlightedTitle = highlightedTitle.replace(viralTerms[0], `**${viralTerms[0]}**`);
-      } else if (!highlightedTitle.includes('**')) {
+      const viralPattern = /\b(Robotic Arms|Table Tennis|Human Pro|World's First|Living Thing|Deep Knowledge|Robotic|Robot|Robots|Algae|Neural|AI|Beat|Players|Human|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Underground|Ocean|Antarctic|Discovery|Discovered|Intelligence)\b/gi;
+
+      const hlMatches = [...title.matchAll(viralPattern)];
+      let appliedCount = (highlightedTitle.match(/\*\*[^*]+\*\*/g) || []).length;
+      for (const m of hlMatches) {
+        if (appliedCount >= 3) break;
+        const term = m[0];
+        if (!highlightedTitle.includes(`**${term}**`)) {
+          highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${term}\\b`, 'g'), `**${term}**`);
+          appliedCount++;
+        }
+      }
+
+      // If still fewer than 2 highlights, highlight top content words (>= 6 chars)
+      if (appliedCount < 2) {
         const words = title.split(/\s+/);
-        const candidates = words.filter(w => w.length >= 6 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would)$/i.test(w));
-        if (candidates.length > 0) {
-          candidates.sort((a, b) => b.length - a.length);
-          highlightedTitle = highlightedTitle.replace(candidates[0], `**${candidates[0]}**`);
+        const candidates = words.filter(w => w.length >= 6 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would|these|those)$/i.test(w));
+        candidates.sort((a, b) => b.length - a.length);
+        for (const cand of candidates) {
+          if (appliedCount >= 2) break;
+          const cleanCand = cand.replace(/[^a-zA-Z0-9]/g, '');
+          if (cleanCand && !highlightedTitle.includes(`**${cleanCand}**`)) {
+            highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${cleanCand}\\b`, 'g'), `**${cleanCand}**`);
+            appliedCount++;
+          }
         }
       }
 

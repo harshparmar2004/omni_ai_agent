@@ -1298,11 +1298,11 @@ function parseHeadlineTokens(rawHeadline) {
       }
     }
   } else {
-    // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words
+    // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words (up to 3 words)
     const words = clean.split(/\s+/);
     let highlightCount = 0;
-    const maxAutoHighlights = 2;
-    const viralPattern = /^(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|hundred|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|revolution|future|underground|ocean|antarctic|human|quantum|overheating|supercluster)$/i;
+    const maxAutoHighlights = 3;
+    const viralPattern = /^(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|hundred|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|robotic|arms|algae|beat|players|table|tennis|moves|revolution|future|underground|ocean|antarctic|human|quantum|overheating|supercluster)$/i;
 
     const stopWords = new Set([
       'about','above','after','again','against','all','also','and','any','because','been',
@@ -1323,7 +1323,7 @@ function parseHeadlineTokens(rawHeadline) {
       return { text: w, highlight: shouldHighlight, clean: cleanW.toLowerCase() };
     });
 
-    // Pass 2: If fewer than 2 words were highlighted, guarantee 1-2 semantic content words get brand lime highlight!
+    // Pass 2: If fewer than 2 words were highlighted, guarantee 2-3 semantic content words get brand lime highlight!
     if (highlightCount < 2) {
       const candidates = [];
       tokenList.forEach((t, idx) => {
@@ -1337,7 +1337,7 @@ function parseHeadlineTokens(rawHeadline) {
         if (highlightCount >= maxAutoHighlights) break;
         // Don't highlight adjacent words unless no other options
         const isAdjacent = tokenList.some((t, i) => t.highlight && Math.abs(i - cand.idx) <= 1);
-        if (!isAdjacent || candidates.length === 1) {
+        if (!isAdjacent || candidates.length <= 2) {
           tokenList[cand.idx].highlight = true;
           highlightCount++;
         }
@@ -1589,13 +1589,13 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 3. Ergonomic & Responsive Layout
   const marginX = 64;
-  const maxTextWidth = 860; // Wide, screen-filling hook without touching side edges
+  const maxTextWidth = 900; // Wide, screen-filling hook without touching side edges
   const spaceAboveVideo = 26; // Snug, ergonomic breathing room right above video card
-  const spaceBetweenHeaderAndHeadline = 22;
+  const spaceBetweenHeaderAndHeadline = 24;
 
   const headerAlign = options.headerAlign || options.page?.header_align || 'center';
   const isCentered = headerAlign === 'center';
-  const avatarSize = 84; // Prominent, clear 84px avatar diameter
+  const avatarSize = 98; // Prominent, clear 98px avatar diameter (bigger and clearer)
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1605,15 +1605,15 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     .replace(/["'“”\s]+$/, '')
     .trim();
 
-  // Responsive headline font: 48px default for bold, screen-filling hooks
+  // Responsive headline font: 54px default for bold, screen-filling hooks
   const wordsCount = cleanHeadline.split(/\s+/).length;
-  let fontSize = 48;
+  let fontSize = 54;
   if (cleanHeadline.length > 85 || wordsCount > 17) {
-    fontSize = 38;
+    fontSize = 42;
   } else if (cleanHeadline.length > 70 || wordsCount > 14) {
-    fontSize = 44;
+    fontSize = 48;
   }
-  const lineHeight = Math.round(fontSize * 1.25); // ~60px clean vertical rhythm
+  const lineHeight = Math.round(fontSize * 1.25); // ~68px clean vertical rhythm
 
   ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 
@@ -1670,11 +1670,11 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   if (isCentered) {
     // 5A. Centered Middle Header: [ (Cult Logo)  @cult_information  ✔ ]
-    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = 'bold 34px "Segoe UI", Roboto, Arial, sans-serif';
     const handleW = ctx.measureText(displayHandle).width;
-    const badgeSize = 22;
-    const gap = 14;
-    const totalHeaderW = avatarSize + gap + handleW + 10 + badgeSize;
+    const badgeSize = 26;
+    const gap = 16;
+    const totalHeaderW = avatarSize + gap + handleW + 12 + badgeSize;
     const headerStartX = Math.round((width - totalHeaderW) / 2);
 
     const avatarX = headerStartX;
@@ -1695,9 +1695,9 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     ctx.beginPath();
     ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
     ctx.strokeStyle = highlightColor;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.8;
     ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 14;
     ctx.stroke();
     ctx.restore();
 
@@ -1726,7 +1726,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
       const words = (pageName || 'Channel').trim().split(/\s+/);
       const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
       ctx.fillStyle = '#CCFF00';
-      ctx.font = '900 30px "Arial Black", Arial, sans-serif';
+      ctx.font = '900 34px "Arial Black", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(initials, avatarCenter, avatarCenterY);
@@ -1735,12 +1735,12 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
     // Centered Handle + Blue Verified Badge
     ctx.save();
-    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = 'bold 34px "Segoe UI", Roboto, Arial, sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textBaseline = 'middle';
     const textX = avatarX + avatarSize + gap;
     ctx.fillText(displayHandle, textX, avatarCenterY);
-    drawVerifiedBadge(ctx, textX + handleW + 10, avatarCenterY - (badgeSize / 2), badgeSize);
+    drawVerifiedBadge(ctx, textX + handleW + 12, avatarCenterY - (badgeSize / 2), badgeSize);
     ctx.restore();
   } else {
     // 5B. Left-Aligned Header: [ (Cult Logo) ]  Cult Information ✔ / @cult_information
@@ -1760,9 +1760,9 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     ctx.beginPath();
     ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
     ctx.strokeStyle = highlightColor;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.8;
     ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 14;
     ctx.stroke();
     ctx.restore();
 
@@ -1790,7 +1790,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
       const words = (pageName || 'Channel').trim().split(/\s+/);
       const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
       ctx.fillStyle = '#CCFF00';
-      ctx.font = '900 32px "Arial Black", Arial, sans-serif';
+      ctx.font = '900 34px "Arial Black", Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(initials, avatarCenter, avatarCenterY);
@@ -1798,23 +1798,23 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     ctx.restore();
 
     // Page Name + Verified Badge
-    const textLeftX = marginX + avatarSize + 18;
+    const textLeftX = marginX + avatarSize + 20;
     ctx.save();
-    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = 'bold 34px "Segoe UI", Roboto, Arial, sans-serif';
     ctx.fillStyle = '#FFFFFF';
     ctx.textBaseline = 'middle';
-    const nameCenterY = headerTopY + 26;
+    const nameCenterY = headerTopY + 32;
     ctx.fillText(pageName, textLeftX, nameCenterY);
 
     const rawNameWidth = ctx.measureText(pageName).width;
-    const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 400) ? rawNameWidth : 220;
-    const badgeSize = 20;
-    drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, nameCenterY - (badgeSize / 2), badgeSize);
+    const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 450) ? rawNameWidth : 260;
+    const badgeSize = 24;
+    drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
 
     // Handle below name
-    ctx.font = '500 20px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = '500 24px "Segoe UI", Roboto, Arial, sans-serif';
     ctx.fillStyle = '#A1A1AA';
-    const handleCenterY = headerTopY + 56;
+    const handleCenterY = headerTopY + 68;
     ctx.fillText(displayHandle, textLeftX, handleCenterY);
     ctx.restore();
   }
