@@ -221,29 +221,55 @@ async function localOcrHeadlineDetection(framePath) {
     }
 
     const candidateLines = filteredLines.length > 0 ? filteredLines : rawLines;
-    let title = candidateLines[0] || '';
-    if (candidateLines.length > 1 && title.split(/\s+/).length < 7) {
-      title += ' ' + candidateLines[1];
-    }
-    title = title
-      .replace(/[©®™|]/g, '')
-      .replace(/^.*?@\w+[\s:]*/i, '') // Strip any remaining leading handle
-      .replace(/[\/\\|<=>~_—\-+=:;`^•*]+/g, ' ')
-      .replace(/^["'“”\s]+/, '')
-      .replace(/["'“”\s]+$/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const cleanLines = [];
+    for (const raw of candidateLines) {
+      // Check alphanumeric character ratio to drop video background noise
+      const alphaChars = (raw.match(/[a-zA-Z0-9]/g) || []).length;
+      if (raw.length === 0 || (alphaChars / raw.length) < 0.55) break;
 
-    // Remove trailing noise fragments (e.g. random 1-2 char noise or symbols at the end)
-    title = title.replace(/(?:\s+[a-z0-9]{1,2})+\s*$/i, '').trim();
-    title = title.replace(/[\s.,;:!\-—|]+$/, '').trim();
+      let l = raw
+        .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]]/g, ' ')
+        .replace(/^.*?@\w+[\s:]*/i, '')
+        .replace(/^["'“”\s]+|["'“”\s]+$/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      // Strip trailing single noise characters or symbols (e.g. "Pro 8", "Pro &", "Pro >")
+      l = l.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
+
+      if (l.length >= 4) {
+        cleanLines.push(l);
+      }
+      // If we have collected 8-16 words, we have a complete viral heading
+      const currentWordCount = cleanLines.join(' ').split(/\s+/).length;
+      if (currentWordCount >= 9) break;
+    }
+
+    let title = cleanLines.join(' ');
+    // Fix OCR misreads of "AI" (e.g. "Al Table Tennis" -> "AI Table Tennis", "Al servers" -> "AI servers")
+    title = title.replace(/\bAl\b/g, 'AI').replace(/\bAl's\b/g, "AI's").trim();
+    // Strip trailing single noise tokens and punctuation artifacts
+    title = title.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
+    title = title.replace(/[\s.,;:!\-—|§°_~>#+=&\\\/]+$/, '').trim();
 
     const wordCount = title.split(/\s+/).length;
     const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
     if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
-      const { parseHeadlineTokens } = require('../utils/ffmpegHelper');
-      const tokens = parseHeadlineTokens(title);
-      const highlightedTitle = tokens.map(t => t.highlight ? `**${t.text}**` : t.text).join(' ');
+      // Smart brand highlighting on numbers, percentages, and high-impact viral words
+      let highlightedTitle = title;
+      highlightedTitle = highlightedTitle.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion|hundred)\b)/gi, '**$1**');
+      
+      const viralTerms = title.match(/\b(World's|First|Human Pro|Robot|Robots|Human|Living Thing|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Neural|Underground|Ocean|Antarctic)\b/i);
+      if (viralTerms && !highlightedTitle.includes(`**${viralTerms[0]}**`)) {
+        highlightedTitle = highlightedTitle.replace(viralTerms[0], `**${viralTerms[0]}**`);
+      } else if (!highlightedTitle.includes('**')) {
+        const words = title.split(/\s+/);
+        const candidates = words.filter(w => w.length >= 6 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would)$/i.test(w));
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => b.length - a.length);
+          highlightedTitle = highlightedTitle.replace(candidates[0], `**${candidates[0]}**`);
+        }
+      }
 
       return {
         hasTitle: true,

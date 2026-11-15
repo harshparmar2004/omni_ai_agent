@@ -6,7 +6,9 @@ const { detectOnScreenHeadline } = require('../src/core/videoVisionService');
 
 async function runVerification() {
   console.log('=== Step 1: Testing Movie Template Overlay & Video Framing ===');
-  const sampleVideo = path.join(__dirname, '..', 'public', 'generated', 'downloads', 'reel_DfZqnfuArzx.mp4');
+  const downloadsDir = path.join(__dirname, '..', 'public', 'generated', 'downloads');
+  const availableFiles = fs.existsSync(downloadsDir) ? fs.readdirSync(downloadsDir).filter(f => f.endsWith('.mp4') && !f.includes('framed')) : [];
+  const sampleVideo = availableFiles.length > 0 ? path.join(downloadsDir, availableFiles[0]) : path.join(downloadsDir, 'reel_DfZqnfuArzx.mp4');
   if (!fs.existsSync(sampleVideo)) {
     throw new Error('Sample test video not found: ' + sampleVideo);
   }

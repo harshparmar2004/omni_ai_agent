@@ -1294,7 +1294,7 @@ function parseHeadlineTokens(rawHeadline) {
     const words = clean.split(/\s+/);
     let highlightCount = 0;
     const maxAutoHighlights = 2;
-    const viralPattern = /^(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|revolution|future)$/i;
+    const viralPattern = /^(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|hundred|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|revolution|future|underground|ocean|antarctic|human|quantum|overheating|supercluster)$/i;
 
     const stopWords = new Set([
       'about','above','after','again','against','all','also','and','any','because','been',
@@ -1315,24 +1315,26 @@ function parseHeadlineTokens(rawHeadline) {
       return { text: w, highlight: shouldHighlight, clean: cleanW.toLowerCase() };
     });
 
-    // Pass 2: If no words were highlighted, guarantee 1-2 semantic content words get brand lime highlight!
-    if (highlightCount === 0) {
+    // Pass 2: If fewer than 2 words were highlighted, guarantee 1-2 semantic content words get brand lime highlight!
+    if (highlightCount < 2) {
       const candidates = [];
       tokenList.forEach((t, idx) => {
-        if (t.clean.length >= 5 && !stopWords.has(t.clean)) {
+        if (!t.highlight && t.clean.length >= 5 && !stopWords.has(t.clean)) {
           candidates.push({ idx, length: t.clean.length });
         }
       });
       // Sort candidates by length descending to pick the most impactful words
       candidates.sort((a, b) => b.length - a.length);
-      if (candidates.length > 0) {
-        tokenList[candidates[0].idx].highlight = true;
-        highlightCount++;
-        if (candidates.length > 1 && Math.abs(candidates[0].idx - candidates[1].idx) > 1) {
-          tokenList[candidates[1].idx].highlight = true;
+      for (const cand of candidates) {
+        if (highlightCount >= maxAutoHighlights) break;
+        // Don't highlight adjacent words unless no other options
+        const isAdjacent = tokenList.some((t, i) => t.highlight && Math.abs(i - cand.idx) <= 1);
+        if (!isAdjacent || candidates.length === 1) {
+          tokenList[cand.idx].highlight = true;
           highlightCount++;
         }
-      } else if (tokenList.length >= 3) {
+      }
+      if (highlightCount === 0 && tokenList.length >= 3) {
         tokenList[tokenList.length - 2].highlight = true;
       }
     }
@@ -1577,17 +1579,12 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   // 2. Clear cutout where the video plays cleanly without borders
   ctx.clearRect(cardX, cardY, cardW, cardH);
 
-  // 3. Ergonomic Downward Layout & Spacing:
-  // Dynamically position Cult Information logo & headline closer to the video (cardY),
-  // leaving comfortable top margin below Instagram chrome and ensuring 100% black belt coverage!
-  const marginX = 54;
+  // 3. Ergonomic & Responsive Layout
+  const marginX = 64;
   const maxTextWidth = width - (marginX * 2);
-  const avatarSize = 118; // Prominent, high-impact brand logo (was 84px)
-  const lineHeight = 62;
-  const spaceAboveVideo = 36;
-  const spaceBetweenHeaderAndHeadline = 28;
-
-  ctx.font = '900 48px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+  const avatarSize = 80; // Sleek, modern editorial logo size (was 118px)
+  const spaceAboveVideo = 28; // Clean breathing room right above video card
+  const spaceBetweenHeaderAndHeadline = 22;
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1597,14 +1594,21 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     .replace(/["'“”\s]+$/, '')
     .trim();
 
+  // Responsive headline font: 32px for long titles (>13 words / >70 chars), 35px for standard
+  const wordsCount = cleanHeadline.split(/\s+/).length;
+  const fontSize = (wordsCount > 13 || cleanHeadline.length > 70) ? 32 : 35;
+  const lineHeight = fontSize + 12; // 44px to 47px clean vertical rhythm
+
+  ctx.font = `800 ${fontSize}px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif`;
+
   const tokens = parseHeadlineTokens(cleanHeadline);
   const lines = wrapTokens(ctx, tokens, maxTextWidth);
   const totalTextHeight = lines.length * lineHeight;
-
-  // 3. Ergonomic Top-Anchored & Responsive Ratio Layout:
-  const minSafeTopMargin = 124; // Clean margin below Instagram's top header bar
   const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
 
+  // 4. Flexible Dynamic Positioning based on Video Bounds (cardY)
+  // For 1:1 square video (cardY ~ 420), position comfortably right above video rather than pinned high up
+  const minSafeTopMargin = 136; // Clean clearance below Instagram's top chrome (audio, camera, back)
   let headerTopY;
   let headlineY;
 
@@ -1612,19 +1616,28 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     headerTopY = options.headerTopY;
     headlineY = options.headlineY;
   } else {
-    const availableTopSpace = cardY - spaceAboveVideo - minSafeTopMargin;
-
-    if (availableTopSpace >= totalBrandingHeight + 30) {
-      const idealHeaderY = minSafeTopMargin + Math.round((availableTopSpace - totalBrandingHeight) / 2);
-      headerTopY = Math.min(Math.max(minSafeTopMargin, idealHeaderY), 190);
-      headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+    if (cardY >= 350) {
+      const spaceAbove = cardY - spaceAboveVideo;
+      const desiredTopY = spaceAbove - totalBrandingHeight;
+      if (desiredTopY >= minSafeTopMargin) {
+        if (cardY > 520) {
+          // When cardY is low (e.g. 16:9 at Y=656), center smoothly in available top zone with slight bottom weight
+          const availableSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+          headerTopY = minSafeTopMargin + Math.round((availableSpace - totalBrandingHeight) * 0.60);
+        } else {
+          // For 1:1 square video (cardY ~ 420), position comfortably right above video!
+          headerTopY = desiredTopY;
+        }
+      } else {
+        headerTopY = Math.max(100, cardY - totalBrandingHeight - spaceAboveVideo);
+      }
     } else {
-      headerTopY = Math.max(100, Math.min(minSafeTopMargin, cardY - totalBrandingHeight - spaceAboveVideo));
-      headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+      headerTopY = minSafeTopMargin;
     }
+    headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
   }
 
-  // Circular Logo Avatar (118px diameter)
+  // Circular Logo Avatar (80px diameter)
   const avatarCenter = marginX + avatarSize / 2;
   const avatarCenterY = headerTopY + avatarSize / 2;
   const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
@@ -1676,8 +1689,8 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     const words = (pageName || 'Channel').trim().split(/\s+/);
     const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 
-    ctx.fillStyle = options.highlightColor || '#c1d82f'; // Cult signature lime
-    ctx.font = '900 42px RobotoBlack, "Arial Black", Arial, sans-serif';
+    ctx.fillStyle = '#CCFF00'; // Cult signature electric lime
+    ctx.font = '900 32px RobotoBlack, "Arial Black", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(initials, avatarCenter, avatarCenterY);
@@ -1685,36 +1698,36 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   ctx.restore();
 
   // Signature Cult Neon Lime Double Glow Border Ring
-  const highlightColor = options.highlightColor || '#c1d82f'; // Signature Cult neon lime green
+  const highlightColor = options.highlightColor || '#CCFF00'; // High-Energy Cyber/Electric Lime
   ctx.save();
   ctx.beginPath();
   ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
   ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = 3.5;
-  ctx.shadowColor = 'rgba(193, 216, 47, 0.5)';
-  ctx.shadowBlur = 14;
+  ctx.lineWidth = 2.5;
+  ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
+  ctx.shadowBlur = 12;
   ctx.stroke();
   ctx.restore();
 
   // Page Name + Verified Badge
-  const textLeftX = marginX + avatarSize + 22;
+  const textLeftX = marginX + avatarSize + 18;
   ctx.save();
-  ctx.font = 'bold 36px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+  ctx.font = 'bold 28px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
   ctx.fillStyle = '#FFFFFF';
   ctx.textBaseline = 'middle';
-  const nameCenterY = headerTopY + 38;
+  const nameCenterY = headerTopY + 26;
   ctx.fillText(pageName, textLeftX, nameCenterY);
 
   const rawNameWidth = ctx.measureText(pageName).width;
-  const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 450) ? rawNameWidth : 260;
-  const badgeSize = 24;
-  drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
+  const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 400) ? rawNameWidth : 220;
+  const badgeSize = 20;
+  drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, nameCenterY - (badgeSize / 2), badgeSize);
 
   // Handle below name
-  ctx.font = '500 24px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-  ctx.fillStyle = '#A0A0AB'; // Sleek iOS silver
+  ctx.font = '500 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+  ctx.fillStyle = '#A1A1AA'; // Sleek zinc silver
   ctx.textBaseline = 'middle';
-  const handleCenterY = headerTopY + 80;
+  const handleCenterY = headerTopY + 56;
   const rawHandle = options.page?.handle || cleanHandle;
   const displayHandle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle.replace(/^@+/, '')}`;
   ctx.fillText(displayHandle, textLeftX, handleCenterY);
@@ -1722,7 +1735,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
   ctx.save();
-  ctx.font = '900 48px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
+  ctx.font = `800 ${fontSize}px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif`;
   ctx.textBaseline = 'top';
   const spaceWidth = ctx.measureText(' ').width;
 
@@ -1730,8 +1743,17 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     let currentX = marginX;
     const currentY = headlineY + (lineIdx * lineHeight);
     for (const token of lineTokens) {
-      ctx.fillStyle = token.highlight ? highlightColor : '#FFFFFF';
-      ctx.fillText(token.text, currentX, currentY);
+      if (token.highlight) {
+        ctx.save();
+        ctx.fillStyle = highlightColor;
+        ctx.shadowColor = 'rgba(204, 255, 0, 0.45)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(token.text, currentX, currentY);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(token.text, currentX, currentY);
+      }
       currentX += ctx.measureText(token.text).width + spaceWidth;
     }
   });
@@ -1741,7 +1763,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   const genDir = path.join(publicDir, 'generated');
   if (!fs.existsSync(genDir)) fs.mkdirSync(genDir, { recursive: true });
 
-  const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'evolving_ai'}.png`);
+  const overlayPath = path.join(genDir, `feed_frame_overlay_${cleanHandle || 'cult_information'}.png`);
   fs.writeFileSync(overlayPath, canvas.toBuffer('image/png'));
   return overlayPath;
 }
@@ -2147,27 +2169,39 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
     // When cardY is >= 350 AND page is an editorial video-essay (Cult Information) with headline enabled
     if (cardY >= 350 && (isVideoEssay || options.showHeadline === true)) {
-      const avatarSize = 118;
-      const lineHeight = 62;
-      const spaceAboveVideo = 36;
-      const spaceBetweenHeaderAndHeadline = 26;
+      const avatarSize = 80;
+      const spaceAboveVideo = 28;
+      const spaceBetweenHeaderAndHeadline = 22;
 
-      ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      const wordsCount = cleanHeadline.split(/\s+/).length;
+      const fontSize = (wordsCount > 13 || cleanHeadline.length > 70) ? 32 : 35;
+      const lineHeight = fontSize + 12;
+
+      ctx.font = `800 ${fontSize}px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
       const tokens = parseHeadlineTokens(cleanHeadline);
       const lines = wrapTokens(ctx, tokens, maxTextWidth);
       const totalTextHeight = lines.length * lineHeight;
       const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
 
-      const minSafeTopMargin = 124;
-      const availableTopSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+      const minSafeTopMargin = 136;
       let headerTopY, headlineY;
 
-      if (availableTopSpace >= totalBrandingHeight + 30) {
-        const idealHeaderY = minSafeTopMargin + Math.round((availableTopSpace - totalBrandingHeight) / 2);
-        headerTopY = Math.min(Math.max(minSafeTopMargin, idealHeaderY), 190);
-        headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
+      if (options.headerTopY !== undefined && options.headlineY !== undefined) {
+        headerTopY = options.headerTopY;
+        headlineY = options.headlineY;
       } else {
-        headerTopY = Math.max(100, Math.min(minSafeTopMargin, cardY - totalBrandingHeight - spaceAboveVideo));
+        const spaceAbove = cardY - spaceAboveVideo;
+        const desiredTopY = spaceAbove - totalBrandingHeight;
+        if (desiredTopY >= minSafeTopMargin) {
+          if (cardY > 520) {
+            const availableSpace = cardY - spaceAboveVideo - minSafeTopMargin;
+            headerTopY = minSafeTopMargin + Math.round((availableSpace - totalBrandingHeight) * 0.60);
+          } else {
+            headerTopY = desiredTopY;
+          }
+        } else {
+          headerTopY = Math.max(100, cardY - totalBrandingHeight - spaceAboveVideo);
+        }
         headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
       }
 
@@ -2212,8 +2246,8 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
         const words = (pageName || 'Channel').trim().split(/\s+/);
         const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
-        ctx.fillStyle = highlightColor;
-        ctx.font = '900 44px "Arial Black", Arial, sans-serif';
+        ctx.fillStyle = '#CCFF00';
+        ctx.font = '900 32px "Arial Black", Arial, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(initials, avatarCenter, avatarCenterY);
@@ -2221,57 +2255,58 @@ async function generateFeedPostOverlay(handle, options = {}) {
       ctx.restore();
 
       // 2. Dual-Glow Neon Avatar Ring
+      const ringColor = isVideoEssay ? '#CCFF00' : highlightColor;
       ctx.save();
       ctx.beginPath();
       ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
       const ringGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
-      ringGrad.addColorStop(0, highlightColor);
-      ringGrad.addColorStop(1, secondaryColor);
+      ringGrad.addColorStop(0, ringColor);
+      ringGrad.addColorStop(1, isVideoEssay ? '#A3E635' : secondaryColor);
       ctx.strokeStyle = ringGrad;
-      ctx.lineWidth = 3.5;
-      ctx.shadowColor = isMovie ? 'rgba(255, 183, 3, 0.75)' : (isGTA6 ? 'rgba(247, 37, 133, 0.8)' : 'rgba(56, 189, 248, 0.7)');
-      ctx.shadowBlur = 18;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = isVideoEssay ? 'rgba(204, 255, 0, 0.75)' : (isMovie ? 'rgba(255, 183, 3, 0.75)' : 'rgba(56, 189, 248, 0.7)');
+      ctx.shadowBlur = 12;
       ctx.stroke();
       ctx.restore();
 
       // 3. Page Name & Verified Badge
-      const textLeftX = marginX + avatarSize + 22;
+      const textLeftX = marginX + avatarSize + 18;
       ctx.save();
-      ctx.font = 'bold 36px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.font = 'bold 28px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
       ctx.fillStyle = '#FFFFFF';
       ctx.textBaseline = 'middle';
-      const nameCenterY = headerTopY + 38;
+      const nameCenterY = headerTopY + 26;
       ctx.fillText(pageName, textLeftX, nameCenterY);
 
       const nameWidth = ctx.measureText(pageName).width;
-      const badgeSize = 24;
-      drawVerifiedBadge(ctx, textLeftX + nameWidth + 12, nameCenterY - (badgeSize / 2), badgeSize);
+      const badgeSize = 20;
+      drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, nameCenterY - (badgeSize / 2), badgeSize);
 
       // 4. Handle below Page Name
-      ctx.font = '500 24px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.font = '500 20px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
       ctx.fillStyle = '#A0A0AB';
       ctx.textBaseline = 'middle';
-      const handleCenterY = headerTopY + 80;
+      const handleCenterY = headerTopY + 56;
       const displayHandle = cleanHandle.startsWith('@') ? cleanHandle : '@' + cleanHandle;
       ctx.fillText(displayHandle, textLeftX, handleCenterY);
 
       // Right-aligned theme badge in small box
       const tagText = isMovie ? 'CINEMA PICKS' : (isGTA6 ? 'GTA VI' : 'OFFICIAL');
-      ctx.font = '900 16px "Arial Black", Arial, sans-serif';
-      const tagW = ctx.measureText(tagText).width + 24;
-      const tagH = 34;
+      ctx.font = '900 14px "Arial Black", Arial, sans-serif';
+      const tagW = ctx.measureText(tagText).width + 20;
+      const tagH = 30;
       const tagX = width - marginX - tagW;
-      const tagY = headerTopY + 28;
+      const tagY = headerTopY + 20;
 
       ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
       ctx.beginPath();
       ctx.roundRect(tagX, tagY, tagW, tagH, 8);
       ctx.fill();
-      ctx.strokeStyle = highlightColor;
+      ctx.strokeStyle = ringColor;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      ctx.fillStyle = highlightColor;
+      ctx.fillStyle = ringColor;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(tagText, tagX + tagW / 2, tagY + tagH / 2 + 1);
@@ -2280,7 +2315,7 @@ async function generateFeedPostOverlay(handle, options = {}) {
 
       // 5. Punchy Viral Hook Headline with Theme Highlight
       ctx.save();
-      ctx.font = '900 48px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+      ctx.font = `800 ${fontSize}px Arial, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
       ctx.textBaseline = 'top';
       const spaceWidth = ctx.measureText(' ').width;
 
@@ -2288,8 +2323,17 @@ async function generateFeedPostOverlay(handle, options = {}) {
         let currentX = marginX;
         const currentY = headlineY + (lineIdx * lineHeight);
         for (const token of lineTokens) {
-          ctx.fillStyle = token.highlight ? highlightColor : '#FFFFFF';
-          ctx.fillText(token.text, currentX, currentY);
+          if (token.highlight) {
+            ctx.save();
+            ctx.fillStyle = isVideoEssay ? '#CCFF00' : highlightColor;
+            ctx.shadowColor = isVideoEssay ? 'rgba(204, 255, 0, 0.45)' : 'rgba(0, 0, 0, 0.9)';
+            ctx.shadowBlur = 8;
+            ctx.fillText(token.text, currentX, currentY);
+            ctx.restore();
+          } else {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(token.text, currentX, currentY);
+          }
           currentX += ctx.measureText(token.text).width + spaceWidth;
         }
       });
