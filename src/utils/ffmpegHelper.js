@@ -1581,10 +1581,13 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 3. Ergonomic & Responsive Layout
   const marginX = 64;
-  const maxTextWidth = width - (marginX * 2);
-  const avatarSize = 80; // Sleek, modern editorial logo size (was 118px)
-  const spaceAboveVideo = 28; // Clean breathing room right above video card
-  const spaceBetweenHeaderAndHeadline = 22;
+  const maxTextWidth = 820; // Balanced 2-line layout matching viral reel aesthetic
+  const spaceAboveVideo = 30; // Clean breathing room right above video card
+  const spaceBetweenHeaderAndHeadline = 24;
+
+  const headerAlign = options.headerAlign || options.page?.header_align || 'center';
+  const isCentered = headerAlign === 'center';
+  const avatarSize = isCentered ? 72 : 80;
 
   const cleanHeadline = (hookHeadline || 'Breakthrough AI technology is evolving faster than anyone expected')
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
@@ -1594,12 +1597,17 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     .replace(/["'“”\s]+$/, '')
     .trim();
 
-  // Responsive headline font: 32px for long titles (>13 words / >70 chars), 35px for standard
+  // Responsive headline font: 44px default for punchy 2-line hooks, scaling gracefully for long text
   const wordsCount = cleanHeadline.split(/\s+/).length;
-  const fontSize = (wordsCount > 13 || cleanHeadline.length > 70) ? 32 : 35;
-  const lineHeight = fontSize + 12; // 44px to 47px clean vertical rhythm
+  let fontSize = 44;
+  if (cleanHeadline.length > 90 || wordsCount > 18) {
+    fontSize = 34;
+  } else if (cleanHeadline.length > 76 || wordsCount > 15) {
+    fontSize = 38;
+  }
+  const lineHeight = Math.round(fontSize * 1.28); // 44px-56px clean vertical rhythm
 
-  ctx.font = `800 ${fontSize}px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif`;
+  ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
 
   const tokens = parseHeadlineTokens(cleanHeadline);
   const lines = wrapTokens(ctx, tokens, maxTextWidth);
@@ -1637,9 +1645,6 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     headlineY = headerTopY + avatarSize + spaceBetweenHeaderAndHeadline;
   }
 
-  // Circular Logo Avatar (80px diameter)
-  const avatarCenter = marginX + avatarSize / 2;
-  const avatarCenterY = headerTopY + avatarSize / 2;
   const brandingDir = path.join(__dirname, '..', '..', 'public', 'branding');
   const candidateAvatarPaths = [
     options.avatarPath,
@@ -1656,92 +1661,175 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   ].filter(Boolean);
 
   const existingAvatarPath = candidateAvatarPaths.find(p => fs.existsSync(p));
-
-  // Solid dark backdrop for avatar circle
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#08080A';
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
-  ctx.closePath();
-  ctx.clip();
-
-  if (existingAvatarPath) {
-    try {
-      const avatarImg = await loadImage(existingAvatarPath);
-      ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
-    } catch (e) {
-      console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
-    }
-  } else {
-    // Dynamic Modern Monogram based on actual page name
-    const bgGrad = ctx.createLinearGradient(marginX, headerTopY, marginX + avatarSize, headerTopY + avatarSize);
-    bgGrad.addColorStop(0, '#1E1E24');
-    bgGrad.addColorStop(1, '#0A0A0F');
-    ctx.fillStyle = bgGrad;
-    ctx.fill();
-
-    const words = (pageName || 'Channel').trim().split(/\s+/);
-    const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
-
-    ctx.fillStyle = '#CCFF00'; // Cult signature electric lime
-    ctx.font = '900 32px RobotoBlack, "Arial Black", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(initials, avatarCenter, avatarCenterY);
-  }
-  ctx.restore();
-
-  // Signature Cult Neon Lime Double Glow Border Ring
-  const highlightColor = options.highlightColor || '#CCFF00'; // High-Energy Cyber/Electric Lime
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
-  ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = 2.5;
-  ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
-  ctx.shadowBlur = 12;
-  ctx.stroke();
-  ctx.restore();
-
-  // Page Name + Verified Badge
-  const textLeftX = marginX + avatarSize + 18;
-  ctx.save();
-  ctx.font = 'bold 28px RobotoBold, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textBaseline = 'middle';
-  const nameCenterY = headerTopY + 26;
-  ctx.fillText(pageName, textLeftX, nameCenterY);
-
-  const rawNameWidth = ctx.measureText(pageName).width;
-  const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 400) ? rawNameWidth : 220;
-  const badgeSize = 20;
-  drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, nameCenterY - (badgeSize / 2), badgeSize);
-
-  // Handle below name
-  ctx.font = '500 20px RobotoMedium, "Liberation Sans", "DejaVu Sans", Arial, sans-serif';
-  ctx.fillStyle = '#A1A1AA'; // Sleek zinc silver
-  ctx.textBaseline = 'middle';
-  const handleCenterY = headerTopY + 56;
+  const highlightColor = options.highlightColor || '#CCFF00'; // High-Energy Cult Electric Lime
   const rawHandle = options.page?.handle || cleanHandle;
   const displayHandle = rawHandle.startsWith('@') ? rawHandle : `@${rawHandle.replace(/^@+/, '')}`;
-  ctx.fillText(displayHandle, textLeftX, handleCenterY);
-  ctx.restore();
 
-  // 4. Punchy Viral Headline / Hook with Brand Color Word Highlighting
+  if (isCentered) {
+    // 5A. Centered Middle Header: [ (Cult Logo)  @cult_information  ✔ ]
+    ctx.font = 'bold 26px "Segoe UI", Roboto, Arial, sans-serif';
+    const handleW = ctx.measureText(displayHandle).width;
+    const badgeSize = 20;
+    const gap = 14;
+    const totalHeaderW = avatarSize + gap + handleW + 10 + badgeSize;
+    const headerStartX = Math.round((width - totalHeaderW) / 2);
+
+    const avatarX = headerStartX;
+    const avatarY = headerTopY;
+    const avatarCenter = avatarX + avatarSize / 2;
+    const avatarCenterY = avatarY + avatarSize / 2;
+
+    // Solid dark backdrop
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#08080A';
+    ctx.fill();
+    ctx.restore();
+
+    // Signature Cult Neon Lime Double Glow Border Ring
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
+    ctx.strokeStyle = highlightColor;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.restore();
+
+    // Circular Avatar with internal padding (8%) so "CULT INFORMATION" text is 100% visible and never clipped!
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 - 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+
+    if (existingAvatarPath) {
+      try {
+        const avatarImg = await loadImage(existingAvatarPath);
+        const pad = Math.round(avatarSize * 0.08);
+        ctx.drawImage(avatarImg, avatarX + pad, avatarY + pad, avatarSize - pad * 2, avatarSize - pad * 2);
+      } catch (e) {
+        console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
+      }
+    } else {
+      const bgGrad = ctx.createLinearGradient(avatarX, avatarY, avatarX + avatarSize, avatarY + avatarSize);
+      bgGrad.addColorStop(0, '#1E1E24');
+      bgGrad.addColorStop(1, '#0A0A0F');
+      ctx.fillStyle = bgGrad;
+      ctx.fill();
+
+      const words = (pageName || 'Channel').trim().split(/\s+/);
+      const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
+      ctx.fillStyle = '#CCFF00';
+      ctx.font = '900 30px "Arial Black", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials, avatarCenter, avatarCenterY);
+    }
+    ctx.restore();
+
+    // Centered Handle + Blue Verified Badge
+    ctx.save();
+    ctx.font = 'bold 26px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'middle';
+    const textX = avatarX + avatarSize + gap;
+    ctx.fillText(displayHandle, textX, avatarCenterY);
+    drawVerifiedBadge(ctx, textX + handleW + 10, avatarCenterY - (badgeSize / 2), badgeSize);
+    ctx.restore();
+  } else {
+    // 5B. Left-Aligned Header: [ (Cult Logo) ]  Cult Information ✔ / @cult_information
+    const avatarX = marginX;
+    const avatarY = headerTopY;
+    const avatarCenter = avatarX + avatarSize / 2;
+    const avatarCenterY = avatarY + avatarSize / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#08080A';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 + 1, 0, Math.PI * 2);
+    ctx.strokeStyle = highlightColor;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.75)';
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarCenter, avatarCenterY, avatarSize / 2 - 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+
+    if (existingAvatarPath) {
+      try {
+        const avatarImg = await loadImage(existingAvatarPath);
+        const pad = Math.round(avatarSize * 0.08);
+        ctx.drawImage(avatarImg, avatarX + pad, avatarY + pad, avatarSize - pad * 2, avatarSize - pad * 2);
+      } catch (e) {
+        console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
+      }
+    } else {
+      const bgGrad = ctx.createLinearGradient(avatarX, avatarY, avatarX + avatarSize, avatarY + avatarSize);
+      bgGrad.addColorStop(0, '#1E1E24');
+      bgGrad.addColorStop(1, '#0A0A0F');
+      ctx.fillStyle = bgGrad;
+      ctx.fill();
+
+      const words = (pageName || 'Channel').trim().split(/\s+/);
+      const initials = (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
+      ctx.fillStyle = '#CCFF00';
+      ctx.font = '900 32px "Arial Black", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials, avatarCenter, avatarCenterY);
+    }
+    ctx.restore();
+
+    // Page Name + Verified Badge
+    const textLeftX = marginX + avatarSize + 18;
+    ctx.save();
+    ctx.font = 'bold 28px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'middle';
+    const nameCenterY = headerTopY + 26;
+    ctx.fillText(pageName, textLeftX, nameCenterY);
+
+    const rawNameWidth = ctx.measureText(pageName).width;
+    const nameWidth = (rawNameWidth && rawNameWidth > 50 && rawNameWidth < 400) ? rawNameWidth : 220;
+    const badgeSize = 20;
+    drawVerifiedBadge(ctx, textLeftX + nameWidth + 10, nameCenterY - (badgeSize / 2), badgeSize);
+
+    // Handle below name
+    ctx.font = '500 20px "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.fillStyle = '#A1A1AA';
+    const handleCenterY = headerTopY + 56;
+    ctx.fillText(displayHandle, textLeftX, handleCenterY);
+    ctx.restore();
+  }
+
+  // 6. Punchy Viral Headline - Center-Aligned with Cult Electric Lime Highlighting
   ctx.save();
-  ctx.font = `800 ${fontSize}px RobotoBlack, "Liberation Sans", "DejaVu Sans", Arial, sans-serif`;
+  ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
   ctx.textBaseline = 'top';
   const spaceWidth = ctx.measureText(' ').width;
 
   lines.forEach((lineTokens, lineIdx) => {
-    let currentX = marginX;
+    let lineWidth = 0;
+    for (let i = 0; i < lineTokens.length; i++) {
+      lineWidth += ctx.measureText(lineTokens[i].text).width + (i > 0 ? spaceWidth : 0);
+    }
+    let currentX = Math.round((width - lineWidth) / 2);
     const currentY = headlineY + (lineIdx * lineHeight);
+
     for (const token of lineTokens) {
       if (token.highlight) {
         ctx.save();
@@ -2225,7 +2313,8 @@ async function generateFeedPostOverlay(handle, options = {}) {
       if (existingAvatarPath) {
         try {
           const avatarImg = await loadImage(existingAvatarPath);
-          ctx.drawImage(avatarImg, marginX, headerTopY, avatarSize, avatarSize);
+          const pad = isVideoEssay ? Math.round(avatarSize * 0.08) : 0;
+          ctx.drawImage(avatarImg, marginX + pad, headerTopY + pad, avatarSize - pad * 2, avatarSize - pad * 2);
         } catch (e) {
           console.warn('[FFmpeg Helper] Avatar image load error:', e.message);
         }
@@ -2320,7 +2409,11 @@ async function generateFeedPostOverlay(handle, options = {}) {
       const spaceWidth = ctx.measureText(' ').width;
 
       lines.forEach((lineTokens, lineIdx) => {
-        let currentX = marginX;
+        let lineWidth = 0;
+        for (let i = 0; i < lineTokens.length; i++) {
+          lineWidth += ctx.measureText(lineTokens[i].text).width + (i > 0 ? spaceWidth : 0);
+        }
+        let currentX = isVideoEssay ? Math.round((width - lineWidth) / 2) : marginX;
         const currentY = headlineY + (lineIdx * lineHeight);
         for (const token of lineTokens) {
           if (token.highlight) {
