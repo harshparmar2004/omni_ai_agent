@@ -1259,8 +1259,38 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 /**
+ * Calculates optimal brand highlight count based on headline word length
+ * Ensures generous brand color proportion:
+ * - 4 to 6 words: 2 highlighted words (~35-50%)
+ * - 7 to 8 words: 3 highlighted words (~38-43%)
+ * - 9 to 11 words: 4 highlighted words (~36-44%)
+ * - 12 to 14 words: 5 highlighted words (~36-42%)
+ * - 15+ words: 6 highlighted words (capped at 6)
+ */
+function getTargetHighlightCount(totalWords) {
+  if (totalWords <= 3) return Math.min(1, totalWords);
+  if (totalWords <= 6) return 2;
+  if (totalWords <= 8) return 3;
+  if (totalWords <= 11) return 4;
+  if (totalWords <= 14) return 5;
+  return Math.min(6, Math.max(5, Math.round(totalWords * 0.38)));
+}
+
+/**
+ * Checks if a token can be highlighted without creating a run of more than maxRun adjacent highlights
+ */
+function canHighlightWithoutExceedingMaxRun(tokens, idx, maxRun = 2) {
+  let left = 0;
+  for (let i = idx - 1; i >= 0 && tokens[i]?.highlight; i--) left++;
+  let right = 0;
+  for (let i = idx + 1; i < tokens.length && tokens[i]?.highlight; i++) right++;
+  return (left + 1 + right) <= maxRun;
+}
+
+/**
  * Tokenizes headline text supporting explicit markdown (**highlighted**)
- * as well as smart automatic keyword/number highlighting in brand colors.
+ * as well as smart automatic keyword/number highlighting in Cult brand colors (#CCFF00).
+ * Guarantees balanced, dynamic color highlighting across all new reels.
  */
 function parseHeadlineTokens(rawHeadline) {
   if (!rawHeadline) return [];
@@ -1273,6 +1303,24 @@ function parseHeadlineTokens(rawHeadline) {
     .replace(/^["'“”\s]+/, '')
     .replace(/["'“”\s]+$/, '')
     .trim();
+
+  const stopWords = new Set([
+    'a','an','the','about','above','after','again','against','all','also','and','any',
+    'are','as','at','be','because','been','before','being','below','between','both',
+    'but','by','came','can','cant','cannot','come','could','did','do','does','doing',
+    'down','during','each','even','ever','every','for','from','further','get','got',
+    'had','has','have','having','he','her','here','hers','herself','him','himself',
+    'his','how','i','if','in','into','is','it','its','itself','just','leave','let',
+    'me','more','most','much','my','myself','no','nor','not','of','off','on','once',
+    'only','or','other','ought','our','ours','ourselves','out','over','own','same',
+    'she','should','so','some','someone','something','started','such','than','that',
+    'theirs','them','themselves','then','there','these','they','this','those',
+    'through','to','too','under','until','up','very','was','wasnt','we','were','werent',
+    'what','when','where','which','while','who','whom','why','will','with','wont',
+    'would','wouldnt','you','your','yours','yourself','yourselves'
+  ]);
+
+  const viralPattern = /^(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|hundred|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|robotic|arms|algae|beat|players|table|tennis|moves|move|revolution|future|underground|ocean|antarctic|human|quantum|overheating|supercluster|living|organism|organisms|brain|engine|supercomputer|discovery|discovered|intelligence)$/i;
 
   const hasExplicitMarkup = /\*\*.*?\*\*|\*.*?\*|<hl>.*?<\/hl>/.test(clean);
   const tokens = [];
@@ -1297,53 +1345,103 @@ function parseHeadlineTokens(rawHeadline) {
         tokens.push({ text: match[0], highlight: false });
       }
     }
-  } else {
-    // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words (up to 3 words)
-    const words = clean.split(/\s+/);
-    let highlightCount = 0;
-    const maxAutoHighlights = 3;
-    const viralPattern = /^(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\d+[-a-zA-Z0-9]+|world's|first|secret|secrets|unveiled|revealed|exposed|shocking|banned|billionaires|billionaire|anthem|satire|record|million|billion|trillion|hundred|blackwell|breakthrough|warning|mystery|truth|danger|leaked|classified|impossible|ai|robot|robots|robotic|arms|algae|beat|players|table|tennis|moves|revolution|future|underground|ocean|antarctic|human|quantum|overheating|supercluster)$/i;
 
-    const stopWords = new Set([
-      'about','above','after','again','against','all','also','and','any','because','been',
-      'before','being','below','between','both','came','come','could','doing','down',
-      'during','each','even','ever','every','from','further','great','have','having',
-      'here','into','just','leave','more','most','much','never','only','other','over',
-      'same','should','some','someone','something','started','such','than','that','their',
-      'theirs','them','then','there','these','they','thing','things','this','those',
-      'through','under','until','very','what','when','where','which','while','with',
-      'would','your','yours'
-    ]);
+    // Dynamic brand color augmentation:
+    // If explicit markup highlighted fewer words than targetHighlights, augment key content words!
+    let currentHighlights = tokens.filter(t => t.highlight).length;
+    const targetHighlights = getTargetHighlightCount(tokens.length);
 
-    // Pass 1: Check viral pattern and numbers
-    const tokenList = words.map(w => {
-      const cleanW = w.replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9%]+$/g, '');
-      const shouldHighlight = highlightCount < maxAutoHighlights && viralPattern.test(cleanW);
-      if (shouldHighlight) highlightCount++;
-      return { text: w, highlight: shouldHighlight, clean: cleanW.toLowerCase() };
-    });
-
-    // Pass 2: If fewer than 2 words were highlighted, guarantee 2-3 semantic content words get brand lime highlight!
-    if (highlightCount < 2) {
+    if (currentHighlights < targetHighlights) {
       const candidates = [];
-      tokenList.forEach((t, idx) => {
-        if (!t.highlight && t.clean.length >= 5 && !stopWords.has(t.clean)) {
-          candidates.push({ idx, length: t.clean.length });
+      tokens.forEach((t, idx) => {
+        if (!t.highlight) {
+          const cleanW = t.text.replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9%]+$/g, '');
+          const lower = cleanW.toLowerCase();
+          let score = cleanW.length;
+          if (viralPattern.test(cleanW)) score += 100;
+          if (stopWords.has(lower)) score = -100;
+          if (cleanW.length < 3) score = -50;
+          if (cleanW && cleanW[0] === cleanW[0].toUpperCase() && cleanW[0] !== cleanW[0].toLowerCase()) score += 10;
+          if (score > 0) {
+            candidates.push({ idx, score, text: t.text });
+          }
         }
       });
-      // Sort candidates by length descending to pick the most impactful words
-      candidates.sort((a, b) => b.length - a.length);
+
+      candidates.sort((a, b) => b.score - a.score);
+
+      // Pass A: Candidates that do not exceed maxRun of 2 consecutive highlights
       for (const cand of candidates) {
-        if (highlightCount >= maxAutoHighlights) break;
-        // Don't highlight adjacent words unless no other options
-        const isAdjacent = tokenList.some((t, i) => t.highlight && Math.abs(i - cand.idx) <= 1);
-        if (!isAdjacent || candidates.length <= 2) {
+        if (currentHighlights >= targetHighlights) break;
+        if (canHighlightWithoutExceedingMaxRun(tokens, cand.idx, 2)) {
+          tokens[cand.idx].highlight = true;
+          currentHighlights++;
+        }
+      }
+
+      // Pass B: If still under target, pick remaining candidates
+      if (currentHighlights < targetHighlights) {
+        for (const cand of candidates) {
+          if (currentHighlights >= targetHighlights) break;
+          if (!tokens[cand.idx].highlight) {
+            tokens[cand.idx].highlight = true;
+            currentHighlights++;
+          }
+        }
+      }
+    }
+  } else {
+    // Smart auto-highlighting: numbers, currencies, percentages, and high-impact viral trigger words
+    const words = clean.split(/\s+/);
+    const targetHighlights = getTargetHighlightCount(words.length);
+    let highlightCount = 0;
+
+    const tokenList = words.map(w => {
+      const cleanW = w.replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9%]+$/g, '');
+      return { text: w, highlight: false, cleanW, lower: cleanW.toLowerCase() };
+    });
+
+    // Score all words
+    const candidates = [];
+    tokenList.forEach((t, idx) => {
+      let score = t.cleanW.length;
+      if (viralPattern.test(t.cleanW)) score += 100;
+      if (stopWords.has(t.lower)) score = -100;
+      if (t.cleanW.length < 3) score = -50;
+      if (t.cleanW && t.cleanW[0] === t.cleanW[0].toUpperCase() && t.cleanW[0] !== t.cleanW[0].toLowerCase()) score += 10;
+      if (score > 0) candidates.push({ idx, score });
+    });
+
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Pass 1: High-scoring candidates respecting maxRun of 2
+    for (const cand of candidates) {
+      if (highlightCount >= targetHighlights) break;
+      if (canHighlightWithoutExceedingMaxRun(tokenList, cand.idx, 2)) {
+        tokenList[cand.idx].highlight = true;
+        highlightCount++;
+      }
+    }
+
+    // Pass 2: Remaining candidates if needed
+    if (highlightCount < targetHighlights) {
+      for (const cand of candidates) {
+        if (highlightCount >= targetHighlights) break;
+        if (!tokenList[cand.idx].highlight) {
           tokenList[cand.idx].highlight = true;
           highlightCount++;
         }
       }
-      if (highlightCount === 0 && tokenList.length >= 3) {
-        tokenList[tokenList.length - 2].highlight = true;
+    }
+
+    // Pass 3: Safety guarantee for short headlines
+    if (highlightCount < Math.min(2, tokenList.length)) {
+      for (let i = tokenList.length - 1; i >= 0; i--) {
+        if (highlightCount >= Math.min(2, tokenList.length)) break;
+        if (!tokenList[i].highlight && !stopWords.has(tokenList[i].lower)) {
+          tokenList[i].highlight = true;
+          highlightCount++;
+        }
       }
     }
 

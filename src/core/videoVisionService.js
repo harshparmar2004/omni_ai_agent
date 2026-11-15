@@ -98,7 +98,7 @@ async function callGeminiVision(imagePath, apiKey) {
 
   const prompt = `Analyze this video frame from a social media reel (1080x1920 layout).
 1. "headline": Check if there is an on-screen title, hook, or headline text displayed on the screen (such as at the top or above the video content). If yes, extract that EXACT title or hook text. If not, write an ultra-catchy 8-12 word hook based on what is happening in the video.
-2. Identify 1 to 3 of the most impactful keywords, numbers, or terms in the headline. Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "Scientists Made The First **Living Thing** Built For **Mars**").
+2. Identify 2 to 5 of the most impactful keywords, numbers, or terms in the headline (~35-40% of words). Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "These **Robotic Arms** Are Powered By **Algae**. Watch How They **Move**").
 3. "topicBreakdown": Write a concise, 2-sentence high-energy explanation of this topic for an Instagram caption post body.
 4. "hasCompetitorHeader": Is there existing text, title, or account branding in the top area (above the video)? (true/false)
 
@@ -280,7 +280,8 @@ async function localOcrHeadlineDetection(framePath) {
     const wordCount = title.split(/\s+/).length;
     const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
     if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
-      // Smart brand highlighting on numbers, percentages, and high-impact viral words (2 to 3 highlights)
+      // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
+      const targetHighlights = Math.max(2, Math.min(6, Math.round(wordCount * 0.38)));
       let highlightedTitle = title;
       highlightedTitle = highlightedTitle.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion|hundred)\b)/gi, '**$1**');
 
@@ -289,7 +290,7 @@ async function localOcrHeadlineDetection(framePath) {
       const hlMatches = [...title.matchAll(viralPattern)];
       let appliedCount = (highlightedTitle.match(/\*\*[^*]+\*\*/g) || []).length;
       for (const m of hlMatches) {
-        if (appliedCount >= 3) break;
+        if (appliedCount >= targetHighlights) break;
         const term = m[0];
         if (!highlightedTitle.includes(`**${term}**`)) {
           highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${term}\\b`, 'g'), `**${term}**`);
@@ -297,13 +298,16 @@ async function localOcrHeadlineDetection(framePath) {
         }
       }
 
-      // If still fewer than 2 highlights, highlight top content words (>= 6 chars)
-      if (appliedCount < 2) {
+      // If still fewer than targetHighlights, highlight top content words (>= 4 chars, non-stopwords)
+      if (appliedCount < targetHighlights) {
         const words = title.split(/\s+/);
-        const candidates = words.filter(w => w.length >= 6 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would|these|those)$/i.test(w));
+        const candidates = words.filter(w => {
+          const cleanW = w.replace(/[^a-zA-Z0-9]/g, '');
+          return cleanW.length >= 4 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would|these|those|there|their|watch|with|from|have|been|that|this)$/i.test(cleanW);
+        });
         candidates.sort((a, b) => b.length - a.length);
         for (const cand of candidates) {
-          if (appliedCount >= 2) break;
+          if (appliedCount >= targetHighlights) break;
           const cleanCand = cand.replace(/[^a-zA-Z0-9]/g, '');
           if (cleanCand && !highlightedTitle.includes(`**${cleanCand}**`)) {
             highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${cleanCand}\\b`, 'g'), `**${cleanCand}**`);

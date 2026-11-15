@@ -326,4 +326,41 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       if (fs.existsSync(tmpFrame)) fs.unlinkSync(tmpFrame);
     }
   });
+
+  await t.test('12. Dynamic Cult Electric Lime Color Highlighting Across Short & Long Reel Headlines', () => {
+    const { parseHeadlineTokens } = require('../src/utils/ffmpegHelper');
+
+    // 1. Low word count (5 words): must highlight 2 words (~40%)
+    const shortHeadline = 'Brain Chips Are Now Reality';
+    const shortTokens = parseHeadlineTokens(shortHeadline);
+    const shortHighlights = shortTokens.filter(t => t.highlight);
+    assert.equal(shortHighlights.length, 2, '5-word headline must have 2 words highlighted in Cult color theme');
+
+    // 2. Medium word count (7 words): must highlight 3 words (~43%)
+    const medHeadline = 'Mystery Of The 2000-Year-Old Greek Computer Solved';
+    const medTokens = parseHeadlineTokens(medHeadline);
+    const medHighlights = medTokens.filter(t => t.highlight);
+    assert.equal(medHighlights.length, 3, '7-word headline must have 3 words highlighted in Cult color theme');
+
+    // 3. Standard headline with explicit markup but only 1 highlighted word: must augment to 4 words (~36%)
+    const singleMarked = 'These Robotic Arms Are powered by **Algae**. Watch How They Move';
+    const singleTokens = parseHeadlineTokens(singleMarked);
+    const singleHighlights = singleTokens.filter(t => t.highlight);
+    assert.equal(singleHighlights.length, 4, '11-word headline must augment to 4 words highlighted in Cult color theme');
+    assert.ok(singleHighlights.some(t => t.text.includes('Algae')), 'Must preserve original highlighted word');
+    assert.ok(singleHighlights.some(t => t.text.includes('Robotic')), 'Must augment with high-impact keyword Robotic');
+
+    // 4. Long headline (17 words): must highlight 6 words in Cult color theme
+    const longHeadline = 'China Built The World\'s First AI Hospital Town Where Patients Are Treated By Robots In Real Time';
+    const longTokens = parseHeadlineTokens(longHeadline);
+    const longHighlights = longTokens.filter(t => t.highlight);
+    assert.equal(longHighlights.length, 6, '17-word headline must highlight 6 words in Cult color theme');
+
+    // 5. No consecutive 3-word highlight run (max run <= 2) to maintain typography aesthetics
+    for (let i = 0; i < longTokens.length - 2; i++) {
+      const threeInARow = longTokens[i].highlight && longTokens[i + 1].highlight && longTokens[i + 2].highlight;
+      assert.ok(!threeInARow, 'Must never create 3 consecutive highlighted words in a row');
+    }
+  });
 });
+
