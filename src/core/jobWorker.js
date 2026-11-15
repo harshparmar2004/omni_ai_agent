@@ -78,6 +78,22 @@ class JobWorkerPool {
           continue;
         }
 
+        // Anti-Spam Velocity Guardrail: Enforce minimum interval between published posts per page
+        // Prevents rapid burst publishing from triggering Meta algorithmic shadowbans (default: 4 hours)
+        const minHours = parseFloat(getSetting('min_publish_interval_hours', '4') || '4');
+        if (minHours > 0) {
+          const lastPub = getLastPublishedTimestamp(job.page_id);
+          if (lastPub) {
+            const elapsedMs = Date.now() - new Date(lastPub).getTime();
+            const minMs = minHours * 60 * 60 * 1000;
+            if (elapsedMs < minMs) {
+              const remainingMin = Math.round((minMs - elapsedMs) / 60000);
+              console.log(`[Job Worker] ⏳ Velocity Guardrail: Page #${job.page_id} published ${Math.round(elapsedMs / 60000)}m ago. Waiting ${remainingMin}m to protect account trust.`);
+              continue;
+            }
+          }
+        }
+
         // Lock page and process job asynchronously
         this.activePages.add(job.page_id);
         this.processJob(job.id).finally(() => {
