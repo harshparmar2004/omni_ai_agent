@@ -147,6 +147,7 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
         upload_type: 'resumable',
         caption: caption,
         thumb_offset: 1500,
+        share_to_feed: true,
         access_token: token
       };
       const rRes = await axios.post(`${baseUrl}/${igUserId}/media`, null, {
@@ -190,6 +191,7 @@ async function publishReel({ page, videoPath, caption, coverPath = null, onProgr
       video_url: publicVideoUrl,
       caption: caption,
       thumb_offset: 1500,
+      share_to_feed: true,
       is_ai_generated: false,
       access_token: token
     };
