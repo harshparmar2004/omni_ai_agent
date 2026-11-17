@@ -182,6 +182,40 @@ Respond ONLY with valid JSON:
 }
 
 /**
+ * Detects whether an extracted OCR string is a tabular spec sheet, pricing matrix,
+ * or benchmark runtime log rather than an editorial headline hook.
+ */
+function isTabularOrSpecDebris(text) {
+  if (!text) return true;
+  const clean = text.replace(/[\*<>]+/g, '').trim();
+  const tokens = clean.split(/\s+/).filter(Boolean);
+  if (tokens.length < 3) return true;
+
+  // 1. Multiple currency markers (e.g. $81.10 ... $45.97)
+  const currencyMatches = clean.match(/[\$€£¥]\s*\d/g) || [];
+  if (currencyMatches.length >= 2) return true;
+
+  // 2. Multiple duration/timestamp units (e.g. 1 hs 56m 52s ... 3 h 11m 26s)
+  const durationMatches = clean.match(/\b(?:\d+\s*(?:hs?|hrs?|mins?|secs?|[hms])(?:\b|\d))\b/gi) || [];
+  if (durationMatches.length >= 2) return true;
+
+  // 3. High numeric/unit density: if > 35% of tokens are numbers, decimals, or units
+  const numericTokens = tokens.filter(t => /^[\$€£¥]?\d+(?:[\.,]\d+)*(?:[%xXkKmMbBtT]|th|rd|st|nd|[hms])?$/i.test(t));
+  if (numericTokens.length / tokens.length > 0.35) return true;
+
+  // 4. Multiple version numbers (e.g. 5.2 ... 5.5) combined with model names
+  const versionMatches = clean.match(/\b\d+\.\d+\b/g) || [];
+  if (versionMatches.length >= 2 && numericTokens.length >= 3) return true;
+
+  // 5. Benchmark or cost keywords combined with numbers
+  if (/\b(?:benchmark|latency|throughput|pricing|runtime|cost per|tokens\/s)\b/i.test(clean) && numericTokens.length >= 2) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Local offline OCR fallback using Tesseract.js & canvas cropping
  * Requires zero API keys and runs 100% locally.
  */
@@ -277,13 +311,20 @@ async function localOcrHeadlineDetection(framePath) {
     title = title.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
     title = title.replace(/[\s.,;:!\-—|§°_~>#+=&\\\/]+$/, '').trim();
 
+    // Reject tabular data, benchmark spec sheets, and price lists
+    if (isTabularOrSpecDebris(title)) {
+      console.log(`[Video Vision] ⚠️ Discarded OCR title as tabular/benchmark spec data ("${title}"). Falling back to editorial hook synthesis.`);
+      return null;
+    }
+
     const wordCount = title.split(/\s+/).length;
     const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
     if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
       // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
       const targetHighlights = Math.max(2, Math.min(6, Math.round(wordCount * 0.38)));
       let highlightedTitle = title;
-      highlightedTitle = highlightedTitle.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion|hundred)\b)/gi, '**$1**');
+      // Word-boundary safe number/unit highlighting: prevents matching inside glued alphanumeric tokens
+      highlightedTitle = highlightedTitle.replace(/(?<=\s|^)(\$?\d[\d,\.]*(?:[%xXkKmMbBtT]|th|rd|st|nd)?|\b(?:billion|million|trillion|hundred)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
 
       const viralPattern = /\b(Robotic Arms|Table Tennis|Human Pro|World's First|Living Thing|Deep Knowledge|Robotic|Robot|Robots|Algae|Neural|AI|Beat|Players|Human|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Underground|Ocean|Antarctic|Discovery|Discovered|Intelligence)\b/gi;
 
@@ -316,10 +357,19 @@ async function localOcrHeadlineDetection(framePath) {
         }
       }
 
+      // Clean touching markdown boundaries
+      highlightedTitle = highlightedTitle
+        .replace(/\*{4,}/g, '** **')
+        .replace(/\*{3}/g, '**')
+        .replace(/([a-zA-Z0-9$%])\*\*([^\s*]+)/g, '$1 **$2')
+        .replace(/([^\s*]+)\*\*([a-zA-Z0-9$%])/g, '$1** $2')
+        .replace(/\s+/g, ' ')
+        .trim();
+
       return {
         hasTitle: true,
         headline: highlightedTitle,
-        rawTitle: title
+        rawTitle: title.replace(/[\*<>]+/g, '').trim()
       };
     }
     return null;
@@ -429,17 +479,17 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with Gemini Vision OCR...`);
           const result = await callGeminiVision(framePath, geminiKey);
           const hCandidate = result?.headline?.trim() || '';
-          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate);
+          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
           if (result && result.hasTitle && isHValid) {
             let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {
-              cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+              cleanHeadline = cleanHeadline.replace(/(?<=\s|^)(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
             }
             console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
             return {
               found: true,
               headline: cleanHeadline,
-              rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
+              rawTitle: (result.rawTitle || cleanHeadline).replace(/[\*<>]+/g, '').trim(),
               breakdown: result.topicBreakdown || '',
               hasCompetitorHeader: Boolean(result.hasCompetitorHeader),
               provider: 'gemini_vision'
@@ -456,17 +506,17 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with OpenAI Vision...`);
           const result = await callOpenAiVision(framePath, openAiKey);
           const hCandidate = result?.headline?.trim() || '';
-          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate);
+          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
           if (result && result.hasTitle && isHValid) {
             let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {
-              cleanHeadline = cleanHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+              cleanHeadline = cleanHeadline.replace(/(?<=\s|^)(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
             }
             console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
             return {
               found: true,
               headline: cleanHeadline,
-              rawTitle: result.rawTitle || cleanHeadline.replace(/\*\*/g, ''),
+              rawTitle: (result.rawTitle || cleanHeadline).replace(/[\*<>]+/g, '').trim(),
               provider: 'openai_vision'
             };
           }
@@ -484,7 +534,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
           return {
             found: true,
             headline: localResult.headline,
-            rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
+            rawTitle: (localResult.rawTitle || localResult.headline).replace(/[\*<>]+/g, '').trim(),
             hasCompetitorHeader: true,
             provider: 'local_ocr'
           };

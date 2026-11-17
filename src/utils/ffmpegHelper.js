@@ -1294,7 +1294,7 @@ function canHighlightWithoutExceedingMaxRun(tokens, idx, maxRun = 2) {
  */
 function parseHeadlineTokens(rawHeadline) {
   if (!rawHeadline) return [];
-  const clean = rawHeadline
+  let clean = rawHeadline
     .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu, '')
     .replace(/\n+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -1303,6 +1303,17 @@ function parseHeadlineTokens(rawHeadline) {
     .replace(/^["'“”\s]+/, '')
     .replace(/["'“”\s]+$/, '')
     .trim();
+
+  // Normalize touching markdown boundaries:
+  // 1. Quad asterisks or more: `****` -> `** **` (e.g. `**56m****52s**` -> `**56m** **52s**`)
+  clean = clean.replace(/\*{4,}/g, '** **');
+  // 2. Triple asterisks: `***` -> `**`
+  clean = clean.replace(/\*{3}/g, '**');
+  // 3. Glued opening asterisks preceded by alphanumeric: `hs**56m` -> `hs **56m`
+  clean = clean.replace(/([a-zA-Z0-9$%])\*\*([^\s*]+)/g, '$1 **$2');
+  // 4. Glued closing asterisks followed by alphanumeric: `56m**next` -> `56m** next`
+  clean = clean.replace(/([^\s*]+)\*\*([a-zA-Z0-9$%])/g, '$1** $2');
+  clean = clean.replace(/\s+/g, ' ').trim();
 
   const stopWords = new Set([
     'a','an','the','about','above','after','again','against','all','also','and','any',
@@ -1448,7 +1459,17 @@ function parseHeadlineTokens(rawHeadline) {
     tokens.push(...tokenList.map(t => ({ text: t.text, highlight: t.highlight })));
   }
 
-  return tokens;
+  // Absolute typography safety: strip any dangling asterisks or brackets from token text
+  // Guarantees literal asterisks can NEVER be drawn to the canvas under any edge case!
+  const sanitizedTokens = [];
+  for (const t of tokens) {
+    const textClean = t.text.replace(/[\*<>]+/g, '').trim();
+    if (textClean.length > 0) {
+      sanitizedTokens.push({ text: textClean, highlight: t.highlight });
+    }
+  }
+
+  return sanitizedTokens;
 }
 
 function wrapTokens(ctx, tokens, maxWidth) {

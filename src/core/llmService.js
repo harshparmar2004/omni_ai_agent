@@ -234,8 +234,8 @@ function synthesizeOfflineHook(rawText, pageName = '') {
 
   // 5. Wrap high-impact keywords in double asterisks for Cult Lime brand highlight
   if (!candidate.includes('**')) {
-    // Numbers, currencies, percentages, decades (e.g. 80s, 90s) or hyphenated numbers
-    candidate = candidate.replace(/(\$?\d[\d,\.]*(?:[%xXkKmMbBtTsS]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+    // Numbers, currencies, percentages, decades (e.g. 80s, 90s) or hyphenated numbers with safe boundaries
+    candidate = candidate.replace(/(?<=\s|^)(\$?\d[\d,\.]*(?:[%xXkKmMbBtT]|th|rd|st|nd)?(?:-[a-zA-Z0-9]+)?|\b(?:billion|million|trillion)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
     // High-energy viral trigger words
     if (!candidate.includes('**')) {
       const strongWords = candidate.match(/\b(Satire|Anthem|Parody|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Silicon Valley|Unite)\b/i);
@@ -243,6 +243,15 @@ function synthesizeOfflineHook(rawText, pageName = '') {
         candidate = candidate.replace(strongWords[0], `**${strongWords[0]}**`);
       }
     }
+
+    // Clean touching markdown boundaries
+    candidate = candidate
+      .replace(/\*{4,}/g, '** **')
+      .replace(/\*{3}/g, '**')
+      .replace(/([a-zA-Z0-9$%])\*\*([^\s*]+)/g, '$1 **$2')
+      .replace(/([^\s*]+)\*\*([a-zA-Z0-9$%])/g, '$1** $2')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   return candidate;

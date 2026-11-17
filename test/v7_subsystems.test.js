@@ -362,5 +362,32 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       assert.ok(!threeInARow, 'Must never create 3 consecutive highlighted words in a row');
     }
   });
+
+  await t.test('13. Foolproof Headline Asterisk Elimination & Tabular Spec Sheet Debris Rejection', () => {
+    const { parseHeadlineTokens } = require('../src/utils/ffmpegHelper');
+
+    // 1. Problem string from screenshot: glued asterisks and quad stars must NEVER leak into token text
+    const problemInput = 'Claude Fable **5.2** Claude Opus **5.5** **$81.10** **1** hs**56m****52s** **$45.97** **3** h **11m** **26s**';
+    const tokens = parseHeadlineTokens(problemInput);
+
+    // Assert that NO token contains any asterisk characters
+    for (const token of tokens) {
+      assert.ok(!token.text.includes('*'), `Token "${token.text}" must NOT contain any asterisks`);
+      assert.ok(token.text.length > 0, 'Token text must not be empty');
+    }
+
+    // 2. Assert that hs, 56m, and 52s are separated into clean individual tokens
+    const tokenTexts = tokens.map(t => t.text);
+    assert.ok(tokenTexts.includes('hs'), 'Must extract hs as separate token');
+    assert.ok(tokenTexts.includes('56m'), 'Must extract 56m as separate token');
+    assert.ok(tokenTexts.includes('52s'), 'Must extract 52s as separate token');
+
+    // 3. Stray asterisks or triple stars
+    const strayInput = '***Breaking News*** with stray ** asterisks * everywhere';
+    const strayTokens = parseHeadlineTokens(strayInput);
+    for (const token of strayTokens) {
+      assert.ok(!token.text.includes('*'), `Stray token "${token.text}" must not contain any asterisks`);
+    }
+  });
 });
 
