@@ -533,6 +533,24 @@ class JobWorkerPool {
 
       console.log(`[Job Worker] ✅ Job #${job.id} completed! Live at: ${pubResult.permalink}`);
 
+      // ── Step 3d: Standalone Audible Lock-Screen Push Notification ──
+      // Telegram does NOT ring or vibrate for edited messages.
+      // We send a fresh, standalone message to guarantee the user's phone chimes on their lock screen even when asleep!
+      try {
+        const { getSetting } = require('../database');
+        const alertChatId = job.telegram_chat_id || getSetting('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID;
+        if (alertChatId) {
+          const alertMsg =
+            `🎉 <b>REEL IS LIVE ON INSTAGRAM!</b>\n\n` +
+            `📱 <b>Channel:</b> <code>${page.handle}</code> (${escapeHtml(page.name)})\n` +
+            `🌐 <b>Live Reel:</b> <a href="${pubResult.permalink}">${pubResult.permalink}</a>\n\n` +
+            `💡 <i>Autonomous cloud execution complete — posted while phone was locked.</i>`;
+          await notifier.sendTelegramMessage(alertChatId, alertMsg, { disable_notification: false }).catch(() => {});
+        }
+      } catch (pushErr) {
+        console.warn(`[Job Worker] Push alert notice: ${pushErr.message}`);
+      }
+
       // v8 Multi-Tenant Distribution Trigger:
       // If this page belongs to any interconnected distribution groups, fan out to sibling pages!
       try {

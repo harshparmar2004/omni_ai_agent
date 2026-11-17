@@ -116,7 +116,159 @@ async function getPagesList() {
   ];
 }
 
-module.exports = async function handler(req, res) {
+function resolveAutoTargetPage(text = '', requestedId = null) {
+  if (requestedId && ['1', '2', '3', '4'].includes(String(requestedId))) {
+    return String(requestedId);
+  }
+  const lower = (text || '').toLowerCase();
+  if (lower.includes('page:2') || lower.includes('p:2') || lower.includes('@movie_series_365') || /movie|film|series|cinema|netflix|hollywood|trailer|actor|actress|scene|imdb/i.test(lower)) {
+    return '2'; // @movie_series_365
+  }
+  if (lower.includes('page:1') || lower.includes('@gta6_updates_007') || /gta|rockstar|gaming|gameplay/i.test(lower)) {
+    return '1'; // @gta6_updates_007
+  }
+  if (lower.includes('page:3') || lower.includes('@clubbingcult') || /rave|clubbing|party|techno|dj|festival/i.test(lower)) {
+    return '3'; // @clubbingcult
+  }
+  // Default to Cult Information (Page #4, active & healthy token)
+  return '4';
+}
+
+async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId = null, isForce = false }) {
+  const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
+  const pages = await getPagesList();
+  const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Cult Information', handle: '@cult_information', id: '4' };
+
+  const cloudRunUrl = (process.env.CLOUD_RUN_WORKER_URL || process.env.CLOUD_RUN_URL || '').trim().replace(/\/$/, '');
+  const isCloudRun = Boolean(cloudRunUrl);
+
+  const statusText =
+    `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>${isForce ? ' (RE-PUBLISHING)' : ''}\n` +
+    `📱 <b>Destination:</b> <code>${targetPage.handle}</code> (${targetPage.name})\n\n` +
+    `⏳ <b>1. Ingest:</b> ${isForce ? 'Re-publish approved by operator...' : (isCloudRun ? 'Cloud Run worker connecting...' : 'Cloud runner spawned & initializing...')}\n` +
+    `⚪ <b>2. Download:</b> Waiting\n` +
+    `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
+    `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
+    `<i>Status: Running on 24/7 cloud servers (publishes autonomously even if phone is switched off)</i>`;
+
+  // Quick switch destination buttons
+  const otherPages = pages.filter(p => String(p.id) !== String(pageId));
+  const keyboard = [];
+  const switchRow = otherPages.map(p => ({
+    text: `Switch to ${p.handle}`,
+    callback_data: `post:${p.id}:${shortcode}`
+  }));
+  if (switchRow.length > 0) {
+    keyboard.push(switchRow.slice(0, 2));
+    if (switchRow.length > 2) keyboard.push(switchRow.slice(2));
+  }
+  keyboard.push([{ text: '✖ Cancel', callback_data: `cancel:${shortcode}` }]);
+
+  let activeMessageId = messageId;
+  if (activeMessageId) {
+    await editTelegram(chatId, activeMessageId, statusText, {
+      reply_markup: { inline_keyboard: keyboard }
+    });
+  } else {
+    const sent = await sendTelegram(chatId, statusText, {
+      reply_markup: { inline_keyboard: keyboard }
+    });
+    if (sent?.message_id) {
+      activeMessageId = String(sent.message_id);
+    }
+  }
+
+  // 1. Direct Cloud Run Dispatch (if configured)
+  if (cloudRunUrl) {
+    try {
+      console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}... (Force: ${isForce})`);
+      await axios.post(
+        `${cloudRunUrl}/api/reposter/jobs`,
+        {
+          url: url || `https://www.instagram.com/reel/${shortcode}/`,
+          chatId: String(chatId),
+          chat_id: String(chatId),
+          pageId: parseInt(pageId, 10),
+          page_id: parseInt(pageId, 10),
+          messageId: String(activeMessageId || ''),
+          message_id: String(activeMessageId || ''),
+          origin: 'telegram_cloud',
+          force: isForce
+        },
+        { timeout: 10000 }
+      );
+      console.log(`[Webhook] ✓ Successfully dispatched to Cloud Run for #${shortcode}`);
+      return { success: true, runner: 'cloud_run' };
+    } catch (crErr) {
+      console.warn(`[Webhook Cloud Run Warning]: ${crErr.message}. Falling back to GitHub Actions runner...`);
+    }
+  }
+
+  // 2. Trigger Turbocharged GitHub Actions Workflow
+  if (!GITHUB_TOKEN) {
+    if (activeMessageId) {
+      await editTelegram(
+        chatId,
+        activeMessageId,
+        `⚠️ <b>GitHub Token Required</b>\n` +
+        `To allow Vercel to trigger GitHub Actions, please add <code>GH_DISPATCH_TOKEN</code> in your Vercel project environment variables.\n` +
+        `Generate a free token at https://github.com/settings/tokens with 'repo' scope.`
+      );
+    }
+    return { success: false, error: 'no_github_token' };
+  }
+
+  const workflowCandidates = ['393722735', 'repost-job.yml', '.github/workflows/repost-job.yml'];
+  let dispatchSuccess = false;
+  let lastErrDetail = '';
+
+  for (const wf of workflowCandidates) {
+    try {
+      const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+      await axios.post(
+        dispatchUrl,
+        {
+          ref: 'main',
+          inputs: {
+            url: url || `https://www.instagram.com/reel/${shortcode}/`,
+            chat_id: String(chatId),
+            page_id: String(pageId),
+            message_id: String(activeMessageId || ''),
+            force: isForce ? 'true' : 'false'
+          }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${GITHUB_TOKEN}`,
+            Accept: 'application/vnd.github.v3+json',
+            'User-Agent': 'OmniStudio-Vercel-Bridge'
+          },
+          timeout: 15000
+        }
+      );
+
+      console.log(`[Webhook] ✓ GitHub Actions Dispatched via '${wf}' for #${shortcode} on Page #${pageId} (Force: ${isForce})`);
+      dispatchSuccess = true;
+      break;
+    } catch (err) {
+      lastErrDetail = err.response?.data?.message || err.message;
+      console.warn(`[Webhook Dispatch Attempt Failed for '${wf}']: ${lastErrDetail}`);
+    }
+  }
+
+  if (!dispatchSuccess && activeMessageId) {
+    await editTelegram(
+      chatId,
+      activeMessageId,
+      `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\nPlease check your GitHub token permissions (requires 'repo' or 'workflow' scope) or try again.`
+    );
+    return { success: false, error: lastErrDetail };
+  }
+
+  return { success: true, runner: 'github_actions' };
+}
+
+async function handler(req, res) {
   const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
   if (req.method === 'GET') {
     return res.status(200).json({ status: 'active', service: 'OmniStudio Telegram Webhook Bridge v7' });
@@ -190,111 +342,16 @@ module.exports = async function handler(req, res) {
 
     if (action === 'post' || action === 'retry' || action === 'republish') {
       const isForce = action === 'republish';
-      const pageId = parts[1] || '1';
+      const pageId = parts[1] || '4';
       const shortcode = parts[2];
-      const pages = await getPagesList();
-      const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Destination Page', handle: `@page_${pageId}` };
-
-      const cloudRunUrl = (process.env.CLOUD_RUN_WORKER_URL || process.env.CLOUD_RUN_URL || '').trim().replace(/\/$/, '');
-      const isCloudRun = Boolean(cloudRunUrl);
-
-      // Update message with in-place stepper
-      await editTelegram(
+      await dispatchJobToRunner({
+        url: `https://www.instagram.com/reel/${shortcode}/`,
+        shortcode,
+        pageId,
         chatId,
         messageId,
-        `⚡ <b>Agent 1 (Reposter Engine) Engaged:</b> <code>#${shortcode}</code>${isForce ? ' (RE-PUBLISHING)' : ''}\n` +
-        `📱 <b>Destination:</b> <code>${targetPage.handle}</code> (${targetPage.name})\n\n` +
-        `⏳ <b>1. Ingest:</b> ${isForce ? 'Re-publish approved by operator...' : (isCloudRun ? 'Cloud Run worker connecting...' : 'Cloud runner initializing...')}\n` +
-        `⚪ <b>2. Download:</b> Waiting\n` +
-        `⚪ <b>3. AI Hook & Copy:</b> Waiting\n` +
-        `⚪ <b>4. Publishing:</b> Waiting (Reel & Story)\n\n` +
-        `<i>Status: ${isCloudRun ? 'Dispatching to high-speed Cloud Run service...' : 'Spawning cloud runner... (updates in ~15s)'}</i>`
-      );
-
-      // 1. Direct Cloud Run Dispatch (if configured)
-      if (cloudRunUrl) {
-        try {
-          console.log(`[Webhook] Dispatching directly to Cloud Run at ${cloudRunUrl}... (Force: ${isForce})`);
-          await axios.post(
-            `${cloudRunUrl}/api/reposter/jobs`,
-            {
-              url: `https://www.instagram.com/reel/${shortcode}/`,
-              chatId: String(chatId),
-              chat_id: String(chatId),
-              pageId: parseInt(pageId, 10),
-              page_id: parseInt(pageId, 10),
-              messageId: String(messageId),
-              message_id: String(messageId),
-              origin: 'telegram_cloud',
-              force: isForce
-            },
-            { timeout: 10000 }
-          );
-          console.log(`[Webhook] ✓ Successfully dispatched to Cloud Run for #${shortcode}`);
-          return res.status(200).json({ ok: true, runner: 'cloud_run' });
-        } catch (crErr) {
-          console.warn(`[Webhook Cloud Run Warning]: ${crErr.message}. Falling back to GitHub Actions runner...`);
-        }
-      }
-
-      // 2. Trigger Turbocharged GitHub Actions Workflow
-      if (!GITHUB_TOKEN) {
-        await sendTelegram(
-          chatId,
-          `⚠️ <b>GitHub Token Required</b>\n` +
-          `To allow Vercel to trigger GitHub Actions, please add <code>GH_DISPATCH_TOKEN</code> in your Vercel project environment variables.\n` +
-          `Generate a free token at https://github.com/settings/tokens with 'repo' scope.`
-        );
-        return res.status(200).json({ ok: true });
-      }
-
-      // Support candidate workflow identifiers: ID 393722735, repost-job.yml, .github/workflows/repost-job.yml
-      const workflowCandidates = ['393722735', 'repost-job.yml', '.github/workflows/repost-job.yml'];
-      let dispatchSuccess = false;
-      let lastErrDetail = '';
-
-      for (const wf of workflowCandidates) {
-        try {
-          const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
-          await axios.post(
-            dispatchUrl,
-            {
-              ref: 'main',
-              inputs: {
-                url: `https://www.instagram.com/reel/${shortcode}/`,
-                chat_id: String(chatId),
-                page_id: String(pageId),
-                message_id: String(messageId || ''),
-                force: isForce ? 'true' : 'false'
-              }
-            },
-            {
-              headers: {
-                Authorization: `Bearer ${GITHUB_TOKEN}`,
-                Accept: 'application/vnd.github.v3+json',
-                'User-Agent': 'OmniStudio-Vercel-Bridge'
-              },
-              timeout: 15000
-            }
-          );
-
-          console.log(`[Webhook] ✓ GitHub Actions Dispatched via '${wf}' for #${shortcode} on Page #${pageId} (Force: ${isForce}, Message ID: ${messageId})`);
-          dispatchSuccess = true;
-          break;
-        } catch (err) {
-          lastErrDetail = err.response?.data?.message || err.message;
-          console.warn(`[Webhook Dispatch Attempt Failed for '${wf}']: ${lastErrDetail}`);
-        }
-      }
-
-      if (!dispatchSuccess) {
-        await editTelegram(
-          chatId,
-          messageId,
-          `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\nPlease check your GitHub token permissions (requires 'repo' or 'workflow' scope) or try again.`
-        );
-      }
-
+        isForce
+      });
       return res.status(200).json({ ok: true });
     }
 
@@ -462,30 +519,26 @@ module.exports = async function handler(req, res) {
 
   console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
 
-  // Build Interactive Destination Page Selection Keyboard
-  const pages = await getPagesList();
-  const keyboard = [];
-  for (const p of pages) {
-    keyboard.push([
-      { text: `${p.icon || '📱'} Post to ${p.name} (${p.handle})`, callback_data: `post:${p.id}:${shortcode}` }
-    ]);
-  }
-  keyboard.push([
-    { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
-  ]);
+  // Zero-Click Instant Autonomous Cloud Dispatch:
+  // Auto-resolve target page from URL context / caption text
+  const targetPageId = resolveAutoTargetPage(text);
 
-  await sendTelegram(
+  console.log(`[Webhook] Auto-dispatching #${shortcode} to Page #${targetPageId} (Zero-Click Autonomous Trigger)`);
+
+  await dispatchJobToRunner({
+    url: reelUrl,
+    shortcode,
+    pageId: targetPageId,
     chatId,
-    `📥 <b>Instagram Reel Received!</b>\n\n` +
-    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n` +
-    `🎬 <b>Source:</b> <a href="${reelUrl}">${reelUrl}</a>\n\n` +
-    `👉 <b>On which account would you like to post this reel?</b>`,
-    {
-      reply_markup: {
-        inline_keyboard: keyboard
-      }
-    }
-  );
+    messageId: null,
+    isForce: false
+  });
 
-  return res.status(200).json({ ok: true });
-};
+  return res.status(200).json({ ok: true, auto_dispatched: true, pageId: targetPageId });
+}
+
+module.exports = handler;
+module.exports.resolveAutoTargetPage = resolveAutoTargetPage;
+module.exports.dispatchJobToRunner = dispatchJobToRunner;
+module.exports.getPagesList = getPagesList;
+

@@ -389,5 +389,45 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       assert.ok(!token.text.includes('*'), `Stray token "${token.text}" must not contain any asterisks`);
     }
   });
+
+  await t.test('14. Zero-Click Instant Autonomous Cloud Dispatch & Target Resolver', () => {
+    const { resolveAutoTargetPage } = require('../api/telegram-webhook');
+
+    // 1. Plain Instagram URL with no text -> defaults to Page 4 (@cult_information)
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/DEb9X7oTq12/'), '4', 'Plain URL must default to Cult Information (Page 4)');
+
+    // 2. Movie/cinema keywords in shared text -> routes to Page 2 (@movie_series_365)
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Check out this new Netflix movie trailer!'), '2');
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Best scene in cinema history'), '2');
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ New sci-fi series review'), '2');
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ page:2'), '2');
+
+    // 3. Gaming/GTA keywords -> routes to Page 1
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ GTA 6 gameplay leak'), '1');
+
+    // 4. Clubbing/party keywords -> routes to Page 3
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Underground techno rave festival'), '3');
+
+    // 5. Tech/AI/general cult content -> routes to Page 4
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Why humans created language 50000 years ago'), '4');
+    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Neuralink breakthrough in robotics'), '4');
+  });
+
+  await t.test('15. Extended Meta Container Polling & Audible Lock-Screen Notifications', () => {
+    const publisherCode = fs.readFileSync(path.join(__dirname, '../src/core/publisher.js'), 'utf8');
+    const jobWorkerCode = fs.readFileSync(path.join(__dirname, '../src/core/jobWorker.js'), 'utf8');
+    const repostSingleCode = fs.readFileSync(path.join(__dirname, '../scripts/repost_single.js'), 'utf8');
+
+    // 1. Extended Container Polling to 80 attempts (~180s)
+    assert.ok(publisherCode.includes('maxAttempts = 80'), 'Meta container polling must support up to 80 attempts');
+    assert.ok(publisherCode.includes('delay = attempts < 5 ? 1500 : (attempts < 25 ? 2000 : 3000)'), 'Tiered delay backoff must be implemented');
+
+    // 2. Audible notification with disable_notification: false on live publish
+    assert.ok(jobWorkerCode.includes('disable_notification: false'), 'jobWorker must trigger audible notification with disable_notification: false');
+    assert.ok(repostSingleCode.includes('disable_notification: false'), 'repost_single must trigger audible notification with disable_notification: false');
+    assert.ok(jobWorkerCode.includes('REEL IS LIVE ON INSTAGRAM'), 'jobWorker must broadcast high-visibility LIVE confirmation');
+    assert.ok(repostSingleCode.includes('REEL IS LIVE ON INSTAGRAM'), 'repost_single must broadcast high-visibility LIVE confirmation');
+  });
 });
+
 

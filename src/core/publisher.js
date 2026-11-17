@@ -33,10 +33,10 @@ function sanitizeToken(token) {
 async function pollContainer(containerId, token, baseUrl, onProgress = null) {
   let isReady = false;
   let attempts = 0;
-  const maxAttempts = 45;
+  const maxAttempts = 80; // Extended to ~180s to prevent timeouts on high-bitrate 1080p video during peak Meta load
 
   while (!isReady && attempts < maxAttempts) {
-    const delay = attempts < 3 ? 1000 : 2000;
+    const delay = attempts < 5 ? 1500 : (attempts < 25 ? 2000 : 3000);
     await new Promise(r => setTimeout(r, delay));
     attempts++;
 

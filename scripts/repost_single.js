@@ -300,6 +300,21 @@ async function main() {
     console.log(`[Reposter Runner] ✅ Job #${jobId} finished!`);
 
     const finalJob = db.prepare('SELECT * FROM publish_jobs WHERE id = ?').get(jobId);
+    if (finalJob && finalJob.status === 'published' && finalJob.permalink) {
+      const selectedPage = pages.find(p => p.id === pageId) || pages[0];
+      const alertMsg =
+        `🎉 <b>REEL IS LIVE ON INSTAGRAM!</b>\n\n` +
+        `📱 <b>Channel:</b> <code>${selectedPage.handle}</code> (${selectedPage.name})\n` +
+        `🌐 <b>Live Reel:</b> <a href="${finalJob.permalink}">${finalJob.permalink}</a>\n\n` +
+        `💡 <i>Autonomous cloud execution complete — posted while phone was locked.</i>`;
+      try {
+        await notifier.sendTelegramMessage(chatId, alertMsg, { disable_notification: false });
+        console.log(`[Reposter Runner] 📢 Sent audible completion push notification to Telegram chat ${chatId}`);
+      } catch (pushErr) {
+        console.warn(`[Reposter Runner] Push alert notice: ${pushErr.message}`);
+      }
+    }
+
     if (finalJob && finalJob.status === 'failed') {
       try {
         const dataDir = path.join(__dirname, '..', 'data');
