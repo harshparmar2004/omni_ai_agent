@@ -24,8 +24,8 @@ def extract_headline_roi(video_path, output_roi_path=None):
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # Sample timestamps across the intro hook (0.5s, 0.8s, 1.2s, 1.6s)
-    sample_timestamps = [0.5, 0.8, 1.2, 1.6]
+    # Sample timestamps across the intro hook (0.5s, 0.8s, 1.2s, 1.6s, 2.0s)
+    sample_timestamps = [0.5, 0.8, 1.2, 1.6, 2.0]
     best_roi = None
     best_candidate_boxes = []
 
@@ -64,20 +64,20 @@ def extract_headline_roi(video_path, output_roi_path=None):
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
             aspect = w / float(h)
-            # Filter for wide headline text lines
-            if w > width * 0.35 and h > 18 and h < crop_h * 0.35 and aspect > 1.8:
+            # Filter for headline text lines (including short/single-word headline lines like "WHY", "HOW", "AI")
+            if w > width * 0.12 and h > 14 and h < crop_h * 0.40 and aspect > 0.75:
                 # Exclude bottom credit badges / handle overlays near the bottom of crop_h
-                if y + h < crop_h * 0.90:
+                if y + h < crop_h * 0.95:
                     headline_boxes.append((x, y, w, h))
 
         if len(headline_boxes) > len(best_candidate_boxes):
             best_candidate_boxes = headline_boxes
             if headline_boxes:
                 # Merge individual text line bounding boxes into a cohesive headline ROI
-                min_x = max(0, min(b[0] for b in headline_boxes) - 24)
-                min_y = max(0, min(b[1] for b in headline_boxes) - 18)
-                max_x = min(width, max(b[0] + b[2] for b in headline_boxes) + 24)
-                max_y = min(crop_h, max(b[1] + b[3] for b in headline_boxes) + 18)
+                min_x = max(0, min(b[0] for b in headline_boxes) - 36)
+                min_y = max(0, min(b[1] for b in headline_boxes) - 30)
+                max_x = min(width, max(b[0] + b[2] for b in headline_boxes) + 36)
+                max_y = min(crop_h, max(b[1] + b[3] for b in headline_boxes) + 30)
                 best_roi = top_region[min_y:max_y, min_x:max_x]
 
     cap.release()
@@ -98,10 +98,11 @@ def extract_headline_roi(video_path, output_roi_path=None):
     roi_upscaled = cv2.resize(roi_gray, (0, 0), fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
     # 3. Bilateral filter to smooth compression artifacts
     filtered = cv2.bilateralFilter(roi_upscaled, 9, 75, 75)
-    # 4. Otsu binarization
-    _, bin_img = cv2.threshold(filtered, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # 4. Adaptive CLAHE for clean, non-degraded character contrast
+    clahe_roi = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+    enhanced_roi = clahe_roi.apply(filtered)
 
-    cv2.imwrite(output_roi_path, bin_img)
+    cv2.imwrite(output_roi_path, enhanced_roi)
 
     return {
         "success": True,

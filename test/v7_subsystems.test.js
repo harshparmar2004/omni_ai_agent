@@ -442,6 +442,38 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(jobWorkerCode.includes('storyPromise = publishStory'), 'jobWorker must launch story pipeline in parallel');
     assert.ok(jobWorkerCode.includes('Pipelined Story publish launched concurrently'), 'jobWorker must log pipelined story launch');
   });
+
+  await t.test('17. High-Fidelity Reel Headline OCR & Complete Word Preservation Subsystem', () => {
+    const cvScript = fs.readFileSync(path.join(__dirname, '../src/utils/opencvTextDetector.py'), 'utf8');
+    const visionServiceCode = fs.readFileSync(path.join(__dirname, '../src/core/videoVisionService.js'), 'utf8');
+    const { parseHeadlineTokens } = require('../src/utils/ffmpegHelper');
+
+    // 1. OpenCV Contour Bounding Box & Sample Timestamp Fidelity
+    assert.ok(cvScript.includes('w > width * 0.12'), 'OpenCV detector must allow single-word / narrow headline lines (w > width * 0.12)');
+    assert.ok(cvScript.includes('aspect > 0.75'), 'OpenCV detector must allow square and stacked text lines (aspect > 0.75)');
+    assert.ok(cvScript.includes('sample_timestamps = [0.5, 0.8, 1.2, 1.6, 2.0]'), 'OpenCV detector must sample across 5 intro frames up to 2.0s');
+    assert.ok(cvScript.includes('clahe_roi = cv2.createCLAHE'), 'OpenCV detector must use CLAHE enhanced grayscale for high-contrast OCR');
+
+    // 2. Vision Service Zero-Word-Loss Filters
+    assert.ok(!visionServiceCode.includes('^[a-zA-Z0-9]{1,3}\\s+(?=[A-Z])'), 'Vision service must NEVER strip 1-3 letter starting words (Why, How, The, AI)');
+    assert.ok(!visionServiceCode.includes('currentWordCount >= 11'), 'Vision service must NOT truncate headlines prematurely at 11 words');
+    assert.ok(visionServiceCode.includes('isAlreadyRoi'), 'localOcrHeadlineDetection must preserve full height of pre-isolated ROI images');
+    assert.ok(visionServiceCode.includes('{ isRoi: true }'), 'detectOnScreenHeadline must signal isRoi: true for OpenCV crops');
+
+    // 3. Verbatim Multi-Line Headline Word Preservation Simulation
+    const fullViralHeadline = "Why China Built The World's First AI Hospital Town Where Patients Are Treated By Robots In Real Time";
+    const words = fullViralHeadline.split(/\s+/);
+    assert.equal(words.length, 18, 'Headline must have 18 words');
+    assert.equal(words[0], 'Why', 'First word must be "Why"');
+    assert.equal(words[words.length - 1], 'Time', 'Last word must be "Time"');
+
+    // Verify tokenization retains every single word without truncation
+    const tokens = parseHeadlineTokens(fullViralHeadline);
+    const tokenWords = tokens.flatMap(t => t.text.split(/\s+/)).filter(Boolean);
+    assert.equal(tokenWords.length, 18, 'All 18 words must be tokenized without loss');
+    assert.equal(tokenWords[0], 'Why', 'First token must be "Why"');
+    assert.equal(tokenWords[tokenWords.length - 1], 'Time', 'Last token must be "Time"');
+  });
 });
 
 

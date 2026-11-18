@@ -97,10 +97,11 @@ async function callGeminiVision(imagePath, apiKey) {
   const base64Data = imageBuffer.toString('base64');
 
   const prompt = `Analyze this video frame from a social media reel (1080x1920 layout).
-1. "headline": Check if there is an on-screen title, hook, or headline text displayed on the screen (such as at the top or above the video content). If yes, extract that EXACT title or hook text. If not, write an ultra-catchy 8-12 word hook based on what is happening in the video.
-2. Identify 2 to 5 of the most impactful keywords, numbers, or terms in the headline (~35-40% of words). Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "These **Robotic Arms** Are Powered By **Algae**. Watch How They **Move**").
-3. "topicBreakdown": Write a concise, 2-sentence high-energy explanation of this topic for an Instagram caption post body.
-4. "hasCompetitorHeader": Is there existing text, title, or account branding in the top area (above the video)? (true/false)
+1. "headline": Check if there is an on-screen title, headline, or hook text displayed on the screen (such as at the top, center, or above the video content). If yes, transcribe 100% of that EXACT title or hook text VERBATIM. Do NOT omit any starting words (e.g. "Why", "How", "The", "Inside", "AI"), do NOT shorten, and do NOT truncate. Transcribe the COMPLETE headline from the first word to the very last word. If there is NO on-screen text, write an ultra-catchy 8-16 word viral hook based on what is happening in the video.
+2. "rawTitle": The complete unformatted verbatim headline with zero asterisks.
+3. Identify 2 to 6 of the most impactful keywords, numbers, or amounts in the headline (~35-40% of words). Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "These **Robotic Arms** Are Powered By **Algae**. Watch How They **Move**").
+4. "topicBreakdown": Write a concise, 2-sentence high-energy explanation of this topic for an Instagram caption post body.
+5. "hasCompetitorHeader": Is there existing text, title, or account branding in the top area (above the video)? (true/false)
 
 Respond ONLY with valid JSON in this exact structure:
 {"hasTitle": true, "headline": "...", "rawTitle": "...", "topicBreakdown": "...", "hasCompetitorHeader": true}`;
@@ -144,9 +145,10 @@ async function callOpenAiVision(imagePath, apiKey) {
 
   const prompt = `Analyze this video frame from a social media reel.
 1. Check if there is an on-screen hook title or headline text displayed on the screen.
-2. If yes, extract that EXACT title or hook text.
-3. Wrap 1 to 3 impactful keywords in double asterisks **like this** for highlighting.
-4. If no title is visible, set hasTitle to false.
+2. If yes, transcribe 100% of the COMPLETE on-screen headline VERBATIM. Do NOT omit any starting words (e.g. "Why", "How", "The", "AI"), do NOT shorten, and do NOT truncate. Transcribe the COMPLETE headline from first word to last word.
+3. Identify 2 to 5 impactful keywords, numbers, or amounts in the headline and wrap them in double asterisks **like this** for brand color highlighting.
+4. "rawTitle": The complete unformatted verbatim headline without asterisks.
+5. If no title is visible, set hasTitle to false.
 
 Respond ONLY with valid JSON:
 {"hasTitle": true, "headline": "...", "rawTitle": "..."}`;
@@ -219,23 +221,23 @@ function isTabularOrSpecDebris(text) {
  * Local offline OCR fallback using Tesseract.js & canvas cropping
  * Requires zero API keys and runs 100% locally.
  */
-async function localOcrHeadlineDetection(framePath) {
+async function localOcrHeadlineDetection(framePath, options = {}) {
   try {
     const Tesseract = require('tesseract.js');
     const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
     const resolved = resolveLocalMediaPath(framePath);
     const img = await loadImage(resolved);
-    // Crop the upper reel region where titles and headlines are located (Y=0% to Y=70%)
-    // Covers top hooks, mid-screen text boxes, and center-aligned reel title cards
-    const cropH = Math.floor(img.height * 0.70);
+    // If the input is already an isolated headline ROI (from OpenCV or options), do not crop
+    const isAlreadyRoi = Boolean(options.isRoi) || (img.height <= 800 && img.width >= img.height);
+    const cropH = isAlreadyRoi ? img.height : Math.floor(img.height * 0.70);
     const canvas = createCanvas(img.width, cropH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
 
     // Preprocessing: High-contrast binarization to make text pop against video background
     try {
-      const imgData = ctx.getImageData(0, 0, img.width, cropH);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const d = imgData.data;
       for (let i = 0; i < d.length; i += 4) {
         const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
@@ -260,13 +262,13 @@ async function localOcrHeadlineDetection(framePath) {
     const validLines = [];
     for (const raw of rawLines) {
       // If credit, source, or edit attribution line reached, stop extraction immediately
-      if (/^(credit|source|via|edit|by)[\s:]/i.test(raw) || /credit:\s*/i.test(raw) || /studio/i.test(raw)) break;
+      if (/^(credit|source|via|edit|by)[\s:]/i.test(raw) || /credit:\s*/i.test(raw)) break;
       // Skip creator handles
       if (/@\w+/.test(raw)) continue;
 
       // Check alphanumeric character ratio to drop pure video background noise
       const alphaChars = (raw.match(/[a-zA-Z0-9]/g) || []).length;
-      if (raw.length === 0 || (alphaChars / raw.length) < 0.50) {
+      if (raw.length === 0 || (alphaChars / raw.length) < 0.40) {
         if (validLines.length >= 1) break;
         continue;
       }
@@ -281,19 +283,14 @@ async function localOcrHeadlineDetection(framePath) {
       // Strip trailing single noise characters or short artifacts (e.g. " Hs", " |", " .", " 8")
       l = l.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-zA-Z0-9]{1,2}\s*$/g, '').trim();
 
-      // Do not start the headline with a 1-word or short artifact (e.g. "Rio", "FRE.", "RPE")
-      const words = l.split(/\s+/).filter(Boolean);
-      if (validLines.length === 0 && (words.length < 2 || l.length < 8)) {
-        continue;
-      }
-
-      if (l.length >= 3) {
+      // Keep all valid headline text lines (including short/single-word headline lines like "WHY", "HOW", "AI", "INSIDE")
+      if (l.length >= 2) {
         validLines.push(l);
       }
 
-      // If we have collected 10-18 words, we have a complete viral heading
+      // Allow complete viral headlines up to 28 words without premature truncation
       const currentWordCount = validLines.join(' ').split(/\s+/).length;
-      if (currentWordCount >= 11) break;
+      if (currentWordCount >= 28) break;
     }
 
     let title = validLines.join(' ');
@@ -304,7 +301,6 @@ async function localOcrHeadlineDetection(framePath) {
       .replace(/\bRohotic\b/gi, 'Robotic')
       .replace(/\bpowered\s+hy\b/gi, 'powered by')
       .replace(/\s+([.,;:!?])/g, '$1')
-      .replace(/^[a-zA-Z0-9]{1,3}\s+(?=[A-Z])/g, '')
       .trim();
 
     // Strip trailing single noise tokens and punctuation artifacts
@@ -319,7 +315,7 @@ async function localOcrHeadlineDetection(framePath) {
 
     const wordCount = title.split(/\s+/).length;
     const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
-    if (wordCount >= 4 && wordCount <= 22 && !isPureDigitsOrJunk && title.length >= 18) {
+    if (wordCount >= 2 && wordCount <= 32 && !isPureDigitsOrJunk && title.length >= 10) {
       // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
       const targetHighlights = Math.max(2, Math.min(6, Math.round(wordCount * 0.38)));
       let highlightedTitle = title;
@@ -440,7 +436,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
       const opencvRoi = await extractOpenCvHeadlineRoi(resolvedPath);
       if (opencvRoi && fs.existsSync(opencvRoi)) {
         console.log(`[Video Vision] 👁️ Scanning OpenCV-isolated headline ROI with high-precision OCR...`);
-        const localResult = await localOcrHeadlineDetection(opencvRoi);
+        const localResult = await localOcrHeadlineDetection(opencvRoi, { isRoi: true });
         try { fs.unlinkSync(opencvRoi); } catch (_) {}
         if (localResult && localResult.hasTitle && localResult.headline) {
           console.log(`[Video Vision] ✅ Found On-Screen Hook via OpenCV Text Detection: "${localResult.headline}"`);
@@ -479,7 +475,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with Gemini Vision OCR...`);
           const result = await callGeminiVision(framePath, geminiKey);
           const hCandidate = result?.headline?.trim() || '';
-          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
+          const isHValid = hCandidate.length >= 10 && hCandidate.split(/\s+/).length >= 2 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
           if (result && result.hasTitle && isHValid) {
             let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {
@@ -506,7 +502,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
           console.log(`[Video Vision] 👁️ Scanning video frame (${ts || 'img'}) with OpenAI Vision...`);
           const result = await callOpenAiVision(framePath, openAiKey);
           const hCandidate = result?.headline?.trim() || '';
-          const isHValid = hCandidate.length >= 18 && hCandidate.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
+          const isHValid = hCandidate.length >= 10 && hCandidate.split(/\s+/).length >= 2 && !/^[\d\s.,\-+]+$/.test(hCandidate) && !/^(?:all\s+)?\d+\s+comments?$/i.test(hCandidate) && !isTabularOrSpecDebris(hCandidate);
           if (result && result.hasTitle && isHValid) {
             let cleanHeadline = hCandidate.replace(/^["'“”]/, '').replace(/["'“”]$/, '');
             if (!cleanHeadline.includes('**')) {

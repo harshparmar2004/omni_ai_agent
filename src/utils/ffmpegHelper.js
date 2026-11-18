@@ -2873,7 +2873,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   }
 
   // For Video-Essay (Cult Information), guarantee on-screen headline OCR from reel if not already provided
-  if (isVideoEssay && (!options.hookHeadline || options.hookHeadline.includes('The next generation of AI is evolving'))) {
+  if (isVideoEssay && (!options.hookHeadline || options.hookHeadline.includes('The next generation of AI is evolving') || options.hookHeadline.includes('The shocking untold truth'))) {
     try {
       const { detectOnScreenHeadline } = require('../core/videoVisionService');
       const visionRes = await detectOnScreenHeadline(absPath);
