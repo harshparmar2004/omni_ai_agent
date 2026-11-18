@@ -284,12 +284,13 @@ function ensureMetaCompliantVideo(inputVideoPath, targetOutputPath = null) {
         '-y',
         '-i', inputVideoPath,
         '-filter_complex',
-        '[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[v];[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15[a]',
+        '[0:v]scale=trunc(iw/2)*2:trunc(ih/2)*2[v];[0:a]volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a]',
         '-map', '[v]',
         '-map', '[a]',
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-preset', 'veryfast',
+        '-tune', 'fastdecode',
         '-crf', '20',
         '-c:a', 'aac',
         '-b:a', '192k',
@@ -2897,7 +2898,7 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   // Clean original audio preservation & normalization (preserves authentic original video audio)
   const inputArgs = ['-y', '-i', absPath, '-i', overlayPngPath];
   const fullFilter = hasAudio
-    ? `${videoFilter};[0:a]dynaudnorm=f=150:g=15:m=8.0:p=0.95,volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
+    ? `${videoFilter};[0:a]volume=1.15,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[outa]`
     : `${videoFilter};anullsrc=channel_layout=stereo:sample_rate=44100[outa]`;
 
   return new Promise((resolve) => {
@@ -2908,7 +2909,8 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
       '-map', '[outa]',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'superfast',
+      '-preset', 'veryfast',
+      '-tune', 'fastdecode',
       '-crf', '22',
       '-threads', '0',
       '-c:a', 'aac',
@@ -3024,7 +3026,8 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
       '-map', '0:a?',
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
-      '-preset', 'superfast',
+      '-preset', 'veryfast',
+      '-tune', 'fastdecode',
       '-crf', '22',
       '-threads', '0',
       '-c:a', 'aac',

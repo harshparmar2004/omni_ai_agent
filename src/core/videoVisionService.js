@@ -413,6 +413,8 @@ function extractOpenCvHeadlineRoi(videoPath) {
   });
 }
 
+const _visionCache = new Map();
+
 /**
  * Detects and extracts on-screen title text from a video or image file
  * Supports OpenCV contour bounding box isolation, Gemini/OpenAI Vision, and high-precision OCR.
@@ -424,6 +426,14 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
   const resolvedPath = resolveLocalMediaPath(videoOrImagePath);
   if (!resolvedPath || !fs.existsSync(resolvedPath)) {
     return { found: false, reason: 'file_not_found' };
+  }
+
+  // Fast In-Memory Memoization Cache: bypass repeat OCR scans on same media
+  const cacheKey = resolvedPath;
+  if (!options.forceFresh && _visionCache.has(cacheKey)) {
+    const cached = _visionCache.get(cacheKey);
+    console.log(`[Video Vision] ⚡ Instant OCR cache hit for: ${path.basename(resolvedPath)} -> "${cached.headline || ''}"`);
+    return cached;
   }
 
   const ext = path.extname(resolvedPath).toLowerCase();
@@ -440,13 +450,15 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
         try { fs.unlinkSync(opencvRoi); } catch (_) {}
         if (localResult && localResult.hasTitle && localResult.headline) {
           console.log(`[Video Vision] ✅ Found On-Screen Hook via OpenCV Text Detection: "${localResult.headline}"`);
-          return {
+          const res = {
             found: true,
             headline: localResult.headline,
             rawTitle: localResult.rawTitle || localResult.headline.replace(/\*\*/g, ''),
             hasCompetitorHeader: true,
             provider: 'opencv_ocr'
           };
+          _visionCache.set(cacheKey, res);
+          return res;
         }
       }
     } catch (opencvErr) {
@@ -482,7 +494,7 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
               cleanHeadline = cleanHeadline.replace(/(?<=\s|^)(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
             }
             console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
-            return {
+            const res = {
               found: true,
               headline: cleanHeadline,
               rawTitle: (result.rawTitle || cleanHeadline).replace(/[\*<>]+/g, '').trim(),
@@ -490,6 +502,8 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
               hasCompetitorHeader: Boolean(result.hasCompetitorHeader),
               provider: 'gemini_vision'
             };
+            _visionCache.set(cacheKey, res);
+            return res;
           }
         } catch (geminiErr) {
           console.warn(`[Video Vision] Gemini Vision attempt failed: ${geminiErr.message}`);
@@ -509,12 +523,14 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
               cleanHeadline = cleanHeadline.replace(/(?<=\s|^)(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
             }
             console.log(`[Video Vision] ✅ Found On-Screen Hook: "${cleanHeadline}"`);
-            return {
+            const res = {
               found: true,
               headline: cleanHeadline,
               rawTitle: (result.rawTitle || cleanHeadline).replace(/[\*<>]+/g, '').trim(),
               provider: 'openai_vision'
             };
+            _visionCache.set(cacheKey, res);
+            return res;
           }
         } catch (openAiErr) {
           console.warn(`[Video Vision] OpenAI Vision attempt failed: ${openAiErr.message}`);
@@ -527,13 +543,15 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
         const localResult = await localOcrHeadlineDetection(framePath);
         if (localResult && localResult.hasTitle && localResult.headline) {
           console.log(`[Video Vision] ✅ Found On-Screen Hook via Local OCR: "${localResult.headline}"`);
-          return {
+          const res = {
             found: true,
             headline: localResult.headline,
             rawTitle: (localResult.rawTitle || localResult.headline).replace(/[\*<>]+/g, '').trim(),
             hasCompetitorHeader: true,
             provider: 'local_ocr'
           };
+          _visionCache.set(cacheKey, res);
+          return res;
         }
       } catch (localErr) {
         console.warn(`[Video Vision] Local OCR attempt notice: ${localErr.message}`);

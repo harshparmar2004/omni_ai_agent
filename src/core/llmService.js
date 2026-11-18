@@ -266,7 +266,7 @@ function synthesizeOfflineHook(rawText, pageName = '') {
  * @param {Object} options.page - Target destination page configuration
  * @returns {Promise<{ caption: string, provider: string, model: string }>}
  */
-async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '' }) {
+async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '', hookHeadline = '' }) {
   const isClubbing = (page.slug && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.slug)) ||
                      (page.handle && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.handle)) ||
                      (page.name && /club|rave|party|dance|edm|techno|concert|nightlife|festival/i.test(page.name)) ||
@@ -387,8 +387,13 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
 
     let hasDetectedOnScreenHook = false;
 
-    // 1. Check On-Screen Reel Vision OCR first if video is provided (reads text written on the reel!)
-    if (videoPath) {
+    // 1. If hookHeadline is already provided, use it directly with zero latency!
+    if (hookHeadline) {
+      console.log(`[LLM Service] ⚡ Using pre-detected on-screen hook: "${hookHeadline}"`);
+      headline = hookHeadline;
+      hasDetectedOnScreenHook = true;
+    } else if (videoPath) {
+      // Check On-Screen Reel Vision OCR if video is provided (reads text written on the reel!)
       try {
         const { detectOnScreenHeadline } = require('./videoVisionService');
         const visionResult = await detectOnScreenHeadline(videoPath);

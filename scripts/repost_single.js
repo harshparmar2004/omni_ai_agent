@@ -187,29 +187,30 @@ async function main() {
     });
   });
 
-  // 3. Launch Cloudflare Edge Tunnel
+  // 3. Launch Cloudflare Edge Tunnel & Ingest Link in Parallel
   const { startTunnel, closeTunnel } = require('../src/core/mediaHost');
-  let tunnelUrl = null;
-  if (!isDryRun) {
-    try {
-      tunnelUrl = await startTunnel(PORT);
-      console.log(`🚀 Edge Tunnel established: ${tunnelUrl}`);
-    } catch (e) {
-      console.warn(`[Tunnel Warning] ${e.message}`);
-    }
-  }
-
-  // 4. Ingest Link into Queue
   const { submitLink } = require('../src/agents/reposter/reposterAgent');
-  console.log(`\n[Reposter Runner] 📥 Submitting link: ${targetUrl}... (Force: ${isForce})`);
-  const enqueueResult = await submitLink({
-    url: targetUrl,
-    pageId: pageId,
-    chatId: chatId,
-    messageId: messageId,
-    origin: 'telegram_cloud',
-    force: isForce
-  });
+  let tunnelUrl = null;
+
+  console.log(`\n[Reposter Runner] 📥 Submitting link & initializing edge tunnel in parallel: ${targetUrl}... (Force: ${isForce})`);
+  const [tunnelResult, enqueueResult] = await Promise.all([
+    !isDryRun ? startTunnel(PORT).catch(e => {
+      console.warn(`[Tunnel Warning] ${e.message}`);
+      return null;
+    }) : Promise.resolve(null),
+    submitLink({
+      url: targetUrl,
+      pageId: pageId,
+      chatId: chatId,
+      messageId: messageId,
+      origin: 'telegram_cloud',
+      force: isForce
+    })
+  ]);
+  tunnelUrl = tunnelResult;
+  if (tunnelUrl) {
+    console.log(`🚀 Edge Tunnel established: ${tunnelUrl}`);
+  }
 
   const selectedPage = pages.find(p => p.id === pageId) || pages[0];
   const targetHandle = selectedPage?.handle || `@page_${pageId}`;

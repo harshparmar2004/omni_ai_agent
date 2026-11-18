@@ -307,7 +307,8 @@ class JobWorkerPool {
           rawCaption,
           sourceUsername: sourceUploader,
           page,
-          videoPath: localVideoPath
+          videoPath: localVideoPath,
+          hookHeadline
         });
         finalCaption = copyDetails.caption;
         if (!hookHeadline) hookHeadline = copyDetails.hookHeadline || '';

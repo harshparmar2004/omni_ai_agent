@@ -194,19 +194,19 @@ function buildCaption({ rawCaption = '', sourceUsername = '', page = {} }) {
 /**
  * Builds AI-buffed viral caption and metadata (including hook headline)
  */
-async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '' }) {
+async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', page = {}, videoPath = '', hookHeadline = '' }) {
   try {
     const { generateAiCaption } = require('./llmService');
-    const result = await generateAiCaption({ rawCaption, sourceUsername, page, videoPath });
+    const result = await generateAiCaption({ rawCaption, sourceUsername, page, videoPath, hookHeadline });
     return {
       caption: result.caption || buildCaption({ rawCaption, sourceUsername, page }),
-      hookHeadline: result.hookHeadline || '',
+      hookHeadline: result.hookHeadline || hookHeadline || '',
       provider: result.provider || 'fallback',
       model: result.model || 'none'
     };
   } catch (err) {
     console.warn(`[Caption Builder] AI generation fallback: ${err.message}`);
-    let fallbackHook = '';
+    let fallbackHook = hookHeadline || '';
     const isVideoEssay = page && (
       page.slug === 'cult_information' ||
       page.handle?.includes('cult_information') ||
@@ -216,7 +216,7 @@ async function buildAiCaptionDetails({ rawCaption = '', sourceUsername = '', pag
       page.theme === 'evolving_ai' ||
       (page.name && page.name.toLowerCase().includes('cult'))
     );
-    if (isVideoEssay) {
+    if (isVideoEssay && !fallbackHook) {
       if (videoPath) {
         try {
           const { detectOnScreenHeadline } = require('./videoVisionService');

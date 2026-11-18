@@ -441,6 +441,23 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     // 3. Companion Story publishing runs concurrently with Feed Reel
     assert.ok(jobWorkerCode.includes('storyPromise = publishStory'), 'jobWorker must launch story pipeline in parallel');
     assert.ok(jobWorkerCode.includes('Pipelined Story publish launched concurrently'), 'jobWorker must log pipelined story launch');
+
+    // 4. Zero-Latency OCR Memoization & Direct Hook Passthrough
+    const visionServiceCode = fs.readFileSync(path.join(__dirname, '../src/core/videoVisionService.js'), 'utf8');
+    const llmServiceCode = fs.readFileSync(path.join(__dirname, '../src/core/llmService.js'), 'utf8');
+    const ffmpegCode = fs.readFileSync(path.join(__dirname, '../src/utils/ffmpegHelper.js'), 'utf8');
+    const repostSingleCode = fs.readFileSync(path.join(__dirname, '../scripts/repost_single.js'), 'utf8');
+
+    assert.ok(visionServiceCode.includes('_visionCache'), 'videoVisionService must maintain in-memory memoization cache');
+    assert.ok(llmServiceCode.includes('if (hookHeadline)'), 'llmService must bypass repeat vision OCR if hookHeadline is already provided');
+    assert.ok(jobWorkerCode.includes('hookHeadline'), 'jobWorker must pass hookHeadline directly to buildAiCaptionDetails');
+
+    // 5. High-Speed Encoding: Removal of CPU-heavy dynaudnorm and addition of fastdecode tune
+    assert.ok(!ffmpegCode.includes('dynaudnorm'), 'ffmpegHelper must eliminate CPU-choking dynaudnorm audio filter');
+    assert.ok(ffmpegCode.includes("'-tune', 'fastdecode'"), 'ffmpegHelper must enable fastdecode tuning');
+
+    // 6. Parallel Tunnel Launch and Link Submission
+    assert.ok(repostSingleCode.includes('Promise.all'), 'repost_single must launch tunnel and ingest in parallel');
   });
 
   await t.test('17. High-Fidelity Reel Headline OCR & Complete Word Preservation Subsystem', () => {
