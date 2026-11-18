@@ -428,12 +428,12 @@ class JobWorkerPool {
         // Pipelined Companion Story Generation & Upload:
         // Launch Story processing concurrently with Feed Reel publishing to cut turnaround time in half!
         let storyPromise = null;
-        if (autoPostStory && processedMediaPaths[0]) {
+        if (autoPostStory && (mediaPaths[0] || processedMediaPaths[0])) {
           console.log(`[Job Worker] 🚀 Pipelined Story publish launched concurrently for ${page.handle}...`);
           storyPromise = publishStory({
             page,
-            videoPath: mediaType === 'reel' ? processedMediaPaths[0] : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? processedMediaPaths[0] : null,
+            videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? (mediaPaths[0] || processedMediaPaths[0]) : null,
             hookHeadline
           }).catch(storyErr => {
             console.warn(`[Job Worker] ⚠️ Pipelined Story notice: ${storyErr.message}`);
@@ -512,13 +512,13 @@ class JobWorkerPool {
         } catch (storyErr) {
           console.warn(`[Job Worker] ⚠️ Instagram Story finalize notice: ${storyErr.message}`);
         }
-      } else if (autoPostStory && processedMediaPaths[0]) {
+      } else if (autoPostStory && (mediaPaths[0] || processedMediaPaths[0])) {
         try {
           console.log(`[Job Worker] 🌟 Publishing Instagram Story for ${page.handle}...`);
           storyResult = await publishStory({
             page,
-            videoPath: mediaType === 'reel' ? processedMediaPaths[0] : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? processedMediaPaths[0] : null,
+            videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? (mediaPaths[0] || processedMediaPaths[0]) : null,
             hookHeadline
           });
         } catch (storyErr) {

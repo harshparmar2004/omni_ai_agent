@@ -460,27 +460,31 @@ function computeStoryCardGeometry(inputWidth, inputHeight) {
 
   let cardW, cardH;
   if (ratio <= 0.65) {
-    // 9:16 Vertical Reel
-    cardW = 760;
+    // 9:16 Vertical Reel (e.g. 1080x1920)
+    cardW = 860;
     cardH = Math.round(cardW / ratio);
-    if (cardH > 1360) {
-      cardH = 1360;
+    if (cardH > 1528) {
+      cardH = 1528;
       cardW = Math.round(cardH * ratio);
     }
-  } else if (ratio <= 1.25) {
-    // 4:5 Portrait / 1:1 Square
-    cardW = 880;
+  } else if (ratio >= 1.35) {
+    // 16:9 Landscape / Widescreen Cinema (e.g. 1920x1080)
+    cardW = 1032;
     cardH = Math.round(cardW / ratio);
-    if (cardH > 1150) {
-      cardH = 1150;
+    if (cardH > 720) {
+      cardH = 720;
       cardW = Math.round(cardH * ratio);
     }
+  } else if (ratio >= 0.95 && ratio <= 1.05) {
+    // 1:1 Square (e.g. 1080x1080)
+    cardW = 1000;
+    cardH = 1000;
   } else {
-    // 16:9 Landscape / Widescreen Cinema
-    cardW = 960;
+    // 4:5 Portrait (e.g. 1080x1350)
+    cardW = 1000;
     cardH = Math.round(cardW / ratio);
-    if (cardH > 700) {
-      cardH = 700;
+    if (cardH > 1260) {
+      cardH = 1260;
       cardW = Math.round(cardH * ratio);
     }
   }
@@ -496,12 +500,12 @@ function computeStoryCardGeometry(inputWidth, inputHeight) {
   const headerH = 54;
   const headerW = Math.min(cardW, 580);
   const headerX = Math.round((canvasW - headerW) / 2);
-  const headerY = Math.max(120, cardY - headerH - 24);
+  const headerY = Math.max(120, cardY - headerH - 22);
 
   const ctaH = 54;
   const ctaW = Math.min(cardW - 40, 440);
   const ctaX = Math.round((canvasW - ctaW) / 2);
-  const ctaY = Math.min(canvasH - ctaH - 120, cardY + cardH + 24);
+  const ctaY = Math.min(canvasH - ctaH - 110, cardY + cardH + 24);
 
   return { cardW, cardH, cardX, cardY, headerW, headerH, headerX, headerY, ctaW, ctaH, ctaX, ctaY, ratio };
 }
@@ -518,7 +522,6 @@ function generateStoryOverlay(handle, options = {}) {
   const ctx = canvas.getContext('2d');
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
-  const typeLabel = options.typeLabel || 'NEW REEL';
   const theme = options.theme || (
     cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
     (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' :
@@ -527,6 +530,7 @@ function generateStoryOverlay(handle, options = {}) {
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
   const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
+  const isGTA6 = !isClubbing && !isMovie && !isVideoEssay;
 
   // Compute or inherit dynamic geometry
   const computed = computeStoryCardGeometry(options.inputWidth || 1080, options.inputHeight || 1920);
@@ -535,11 +539,11 @@ function generateStoryOverlay(handle, options = {}) {
   const cardW = options.cardW !== undefined ? options.cardW : computed.cardW;
   const cardH = options.cardH !== undefined ? options.cardH : computed.cardH;
   const headerX = options.headerX !== undefined ? options.headerX : Math.round((width - Math.min(cardW, 580)) / 2);
-  const headerY = options.headerY !== undefined ? options.headerY : Math.max(120, cardY - 54 - 24);
+  const headerY = options.headerY !== undefined ? options.headerY : Math.max(120, cardY - 54 - 22);
   const headerW = options.headerW !== undefined ? options.headerW : Math.min(cardW, 580);
   const headerH = options.headerH !== undefined ? options.headerH : 54;
   const ctaX = options.ctaX !== undefined ? options.ctaX : Math.round((width - Math.min(cardW - 40, 440)) / 2);
-  const ctaY = options.ctaY !== undefined ? options.ctaY : Math.min(height - 54 - 120, cardY + cardH + 24);
+  const ctaY = options.ctaY !== undefined ? options.ctaY : Math.min(height - 54 - 110, cardY + cardH + 24);
   const ctaW = options.ctaW !== undefined ? options.ctaW : Math.min(cardW - 40, 440);
   const ctaH = options.ctaH !== undefined ? options.ctaH : 54;
 
@@ -558,9 +562,9 @@ function generateStoryOverlay(handle, options = {}) {
     bgGrad.addColorStop(0.5, 'rgba(18, 18, 24, 0.88)');
     bgGrad.addColorStop(1, 'rgba(8, 8, 10, 0.96)');
   } else {
-    bgGrad.addColorStop(0, 'rgba(10, 4, 24, 0.80)');
-    bgGrad.addColorStop(0.5, 'rgba(28, 8, 45, 0.65)');
-    bgGrad.addColorStop(1, 'rgba(8, 2, 16, 0.88)');
+    bgGrad.addColorStop(0, 'rgba(10, 2, 24, 0.82)');
+    bgGrad.addColorStop(0.5, 'rgba(38, 8, 60, 0.65)');
+    bgGrad.addColorStop(1, 'rgba(10, 2, 24, 0.85)');
   }
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
@@ -568,12 +572,12 @@ function generateStoryOverlay(handle, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.70)'));
+  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.75)'));
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 
   // 2. Center Card Cutout (smooth rounded corners)
-  const radius = 24;
+  const radius = 18;
   ctx.save();
   ctx.beginPath();
   if (ctx.roundRect) {
@@ -585,78 +589,289 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.clearRect(0, 0, width, height);
   ctx.restore();
 
-  // 3. Sleek hairline border around the media card
-  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-  ctx.save();
-  if (isClubbing) {
-    borderGrad.addColorStop(0, '#00FFA3');   // Electric Neon Green
-    borderGrad.addColorStop(0.5, '#00E5FF'); // Laser Mint / Cyan
-    borderGrad.addColorStop(1, '#39FF14');   // Electric Lime
-    ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
+  // 3. Signature Framing / Border around the media card
+  if (isGTA6) {
+    // 8px glowing multi-stop neon gradient border
+    ctx.save();
+    const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    bGrad.addColorStop(0, '#00F0FF');
+    bGrad.addColorStop(0.3, '#7209B7');
+    bGrad.addColorStop(0.65, '#F72585');
+    bGrad.addColorStop(1, '#FF8A00');
+    ctx.shadowColor = 'rgba(247, 37, 133, 0.75)';
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = bGrad;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.stroke();
+
+    // Inner accent rail
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
+    else ctx.rect(cardX + 9, cardY + 9, cardW - 18, cardH - 18);
+    ctx.stroke();
+
+    // 4 Prominent Corner Registration Brackets
+    const bLen = Math.min(42, Math.round(cardW * 0.08));
+    ctx.lineWidth = 5;
+
+    // TL (Cyan)
+    ctx.strokeStyle = '#00F0FF';
+    ctx.shadowColor = '#00F0FF';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+    ctx.stroke();
+
+    // TR (Pink)
+    ctx.strokeStyle = '#F72585';
+    ctx.shadowColor = '#F72585';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.stroke();
+
+    // BL (Pink)
+    ctx.strokeStyle = '#F72585';
+    ctx.shadowColor = '#F72585';
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+    ctx.stroke();
+
+    // BR (Sunset Orange)
+    ctx.strokeStyle = '#FF8A00';
+    ctx.shadowColor = '#FF8A00';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY - bLen);
+    ctx.stroke();
+
+    // Bottom Boundary Theme Bar
+    const botBarW = Math.min(680, cardW - 80);
+    const botBarX = cardX + (cardW - botBarW) / 2;
+    const botBarY = cardY + cardH - 12;
+
+    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+    botGrad.addColorStop(0, 'rgba(0, 240, 255, 0)');
+    botGrad.addColorStop(0.15, '#00F0FF');
+    botGrad.addColorStop(0.5, '#F72585');
+    botGrad.addColorStop(0.85, '#FF8A00');
+    botGrad.addColorStop(1, 'rgba(255, 138, 0, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(255, 138, 0, 0.9)';
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
+    else ctx.rect(botBarX, botBarY, botBarW, 8);
+    ctx.fill();
+
+    ctx.font = '900 13px Impact, Arial Black, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('◄ ◄  GTA VI • VICE CITY  ► ►', cardX + cardW / 2, botBarY - 14);
+    ctx.restore();
   } else if (isMovie) {
-    borderGrad.addColorStop(0, 'rgba(255, 215, 120, 0.90)'); // Soft Champagne Gold
-    borderGrad.addColorStop(0.5, 'rgba(212, 175, 55, 0.55)'); // Amber Gold
-    borderGrad.addColorStop(1, 'rgba(193, 18, 31, 0.75)');   // Velvet Crimson accent
-    ctx.shadowColor = 'rgba(212, 175, 55, 0.40)';
-  } else if (isVideoEssay) {
-    borderGrad.addColorStop(0, '#CCFF00');   // Electric Lime
-    borderGrad.addColorStop(0.5, '#FFFFFF'); // Clean White Accent
-    borderGrad.addColorStop(1, '#A6FF00');   // Vivid Lime
-    ctx.shadowColor = 'rgba(204, 255, 0, 0.50)';
+    ctx.save();
+    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    borderGrad.addColorStop(0, '#FFD166');
+    borderGrad.addColorStop(0.35, '#FFB703');
+    borderGrad.addColorStop(0.70, '#C1121F');
+    borderGrad.addColorStop(1, '#E5A93C');
+    ctx.shadowColor = 'rgba(255, 183, 3, 0.70)';
+    ctx.shadowBlur = 22;
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 209, 102, 0.40)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX + 9, cardY + 9, cardW - 18, cardH - 18, 12);
+    else ctx.rect(cardX + 9, cardY + 9, cardW - 18, cardH - 18);
+    ctx.stroke();
+
+    const bLen = Math.min(42, Math.round(cardW * 0.08));
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#FFD166';
+    ctx.shadowColor = '#FFD166';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + bLen); ctx.lineTo(cardX - 6, cardY - 6); ctx.lineTo(cardX + bLen, cardY - 6);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FFB703';
+    ctx.shadowColor = '#FFB703';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY - 6); ctx.lineTo(cardX + cardW + 6, cardY + bLen);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FFB703';
+    ctx.beginPath();
+    ctx.moveTo(cardX - 6, cardY + cardH - bLen); ctx.lineTo(cardX - 6, cardY + cardH + 6); ctx.lineTo(cardX + bLen, cardY + cardH + 6);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#E5A93C';
+    ctx.shadowColor = '#E5A93C';
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY + cardH + 6); ctx.lineTo(cardX + cardW + 6, cardY - bLen);
+    ctx.stroke();
+
+    const botBarW = Math.min(680, cardW - 80);
+    const botBarX = cardX + (cardW - botBarW) / 2;
+    const botBarY = cardY + cardH - 12;
+    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+    botGrad.addColorStop(0, 'rgba(255, 209, 102, 0)');
+    botGrad.addColorStop(0.2, '#FFD166');
+    botGrad.addColorStop(0.5, '#FFB703');
+    botGrad.addColorStop(0.8, '#C1121F');
+    botGrad.addColorStop(1, 'rgba(193, 18, 31, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(255, 183, 3, 0.85)';
+    ctx.shadowBlur = 16;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(botBarX, botBarY, botBarW, 8, 4);
+    else ctx.rect(botBarX, botBarY, botBarW, 8);
+    ctx.fill();
+
+    ctx.font = 'bold 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
+    ctx.restore();
   } else {
-    borderGrad.addColorStop(0, '#00F0FF');   // Cyan glow
-    borderGrad.addColorStop(0.5, '#F72585'); // Neon Pink
-    borderGrad.addColorStop(1, '#FF8A00');   // Sunset Orange
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.45)';
+    // Clubbing Cult or Cult Information
+    ctx.save();
+    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    if (isClubbing) {
+      borderGrad.addColorStop(0, '#00FFA3');
+      borderGrad.addColorStop(0.5, '#00E5FF');
+      borderGrad.addColorStop(1, '#39FF14');
+      ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
+    } else {
+      borderGrad.addColorStop(0, '#CCFF00');
+      borderGrad.addColorStop(0.5, '#FFFFFF');
+      borderGrad.addColorStop(1, '#A6FF00');
+      ctx.shadowColor = 'rgba(204, 255, 0, 0.50)';
+    }
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.stroke();
+    ctx.restore();
   }
 
-  ctx.shadowBlur = 16;
-  ctx.strokeStyle = borderGrad;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-  } else {
-    ctx.rect(cardX, cardY, cardW, cardH);
-  }
-  ctx.stroke();
-  ctx.restore();
+  // 4. Top Header Box
+  if (isGTA6) {
+    const pageName = options.pageName || options.page?.name || (cleanHandle.includes('gta') ? 'GTA 6 Updates 007' : cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    const badgeText1 = pageName;
+    const badgeSep = '  |  ';
+    const badgeText2 = 'GTA VI';
 
-  // 4. Top Header: Minimal Frosted Glass Badge
+    ctx.save();
+    ctx.font = 'bold 22px Arial, sans-serif';
+    const w1 = ctx.measureText(badgeText1).width;
+    ctx.font = 'bold 20px Arial, sans-serif';
+    const wSep = ctx.measureText(badgeSep).width;
+    ctx.font = '600 22px Arial, sans-serif';
+    const w2 = ctx.measureText(badgeText2).width;
+
+    const padX = 26;
+    const hBoxW = Math.min(width - 60, Math.round(w1 + wSep + w2 + padX * 2));
+    const hBoxH = 54;
+    const hBoxX = Math.round((width - hBoxW) / 2);
+    const hBoxY = headerY;
+
+    ctx.shadowColor = 'rgba(0, 240, 255, 0.75)';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = 'rgba(14, 4, 26, 0.94)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX, hBoxY, hBoxW, hBoxH, 8);
+    else ctx.rect(hBoxX, hBoxY, hBoxW, hBoxH);
+    ctx.fill();
+
+    const hbGrad = ctx.createLinearGradient(hBoxX, hBoxY, hBoxX + hBoxW, hBoxY + hBoxH);
+    hbGrad.addColorStop(0, '#00F0FF');
+    hbGrad.addColorStop(0.5, '#F72585');
+    hbGrad.addColorStop(1, '#00F0FF');
+    ctx.strokeStyle = hbGrad;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4, 6);
+    else ctx.rect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4);
+    ctx.stroke();
+
+    let curX = hBoxX + padX;
+    const textCenterY = hBoxY + hBoxH / 2 + 1;
+
+    ctx.font = 'bold 22px Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(badgeText1, curX, textCenterY);
+    curX += w1;
+
+    ctx.font = 'bold 20px Arial, sans-serif';
+    ctx.fillStyle = '#00F0FF';
+    ctx.fillText(badgeSep, curX, textCenterY);
+    curX += wSep;
+
+    ctx.font = '600 22px Arial, sans-serif';
+    ctx.fillStyle = '#00F0FF';
+    ctx.fillText(badgeText2, curX, textCenterY);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : (isVideoEssay ? 'rgba(14, 14, 18, 0.95)' : 'rgba(14, 14, 18, 0.88)');
+    ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(204, 255, 0, 0.60)');
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(headerX, headerY, headerW, headerH, 27);
+    else ctx.rect(headerX, headerY, headerW, headerH);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 21px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (isClubbing) {
+      ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, headerY + headerH / 2);
+    } else if (isMovie) {
+      ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
+    } else {
+      ctx.fillText(`${cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'}  |  Daily Knowledge`, width / 2, headerY + headerH / 2);
+    }
+  }
+
+  // 5. Bottom CTA Sticker
   ctx.save();
-  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : (isVideoEssay ? 'rgba(14, 14, 18, 0.95)' : 'rgba(14, 14, 18, 0.88)');
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.60)' : 'rgba(247, 37, 133, 0.35)'));
-  ctx.lineWidth = 1.5;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(headerX, headerY, headerW, headerH, 27);
-  } else {
-    ctx.rect(headerX, headerY, headerW, headerH);
-  }
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Top Header Text (safe typography)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 21px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if (isClubbing) {
-    ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, headerY + headerH / 2);
-  } else if (isMovie) {
-    ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
-  } else if (isVideoEssay) {
-    ctx.fillText(`⚡ ${cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'}  |  Daily Knowledge`, width / 2, headerY + headerH / 2);
-  } else {
-    ctx.fillText(`@${cleanHandle}  |  Official News & Leaks`, width / 2, headerY + headerH / 2);
-  }
-
-  // 5. Bottom CTA Sticker (clean interactive pill)
   const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
-  ctx.save();
   if (isClubbing) {
     ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
     ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
@@ -670,34 +885,31 @@ function generateStoryOverlay(handle, options = {}) {
     ctaGrad.addColorStop(1, '#99E600');
     ctx.shadowColor = 'rgba(204, 255, 0, 0.60)';
   } else {
-    ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.90)');
-    ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.90)');
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.45)';
+    ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.95)');
+    ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.95)');
+    ctx.shadowColor = 'rgba(247, 37, 133, 0.65)';
   }
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 18;
   ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.8)' : 'rgba(255, 255, 255, 0.25)');
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.8)' : (isMovie ? 'rgba(255, 215, 120, 0.5)' : 'rgba(0, 240, 255, 0.50)'));
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
-  } else {
-    ctx.rect(ctaX, ctaY, ctaW, ctaH);
-  }
+  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
+  else ctx.rect(ctaX, ctaY, ctaW, ctaH);
   ctx.fill();
   ctx.stroke();
   ctx.restore();
 
   ctx.fillStyle = isClubbing ? '#051209' : (isVideoEssay ? '#000000' : '#FFFFFF');
-  ctx.font = isVideoEssay ? '900 20px Arial, sans-serif' : 'bold 19px Arial, sans-serif';
+  ctx.font = isVideoEssay ? '900 20px Arial, sans-serif' : '900 19px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+  ctx.shadowBlur = 6;
   if (isClubbing) {
     ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
   } else if (isMovie) {
     ctx.fillText('Watch Full Scene  >', width / 2, ctaY + ctaH / 2);
-  } else if (isVideoEssay) {
-    ctx.fillText('⚡ Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
   } else {
     ctx.fillText('Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
   }
@@ -3007,7 +3219,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   const filter = [
     '[0:v]split=2[bg_raw][fg_raw]',
     '[bg_raw]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,boxblur=10:1,eq=brightness=-0.32:contrast=0.94,scale=1080:1920:flags=fast_bilinear[bg]',
-    `[fg_raw]scale=${geom.cardW}:${geom.cardH}[card]`,
+    `[fg_raw]scale=${geom.cardW}:${geom.cardH}:force_original_aspect_ratio=increase,crop=${geom.cardW}:${geom.cardH}[card]`,
     `[bg][card]overlay=${geom.cardX}:${geom.cardY}[v1]`,
     '[v1][1:v]overlay=0:0[outv]'
   ].join(';');
@@ -3123,8 +3335,8 @@ async function prepareImageForStory(inputImagePath, options = {}) {
 
   // 2. Compute dynamic card geometry tailored to image aspect ratio
   const geom = computeStoryCardGeometry(img.width, img.height);
-  const { cardX, cardY, cardW, cardH, headerX, headerY, headerW, headerH, ctaX, ctaY, ctaW, ctaH } = geom;
-  const radius = 24;
+  const { cardX, cardY, cardW, cardH } = geom;
+  const radius = 18;
 
   // Draw centered image inside card with rounded corners
   ctx.save();
@@ -3135,99 +3347,16 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   ctx.drawImage(img, cardX, cardY, cardW, cardH);
   ctx.restore();
 
-  // Draw sleek hairline border around the image card
-  const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-  ctx.save();
-  if (isClubbing) {
-    borderGrad.addColorStop(0, '#00FFA3');
-    borderGrad.addColorStop(0.5, '#00E5FF');
-    borderGrad.addColorStop(1, '#39FF14');
-    ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
-  } else if (isMovie) {
-    borderGrad.addColorStop(0, 'rgba(255, 215, 120, 0.90)');
-    borderGrad.addColorStop(0.5, 'rgba(212, 175, 55, 0.55)');
-    borderGrad.addColorStop(1, 'rgba(193, 18, 31, 0.75)');
-    ctx.shadowColor = 'rgba(212, 175, 55, 0.40)';
-  } else {
-    borderGrad.addColorStop(0, '#00F0FF');
-    borderGrad.addColorStop(0.5, '#F72585');
-    borderGrad.addColorStop(1, '#FF8A00');
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.45)';
-  }
-
-  ctx.shadowBlur = 16;
-  ctx.strokeStyle = borderGrad;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-  else ctx.rect(cardX, cardY, cardW, cardH);
-  ctx.stroke();
-  ctx.restore();
-
-  // 3. Top Header: Minimal Frosted Glass Badge
-  ctx.save();
-  ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : 'rgba(14, 14, 18, 0.88)';
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(247, 37, 133, 0.35)');
-  ctx.lineWidth = 1.5;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(headerX, headerY, headerW, headerH, 27);
-  else ctx.rect(headerX, headerY, headerW, headerH);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 21px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if (isClubbing) {
-    ctx.fillText(`@${cleanHandle}  |  Live Sets & Parties`, width / 2, headerY + headerH / 2);
-  } else if (isMovie) {
-    ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
-  } else {
-    ctx.fillText(`@${cleanHandle}  |  Official News & Leaks`, width / 2, headerY + headerH / 2);
-  }
-
-  // 4. Bottom CTA Sticker
-  const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
-  ctx.save();
-  if (isClubbing) {
-    ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
-    ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
-    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
-  } else if (isMovie) {
-    ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
-    ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
-    ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
-  } else {
-    ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.90)');
-    ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.90)');
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.45)';
-  }
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : 'rgba(255, 255, 255, 0.25)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
-  else ctx.rect(ctaX, ctaY, ctaW, ctaH);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.fillStyle = isClubbing ? '#051209' : '#FFFFFF';
-  ctx.font = 'bold 19px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if (isClubbing) {
-    ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
-  } else if (isMovie) {
-    ctx.fillText('View Full Post  >', width / 2, ctaY + ctaH / 2);
-  } else {
-    ctx.fillText('View Full Post  >', width / 2, ctaY + ctaH / 2);
-  }
+  // 3. Composite full branded Story overlay on top (borders, corner brackets, header, bottom bar, CTA)
+  const overlayPngPath = generateStoryOverlay(cleanHandle, {
+    ...options,
+    theme,
+    ...geom,
+    inputWidth: img.width,
+    inputHeight: img.height
+  });
+  const overlayImg = await loadImage(overlayPngPath);
+  ctx.drawImage(overlayImg, 0, 0, width, height);
 
   const dir = path.dirname(absPath);
   const ext = path.extname(absPath);

@@ -491,6 +491,48 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.equal(tokenWords[0], 'Why', 'First token must be "Why"');
     assert.equal(tokenWords[tokenWords.length - 1], 'Time', 'Last token must be "Time"');
   });
+
+  await t.test('18. Authentic Multi-Ratio GTA 6 Story Template & Passthrough Subsystem', () => {
+    const { computeStoryCardGeometry, generateStoryOverlay } = require('../src/utils/ffmpegHelper');
+    const jobWorkerCode = fs.readFileSync(path.join(__dirname, '../src/core/jobWorker.js'), 'utf8');
+    const ffmpegHelperCode = fs.readFileSync(path.join(__dirname, '../src/utils/ffmpegHelper.js'), 'utf8');
+
+    // 1. Multi-Ratio Geometry Responsiveness
+    const g16x9 = computeStoryCardGeometry(1920, 1080);
+    assert.equal(g16x9.cardW, 1032, '16:9 card width must be 1032px');
+    assert.equal(g16x9.cardH, 580, '16:9 card height must be 580px');
+    assert.equal(g16x9.cardX, 24, '16:9 card X must be centered at 24px');
+    assert.equal(g16x9.cardY, 670, '16:9 card Y must be centered at 670px');
+
+    const g1x1 = computeStoryCardGeometry(1080, 1080);
+    assert.equal(g1x1.cardW, 1000, '1:1 card width must be 1000px');
+    assert.equal(g1x1.cardH, 1000, '1:1 card height must be 1000px');
+
+    const g9x16 = computeStoryCardGeometry(1080, 1920);
+    assert.equal(g9x16.cardW, 860, '9:16 card width must be 860px');
+    assert.equal(g9x16.cardH, 1528, '9:16 card height must be 1528px');
+
+    // 2. Story Overlay Generation with GTA 6 Signature Elements
+    const gtaOverlay = generateStoryOverlay('gta6_updates_007', {
+      inputWidth: 1920,
+      inputHeight: 1080,
+      theme: 'gta6',
+      page: { slug: 'gta6', name: 'GTA 6 Updates 007' }
+    });
+    assert.ok(fs.existsSync(gtaOverlay), 'GTA 6 Story Overlay file must exist');
+
+    // 3. Double-Framing Elimination in jobWorker
+    assert.ok(
+      jobWorkerCode.includes("videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null"),
+      'jobWorker must pass raw mediaPaths[0] to publishStory to avoid double-framing'
+    );
+
+    // 4. Zero Distortion Aspect Ratio Fitting in prepareVideoForStory
+    assert.ok(
+      ffmpegHelperCode.includes('force_original_aspect_ratio=increase,crop=${geom.cardW}:${geom.cardH}[card]'),
+      'prepareVideoForStory must use force_original_aspect_ratio=increase,crop to prevent video stretching'
+    );
+  });
 });
 
 
