@@ -76,14 +76,7 @@ function downloadInstagramMedia(url) {
       // Ensure Meta compliance
       try {
         if (isVideo && mediaPaths.length > 0) {
-          const absVideoPath = path.join(publicDir, mediaPaths[0].replace(/^\//, ''));
-          if (fs.existsSync(absVideoPath)) {
-            if (isMetaCompliantVideo(absVideoPath)) {
-              console.log('[Downloader] ⚡ Video is already Meta-compliant H.264/AAC. Skipping redundant transcode pass.');
-            } else {
-              await ensureMetaCompliantVideo(absVideoPath);
-            }
-          }
+          console.log('[Downloader] ⚡ Fast path: Skipping redundant pre-transcode pass (prepareVideoForFeedCard will apply branding & Meta encoding).');
         } else if (mediaPaths.length > 0) {
           for (let i = 0; i < mediaPaths.length; i++) {
             const absImgPath = path.join(publicDir, mediaPaths[i].replace(/^\//, ''));

@@ -390,27 +390,24 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     }
   });
 
-  await t.test('14. Zero-Click Instant Autonomous Cloud Dispatch & Target Resolver', () => {
-    const { resolveAutoTargetPage } = require('../api/telegram-webhook');
+  await t.test('14. Interactive Destination Page Selection Keyboard & Callback Routing', async () => {
+    const { buildPageSelectionKeyboard, getPagesList } = require('../api/telegram-webhook');
 
-    // 1. Plain Instagram URL with no text -> defaults to Page 4 (@cult_information)
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/DEb9X7oTq12/'), '4', 'Plain URL must default to Cult Information (Page 4)');
+    const pages = await getPagesList();
+    const shortcode = 'TEST_SHORTCODE_123';
+    const keyboard = buildPageSelectionKeyboard(shortcode, pages);
 
-    // 2. Movie/cinema keywords in shared text -> routes to Page 2 (@movie_series_365)
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Check out this new Netflix movie trailer!'), '2');
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Best scene in cinema history'), '2');
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ New sci-fi series review'), '2');
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ page:2'), '2');
+    // 1. Must generate a 2-column grid of target pages plus a cancel button
+    assert.ok(Array.isArray(keyboard), 'Keyboard must be an array of rows');
+    assert.ok(keyboard.length >= 3, 'Must have at least 2 rows of pages plus 1 cancel row');
 
-    // 3. Gaming/GTA keywords -> routes to Page 1
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ GTA 6 gameplay leak'), '1');
-
-    // 4. Clubbing/party keywords -> routes to Page 3
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Underground techno rave festival'), '3');
-
-    // 5. Tech/AI/general cult content -> routes to Page 4
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Why humans created language 50000 years ago'), '4');
-    assert.equal(resolveAutoTargetPage('https://www.instagram.com/reel/123/ Neuralink breakthrough in robotics'), '4');
+    // Flatten buttons
+    const allButtons = keyboard.flat();
+    assert.ok(allButtons.some(b => b.text.includes('Cult Information') && b.callback_data === `post:4:${shortcode}`), 'Cult Information button must exist');
+    assert.ok(allButtons.some(b => b.text.includes('Movie Series 365') && b.callback_data === `post:2:${shortcode}`), 'Movie Series 365 button must exist');
+    assert.ok(allButtons.some(b => b.text.includes('GTA 6') && b.callback_data === `post:1:${shortcode}`), 'GTA 6 button must exist');
+    assert.ok(allButtons.some(b => b.text.includes('Clubbing Cult') && b.callback_data === `post:3:${shortcode}`), 'Clubbing Cult button must exist');
+    assert.ok(allButtons.some(b => b.text.includes('Cancel') && b.callback_data === `cancel:${shortcode}`), 'Cancel button must exist');
   });
 
   await t.test('15. Extended Meta Container Polling & Audible Lock-Screen Notifications', () => {
@@ -428,6 +425,24 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(jobWorkerCode.includes('REEL IS LIVE ON INSTAGRAM'), 'jobWorker must broadcast high-visibility LIVE confirmation');
     assert.ok(repostSingleCode.includes('REEL IS LIVE ON INSTAGRAM'), 'repost_single must broadcast high-visibility LIVE confirmation');
   });
+
+  await t.test('16. Pipeline Acceleration: Downloader Bypass, Workflow Slimming & Parallel Story Pipeline', () => {
+    const downloaderCode = fs.readFileSync(path.join(__dirname, '../src/core/downloader.js'), 'utf8');
+    const workflowCode = fs.readFileSync(path.join(__dirname, '../.github/workflows/repost-job.yml'), 'utf8');
+    const jobWorkerCode = fs.readFileSync(path.join(__dirname, '../src/core/jobWorker.js'), 'utf8');
+
+    // 1. Downloader fast path bypasses redundant initial transcode
+    assert.ok(downloaderCode.includes('Skipping redundant pre-transcode pass'), 'Downloader must skip redundant pre-transcode pass for video reels');
+
+    // 2. Workflow slims pip install to fast packages only (yt-dlp requests)
+    assert.ok(workflowCode.includes('pip install --quiet --prefer-binary --no-compile yt-dlp requests'), 'Workflow must only install lightweight stream downloader');
+    assert.ok(!workflowCode.includes('yt-dlp requests playwright'), 'Workflow must NOT block on heavy Playwright installation');
+
+    // 3. Companion Story publishing runs concurrently with Feed Reel
+    assert.ok(jobWorkerCode.includes('storyPromise = publishStory'), 'jobWorker must launch story pipeline in parallel');
+    assert.ok(jobWorkerCode.includes('Pipelined Story publish launched concurrently'), 'jobWorker must log pipelined story launch');
+  });
 });
+
 
 

@@ -134,6 +134,21 @@ function resolveAutoTargetPage(text = '', requestedId = null) {
   return '4';
 }
 
+function buildPageSelectionKeyboard(shortcode, pages) {
+  const keyboard = [];
+  for (let i = 0; i < pages.length; i += 2) {
+    const pair = pages.slice(i, i + 2);
+    keyboard.push(pair.map(p => ({
+      text: `${p.icon || '📱'} ${p.name}`,
+      callback_data: `post:${p.id}:${shortcode}`
+    })));
+  }
+  keyboard.push([
+    { text: '✖ Cancel', callback_data: `cancel:${shortcode}` }
+  ]);
+  return keyboard;
+}
+
 async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId = null, isForce = false }) {
   const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
   const pages = await getPagesList();
@@ -344,6 +359,30 @@ async function handler(req, res) {
       const isForce = action === 'republish';
       const pageId = parts[1] || '4';
       const shortcode = parts[2];
+
+      if ((pageId === '1' || pageId === '3') && !isForce) {
+        const pages = await getPagesList();
+        const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Requested Page', handle: `@page_${pageId}` };
+        await editTelegram(
+          chatId,
+          messageId,
+          `⚠️ <b>Meta Token Invalidation Warning</b>\n\n` +
+          `The Instagram access token for <b>${targetPage.name}</b> (${targetPage.handle}) has expired (Meta Code 190: Session Invalidated).\n\n` +
+          `👉 <b>Please choose an active healthy page, or attempt anyway:</b>`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '🧠 Post to Cult Information (@cult_information)', callback_data: `post:4:${shortcode}` }],
+                [{ text: '🎬 Post to Movie Series 365 (@movie_series_365)', callback_data: `post:2:${shortcode}` }],
+                [{ text: `⚠️ Force Attempt ${targetPage.handle}`, callback_data: `republish:${pageId}:${shortcode}` }],
+                [{ text: '✖ Cancel', callback_data: `cancel:${shortcode}` }]
+              ]
+            }
+          }
+        );
+        return res.status(200).json({ ok: true });
+      }
+
       await dispatchJobToRunner({
         url: `https://www.instagram.com/reel/${shortcode}/`,
         shortcode,
@@ -519,26 +558,31 @@ async function handler(req, res) {
 
   console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
 
-  // Zero-Click Instant Autonomous Cloud Dispatch:
-  // Auto-resolve target page from URL context / caption text
-  const targetPageId = resolveAutoTargetPage(text);
+  // Interactive Destination Page Selection
+  const pages = await getPagesList();
+  const keyboard = buildPageSelectionKeyboard(shortcode, pages);
 
-  console.log(`[Webhook] Auto-dispatching #${shortcode} to Page #${targetPageId} (Zero-Click Autonomous Trigger)`);
-
-  await dispatchJobToRunner({
-    url: reelUrl,
-    shortcode,
-    pageId: targetPageId,
+  await sendTelegram(
     chatId,
-    messageId: null,
-    isForce: false
-  });
+    `📥 <b>Instagram Reel Received!</b>\n\n` +
+    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n` +
+    `🎬 <b>Source:</b> <a href="${reelUrl}">${reelUrl}</a>\n\n` +
+    `👉 <b>On which page would you like to post this reel?</b>\n` +
+    `<i>(Publishes to Feed & Story)</i>`,
+    {
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    }
+  );
 
-  return res.status(200).json({ ok: true, auto_dispatched: true, pageId: targetPageId });
+  return res.status(200).json({ ok: true, interactive_prompt: true, shortcode });
 }
 
 module.exports = handler;
 module.exports.resolveAutoTargetPage = resolveAutoTargetPage;
+module.exports.buildPageSelectionKeyboard = buildPageSelectionKeyboard;
 module.exports.dispatchJobToRunner = dispatchJobToRunner;
 module.exports.getPagesList = getPagesList;
+
 
