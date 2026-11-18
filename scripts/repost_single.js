@@ -100,8 +100,8 @@ async function main() {
       slug: 'gta6',
       name: 'GTA 6 Updates 007',
       handle: '@gta6_updates_007',
-      ig_user_id: process.env.IG_USER_ID || '17841428668115319',
-      access_token: process.env.META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFpESVB4emc1aUk5SzRaRWlpMU51MWoybGdtSGkzUmIyc0pZANkNNb0lJa25LTXVpVVFmdGllVHIzWmZAYZAXlKTTAtbGhnOVd6YlQ5dUE2SjRzZAk9HdEN5eFl4a0lWQ1NGY3N5aEx0VTZAJSWoyWnVXTmlVbGREdwZDZD',
+      ig_user_id: process.env.IG_USER_ID || '29662149860039587',
+      access_token: process.env.META_ACCESS_TOKEN || 'IGAAYJvfGkRZCRBZAFkzb20xakJwYmhsa3R2ci1uelN3NG5DQ1g1dzl4eW9vY2g3QjNyLVB6aEtzWWprV1ZAyV1pBbVN1ZAWdUeldBenNZAZAi12LXZApeFBFdnRlYWpQQzVqaU03RDFLY19jR1AwMHh6dTdWUWhzRXByOTFzVG9pTEhTYwZDZD',
       default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks'
     },
     {

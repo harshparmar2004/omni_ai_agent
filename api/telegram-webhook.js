@@ -360,7 +360,7 @@ async function handler(req, res) {
       const pageId = parts[1] || '4';
       const shortcode = parts[2];
 
-      if ((pageId === '1' || pageId === '3') && !isForce) {
+      if (pageId === '3' && !isForce) {
         const pages = await getPagesList();
         const targetPage = pages.find(p => String(p.id) === String(pageId)) || { name: 'Requested Page', handle: `@page_${pageId}` };
         await editTelegram(
@@ -373,6 +373,7 @@ async function handler(req, res) {
             reply_markup: {
               inline_keyboard: [
                 [{ text: '🧠 Post to Cult Information (@cult_information)', callback_data: `post:4:${shortcode}` }],
+                [{ text: '🎮 Post to GTA 6 Updates (@gta6_updates_007)', callback_data: `post:1:${shortcode}` }],
                 [{ text: '🎬 Post to Movie Series 365 (@movie_series_365)', callback_data: `post:2:${shortcode}` }],
                 [{ text: `⚠️ Force Attempt ${targetPage.handle}`, callback_data: `republish:${pageId}:${shortcode}` }],
                 [{ text: '✖ Cancel', callback_data: `cancel:${shortcode}` }]

@@ -74,7 +74,7 @@ async function main() {
   if (pages.length === 0) {
     console.log('📄 No pages found in database. Initializing default baseline channels...');
     const defaultPages = [
-      { slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', ig_user_id: process.env.IG_USER_ID || '17841428668115319', access_token: process.env.META_ACCESS_TOKEN || '', default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' },
+      { slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', ig_user_id: process.env.IG_USER_ID || '29662149860039587', access_token: process.env.META_ACCESS_TOKEN || '', default_hashtags: '#gta6 #gtavi #rockstargames #vicecity #gta6leaks' },
       { slug: 'movies', name: 'Movie Recommendations', handle: '@movie_series_365', ig_user_id: process.env.MOVIE_IG_USER_ID || '29048404444808513', access_token: process.env.MOVIE_META_ACCESS_TOKEN || '', default_hashtags: '#movies #movierecommendations #filmtok #cinema #mustwatch #365movies' },
       { slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', ig_user_id: process.env.CLUBBING_IG_USER_ID || '29109331262052643', access_token: process.env.CLUBBING_CULT_META_ACCESS_TOKEN || process.env.CLUBBING_META_ACCESS_TOKEN || '', default_hashtags: '#clubbing #party #houseparty #concert #rave #techno #edm #nightlife #festivals #clubbingcult' },
       { slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', ig_user_id: process.env.CULT_INFO_IG_USER_ID || '17841462998491309', access_token: process.env.CULT_INFO_META_ACCESS_TOKEN || '', default_hashtags: '#cultinformation #ai #tech #breakdown #videoessay' }
