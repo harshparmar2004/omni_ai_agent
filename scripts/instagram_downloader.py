@@ -6,7 +6,6 @@ import shutil
 import zipfile
 import asyncio
 import subprocess
-from playwright.async_api import async_playwright
 
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -50,6 +49,16 @@ async def download_scoped_instagram_media(url, output_dir, shortcode):
     if os.path.exists(carousel_dir):
         shutil.rmtree(carousel_dir, ignore_errors=True)
     os.makedirs(carousel_dir, exist_ok=True)
+
+    try:
+        from playwright.async_api import async_playwright
+    except ImportError:
+        print("[Downloader] ⚡ Playwright package missing, installing on-demand...", file=sys.stderr)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "--prefer-binary", "playwright"], check=False)
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError as e:
+            return {"success": False, "error": f"Playwright library not available: {e}"}
 
     async with async_playwright() as p:
         try:
