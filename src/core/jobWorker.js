@@ -343,6 +343,7 @@ class JobWorkerPool {
       let processedMediaPaths = [...mediaPaths];
       let feedVideoPath = mediaPaths[0];
       let pageTheme = 'gta6';
+      let storyPromise = null;
 
       if (mediaType === 'reel') {
         // Dynamic template resolution from page_templates table
@@ -427,7 +428,6 @@ class JobWorkerPool {
 
         // Pipelined Companion Story Generation & Upload:
         // Launch Story processing concurrently with Feed Reel publishing to cut turnaround time in half!
-        let storyPromise = null;
         if (autoPostStory && (mediaPaths[0] || processedMediaPaths[0])) {
           console.log(`[Job Worker] 🚀 Pipelined Story publish launched concurrently for ${page.handle}...`);
           storyPromise = publishStory({
