@@ -430,10 +430,12 @@ class JobWorkerPool {
         // Launch Story processing concurrently with Feed Reel publishing to cut turnaround time in half!
         if (autoPostStory && (mediaPaths[0] || processedMediaPaths[0])) {
           console.log(`[Job Worker] 🚀 Pipelined Story publish launched concurrently for ${page.handle}...`);
+          const storyVideoInput = feedVideoPath || processedMediaPaths[0] || mediaPaths[0];
+          const storyImageInput = processedMediaPaths[0] || mediaPaths[0];
           storyPromise = publishStory({
             page,
-            videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? (mediaPaths[0] || processedMediaPaths[0]) : null,
+            videoPath: mediaType === 'reel' ? storyVideoInput : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? storyImageInput : null,
             hookHeadline
           }).catch(storyErr => {
             console.warn(`[Job Worker] ⚠️ Pipelined Story notice: ${storyErr.message}`);
@@ -515,10 +517,12 @@ class JobWorkerPool {
       } else if (autoPostStory && (mediaPaths[0] || processedMediaPaths[0])) {
         try {
           console.log(`[Job Worker] 🌟 Publishing Instagram Story for ${page.handle}...`);
+          const storyVideoInput = feedVideoPath || processedMediaPaths[0] || mediaPaths[0];
+          const storyImageInput = processedMediaPaths[0] || mediaPaths[0];
           storyResult = await publishStory({
             page,
-            videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null,
-            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? (mediaPaths[0] || processedMediaPaths[0]) : null,
+            videoPath: mediaType === 'reel' ? storyVideoInput : null,
+            imagePath: (mediaType === 'image' || mediaType === 'carousel') ? storyImageInput : null,
             hookHeadline
           });
         } catch (storyErr) {

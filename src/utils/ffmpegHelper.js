@@ -751,21 +751,93 @@ function generateStoryOverlay(handle, options = {}) {
     ctx.shadowBlur = 6;
     ctx.fillText('◄ ◄  DAILY MOVIE & SERIES RECOMMENDATIONS  ► ►', cardX + cardW / 2, botBarY - 14);
     ctx.restore();
-  } else {
-    // Clubbing Cult or Cult Information
+  } else if (isVideoEssay) {
+    // Cult Information Editorial Archive Framing
     ctx.save();
     const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-    if (isClubbing) {
-      borderGrad.addColorStop(0, '#00FFA3');
-      borderGrad.addColorStop(0.5, '#00E5FF');
-      borderGrad.addColorStop(1, '#39FF14');
-      ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
-    } else {
-      borderGrad.addColorStop(0, '#CCFF00');
-      borderGrad.addColorStop(0.5, '#FFFFFF');
-      borderGrad.addColorStop(1, '#A6FF00');
-      ctx.shadowColor = 'rgba(204, 255, 0, 0.50)';
-    }
+    borderGrad.addColorStop(0, '#CCFF00');
+    borderGrad.addColorStop(0.35, '#FFFFFF');
+    borderGrad.addColorStop(0.70, '#A6FF00');
+    borderGrad.addColorStop(1, '#CCFF00');
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.40)';
+    ctx.shadowBlur = 14;
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.stroke();
+
+    // Inner subtle white rail
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.20)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX + 6, cardY + 6, cardW - 12, cardH - 12, 14);
+    else ctx.rect(cardX + 6, cardY + 6, cardW - 12, cardH - 12);
+    ctx.stroke();
+
+    // 4 Minimalist Corner Tick Brackets (Documentary / Archive style)
+    const bLen = Math.min(32, Math.round(cardW * 0.06));
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#CCFF00';
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.55)';
+    ctx.shadowBlur = 8;
+
+    // TL
+    ctx.beginPath();
+    ctx.moveTo(cardX - 4, cardY + bLen); ctx.lineTo(cardX - 4, cardY - 4); ctx.lineTo(cardX + bLen, cardY - 4);
+    ctx.stroke();
+
+    // TR
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 4); ctx.lineTo(cardX + cardW + 4, cardY - 4); ctx.lineTo(cardX + cardW + 4, cardY + bLen);
+    ctx.stroke();
+
+    // BL
+    ctx.beginPath();
+    ctx.moveTo(cardX - 4, cardY + cardH - bLen); ctx.lineTo(cardX - 4, cardY + cardH + 4); ctx.lineTo(cardX + bLen, cardY + cardH + 4);
+    ctx.stroke();
+
+    // BR
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 4); ctx.lineTo(cardX + cardW + 4, cardY + cardH + 4); ctx.lineTo(cardX + cardW + 4, cardY - bLen);
+    ctx.stroke();
+
+    // Bottom Boundary Brand Bar
+    const botBarW = Math.min(640, cardW - 60);
+    const botBarX = cardX + (cardW - botBarW) / 2;
+    const botBarY = cardY + cardH - 10;
+    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+    botGrad.addColorStop(0, 'rgba(204, 255, 0, 0)');
+    botGrad.addColorStop(0.2, '#CCFF00');
+    botGrad.addColorStop(0.5, '#FFFFFF');
+    botGrad.addColorStop(0.8, '#A6FF00');
+    botGrad.addColorStop(1, 'rgba(166, 255, 0, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.65)';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(botBarX, botBarY, botBarW, 6, 3);
+    else ctx.rect(botBarX, botBarY, botBarW, 6);
+    ctx.fill();
+
+    ctx.font = '800 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('◄ ◄  CULT INFORMATION • UNTOLD KNOWLEDGE  ► ►', cardX + cardW / 2, botBarY - 14);
+    ctx.restore();
+  } else {
+    // Clubbing Cult
+    ctx.save();
+    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    borderGrad.addColorStop(0, '#00FFA3');
+    borderGrad.addColorStop(0.5, '#00E5FF');
+    borderGrad.addColorStop(1, '#39FF14');
+    ctx.shadowColor = 'rgba(0, 255, 163, 0.60)';
     ctx.shadowBlur = 16;
     ctx.strokeStyle = borderGrad;
     ctx.lineWidth = 3;
@@ -842,10 +914,75 @@ function generateStoryOverlay(handle, options = {}) {
     ctx.fillStyle = '#00F0FF';
     ctx.fillText(badgeText2, curX, textCenterY);
     ctx.restore();
+  } else if (isVideoEssay) {
+    const pageName = options.pageName || options.page?.name || (cleanHandle.includes('cult') ? 'Cult Information' : cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
+    const badgeText1 = '[ NEW POST ]';
+    const badgeSep = '   ';
+    const badgeText2 = pageName.toUpperCase();
+
+    ctx.save();
+    ctx.font = '900 20px "Segoe UI", Arial, sans-serif';
+    const w1 = ctx.measureText(badgeText1).width;
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    const wSep = ctx.measureText(badgeSep).width;
+    ctx.font = '800 20px "Segoe UI", Arial, sans-serif';
+    const w2 = ctx.measureText(badgeText2).width;
+
+    const padX = 26;
+    const hBoxW = Math.min(width - 60, Math.round(w1 + wSep + w2 + padX * 2));
+    const hBoxH = 54;
+    const hBoxX = Math.round((width - hBoxW) / 2);
+    const hBoxY = headerY;
+
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.55)';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = 'rgba(10, 10, 14, 0.95)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX, hBoxY, hBoxW, hBoxH, 27);
+    else ctx.rect(hBoxX, hBoxY, hBoxW, hBoxH);
+    ctx.fill();
+
+    const hbGrad = ctx.createLinearGradient(hBoxX, hBoxY, hBoxX + hBoxW, hBoxY + hBoxH);
+    hbGrad.addColorStop(0, '#CCFF00');
+    hbGrad.addColorStop(0.5, '#FFFFFF');
+    hbGrad.addColorStop(1, '#A6FF00');
+    ctx.strokeStyle = hbGrad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4, 25);
+    else ctx.rect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4);
+    ctx.stroke();
+
+    let curX = hBoxX + padX;
+    const textCenterY = hBoxY + hBoxH / 2 + 1;
+
+    ctx.font = '900 20px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#CCFF00';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(badgeText1, curX, textCenterY);
+    curX += w1;
+
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.50)';
+    ctx.fillText(badgeSep, curX, textCenterY);
+    curX += wSep;
+
+    ctx.font = '800 20px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(badgeText2, curX, textCenterY);
+    ctx.restore();
   } else {
     ctx.save();
-    ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : (isVideoEssay ? 'rgba(14, 14, 18, 0.95)' : 'rgba(14, 14, 18, 0.88)');
-    ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : (isMovie ? 'rgba(255, 215, 120, 0.35)' : 'rgba(204, 255, 0, 0.60)');
+    ctx.fillStyle = isClubbing ? 'rgba(4, 18, 10, 0.90)' : 'rgba(14, 14, 18, 0.88)';
+    ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.45)' : 'rgba(255, 215, 120, 0.35)';
     ctx.lineWidth = 1.5;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
     ctx.shadowBlur = 12;
@@ -862,56 +999,98 @@ function generateStoryOverlay(handle, options = {}) {
     ctx.textBaseline = 'middle';
     if (isClubbing) {
       ctx.fillText(`@${cleanHandle.toLowerCase()}`, width / 2, headerY + headerH / 2);
-    } else if (isMovie) {
-      ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
     } else {
-      ctx.fillText(`${cleanHandle.includes('cult') ? 'Cult Information' : 'Evolving AI'}  |  Daily Knowledge`, width / 2, headerY + headerH / 2);
+      ctx.fillText(`@${cleanHandle}  |  Cinema Picks`, width / 2, headerY + headerH / 2);
     }
   }
 
   // 5. Bottom CTA Sticker
-  ctx.save();
-  const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
-  if (isClubbing) {
-    ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
-    ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
-    ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
-  } else if (isMovie) {
-    ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
-    ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
-    ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
-  } else if (isVideoEssay) {
-    ctaGrad.addColorStop(0, '#CCFF00');
-    ctaGrad.addColorStop(1, '#99E600');
-    ctx.shadowColor = 'rgba(204, 255, 0, 0.60)';
-  } else {
-    ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.95)');
-    ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.95)');
-    ctx.shadowColor = 'rgba(247, 37, 133, 0.65)';
-  }
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = ctaGrad;
-  ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : (isVideoEssay ? 'rgba(204, 255, 0, 0.8)' : (isMovie ? 'rgba(255, 215, 120, 0.5)' : 'rgba(0, 240, 255, 0.50)'));
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
-  else ctx.rect(ctaX, ctaY, ctaW, ctaH);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  if (isVideoEssay) {
+    const ctaBoxW = Math.min(width - 80, Math.max(cardW - 40, 520));
+    const ctaBoxH = 66;
+    const ctaBoxX = Math.round((width - ctaBoxW) / 2);
+    const ctaBoxY = Math.min(height - ctaBoxH - 96, cardY + cardH + 18);
 
-  ctx.fillStyle = isClubbing ? '#051209' : (isVideoEssay ? '#000000' : '#FFFFFF');
-  ctx.font = isVideoEssay ? '900 20px Arial, sans-serif' : '900 19px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-  ctx.shadowBlur = 6;
-  if (isClubbing) {
-    ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
-  } else if (isMovie) {
-    ctx.fillText('Watch Full Scene  >', width / 2, ctaY + ctaH / 2);
+    ctx.save();
+    ctx.shadowColor = 'rgba(204, 255, 0, 0.50)';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = 'rgba(12, 12, 16, 0.95)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(ctaBoxX, ctaBoxY, ctaBoxW, ctaBoxH, 33);
+    else ctx.rect(ctaBoxX, ctaBoxY, ctaBoxW, ctaBoxH);
+    ctx.fill();
+
+    const ctaGrad = ctx.createLinearGradient(ctaBoxX, ctaBoxY, ctaBoxX + ctaBoxW, ctaBoxY + ctaBoxH);
+    ctaGrad.addColorStop(0, '#CCFF00');
+    ctaGrad.addColorStop(0.5, '#FFFFFF');
+    ctaGrad.addColorStop(1, '#A6FF00');
+    ctx.strokeStyle = ctaGrad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(ctaBoxX + 2, ctaBoxY + 2, ctaBoxW - 4, ctaBoxH - 4, 31);
+    else ctx.rect(ctaBoxX + 2, ctaBoxY + 2, ctaBoxW - 4, ctaBoxH - 4);
+    ctx.stroke();
+
+    // Line 1: Primary Action
+    ctx.font = '900 17px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#CCFF00';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('TAP TO WATCH FULL REEL  ►', width / 2, ctaBoxY + 23);
+
+    // Line 2: Follow for more build-up
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowBlur = 4;
+    ctx.fillText(`FOLLOW @${cleanHandle} FOR MORE DEEP KNOWLEDGE`, width / 2, ctaBoxY + 45);
+    ctx.restore();
   } else {
-    ctx.fillText('Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
+    ctx.save();
+    const ctaGrad = ctx.createLinearGradient(ctaX, ctaY, ctaX + ctaW, ctaY + ctaH);
+    if (isClubbing) {
+      ctaGrad.addColorStop(0, 'rgba(0, 255, 163, 0.95)');
+      ctaGrad.addColorStop(1, 'rgba(0, 180, 110, 0.95)');
+      ctx.shadowColor = 'rgba(0, 255, 163, 0.55)';
+    } else if (isMovie) {
+      ctaGrad.addColorStop(0, 'rgba(193, 18, 31, 0.90)');
+      ctaGrad.addColorStop(1, 'rgba(120, 0, 0, 0.90)');
+      ctx.shadowColor = 'rgba(193, 18, 31, 0.45)';
+    } else {
+      ctaGrad.addColorStop(0, 'rgba(247, 37, 133, 0.95)');
+      ctaGrad.addColorStop(1, 'rgba(114, 9, 183, 0.95)');
+      ctx.shadowColor = 'rgba(247, 37, 133, 0.65)';
+    }
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = ctaGrad;
+    ctx.strokeStyle = isClubbing ? 'rgba(0, 255, 163, 0.5)' : (isMovie ? 'rgba(255, 215, 120, 0.5)' : 'rgba(0, 240, 255, 0.50)');
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(ctaX, ctaY, ctaW, ctaH, 27);
+    else ctx.rect(ctaX, ctaY, ctaW, ctaH);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = isClubbing ? '#051209' : '#FFFFFF';
+    ctx.font = '900 19px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 6;
+    if (isClubbing) {
+      ctx.fillText('Watch Live Set  >', width / 2, ctaY + ctaH / 2);
+    } else if (isMovie) {
+      ctx.fillText('Watch Full Scene  >', width / 2, ctaY + ctaH / 2);
+    } else {
+      ctx.fillText('Watch Full Reel  >', width / 2, ctaY + ctaH / 2);
+    }
   }
 
   const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -3318,6 +3497,10 @@ async function prepareImageForStory(inputImagePath, options = {}) {
     bgGrad.addColorStop(0, 'rgba(8, 8, 12, 0.78)');
     bgGrad.addColorStop(0.5, 'rgba(22, 14, 18, 0.65)');
     bgGrad.addColorStop(1, 'rgba(6, 6, 8, 0.85)');
+  } else if (isVideoEssay) {
+    bgGrad.addColorStop(0, 'rgba(10, 10, 14, 0.96)');
+    bgGrad.addColorStop(0.5, 'rgba(18, 18, 24, 0.88)');
+    bgGrad.addColorStop(1, 'rgba(8, 8, 10, 0.96)');
   } else {
     bgGrad.addColorStop(0, 'rgba(10, 4, 24, 0.80)');
     bgGrad.addColorStop(0.5, 'rgba(28, 8, 45, 0.65)');
@@ -3329,7 +3512,7 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, (isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : 'rgba(0, 0, 0, 0.70)');
+  vig.addColorStop(1, (isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.70)'));
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 

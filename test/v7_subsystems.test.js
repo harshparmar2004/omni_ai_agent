@@ -521,10 +521,10 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     });
     assert.ok(fs.existsSync(gtaOverlay), 'GTA 6 Story Overlay file must exist');
 
-    // 3. Double-Framing Elimination in jobWorker
+    // 3. Story Video Feed Passthrough in jobWorker
     assert.ok(
-      jobWorkerCode.includes("videoPath: mediaType === 'reel' ? (mediaPaths[0] || processedMediaPaths[0]) : null"),
-      'jobWorker must pass raw mediaPaths[0] to publishStory to avoid double-framing'
+      jobWorkerCode.includes("storyVideoInput = feedVideoPath || processedMediaPaths[0] || mediaPaths[0]"),
+      'jobWorker must pass edited feedVideoPath to publishStory'
     );
 
     // 4. Zero Distortion Aspect Ratio Fitting in prepareVideoForStory
