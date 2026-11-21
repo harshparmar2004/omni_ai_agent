@@ -48,15 +48,16 @@ function isChatAuthorized(chatId) {
 function getPageIcon(page) {
   const handle = (page.handle || '').toLowerCase();
   const slug = (page.slug || '').toLowerCase();
+  if (slug === 'cherry' || handle.includes('cherry') || page.is_ai_influencer) return '🍒';
   if (slug === 'movies' || handle.includes('movie_series_365')) return '🎬';
   if (slug === 'clubbing' || handle.includes('clubbingcult')) return '🍸';
   if (slug === 'cult_information' || handle.includes('cult_information')) return '🧠';
   if (slug === 'gta6' || handle.includes('gta6_updates_007')) return '🎮';
-  return '📱';
+  return page.icon || '📱';
 }
 
 function sortPages(pages) {
-  const order = ['movies', 'clubbing', 'cult_information', 'gta6'];
+  const order = ['cherry', 'cult_information', 'clubbing', 'gta6', 'movies'];
   return [...pages].sort((a, b) => {
     const idxA = order.indexOf(a.slug);
     const idxB = order.indexOf(b.slug);

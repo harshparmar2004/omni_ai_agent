@@ -33,6 +33,7 @@ function loadInfluencerProfile(influencerIdOrSlug) {
   const candidates = [
     path.join(configDir, `${cleanId}.json`),
     path.join(configDir, `${cleanId.replace(/_official$/, '')}.json`),
+    path.join(configDir, 'cherry.json'),
     path.join(configDir, 'aria_vance.json'),
     path.join(configDir, 'default_influencer.json')
   ];
@@ -103,7 +104,7 @@ function generateDynamicWardrobePrompt(influencerProfile, context = {}) {
   let hashNum = 0;
   for (let i = 0; i < seed.length; i++) hashNum = (hashNum + seed.charCodeAt(i)) % wardrobePresets.length;
 
-  return `${influencerProfile?.name || 'Aria'} ${wardrobePresets[hashNum]}, ${aesthetic}, photorealistic 8k, natural lighting, high dynamic range`;
+  return `${influencerProfile?.name || 'Cherry'} ${wardrobePresets[hashNum]}, ${aesthetic}, photorealistic 8k, natural lighting, high dynamic range`;
 }
 
 /**

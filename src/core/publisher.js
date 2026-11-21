@@ -428,10 +428,11 @@ async function publishStory({ page, videoPath = null, imagePath = null, hookHead
   const isVideo = Boolean(videoPath);
   let publicMediaUrl = '';
 
+  const isCherryPage = page.slug === 'cherry' || page.id === 5 || String(page.id) === '5' || (page.handle && page.handle.includes('cherry')) || page.is_ai_influencer || page.influencer_profile_id === 'cherry';
   const isClubbingPage = page.slug === 'clubbing' || page.id === 3 || String(page.id) === '3' || (page.handle && page.handle.includes('club'));
   const isMoviePage = page.slug === 'movies' || page.id === 2 || String(page.id) === '2' || (page.handle && page.handle.includes('movie'));
   const isVideoEssayPage = page.slug === 'cult_information' || page.slug === 'ai_curation' || page.id === 4 || String(page.id) === '4' || (page.handle && (page.handle.includes('cult') || page.handle.includes('evolving')));
-  const pageTheme = isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6'));
+  const pageTheme = isCherryPage ? 'cherry' : (isClubbingPage ? 'clubbing' : (isMoviePage ? 'movies' : (isVideoEssayPage ? 'video_essay' : 'gta6')));
 
   if (isVideo) {
     const { prepareVideoForStory } = require('../utils/ffmpegHelper');

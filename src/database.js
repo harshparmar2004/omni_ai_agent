@@ -385,6 +385,52 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN origin_job_id INTEGER REFERENCES publish_jobs(id)'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN is_ai_influencer INTEGER DEFAULT 0'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN influencer_profile_id TEXT DEFAULT NULL'); } catch (e) {}
+
+  // Seed/Ensure Cherry AI Influencer Page
+  try {
+    const existingCherryPage = db.prepare('SELECT id FROM pages WHERE slug = ?').get('cherry');
+    if (!existingCherryPage) {
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO pages (
+          slug, name, handle, ig_user_id, access_token, caption_template,
+          default_hashtags, attribution_enabled, watermark_enabled, post_mode,
+          posts_per_cycle, daily_quota, min_spacing_minutes, is_active,
+          page_type, influencer_profile_id, is_ai_influencer, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'cherry',
+        'Cherry',
+        '@cherry_official',
+        'PENDING_CHERRY_IG_USER_ID',
+        'PENDING_CHERRY_ACCESS_TOKEN',
+        '{caption}\n\n{hashtags}',
+        '#cherry #aiinfluencer #outfitinspo #viralreels #explorepage',
+        0,
+        0,
+        'auto',
+        1,
+        10,
+        60,
+        1,
+        'ai_influencer',
+        'cherry',
+        1,
+        now,
+        now
+      );
+    } else {
+      db.prepare(`
+        UPDATE pages SET
+          page_type = 'ai_influencer',
+          influencer_profile_id = 'cherry',
+          is_ai_influencer = 1
+        WHERE slug = 'cherry'
+      `).run();
+    }
+  } catch (e) {
+    console.warn('[Database] Notice initializing cherry page:', e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -491,7 +537,7 @@ function updatePage(id, data) {
     'post_mode', 'posts_per_cycle', 'daily_quota', 'min_spacing_minutes', 'is_active',
     'page_type', 'niche', 'timezone', 'region', 'onboarding_status', 'template_slug',
     'auto_story', 'auto_cross_post', 'brand_logo_path', 'brand_theme', 'brand_accent_color',
-    'brand_font', 'template_preset'
+    'brand_font', 'template_preset', 'influencer_profile_id', 'is_ai_influencer'
   ];
 
   for (const key of allowed) {

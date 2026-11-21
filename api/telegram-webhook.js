@@ -82,7 +82,7 @@ async function getPagesList() {
           slug: p.slug || p.handle?.replace(/^@/, ''),
           name: p.name,
           handle: p.handle,
-          icon: p.slug?.includes('gta') ? '🎮' : (p.slug?.includes('club') ? '🍸' : (p.slug?.includes('movie') ? '🎬' : '🧠'))
+          icon: p.slug?.includes('cherry') ? '🍒' : (p.slug?.includes('gta') ? '🎮' : (p.slug?.includes('club') ? '🍸' : (p.slug?.includes('movie') ? '🎬' : '🧠')))
         }));
         if (pagesArray.length > 0) {
           cachedPages = pagesArray;
@@ -112,15 +112,19 @@ async function getPagesList() {
     { id: '1', slug: 'gta6', name: 'GTA 6 Updates 007', handle: '@gta6_updates_007', icon: '🎮' },
     { id: '2', slug: 'movies', name: 'Movie Series 365', handle: '@movie_series_365', icon: '🎬' },
     { id: '3', slug: 'clubbing', name: 'Clubbing Cult', handle: '@clubbingcult', icon: '🍸' },
-    { id: '4', slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', icon: '🧠' }
+    { id: '4', slug: 'cult_information', name: 'Cult Information', handle: '@cult_information', icon: '🧠' },
+    { id: '5', slug: 'cherry', name: 'Cherry', handle: '@cherry_official', icon: '🍒', page_type: 'ai_influencer', is_ai_influencer: 1 }
   ];
 }
 
 function resolveAutoTargetPage(text = '', requestedId = null) {
-  if (requestedId && ['1', '2', '3', '4'].includes(String(requestedId))) {
+  if (requestedId && ['1', '2', '3', '4', '5'].includes(String(requestedId))) {
     return String(requestedId);
   }
   const lower = (text || '').toLowerCase();
+  if (lower.includes('page:5') || lower.includes('p:5') || lower.includes('@cherry') || lower.includes('cherry') || /influencer|model|outfit|lifestyle|cherry/i.test(lower)) {
+    return '5'; // @cherry_official
+  }
   if (lower.includes('page:2') || lower.includes('p:2') || lower.includes('@movie_series_365') || /movie|film|series|cinema|netflix|hollywood|trailer|actor|actress|scene|imdb/i.test(lower)) {
     return '2'; // @movie_series_365
   }

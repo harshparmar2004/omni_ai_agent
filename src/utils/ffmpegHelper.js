@@ -19,7 +19,7 @@ try {
  * Supports: 'clubbing' (Cyber/Party HUD), 'movies' (Cinematic Gold), 'video_essay' (Editorial Lime), 'gta6' (Vice City Card)
  */
 function resolvePageTheme(pageOrHandle, explicitTheme = null) {
-  if (explicitTheme && ['clubbing', 'movies', 'video_essay', 'gta6', 'minimal'].includes(explicitTheme)) {
+  if (explicitTheme && ['cherry', 'clubbing', 'movies', 'video_essay', 'gta6', 'minimal'].includes(explicitTheme)) {
     return explicitTheme;
   }
 
@@ -31,6 +31,20 @@ function resolvePageTheme(pageOrHandle, explicitTheme = null) {
   const niche = (page.niche || '').toLowerCase();
 
   const combined = `${handle} ${slug} ${name} ${preset} ${niche}`;
+
+  // 0. AI Influencer / Cherry Theme (e.g. Cherry, @cherry_official)
+  if (
+    explicitTheme === 'cherry' ||
+    page.is_ai_influencer ||
+    page.page_type === 'ai_influencer' ||
+    page.influencer_profile_id === 'cherry' ||
+    slug === 'cherry' ||
+    handle.includes('cherry') ||
+    combined.includes('cherry') ||
+    preset === 'cherry'
+  ) {
+    return 'cherry';
+  }
 
   // 1. Party / Clubbing / Rave / EDM / Concert / Cyber Theme (e.g. Cult Party, Clubbing Cult)
   if (
@@ -522,15 +536,17 @@ function generateStoryOverlay(handle, options = {}) {
   const ctx = canvas.getContext('2d');
 
   const cleanHandle = (handle || 'gta6_updates_007').replace(/^@/, '');
+  const isCherry = options.theme === 'cherry' || cleanHandle.includes('cherry') || (options.page && (options.page.slug === 'cherry' || options.page.is_ai_influencer || options.page.influencer_profile_id === 'cherry'));
   const theme = options.theme || (
-    cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
+    isCherry ? 'cherry' :
+    (cleanHandle.includes('club') || (options.page && options.page.slug === 'clubbing') ? 'clubbing' :
     (cleanHandle.includes('movie') || (options.page && options.page.slug === 'movies') ? 'movies' :
-    (cleanHandle.includes('cult') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation') ? 'video_essay' : 'gta6'))
+    (cleanHandle.includes('cult') || (options.page && options.page.slug === 'cult_information') || cleanHandle.includes('evolving') || (options.page && options.page.slug === 'ai_curation') ? 'video_essay' : 'gta6')))
   );
-  const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
-  const isMovie = theme === 'movies';
-  const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
-  const isGTA6 = !isClubbing && !isMovie && !isVideoEssay;
+  const isClubbing = !isCherry && (theme === 'clubbing' || theme === 'clubbingcult');
+  const isMovie = !isCherry && (theme === 'movies');
+  const isVideoEssay = !isCherry && (theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai');
+  const isGTA6 = !isCherry && !isClubbing && !isMovie && !isVideoEssay;
 
   // Compute or inherit dynamic geometry
   const computed = computeStoryCardGeometry(options.inputWidth || 1080, options.inputHeight || 1920);
@@ -549,7 +565,11 @@ function generateStoryOverlay(handle, options = {}) {
 
   // 1. Ambient Background color tint & vignette
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  if (isClubbing) {
+  if (isCherry) {
+    bgGrad.addColorStop(0, 'rgba(28, 6, 16, 0.94)');
+    bgGrad.addColorStop(0.5, 'rgba(18, 4, 12, 0.88)');
+    bgGrad.addColorStop(1, 'rgba(10, 2, 8, 0.96)');
+  } else if (isClubbing) {
     bgGrad.addColorStop(0, 'rgba(4, 18, 10, 0.85)');
     bgGrad.addColorStop(0.5, 'rgba(6, 28, 14, 0.72)');
     bgGrad.addColorStop(1, 'rgba(2, 12, 6, 0.90)');
@@ -572,7 +592,7 @@ function generateStoryOverlay(handle, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, isClubbing ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.75)'));
+  vig.addColorStop(1, isCherry ? 'rgba(0, 0, 0, 0.82)' : (isClubbing ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.75)')));
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 
@@ -590,7 +610,82 @@ function generateStoryOverlay(handle, options = {}) {
   ctx.restore();
 
   // 3. Signature Framing / Border around the media card
-  if (isGTA6) {
+  if (isCherry) {
+    ctx.save();
+    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    borderGrad.addColorStop(0, '#FF3366');
+    borderGrad.addColorStop(0.35, '#FFB6C1');
+    borderGrad.addColorStop(0.70, '#FF758C');
+    borderGrad.addColorStop(1, '#FF2A6D');
+    ctx.shadowColor = 'rgba(255, 51, 102, 0.55)';
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX, cardY, cardW, cardH, radius);
+    else ctx.rect(cardX, cardY, cardW, cardH);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 182, 193, 0.28)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(cardX + 6, cardY + 6, cardW - 12, cardH - 12, 14);
+    else ctx.rect(cardX + 6, cardY + 6, cardW - 12, cardH - 12);
+    ctx.stroke();
+
+    const bLen = Math.min(36, Math.round(cardW * 0.07));
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#FF758C';
+    ctx.shadowColor = 'rgba(255, 117, 140, 0.65)';
+    ctx.shadowBlur = 10;
+
+    // TL
+    ctx.beginPath();
+    ctx.moveTo(cardX - 5, cardY + bLen); ctx.lineTo(cardX - 5, cardY - 5); ctx.lineTo(cardX + bLen, cardY - 5);
+    ctx.stroke();
+
+    // TR
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY - 5); ctx.lineTo(cardX + cardW + 5, cardY - 5); ctx.lineTo(cardX + cardW + 5, cardY + bLen);
+    ctx.stroke();
+
+    // BL
+    ctx.beginPath();
+    ctx.moveTo(cardX - 5, cardY + cardH - bLen); ctx.lineTo(cardX - 5, cardY + cardH + 5); ctx.lineTo(cardX + bLen, cardY + cardH + 5);
+    ctx.stroke();
+
+    // BR
+    ctx.beginPath();
+    ctx.moveTo(cardX + cardW - bLen, cardY + cardH + 5); ctx.lineTo(cardX + cardW + 5, cardY + cardH + 5); ctx.lineTo(cardX + cardW + 5, cardY - bLen);
+    ctx.stroke();
+
+    const botBarW = Math.min(640, cardW - 60);
+    const botBarX = cardX + (cardW - botBarW) / 2;
+    const botBarY = cardY + cardH - 10;
+    const botGrad = ctx.createLinearGradient(botBarX, botBarY, botBarX + botBarW, botBarY);
+    botGrad.addColorStop(0, 'rgba(255, 51, 102, 0)');
+    botGrad.addColorStop(0.2, '#FF3366');
+    botGrad.addColorStop(0.5, '#FFB6C1');
+    botGrad.addColorStop(0.8, '#FF758C');
+    botGrad.addColorStop(1, 'rgba(255, 117, 140, 0)');
+    ctx.fillStyle = botGrad;
+    ctx.shadowColor = 'rgba(255, 51, 102, 0.75)';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(botBarX, botBarY, botBarW, 6, 3);
+    else ctx.rect(botBarX, botBarY, botBarW, 6);
+    ctx.fill();
+
+    ctx.font = '800 12px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('◄ ◄  CHERRY • OFFICIAL AI INFLUENCER  ► ►', cardX + cardW / 2, botBarY - 14);
+    ctx.restore();
+  } else if (isGTA6) {
     // 8px glowing multi-stop neon gradient border
     ctx.save();
     const bGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
@@ -849,7 +944,71 @@ function generateStoryOverlay(handle, options = {}) {
   }
 
   // 4. Top Header Box
-  if (isGTA6) {
+  if (isCherry) {
+    const badgeText1 = '[ NEW REEL ]';
+    const badgeSep = '   ';
+    const badgeText2 = '🍒 CHERRY';
+
+    ctx.save();
+    ctx.font = '900 20px "Segoe UI", Arial, sans-serif';
+    const w1 = ctx.measureText(badgeText1).width;
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    const wSep = ctx.measureText(badgeSep).width;
+    ctx.font = '800 20px "Segoe UI", Arial, sans-serif';
+    const w2 = ctx.measureText(badgeText2).width;
+
+    const padX = 26;
+    const hBoxW = Math.min(width - 60, Math.round(w1 + wSep + w2 + padX * 2));
+    const hBoxH = 54;
+    const hBoxX = Math.round((width - hBoxW) / 2);
+    const hBoxY = headerY;
+
+    ctx.shadowColor = 'rgba(255, 51, 102, 0.55)';
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = 'rgba(26, 6, 16, 0.95)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX, hBoxY, hBoxW, hBoxH, 27);
+    else ctx.rect(hBoxX, hBoxY, hBoxW, hBoxH);
+    ctx.fill();
+
+    const hbGrad = ctx.createLinearGradient(hBoxX, hBoxY, hBoxX + hBoxW, hBoxY + hBoxH);
+    hbGrad.addColorStop(0, '#FF3366');
+    hbGrad.addColorStop(0.5, '#FFB6C1');
+    hbGrad.addColorStop(1, '#FF758C');
+    ctx.strokeStyle = hbGrad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 182, 193, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4, 25);
+    else ctx.rect(hBoxX + 2, hBoxY + 2, hBoxW - 4, hBoxH - 4);
+    ctx.stroke();
+
+    let curX = hBoxX + padX;
+    const textCenterY = hBoxY + hBoxH / 2 + 1;
+
+    ctx.font = '900 20px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FF758C';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+    ctx.shadowBlur = 4;
+    ctx.fillText(badgeText1, curX, textCenterY);
+    curX += w1;
+
+    ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.50)';
+    ctx.fillText(badgeSep, curX, textCenterY);
+    curX += wSep;
+
+    ctx.font = '800 20px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(badgeText2, curX, textCenterY);
+    ctx.restore();
+  } else if (isGTA6) {
     const pageName = options.pageName || options.page?.name || (cleanHandle.includes('gta') ? 'GTA 6 Updates 007' : cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()));
     const badgeText1 = pageName;
     const badgeSep = '  |  ';
@@ -1005,7 +1164,53 @@ function generateStoryOverlay(handle, options = {}) {
   }
 
   // 5. Bottom CTA Sticker
-  if (isVideoEssay) {
+  if (isCherry) {
+    const ctaBoxW = Math.min(width - 80, Math.max(cardW - 40, 520));
+    const ctaBoxH = 66;
+    const ctaBoxX = Math.round((width - ctaBoxW) / 2);
+    const ctaBoxY = Math.min(height - ctaBoxH - 96, cardY + cardH + 18);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(255, 51, 102, 0.55)';
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = 'rgba(24, 6, 16, 0.95)';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(ctaBoxX, ctaBoxY, ctaBoxW, ctaBoxH, 33);
+    else ctx.rect(ctaBoxX, ctaBoxY, ctaBoxW, ctaBoxH);
+    ctx.fill();
+
+    const ctaGrad = ctx.createLinearGradient(ctaBoxX, ctaBoxY, ctaBoxX + ctaBoxW, ctaBoxY + ctaBoxH);
+    ctaGrad.addColorStop(0, '#FF3366');
+    ctaGrad.addColorStop(0.5, '#FFB6C1');
+    ctaGrad.addColorStop(1, '#FF758C');
+    ctx.strokeStyle = ctaGrad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 182, 193, 0.20)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(ctaBoxX + 2, ctaBoxY + 2, ctaBoxW - 4, ctaBoxH - 4, 31);
+    else ctx.rect(ctaBoxX + 2, ctaBoxY + 2, ctaBoxW - 4, ctaBoxH - 4);
+    ctx.stroke();
+
+    // Line 1: Primary Action
+    ctx.font = '900 17px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FF758C';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText('TAP TO WATCH FULL REEL  ►', width / 2, ctaBoxY + 23);
+
+    // Line 2: Follow for more
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowBlur = 4;
+    ctx.fillText(`FOLLOW @${cleanHandle} FOR MORE`, width / 2, ctaBoxY + 45);
+    ctx.restore();
+  } else if (isVideoEssay) {
     const ctaBoxW = Math.min(width - 80, Math.max(cardW - 40, 520));
     const ctaBoxH = 66;
     const ctaBoxX = Math.round((width - ctaBoxW) / 2);
@@ -3357,10 +3562,12 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
 
   const handle = (options.handle || 'gta6_updates_007').replace(/^@+/, '');
   const theme = options.theme || (
-    handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    handle.includes('cherry') || options.page?.slug === 'cherry' || options.page?.is_ai_influencer ? 'cherry' :
+    (handle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
     (options.page?.slug === 'movies' || handle.includes('movie') ? 'movies' :
-    (handle.includes('cult') || options.page?.slug === 'cult_information' || handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6'))
+    (handle.includes('cult') || options.page?.slug === 'cult_information' || handle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6')))
   );
+  const isCherry = theme === 'cherry';
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
   const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
@@ -3392,7 +3599,7 @@ async function prepareVideoForStory(inputVideoPath, options = {}) {
   const base = path.basename(absPath, ext);
   const storyOutput = path.join(dir, `${base}_story_card.mp4`);
 
-  const themeName = isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Editorial' : 'GTA 6'));
+  const themeName = isCherry ? 'Cherry Rose-Gold Ambient' : (isClubbing ? 'Clubbing Cult Neon Green' : (isMovie ? 'Cinematic Movie' : (isVideoEssay ? 'Cult Information Editorial' : 'GTA 6')));
   console.log(`[FFmpeg Helper] 🎨 Composing ${themeName} Instagram Story Reel Card for @${handle} (${videoWidth}x${videoHeight} -> Card ${geom.cardW}x${geom.cardH} @ ${geom.cardX},${geom.cardY})...`);
 
   const filter = [
@@ -3470,10 +3677,12 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   const { createCanvas, loadImage } = require('@napi-rs/canvas');
   const cleanHandle = (options.handle || 'gta6_updates_007').replace(/^@/, '');
   const theme = options.theme || (
-    cleanHandle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
+    cleanHandle.includes('cherry') || options.page?.slug === 'cherry' || options.page?.is_ai_influencer ? 'cherry' :
+    (cleanHandle.includes('club') || options.page?.slug === 'clubbing' ? 'clubbing' :
     (options.page?.slug === 'movies' || cleanHandle.includes('movie') ? 'movies' :
-    (cleanHandle.includes('cult') || options.page?.slug === 'cult_information' || cleanHandle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6'))
+    (cleanHandle.includes('cult') || options.page?.slug === 'cult_information' || cleanHandle.includes('evolving') || options.page?.slug === 'ai_curation' ? 'video_essay' : 'gta6')))
   );
+  const isCherry = theme === 'cherry';
   const isClubbing = theme === 'clubbing' || theme === 'clubbingcult';
   const isMovie = theme === 'movies';
   const isVideoEssay = theme === 'video_essay' || theme === 'cult_information' || theme === 'evolving_ai';
@@ -3489,7 +3698,11 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   ctx.drawImage(img, -width * 0.25, -height * 0.25, width * 1.5, height * 1.5);
 
   const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-  if (isClubbing) {
+  if (isCherry) {
+    bgGrad.addColorStop(0, 'rgba(28, 6, 16, 0.94)');
+    bgGrad.addColorStop(0.5, 'rgba(18, 4, 12, 0.88)');
+    bgGrad.addColorStop(1, 'rgba(10, 2, 8, 0.96)');
+  } else if (isClubbing) {
     bgGrad.addColorStop(0, 'rgba(4, 18, 10, 0.85)');
     bgGrad.addColorStop(0.5, 'rgba(6, 28, 14, 0.72)');
     bgGrad.addColorStop(1, 'rgba(2, 12, 6, 0.90)');
@@ -3512,7 +3725,7 @@ async function prepareImageForStory(inputImagePath, options = {}) {
   // Radial vignette
   const vig = ctx.createRadialGradient(width / 2, height / 2, 350, width / 2, height / 2, 950);
   vig.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vig.addColorStop(1, (isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.70)'));
+  vig.addColorStop(1, isCherry ? 'rgba(0, 0, 0, 0.82)' : ((isClubbing || isMovie) ? 'rgba(0, 0, 0, 0.85)' : (isVideoEssay ? 'rgba(0, 0, 0, 0.90)' : 'rgba(0, 0, 0, 0.70)')));
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, width, height);
 

@@ -286,16 +286,17 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
                        page.id === 4 || String(page.id) === '4';
 
   const isInfluencer = Boolean(
+    page.slug === 'cherry' ||
     page.is_ai_influencer ||
     page.page_type === 'ai_influencer' ||
     page.influencer_profile_id ||
-    (page.handle && /influencer|avatar|model|persona/i.test(page.handle))
+    (page.handle && /cherry|influencer|avatar|model|persona/i.test(page.handle))
   );
 
   if (isInfluencer) {
-    console.log('[LLM Service] 💃 AI Influencer Account detected: Generating first-person lifestyle caption.');
+    console.log('[LLM Service] 🍒 AI Influencer Account detected: Generating first-person lifestyle caption.');
     const { loadInfluencerProfile } = require('./aiInfluencerService');
-    const profile = loadInfluencerProfile(page.influencer_profile_id || page.handle);
+    const profile = loadInfluencerProfile(page.influencer_profile_id || (page.slug === 'cherry' ? 'cherry' : page.handle) || 'cherry');
     return await generateInfluencerCaption({ page, profile, rawCaption, hookHeadline });
   }
 
@@ -680,27 +681,44 @@ ${cleanedSource || 'Latest game engine details, physics enhancements, and map sc
  * Generates an authentic, high-converting first-person lifestyle caption for AI Influencer accounts.
  */
 async function generateInfluencerCaption({ page = {}, profile = null, rawCaption = '', hookHeadline = '' }) {
-  const handle = page.handle || profile?.handle || '@influencer';
-  const name = profile?.name || page.name || 'Aria';
+  const isCherry = Boolean(
+    page.slug === 'cherry' ||
+    profile?.id === 'cherry' ||
+    (page.handle && page.handle.toLowerCase().includes('cherry'))
+  );
 
-  const captionPool = [
+  const handle = page.handle || profile?.handle || (isCherry ? '@cherry_official' : '@influencer');
+  const name = isCherry ? 'Cherry' : (profile?.name || page.name || 'Cherry');
+
+  const cherryCaptionPool = [
+    `Felt this vibe today 🍒✨ What do you think of this fit? 1 or 2? Let me know in the comments! 💕\n\n💬 Drop a 🍒 if you want more daily looks!\n💾 Save this for your style inspo moodboard!\n✨ Follow ${handle} for daily fashion, dance & lifestyle!`,
+    `Obsessed with this energy today 💫 Taking a moment between shoots to vibe out. What are your weekend plans?\n\n💬 Chat with me in the comments 👇\n🍒 Follow ${handle} for more daily aesthetic fits!`,
+    `Golden hour hitting just right today ☀️ Would you wear this outfit? Rate it 1-10 below 👇\n\n💖 Save this reel & tag your bestie!\n🍒 Follow ${handle} for daily luxury streetwear & lifestyle inspo!`,
+    `Can't get enough of this choreography ✨ Good vibes only today! What's your current favorite song?\n\n💬 Drop your song recs below 👇\n🍒 Follow ${handle} for daily aesthetic energy & viral reels!`
+  ];
+
+  const standardCaptionPool = [
     `Tried this vibe today ✨ What do you think of this look? 1 or 2? Let me know in the comments! 👇\n\n💬 Drop a 💕 if you want more daily outfits!\n💾 Save this for your style moodboard!`,
     `Felt this energy immediately 💫 Obsessed with this sound and this fit today. What are your plans this weekend?\n\n💬 Tell me below 👇\n✨ Follow ${handle} for daily fashion, fitness & lifestyle inspo!`,
     `Golden hour hitting just right today ☀️ Would you wear this fit? Rate it 1-10 below 👇\n\n💖 Save this reel & tag your bestie!\n✨ Follow ${handle} for more daily lifestyle looks!`,
     `Can't get enough of this choreography ✨ Taking today to reset and create. What's your favorite song right now?\n\n💬 Let's chat in the comments 👇\n🌸 Follow ${handle} for daily inspiration & good energy!`
   ];
 
+  const captionPool = isCherry ? cherryCaptionPool : standardCaptionPool;
+
   const seed = String(rawCaption || hookHeadline || new Date().toISOString().slice(0, 10));
   let idx = 0;
   for (let i = 0; i < seed.length; i++) idx = (idx + seed.charCodeAt(i)) % captionPool.length;
   let bodyText = captionPool[idx];
 
-  const hashtags = '#aiinfluencer #outfitinspo #fashionstyle #explorepage #viralreels #aesthetic #lifestyle #styleinspo';
+  const hashtags = isCherry
+    ? '#cherry #aiinfluencer #outfitinspo #viralreels #explorepage #cherryofficial #aesthetic #lifestyle'
+    : '#aiinfluencer #outfitinspo #fashionstyle #explorepage #viralreels #aesthetic #lifestyle #styleinspo';
   const finalCaption = `${bodyText}\n\n${hashtags}`;
 
   return {
     caption: finalCaption,
-    provider: 'influencer_persona',
+    provider: isCherry ? 'cherry_persona' : 'influencer_persona',
     model: 'first_person_lifestyle',
     breakdown: bodyText
   };

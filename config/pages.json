@@ -28,5 +28,15 @@
     "handle": "@cult_information",
     "ig_user_id": "17841462998491309",
     "icon": "🧠"
+  },
+  {
+    "id": "5",
+    "slug": "cherry",
+    "name": "Cherry",
+    "handle": "@cherry_official",
+    "icon": "🍒",
+    "page_type": "ai_influencer",
+    "influencer_profile_id": "cherry",
+    "is_ai_influencer": 1
   }
 ]

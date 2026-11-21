@@ -270,7 +270,15 @@ class JobWorkerPool {
         } catch (_) {}
       }
 
-      const isVideoEssay = page && (
+      const isInfluencerPage = Boolean(
+        page.slug === 'cherry' ||
+        page.is_ai_influencer ||
+        page.page_type === 'ai_influencer' ||
+        page.influencer_profile_id ||
+        (page.handle && /cherry|influencer|avatar|model|persona/i.test(page.handle))
+      );
+
+      const isVideoEssay = !isInfluencerPage && page && (
         page.slug === 'cult_information' ||
         page.handle?.includes('cult_information') ||
         page.content_type === 'feed_card' ||
@@ -353,9 +361,10 @@ class JobWorkerPool {
         } catch (_) {}
 
         const explicitTheme = savedTemplate?.template_type || page.template_slug || page.template_preset || page.brand_theme;
-        pageTheme = resolvePageTheme(page, explicitTheme);
+        pageTheme = isInfluencerPage ? 'cherry' : resolvePageTheme(page, explicitTheme);
 
         const themeLabels = {
+          cherry: 'Cherry Rose-Gold Ambient',
           clubbing: 'Clubbing Cult Neon Green',
           movies: 'Cinematic Movie',
           video_essay: 'Editorial Video-Essay',
@@ -371,18 +380,11 @@ class JobWorkerPool {
         });
 
         // ── AI Influencer Avatar Transformation Layer ──
-        const isInfluencerPage = Boolean(
-          page.is_ai_influencer ||
-          page.page_type === 'ai_influencer' ||
-          page.influencer_profile_id ||
-          (page.handle && /influencer|avatar|model|persona/i.test(page.handle))
-        );
-
         if (isInfluencerPage && mediaPaths[0]) {
           try {
             const { transformReelToInfluencer, loadInfluencerProfile } = require('./aiInfluencerService');
-            console.log(`[Job Worker] 💃 AI Influencer Channel detected for ${page.handle}: Transforming video with persistent character identity...`);
-            const profile = loadInfluencerProfile(page.influencer_profile_id || page.handle || 'default');
+            console.log(`[Job Worker] 🍒 Dedicated Cherry Influencer Pipeline active for ${page.handle}: Transforming video with persistent character identity...`);
+            const profile = loadInfluencerProfile(page.influencer_profile_id || (page.slug === 'cherry' ? 'cherry' : page.handle) || 'cherry');
             const transformed = await transformReelToInfluencer(mediaPaths[0], profile, { page, hookHeadline });
             if (transformed?.videoPath) {
               const absTransformed = (path.isAbsolute(transformed.videoPath) && fs.existsSync(transformed.videoPath))
@@ -400,7 +402,8 @@ class JobWorkerPool {
           }
         }
 
-        if (brandingMode === 'frame') {
+        // For influencer channels, keep Feed Reel 100% full-screen photorealistic clean video (no news card frame or watermarks)
+        if (!isInfluencerPage && brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying ${themeLabel} Framed Template to Feed Reel for ${page.handle}...`);
@@ -424,7 +427,7 @@ class JobWorkerPool {
           } catch (frameErr) {
             console.warn(`[Job Worker] Feed frame notice: ${frameErr.message}`);
           }
-        } else if (brandingMode === 'watermark') {
+        } else if (!isInfluencerPage && brandingMode === 'watermark') {
           try {
             const { applyBrandedFeedOverlay } = require('../utils/ffmpegHelper');
             console.log(`[Job Worker] 🎨 Applying custom ${themeLabel} watermark to Reel for ${page.handle}...`);

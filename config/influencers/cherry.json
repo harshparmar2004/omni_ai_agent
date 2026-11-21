@@ -1,0 +1,38 @@
+{
+  "id": "cherry",
+  "name": "Cherry",
+  "handle": "@cherry_official",
+  "gender": "female",
+  "age": 21,
+  "ethnicity": "radiant_brunette",
+  "features": {
+    "eye_color": "warm almond hazel",
+    "hair_style": "long wavy espresso hair with soft sun-kissed highlights",
+    "physique": "fit athletic toned, natural graceful proportions",
+    "signature_vibe": "luxury streetwear, aesthetic dance, rooftop lifestyle, gym chic, modern high-fashion"
+  },
+  "reference_images": [
+    "public/influencers/cherry/face_front.png",
+    "public/influencers/cherry/face_angle.png",
+    "public/influencers/cherry/body_full.png"
+  ],
+  "prompt_profile": "hyper-realistic raw portrait photo of Cherry (@cherry_official), 21yo, radiant warm almond hazel eyes, natural skin texture with subtle pores, long wavy espresso hair, golden hour soft rim lighting, luxury chic aesthetic, photorealistic 8k",
+  "negative_prompt": "cgi, 3d render, anime, plastic smooth skin, distorted hands, extra fingers, cartoon, blurry, low resolution, bad anatomy, overexposed",
+  "provider": "alibaba_wan",
+  "mode": "real_world_passthrough",
+  "wan_settings": {
+    "model": "wan3.0-video",
+    "guide_scale": 6.0,
+    "flow_shift": 5.0,
+    "sampling_steps": 25,
+    "strength": 0.82,
+    "resolution": "720p",
+    "aspect_ratio": "9:16",
+    "backend": "dashscope",
+    "enable_audio": true,
+    "max_duration_seconds": 7
+  },
+  "enable_codeformer": true,
+  "fidelity_weight": 0.88,
+  "created_at": "2026-11-21T23:55:00.000Z"
+}
