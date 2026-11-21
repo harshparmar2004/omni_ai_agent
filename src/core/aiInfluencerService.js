@@ -69,7 +69,7 @@ function loadInfluencerProfile(influencerIdOrSlug) {
     provider: 'alibaba_wan',
     mode: 'real_world_passthrough',
     wan_settings: {
-      model: 'wan3.0-video-prime',
+      model: 'wan3.0-video',
       guide_scale: 6.0,
       flow_shift: 5.0,
       sampling_steps: 25,
@@ -77,7 +77,8 @@ function loadInfluencerProfile(influencerIdOrSlug) {
       resolution: '720p',
       aspect_ratio: '9:16',
       backend: 'dashscope',
-      enable_audio: true
+      enable_audio: true,
+      max_duration_seconds: 7
     },
     enable_codeformer: true,
     fidelity_weight: 0.88
@@ -194,10 +195,25 @@ async function transformReelToInfluencer(inputVideoPath, influencerProfile = nul
 async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile, apiKey, options = {}) {
   const wanCfg = profile.wan_settings || {};
   const backend = (options.backend || wanCfg.backend || 'dashscope').toLowerCase();
-  const model = options.model || wanCfg.model || 'wan3.0-video-prime';
+  const model = options.model || wanCfg.model || 'wan3.0-video';
   const prompt = options.prompt || generateDynamicWardrobePrompt(profile, options);
   const negativePrompt = options.negative_prompt || profile.negative_prompt || 'cgi, 3d render, anime, plastic smooth skin, distorted hands, cartoon, blurry, low resolution';
-  const isWan3 = /3\.0|prime/i.test(model);
+  const isWan3 = /3\.0|wan3/i.test(model);
+
+  // Budget Guard: Trim video to max_duration_seconds (default 7s) to protect against unexpected high input+output API charges
+  const maxDuration = options.max_duration || wanCfg.max_duration_seconds || 7;
+  let videoToSend = inputVideoPath;
+  let tempTrimmed = null;
+  if (maxDuration > 0 && fs.existsSync(inputVideoPath)) {
+    try {
+      tempTrimmed = targetOutput.replace(/\.mp4$/, '_hook_clip.mp4');
+      execSync(`ffmpeg -y -i "${inputVideoPath}" -t ${maxDuration} -c:v copy -c:a copy "${tempTrimmed}"`, { timeout: 15000, stdio: 'ignore' });
+      if (fs.existsSync(tempTrimmed)) {
+        videoToSend = tempTrimmed;
+        console.log(`[AI Influencer] ⏱️ Reel trimmed to ${maxDuration}s viral hook to optimize API billing.`);
+      }
+    } catch (_) {}
+  }
 
   console.log(`[AI Influencer] 🚀 Calling Official Alibaba Wan [Model: ${model.toUpperCase()}] [Backend: ${backend.toUpperCase()}] for ${profile.name}...`);
   console.log(`[AI Influencer] 📝 Wan Prompt: "${prompt}"`);
@@ -213,7 +229,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
       input: {
         prompt,
         negative_prompt: negativePrompt,
-        video_url: options.publicVideoUrl || `file://${inputVideoPath}`
+        video_url: options.publicVideoUrl || `file://${videoToSend}`
       },
       parameters: {
         guide_scale: wanCfg.guide_scale || 6.0,
@@ -258,6 +274,10 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
       }
     }
 
+    if (tempTrimmed && fs.existsSync(tempTrimmed)) {
+      try { fs.unlinkSync(tempTrimmed); } catch (_) {}
+    }
+
     if (videoResultUrl) {
       const writer = fs.createWriteStream(targetOutput);
       const streamRes = await axios({ url: videoResultUrl, method: 'GET', responseType: 'stream' });
@@ -291,7 +311,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
     const payload = {
       prompt,
       negative_prompt: negativePrompt,
-      video_url: options.publicVideoUrl || `file://${inputVideoPath}`,
+      video_url: options.publicVideoUrl || `file://${videoToSend}`,
       image_url: referenceImage,
       strength: wanCfg.strength || options.strength || 0.82,
       guide_scale: wanCfg.guide_scale || 6.0,
@@ -330,6 +350,10 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
       }
     }
 
+    if (tempTrimmed && fs.existsSync(tempTrimmed)) {
+      try { fs.unlinkSync(tempTrimmed); } catch (_) {}
+    }
+
     if (videoResultUrl) {
       const writer = fs.createWriteStream(targetOutput);
       const streamRes = await axios({ url: videoResultUrl, method: 'GET', responseType: 'stream' });
@@ -351,6 +375,10 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
     }
 
     throw new Error('Alibaba Wan polling timed out or returned empty video URL');
+  }
+
+  if (tempTrimmed && fs.existsSync(tempTrimmed)) {
+    try { fs.unlinkSync(tempTrimmed); } catch (_) {}
   }
 
   // Fallback to simulation
