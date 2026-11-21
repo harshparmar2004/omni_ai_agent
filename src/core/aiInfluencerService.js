@@ -69,14 +69,15 @@ function loadInfluencerProfile(influencerIdOrSlug) {
     provider: 'alibaba_wan',
     mode: 'real_world_passthrough',
     wan_settings: {
-      model: 'wan2.1-14b',
+      model: 'wan3.0-prime',
       guide_scale: 6.0,
       flow_shift: 5.0,
-      sampling_steps: 30,
+      sampling_steps: 25,
       strength: 0.82,
       resolution: '720p',
       aspect_ratio: '9:16',
-      backend: 'fal_ai'
+      backend: 'fal_ai',
+      enable_audio: true
     },
     enable_codeformer: true,
     fidelity_weight: 0.88
@@ -187,21 +188,25 @@ async function transformReelToInfluencer(inputVideoPath, influencerProfile = nul
 }
 
 /**
- * Alibaba Wan 2.1 Video Foundation Model Adapter (Wan 14B Video-to-Video & Image-to-Video)
- * Supports Fal.ai serverless Wan 2.1 endpoint, Alibaba Cloud DashScope / Bailian API, or ComfyUI node.
+ * Alibaba Wan Video Foundation Model Adapter (Wan 3.0 Prime & Wan 2.1 Video-to-Video & Image-to-Video)
+ * Supports Fal.ai serverless Wan 3.0 Prime endpoint, Alibaba Cloud DashScope / Bailian API, or ComfyUI node.
  */
 async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile, apiKey, options = {}) {
   const wanCfg = profile.wan_settings || {};
   const backend = (options.backend || wanCfg.backend || 'fal_ai').toLowerCase();
+  const model = options.model || wanCfg.model || 'wan3.0-prime';
   const prompt = options.prompt || generateDynamicWardrobePrompt(profile, options);
   const negativePrompt = options.negative_prompt || profile.negative_prompt || 'cgi, 3d render, anime, plastic smooth skin, distorted hands, cartoon, blurry, low resolution';
+  const isWan3 = /3\.0|prime/i.test(model);
 
-  console.log(`[AI Influencer] 🚀 Calling Alibaba Wan 2.1 (14B) Video Engine [Backend: ${backend.toUpperCase()}] for ${profile.name}...`);
+  console.log(`[AI Influencer] 🚀 Calling Alibaba Wan [Model: ${model.toUpperCase()}] [Backend: ${backend.toUpperCase()}] for ${profile.name}...`);
   console.log(`[AI Influencer] 📝 Wan Prompt: "${prompt}"`);
 
-  // Path A: Fal.ai Serverless Wan 2.1 Video-to-Video Endpoint
+  // Path A: Fal.ai Serverless Wan 3.0 Prime / Wan 2.1 Video-to-Video Endpoint
   if (backend === 'fal_ai' || (!process.env.DASHSCOPE_API_KEY && (process.env.FAL_KEY || process.env.FAL_AI_KEY))) {
-    const falEndpoint = 'https://queue.fal.run/fal-ai/wan/v2.1/video-to-video';
+    const falEndpoint = isWan3
+      ? 'https://queue.fal.run/alibaba/wan-3.0-prime/video-to-video'
+      : 'https://queue.fal.run/fal-ai/wan/v2.1/video-to-video';
     const referenceImage = profile.reference_images?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb';
 
     const payload = {
@@ -212,9 +217,10 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
       strength: wanCfg.strength || options.strength || 0.82,
       guide_scale: wanCfg.guide_scale || 6.0,
       flow_shift: wanCfg.flow_shift || 5.0,
-      sampling_steps: wanCfg.sampling_steps || 30,
+      sampling_steps: wanCfg.sampling_steps || 25,
       aspect_ratio: wanCfg.aspect_ratio || '9:16',
-      resolution: wanCfg.resolution || '720p'
+      resolution: wanCfg.resolution || '720p',
+      enable_audio: wanCfg.enable_audio ?? true
     };
 
     const response = await axios.post(falEndpoint, payload, {
@@ -227,7 +233,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
 
     const statusUrl = response.data?.status_url;
     const requestId = response.data?.request_id;
-    console.log(`[AI Influencer] Alibaba Wan (Fal.ai) Job Queued: Request ID ${requestId}`);
+    console.log(`[AI Influencer] Alibaba Wan (${model}) [Fal.ai] Job Queued: Request ID ${requestId}`);
 
     let videoResultUrl = null;
     const startTime = Date.now();
@@ -258,7 +264,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
         videoPath: targetOutput,
         provider: 'alibaba_wan',
         backend: 'fal_ai',
-        model: 'wan2.1-14b',
+        model,
         influencerId: profile.id,
         requestId,
         prompt
@@ -271,8 +277,9 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
   // Path B: Alibaba Cloud DashScope / Bailian API
   if (backend === 'dashscope' || process.env.DASHSCOPE_API_KEY) {
     const dashKey = process.env.DASHSCOPE_API_KEY || apiKey;
+    const dashModel = isWan3 ? (model.includes('prime') ? 'wan3.0-video-prime' : 'wan3.0-video') : (wanCfg.model || 'wanx2.1-v2v');
     const dashPayload = {
-      model: wanCfg.model || 'wanx2.1-v2v',
+      model: dashModel,
       input: {
         prompt,
         negative_prompt: negativePrompt,
@@ -281,7 +288,8 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
       parameters: {
         guide_scale: wanCfg.guide_scale || 6.0,
         flow_shift: wanCfg.flow_shift || 5.0,
-        sampling_steps: wanCfg.sampling_steps || 30
+        sampling_steps: wanCfg.sampling_steps || 25,
+        enable_audio: wanCfg.enable_audio ?? true
       }
     };
 
@@ -299,7 +307,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
     );
 
     const taskId = response.data?.output?.task_id;
-    console.log(`[AI Influencer] Alibaba Wan (DashScope) Task Queued: ${taskId}`);
+    console.log(`[AI Influencer] Alibaba Wan (${dashModel}) [DashScope] Task Queued: ${taskId}`);
 
     const startTime = Date.now();
     let videoResultUrl = null;
@@ -331,7 +339,7 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
         videoPath: targetOutput,
         provider: 'alibaba_wan',
         backend: 'dashscope',
-        model: wanCfg.model || 'wanx2.1-v2v',
+        model: dashModel,
         influencerId: profile.id,
         taskId,
         prompt

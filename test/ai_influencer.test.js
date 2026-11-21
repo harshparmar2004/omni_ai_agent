@@ -114,14 +114,15 @@ test('AI Influencer Avatar Pipeline Subsystem', async (t) => {
     }
   });
 
-  await t.test('6. Alibaba Wan 2.1 Video Engine Settings & Simulation Routing', async () => {
+  await t.test('6. Alibaba Wan 3.0 Prime Video Engine Settings & Simulation Routing', async () => {
     const profile = loadInfluencerProfile('aria_vance');
     assert.equal(profile.provider, 'alibaba_wan', 'Default provider must be alibaba_wan');
     assert.ok(profile.wan_settings, 'Profile must have wan_settings defined');
-    assert.equal(profile.wan_settings.model, 'wan2.1-14b', 'Wan model must be wan2.1-14b');
+    assert.equal(profile.wan_settings.model, 'wan3.0-prime', 'Wan model must be wan3.0-prime');
     assert.equal(profile.wan_settings.guide_scale, 6.0, 'Default guide_scale must be 6.0');
     assert.equal(profile.wan_settings.flow_shift, 5.0, 'Default flow_shift must be 5.0');
-    assert.equal(profile.wan_settings.sampling_steps, 30, 'Default sampling_steps must be 30');
+    assert.equal(profile.wan_settings.sampling_steps, 25, 'Default sampling_steps must be 25');
+    assert.equal(profile.wan_settings.enable_audio, true, 'Wan 3.0 Prime should have enable_audio true');
 
     // Test simulation dispatch under alibaba_wan provider
     const testDir = path.join(__dirname, '../public/generated/influencers');
