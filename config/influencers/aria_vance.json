@@ -1,0 +1,26 @@
+﻿{
+  "id": "aria_vance",
+  "name": "Aria Vance",
+  "handle": "@aria_vance_official",
+  "gender": "female",
+  "age": 22,
+  "ethnicity": "caucasian_brunette",
+  "features": {
+    "eye_color": "hazel green",
+    "hair_style": "long wavy espresso brown",
+    "physique": "fit athletic toned, natural aesthetic proportions",
+    "signature_vibe": "luxury streetwear, aesthetic fitness, high-fashion lifestyle"
+  },
+  "reference_images": [
+    "public/influencers/aria_vance/face_front.png",
+    "public/influencers/aria_vance/face_angle.png",
+    "public/influencers/aria_vance/body_full.png"
+  ],
+  "prompt_profile": "hyper-realistic raw portrait photo of Aria Vance, 22yo, hazel eyes, natural skin texture with subtle pores, long wavy espresso brown hair, soft rim lighting, photorealistic 8k",
+  "negative_prompt": "cgi, 3d render, anime, plastic smooth skin, distorted hands, extra fingers, cartoon, blurry, low resolution",
+  "provider": "fal_ai",
+  "mode": "real_world_passthrough",
+  "enable_codeformer": true,
+  "fidelity_weight": 0.88,
+  "created_at": "2026-11-21T21:50:00.000Z"
+}

@@ -339,6 +339,24 @@ function initV7Schema(db) {
 
     CREATE INDEX IF NOT EXISTS idx_je_job ON job_events(job_id);
     CREATE INDEX IF NOT EXISTS idx_je_stage ON job_events(stage);
+
+    -- 11. AI Influencer Profiles
+    CREATE TABLE IF NOT EXISTS influencer_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      handle TEXT NOT NULL,
+      page_id INTEGER REFERENCES pages(id),
+      provider TEXT DEFAULT 'fal_ai',
+      gender TEXT DEFAULT 'female',
+      ethnicity TEXT DEFAULT 'caucasian_brunette',
+      prompt_profile TEXT DEFAULT '',
+      negative_prompt TEXT DEFAULT '',
+      reference_images_json TEXT DEFAULT '[]',
+      config_json TEXT DEFAULT '{}',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // v8 migrations for existing tables (safe ALTER — will no-op if columns exist)
@@ -350,6 +368,8 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE pages ADD COLUMN template_slug TEXT DEFAULT \'default\''); } catch (e) {}
   try { db.exec('ALTER TABLE pages ADD COLUMN auto_story INTEGER DEFAULT 1'); } catch (e) {}
   try { db.exec('ALTER TABLE pages ADD COLUMN auto_cross_post INTEGER DEFAULT 1'); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN influencer_profile_id TEXT DEFAULT NULL'); } catch (e) {}
+  try { db.exec('ALTER TABLE pages ADD COLUMN is_ai_influencer INTEGER DEFAULT 0'); } catch (e) {}
 
   try { db.exec('ALTER TABLE source_accounts ADD COLUMN group_id INTEGER'); } catch (e) {}
   try { db.exec('ALTER TABLE source_accounts ADD COLUMN scope TEXT DEFAULT \'page\''); } catch (e) {}
@@ -363,6 +383,8 @@ function initV7Schema(db) {
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_ig_media_id TEXT DEFAULT \'\''); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN origin_job_id INTEGER REFERENCES publish_jobs(id)'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN is_ai_influencer INTEGER DEFAULT 0'); } catch (e) {}
+  try { db.exec('ALTER TABLE publish_jobs ADD COLUMN influencer_profile_id TEXT DEFAULT NULL'); } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1693,6 +1715,63 @@ function deletePageTemplate(id) {
   return getDb().prepare('DELETE FROM page_templates WHERE id = ?').run(id);
 }
 
+// ─────────────────────────────────────────────────────────────
+// AI Influencer Profiles Operations
+// ─────────────────────────────────────────────────────────────
+
+function upsertInfluencerProfile(profile) {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = profile.id || profile.slug || `inf_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO influencer_profiles (
+      id, name, handle, page_id, provider, gender, ethnicity,
+      prompt_profile, negative_prompt, reference_images_json, config_json, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      handle = excluded.handle,
+      page_id = excluded.page_id,
+      provider = excluded.provider,
+      gender = excluded.gender,
+      ethnicity = excluded.ethnicity,
+      prompt_profile = excluded.prompt_profile,
+      negative_prompt = excluded.negative_prompt,
+      reference_images_json = excluded.reference_images_json,
+      config_json = excluded.config_json,
+      is_active = excluded.is_active,
+      updated_at = excluded.updated_at
+  `).run(
+    id,
+    profile.name || 'AI Influencer',
+    profile.handle || '@influencer',
+    profile.page_id || null,
+    profile.provider || 'fal_ai',
+    profile.gender || 'female',
+    profile.ethnicity || 'caucasian_brunette',
+    profile.prompt_profile || '',
+    profile.negative_prompt || '',
+    typeof profile.reference_images === 'string' ? profile.reference_images : JSON.stringify(profile.reference_images || []),
+    typeof profile.config === 'string' ? profile.config : JSON.stringify(profile.config || profile),
+    profile.is_active !== undefined ? (profile.is_active ? 1 : 0) : 1,
+    profile.created_at || now,
+    now
+  );
+  return getInfluencerProfile(id);
+}
+
+function getInfluencerProfile(id) {
+  return getDb().prepare('SELECT * FROM influencer_profiles WHERE id = ?').get(id);
+}
+
+function listInfluencerProfiles() {
+  return getDb().prepare('SELECT * FROM influencer_profiles ORDER BY name ASC').all();
+}
+
+function deleteInfluencerProfile(id) {
+  return getDb().prepare('DELETE FROM influencer_profiles WHERE id = ?').run(id);
+}
+
 module.exports = {
   getDb,
   // Settings
@@ -1768,5 +1847,10 @@ module.exports = {
   upsertPageTemplate,
   getPageTemplate,
   listPageTemplates,
-  deletePageTemplate
+  deletePageTemplate,
+  // v9 AI Influencer Profiles
+  upsertInfluencerProfile,
+  getInfluencerProfile,
+  listInfluencerProfiles,
+  deleteInfluencerProfile
 };

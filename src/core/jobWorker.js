@@ -370,6 +370,36 @@ class JobWorkerPool {
           edit_theme: pageTheme
         });
 
+        // ── AI Influencer Avatar Transformation Layer ──
+        const isInfluencerPage = Boolean(
+          page.is_ai_influencer ||
+          page.page_type === 'ai_influencer' ||
+          page.influencer_profile_id ||
+          (page.handle && /influencer|avatar|model|persona/i.test(page.handle))
+        );
+
+        if (isInfluencerPage && mediaPaths[0]) {
+          try {
+            const { transformReelToInfluencer, loadInfluencerProfile } = require('./aiInfluencerService');
+            console.log(`[Job Worker] 💃 AI Influencer Channel detected for ${page.handle}: Transforming video with persistent character identity...`);
+            const profile = loadInfluencerProfile(page.influencer_profile_id || page.handle || 'default');
+            const transformed = await transformReelToInfluencer(mediaPaths[0], profile, { page, hookHeadline });
+            if (transformed?.videoPath) {
+              const absTransformed = (path.isAbsolute(transformed.videoPath) && fs.existsSync(transformed.videoPath))
+                ? transformed.videoPath
+                : path.join(__dirname, '..', '..', 'public', transformed.videoPath.replace(/^[/\\]+/, ''));
+              if (fs.existsSync(absTransformed)) {
+                mediaPaths[0] = absTransformed;
+                feedVideoPath = absTransformed;
+                processedMediaPaths[0] = absTransformed;
+                console.log(`[Job Worker] ✨ AI Influencer transformation complete: ${absTransformed}`);
+              }
+            }
+          } catch (influencerErr) {
+            console.warn(`[Job Worker] ⚠️ AI Influencer transformation notice: ${influencerErr.message}`);
+          }
+        }
+
         if (brandingMode === 'frame') {
           try {
             const { prepareVideoForFeedCard } = require('../utils/ffmpegHelper');
