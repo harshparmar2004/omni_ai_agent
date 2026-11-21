@@ -69,14 +69,14 @@ function loadInfluencerProfile(influencerIdOrSlug) {
     provider: 'alibaba_wan',
     mode: 'real_world_passthrough',
     wan_settings: {
-      model: 'wan3.0-prime',
+      model: 'wan3.0-video-prime',
       guide_scale: 6.0,
       flow_shift: 5.0,
       sampling_steps: 25,
       strength: 0.82,
       resolution: '720p',
       aspect_ratio: '9:16',
-      backend: 'fal_ai',
+      backend: 'dashscope',
       enable_audio: true
     },
     enable_codeformer: true,
@@ -188,22 +188,101 @@ async function transformReelToInfluencer(inputVideoPath, influencerProfile = nul
 }
 
 /**
- * Alibaba Wan Video Foundation Model Adapter (Wan 3.0 Prime & Wan 2.1 Video-to-Video & Image-to-Video)
- * Supports Fal.ai serverless Wan 3.0 Prime endpoint, Alibaba Cloud DashScope / Bailian API, or ComfyUI node.
+ * Alibaba Wan Video Foundation Model Adapter (Official Alibaba Cloud DashScope / Model Studio API)
+ * Direct upstream integration with Alibaba Cloud: https://dashscope.aliyuncs.com
  */
 async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile, apiKey, options = {}) {
   const wanCfg = profile.wan_settings || {};
-  const backend = (options.backend || wanCfg.backend || 'fal_ai').toLowerCase();
-  const model = options.model || wanCfg.model || 'wan3.0-prime';
+  const backend = (options.backend || wanCfg.backend || 'dashscope').toLowerCase();
+  const model = options.model || wanCfg.model || 'wan3.0-video-prime';
   const prompt = options.prompt || generateDynamicWardrobePrompt(profile, options);
   const negativePrompt = options.negative_prompt || profile.negative_prompt || 'cgi, 3d render, anime, plastic smooth skin, distorted hands, cartoon, blurry, low resolution';
   const isWan3 = /3\.0|prime/i.test(model);
 
-  console.log(`[AI Influencer] 🚀 Calling Alibaba Wan [Model: ${model.toUpperCase()}] [Backend: ${backend.toUpperCase()}] for ${profile.name}...`);
+  console.log(`[AI Influencer] 🚀 Calling Official Alibaba Wan [Model: ${model.toUpperCase()}] [Backend: ${backend.toUpperCase()}] for ${profile.name}...`);
   console.log(`[AI Influencer] 📝 Wan Prompt: "${prompt}"`);
 
-  // Path A: Fal.ai Serverless Wan 3.0 Prime / Wan 2.1 Video-to-Video Endpoint
-  if (backend === 'fal_ai' || (!process.env.DASHSCOPE_API_KEY && (process.env.FAL_KEY || process.env.FAL_AI_KEY))) {
+  // Path A: Official Alibaba Cloud DashScope / Model Studio API (Direct Upstream)
+  if (backend === 'dashscope' || process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_WAN_API_KEY || (!process.env.FAL_KEY && !process.env.FAL_AI_KEY)) {
+    const dashKey = process.env.DASHSCOPE_API_KEY || process.env.ALIBABA_WAN_API_KEY || apiKey;
+    const baseUrl = (process.env.DASHSCOPE_BASE_URL || 'https://dashscope.aliyuncs.com').replace(/\/+$/, '');
+    const dashModel = isWan3 ? (model.includes('prime') ? 'wan3.0-video-prime' : 'wan3.0-video') : (wanCfg.model || 'wanx2.1-v2v');
+
+    const dashPayload = {
+      model: dashModel,
+      input: {
+        prompt,
+        negative_prompt: negativePrompt,
+        video_url: options.publicVideoUrl || `file://${inputVideoPath}`
+      },
+      parameters: {
+        guide_scale: wanCfg.guide_scale || 6.0,
+        flow_shift: wanCfg.flow_shift || 5.0,
+        sampling_steps: wanCfg.sampling_steps || 25,
+        resolution: wanCfg.resolution || '720p',
+        aspect_ratio: wanCfg.aspect_ratio || '9:16',
+        enable_audio: wanCfg.enable_audio ?? true
+      }
+    };
+
+    const response = await axios.post(
+      `${baseUrl}/api/v1/services/aigc/video-generation/generation`,
+      dashPayload,
+      {
+        headers: {
+          'Authorization': `Bearer ${dashKey}`,
+          'X-DashScope-Async': 'enable',
+          'Content-Type': 'application/json'
+        },
+        timeout: 45000
+      }
+    );
+
+    const taskId = response.data?.output?.task_id;
+    console.log(`[AI Influencer] Official Alibaba Wan (${dashModel}) Task Queued: ${taskId}`);
+
+    const startTime = Date.now();
+    let videoResultUrl = null;
+    while (Date.now() - startTime < 180000) {
+      await new Promise(r => setTimeout(r, 5000));
+      const checkRes = await axios.get(`${baseUrl}/api/v1/tasks/${taskId}`, {
+        headers: { 'Authorization': `Bearer ${dashKey}` }
+      });
+      const taskStatus = checkRes.data?.output?.task_status;
+      if (taskStatus === 'SUCCEEDED') {
+        videoResultUrl = checkRes.data?.output?.video_url;
+        break;
+      }
+      if (taskStatus === 'FAILED') {
+        throw new Error(`Official Alibaba DashScope Wan generation failed: ${checkRes.data?.output?.message || 'Task failed'}`);
+      }
+    }
+
+    if (videoResultUrl) {
+      const writer = fs.createWriteStream(targetOutput);
+      const streamRes = await axios({ url: videoResultUrl, method: 'GET', responseType: 'stream' });
+      streamRes.data.pipe(writer);
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      return {
+        success: true,
+        videoPath: targetOutput,
+        provider: 'alibaba_wan',
+        backend: 'dashscope',
+        model: dashModel,
+        influencerId: profile.id,
+        taskId,
+        prompt
+      };
+    }
+
+    throw new Error('Alibaba DashScope Wan polling timed out or returned empty video URL');
+  }
+
+  // Path B: Optional Fallback (Fal.ai Serverless)
+  if (backend === 'fal_ai' && (process.env.FAL_KEY || process.env.FAL_AI_KEY)) {
     const falEndpoint = isWan3
       ? 'https://queue.fal.run/alibaba/wan-3.0-prime/video-to-video'
       : 'https://queue.fal.run/fal-ai/wan/v2.1/video-to-video';
@@ -272,81 +351,6 @@ async function executeAlibabaWanTransform(inputVideoPath, targetOutput, profile,
     }
 
     throw new Error('Alibaba Wan polling timed out or returned empty video URL');
-  }
-
-  // Path B: Alibaba Cloud DashScope / Bailian API
-  if (backend === 'dashscope' || process.env.DASHSCOPE_API_KEY) {
-    const dashKey = process.env.DASHSCOPE_API_KEY || apiKey;
-    const dashModel = isWan3 ? (model.includes('prime') ? 'wan3.0-video-prime' : 'wan3.0-video') : (wanCfg.model || 'wanx2.1-v2v');
-    const dashPayload = {
-      model: dashModel,
-      input: {
-        prompt,
-        negative_prompt: negativePrompt,
-        video_url: options.publicVideoUrl || `file://${inputVideoPath}`
-      },
-      parameters: {
-        guide_scale: wanCfg.guide_scale || 6.0,
-        flow_shift: wanCfg.flow_shift || 5.0,
-        sampling_steps: wanCfg.sampling_steps || 25,
-        enable_audio: wanCfg.enable_audio ?? true
-      }
-    };
-
-    const response = await axios.post(
-      'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/generation',
-      dashPayload,
-      {
-        headers: {
-          'Authorization': `Bearer ${dashKey}`,
-          'X-DashScope-Async': 'enable',
-          'Content-Type': 'application/json'
-        },
-        timeout: 45000
-      }
-    );
-
-    const taskId = response.data?.output?.task_id;
-    console.log(`[AI Influencer] Alibaba Wan (${dashModel}) [DashScope] Task Queued: ${taskId}`);
-
-    const startTime = Date.now();
-    let videoResultUrl = null;
-    while (Date.now() - startTime < 180000) {
-      await new Promise(r => setTimeout(r, 5000));
-      const checkRes = await axios.get(`https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`, {
-        headers: { 'Authorization': `Bearer ${dashKey}` }
-      });
-      const taskStatus = checkRes.data?.output?.task_status;
-      if (taskStatus === 'SUCCEEDED') {
-        videoResultUrl = checkRes.data?.output?.video_url;
-        break;
-      }
-      if (taskStatus === 'FAILED') {
-        throw new Error(`DashScope Wan generation failed: ${checkRes.data?.output?.message || 'Task failed'}`);
-      }
-    }
-
-    if (videoResultUrl) {
-      const writer = fs.createWriteStream(targetOutput);
-      const streamRes = await axios({ url: videoResultUrl, method: 'GET', responseType: 'stream' });
-      streamRes.data.pipe(writer);
-      await new Promise((resolve, reject) => {
-        writer.on('finish', resolve);
-        writer.on('error', reject);
-      });
-      return {
-        success: true,
-        videoPath: targetOutput,
-        provider: 'alibaba_wan',
-        backend: 'dashscope',
-        model: dashModel,
-        influencerId: profile.id,
-        taskId,
-        prompt
-      };
-    }
-
-    throw new Error('DashScope Wan polling timed out or returned empty video URL');
   }
 
   // Fallback to simulation

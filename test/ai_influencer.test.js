@@ -118,7 +118,8 @@ test('AI Influencer Avatar Pipeline Subsystem', async (t) => {
     const profile = loadInfluencerProfile('aria_vance');
     assert.equal(profile.provider, 'alibaba_wan', 'Default provider must be alibaba_wan');
     assert.ok(profile.wan_settings, 'Profile must have wan_settings defined');
-    assert.equal(profile.wan_settings.model, 'wan3.0-prime', 'Wan model must be wan3.0-prime');
+    assert.equal(profile.wan_settings.model, 'wan3.0-video-prime', 'Wan model must be wan3.0-video-prime');
+    assert.equal(profile.wan_settings.backend, 'dashscope', 'Default backend must be official dashscope');
     assert.equal(profile.wan_settings.guide_scale, 6.0, 'Default guide_scale must be 6.0');
     assert.equal(profile.wan_settings.flow_shift, 5.0, 'Default flow_shift must be 5.0');
     assert.equal(profile.wan_settings.sampling_steps, 25, 'Default sampling_steps must be 25');
