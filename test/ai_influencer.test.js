@@ -1,4 +1,4 @@
-﻿const test = require('node:test');
+const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
@@ -113,4 +113,37 @@ test('AI Influencer Avatar Pipeline Subsystem', async (t) => {
       try { fs.unlinkSync(result.videoPath); } catch (_) {}
     }
   });
+
+  await t.test('6. Alibaba Wan 2.1 Video Engine Settings & Simulation Routing', async () => {
+    const profile = loadInfluencerProfile('aria_vance');
+    assert.equal(profile.provider, 'alibaba_wan', 'Default provider must be alibaba_wan');
+    assert.ok(profile.wan_settings, 'Profile must have wan_settings defined');
+    assert.equal(profile.wan_settings.model, 'wan2.1-14b', 'Wan model must be wan2.1-14b');
+    assert.equal(profile.wan_settings.guide_scale, 6.0, 'Default guide_scale must be 6.0');
+    assert.equal(profile.wan_settings.flow_shift, 5.0, 'Default flow_shift must be 5.0');
+    assert.equal(profile.wan_settings.sampling_steps, 30, 'Default sampling_steps must be 30');
+
+    // Test simulation dispatch under alibaba_wan provider
+    const testDir = path.join(__dirname, '../public/generated/influencers');
+    if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+
+    const mockInput = path.join(testDir, 'test_wan_sample.mp4');
+    try {
+      const { execSync } = require('child_process');
+      execSync(`ffmpeg -y -f lavfi -i color=c=red:s=360x640:d=1 -f lavfi -i anullsrc=r=44100:cl=stereo -c:v libx264 -t 1 -pix_fmt yuv420p "${mockInput}"`, { timeout: 10000 });
+    } catch (_) {}
+
+    if (fs.existsSync(mockInput)) {
+      const result = await transformReelToInfluencer(mockInput, profile, { mock: true, provider: 'alibaba_wan' });
+      assert.ok(result.success, 'Wan transformation should succeed');
+      assert.ok(fs.existsSync(result.videoPath), 'Transformed video output must exist');
+      assert.equal(result.provider, 'alibaba_wan_simulated', 'Provider should reflect alibaba_wan_simulated');
+      assert.ok(result.wardrobePrompt, 'Wan transformation must include wardrobe prompt');
+
+      // Cleanup
+      try { fs.unlinkSync(mockInput); } catch (_) {}
+      try { fs.unlinkSync(result.videoPath); } catch (_) {}
+    }
+  });
 });
+
