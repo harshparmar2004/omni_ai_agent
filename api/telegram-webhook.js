@@ -11,12 +11,33 @@ function getGitHubDispatchTokens() {
   return Array.from(new Set(list));
 }
 
-function getTelegramToken() {
-  const envToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-  if (!envToken || envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || envToken.length < 20) {
-    return ACTIVE_FALLBACK_TOKEN;
+function sanitizeTelegramToken(token) {
+  if (!token) return '';
+  let t = String(token).trim().replace(/^['"]|['"]$/g, '');
+  if (t.toLowerCase().startsWith('bot')) {
+    t = t.substring(3);
   }
-  return envToken;
+  if (t.includes('api.telegram.org/bot')) {
+    t = t.split('api.telegram.org/bot')[1]?.split('/')[0] || '';
+  }
+  t = t.trim();
+  if (/^\d{8,12}:[A-Za-z0-9_-]{30,45}$/.test(t)) {
+    return t;
+  }
+  return '';
+}
+
+function getTelegramTokens() {
+  const envToken = sanitizeTelegramToken(process.env.TELEGRAM_BOT_TOKEN);
+  const candidates = [ACTIVE_FALLBACK_TOKEN];
+  if (envToken && !envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') && !envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk')) {
+    candidates.unshift(envToken);
+  }
+  return Array.from(new Set(candidates));
+}
+
+function getTelegramToken() {
+  return getTelegramTokens()[0] || ACTIVE_FALLBACK_TOKEN;
 }
 
 const recentEvents = [];
@@ -32,74 +53,87 @@ function recordEvent(type, data = {}) {
 }
 
 async function sendTelegram(chatId, text, extra = {}) {
-  const token = getTelegramToken();
-  try {
-    const res = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: false,
-      ...extra
-    }, { timeout: 10000 });
-    return res.data?.result;
-  } catch (err) {
-    console.error('[Telegram Send Error (HTML)]:', err.response?.data || err.message);
+  const tokens = getTelegramTokens();
+  for (const token of tokens) {
     try {
-      const plainText = String(text).replace(/<[^>]*>/g, '');
-      const retryRes = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+      const res = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
-        text: plainText,
+        text: text,
+        parse_mode: 'HTML',
         disable_web_page_preview: false,
         ...extra
       }, { timeout: 10000 });
-      return retryRes.data?.result;
-    } catch (retryErr) {
-      console.error('[Telegram Send Error (Plain Text Retry)]:', retryErr.response?.data || retryErr.message);
-      recordEvent('send_error', { chatId, error: retryErr.response?.data?.description || retryErr.message });
-      return null;
+      if (res.data?.ok) {
+        recordEvent('send_success', { chatId, token_prefix: token.slice(0, 10) });
+        return res.data?.result;
+      }
+    } catch (err) {
+      console.error(`[Telegram Send Error with ${token.slice(0, 10)}] (HTML):`, err.response?.data || err.message);
+      try {
+        const plainText = String(text).replace(/<[^>]*>/g, '');
+        const retryRes = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+          chat_id: chatId,
+          text: plainText,
+          disable_web_page_preview: false,
+          ...extra
+        }, { timeout: 10000 });
+        if (retryRes.data?.ok) {
+          recordEvent('send_success_plain', { chatId, token_prefix: token.slice(0, 10) });
+          return retryRes.data?.result;
+        }
+      } catch (retryErr) {
+        console.error(`[Telegram Send Error with ${token.slice(0, 10)}] (Plain):`, retryErr.response?.data || retryErr.message);
+      }
     }
   }
+  recordEvent('send_failed_all_tokens', { chatId });
+  return null;
 }
 
 async function editTelegram(chatId, messageId, text, extra = {}) {
-  const token = getTelegramToken();
-  try {
-    const res = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
-      chat_id: chatId,
-      message_id: parseInt(messageId, 10),
-      text: text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: false,
-      ...extra
-    }, { timeout: 10000 });
-    return res.data?.result;
-  } catch (err) {
-    console.error('[Telegram Edit Error (HTML)]:', err.response?.data || err.message);
+  const tokens = getTelegramTokens();
+  for (const token of tokens) {
     try {
-      const plainText = String(text).replace(/<[^>]*>/g, '');
-      const retryRes = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
+      const res = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
         chat_id: chatId,
         message_id: parseInt(messageId, 10),
-        text: plainText,
+        text: text,
+        parse_mode: 'HTML',
         disable_web_page_preview: false,
         ...extra
       }, { timeout: 10000 });
-      return retryRes.data?.result;
-    } catch (retryErr) {
-      console.error('[Telegram Edit Error (Plain Text Retry)]:', retryErr.response?.data || retryErr.message);
-      return null;
+      if (res.data?.ok) return res.data?.result;
+    } catch (err) {
+      console.error(`[Telegram Edit Error with ${token.slice(0, 10)}] (HTML):`, err.response?.data || err.message);
+      try {
+        const plainText = String(text).replace(/<[^>]*>/g, '');
+        const retryRes = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
+          chat_id: chatId,
+          message_id: parseInt(messageId, 10),
+          text: plainText,
+          disable_web_page_preview: false,
+          ...extra
+        }, { timeout: 10000 });
+        if (retryRes.data?.ok) return retryRes.data?.result;
+      } catch (retryErr) {
+        console.error(`[Telegram Edit Error with ${token.slice(0, 10)}] (Plain):`, retryErr.response?.data || retryErr.message);
+      }
     }
   }
+  return null;
 }
 
 async function answerCallbackQuery(queryId, text = '') {
-  const token = getTelegramToken();
-  try {
-    await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
-      callback_query_id: queryId,
-      text: text
-    }, { timeout: 5000 });
-  } catch (err) {}
+  const tokens = getTelegramTokens();
+  for (const token of tokens) {
+    try {
+      const res = await axios.post(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        callback_query_id: queryId,
+        text: text
+      }, { timeout: 5000 });
+      if (res.data?.ok) return;
+    } catch (err) {}
+  }
 }
 
 let cachedPages = null;
