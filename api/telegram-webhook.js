@@ -19,6 +19,18 @@ function getTelegramToken() {
   return envToken;
 }
 
+const recentEvents = [];
+function recordEvent(type, data = {}) {
+  try {
+    recentEvents.unshift({
+      timestamp: new Date().toISOString(),
+      type,
+      ...data
+    });
+    if (recentEvents.length > 30) recentEvents.pop();
+  } catch (e) {}
+}
+
 async function sendTelegram(chatId, text, extra = {}) {
   const token = getTelegramToken();
   try {
@@ -31,8 +43,21 @@ async function sendTelegram(chatId, text, extra = {}) {
     }, { timeout: 10000 });
     return res.data?.result;
   } catch (err) {
-    console.error('[Telegram Send Error]:', err.response?.data || err.message);
-    return null;
+    console.error('[Telegram Send Error (HTML)]:', err.response?.data || err.message);
+    try {
+      const plainText = String(text).replace(/<[^>]*>/g, '');
+      const retryRes = await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId,
+        text: plainText,
+        disable_web_page_preview: false,
+        ...extra
+      }, { timeout: 10000 });
+      return retryRes.data?.result;
+    } catch (retryErr) {
+      console.error('[Telegram Send Error (Plain Text Retry)]:', retryErr.response?.data || retryErr.message);
+      recordEvent('send_error', { chatId, error: retryErr.response?.data?.description || retryErr.message });
+      return null;
+    }
   }
 }
 
@@ -49,8 +74,21 @@ async function editTelegram(chatId, messageId, text, extra = {}) {
     }, { timeout: 10000 });
     return res.data?.result;
   } catch (err) {
-    console.error('[Telegram Edit Error]:', err.response?.data || err.message);
-    return null;
+    console.error('[Telegram Edit Error (HTML)]:', err.response?.data || err.message);
+    try {
+      const plainText = String(text).replace(/<[^>]*>/g, '');
+      const retryRes = await axios.post(`https://api.telegram.org/bot${token}/editMessageText`, {
+        chat_id: chatId,
+        message_id: parseInt(messageId, 10),
+        text: plainText,
+        disable_web_page_preview: false,
+        ...extra
+      }, { timeout: 10000 });
+      return retryRes.data?.result;
+    } catch (retryErr) {
+      console.error('[Telegram Edit Error (Plain Text Retry)]:', retryErr.response?.data || retryErr.message);
+      return null;
+    }
   }
 }
 
@@ -321,9 +359,10 @@ async function handler(req, res) {
     const tokens = getGitHubDispatchTokens();
     return res.status(200).json({
       status: 'active',
-      service: 'OmniStudio Telegram Webhook Bridge v7',
+      service: 'OmniStudio Telegram Webhook Bridge v8',
       tokens_configured: tokens.length,
-      allowed_chats: ALLOWED_CHATS
+      allowed_chats: ALLOWED_CHATS,
+      recent_events: recentEvents.slice(0, 15)
     });
   }
 
@@ -331,9 +370,15 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const update = req.body;
-  if (!update) {
-    return res.status(200).json({ ok: true });
+  let update = req.body;
+  if (typeof update === 'string') {
+    try { update = JSON.parse(update); } catch (e) { update = null; }
+  } else if (Buffer.isBuffer(update)) {
+    try { update = JSON.parse(update.toString('utf8')); } catch (e) { update = null; }
+  }
+
+  if (!update || typeof update !== 'object') {
+    return res.status(200).json({ ok: true, empty: true });
   }
 
   const msg = update.message || update.callback_query?.message || update.channel_post || update.edited_message;
@@ -342,7 +387,9 @@ async function handler(req, res) {
   }
 
   const chatId = msg.chat?.id;
-  const text = (
+  const senderId = msg.from?.id;
+
+  let text = (
     update.message?.text ||
     update.message?.caption ||
     update.channel_post?.text ||
@@ -352,12 +399,33 @@ async function handler(req, res) {
     ''
   ).trim();
 
+  // If text doesn't contain a link, check entities for url
+  const allEntities = [
+    ...(update.message?.entities || []),
+    ...(update.message?.caption_entities || []),
+    ...(update.channel_post?.entities || [])
+  ];
+  for (const ent of allEntities) {
+    if (ent.url && !text.includes(ent.url)) {
+      text += ' ' + ent.url;
+    }
+  }
+
+  recordEvent('inbound_update', {
+    update_id: update.update_id,
+    chat_id: chatId,
+    sender_id: senderId,
+    is_callback: Boolean(update.callback_query),
+    text_preview: text.slice(0, 100)
+  });
+
   if (!chatId) return res.status(200).json({ ok: true });
 
-  // Security Gate
-  if (!ALLOWED_CHATS.includes(String(chatId))) {
-    await sendTelegram(chatId, `⛔ <b>Access Denied</b>\nChat ID <code>${chatId}</code> is not authorized.`);
-    return res.status(200).json({ ok: true });
+  // Security Gate (allows if chatId is authorized or senderId is authorized)
+  const isAuthorized = ALLOWED_CHATS.includes(String(chatId)) || (senderId && ALLOWED_CHATS.includes(String(senderId)));
+  if (!isAuthorized) {
+    await sendTelegram(chatId, `⛔ <b>Access Denied</b>\nChat ID <code>${chatId}</code> (User: <code>${senderId || 'unknown'}</code>) is not authorized.`);
+    return res.status(200).json({ ok: true, access_denied: true });
   }
 
   // Handle Callback Queries (Button Clicks)
@@ -595,8 +663,8 @@ async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // Check Instagram Link (matches reel, reels, p, tv, and share URLs across instagram.com and instagr.am)
-  const match = text.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|reels|tv|share\/reel)\/([A-Za-z0-9_-]+)/i);
+  // Check Instagram Link (matches reel, reels, p, tv, share/reel, share/p across instagram.com and instagr.am)
+  const match = text.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|reels|tv|share\/reel|share\/p)\/([A-Za-z0-9_-]+)/i);
 
   if (!match) {
     await sendTelegram(
@@ -612,30 +680,30 @@ async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  const reelUrl = match[0];
+  const rawUrl = match[0];
   const shortcode = match[1];
+  const reelUrl = `https://www.instagram.com/reel/${shortcode}/`;
 
-  console.log(`[Webhook] Inbound Instagram URL: ${reelUrl} (Shortcode: ${shortcode})`);
+  console.log(`[Webhook] Inbound Instagram URL: ${rawUrl} (Shortcode: ${shortcode})`);
 
-  // Interactive Destination Page Selection
-  const pages = await getPagesList();
-  const keyboard = buildPageSelectionKeyboard(shortcode, pages);
+  // Auto-resolve target page (e.g. cherry, cult, movie, clubbing, gta)
+  const targetPageId = resolveAutoTargetPage(text);
 
-  await sendTelegram(
+  console.log(`[Webhook] Autonomous Instant Trigger: #${shortcode} -> Page #${targetPageId}`);
+
+  // Dispatches to GitHub Actions immediately, sends stepper status message with switch buttons to Telegram
+  const dispatchResult = await dispatchJobToRunner({
+    url: reelUrl,
+    shortcode,
+    pageId: targetPageId,
     chatId,
-    `📥 <b>Instagram Reel Received!</b>\n\n` +
-    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n` +
-    `🎬 <b>Source:</b> <a href="${reelUrl}">${reelUrl}</a>\n\n` +
-    `👉 <b>On which page would you like to post this reel?</b>\n` +
-    `<i>(Publishes to Feed & Story)</i>`,
-    {
-      reply_markup: {
-        inline_keyboard: keyboard
-      }
-    }
-  );
+    messageId: null,
+    isForce: false
+  });
 
-  return res.status(200).json({ ok: true, interactive_prompt: true, shortcode });
+  recordEvent('dispatched_reel', { shortcode, pageId: targetPageId, success: dispatchResult?.success });
+
+  return res.status(200).json({ ok: true, auto_dispatched: true, pageId: targetPageId, shortcode, dispatch: dispatchResult });
 }
 
 module.exports = handler;
