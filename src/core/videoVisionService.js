@@ -218,6 +218,121 @@ function isTabularOrSpecDebris(text) {
 }
 
 /**
+ * Intelligent social media card / reel headline parser.
+ * Discards avatar logos, competitor display names, handle lines (@...),
+ * verification badges, engagement counts, and random visual debris.
+ * Isolates and returns genuine editorial headline hooks.
+ */
+function extractHeadlineBlocksFromOcr(rawText) {
+  if (!rawText || typeof rawText !== 'string') return [];
+
+  const rawLines = rawText.split('\n')
+    .map(l => l.trim())
+    .filter(Boolean);
+
+  // 1. Identify handle lines (e.g. @evolving.ai, @nvidianewsroom, (@ e ilale Nel)
+  const isHandle = (l) => {
+    return /^[@#][a-zA-Z0-9_.-]{2,}/i.test(l) ||
+           /\b@[a-zA-Z0-9_.-]{2,}/i.test(l) ||
+           /@\s*[a-zA-Z0-9_.-]{2,}/i.test(l) ||
+           /^[({\[]?\s*@/i.test(l) ||
+           /@$/.test(l) ||
+           /\b@\b/.test(l);
+  };
+
+  // 2. Identify account display names or channel branding
+  const isAccountDisplayName = (l) => {
+    if (/\b(newsroom|official|media|daily|updates?|technologies|studios?)\b/i.test(l)) return true;
+    if (/\b(evolving\s+ai|evolving\s+evolving|evolution)\b/i.test(l)) return true;
+    if (/^[<x«»\s]*[a-zA-Z\s]+(?:\s+\d{1,3})?$/i.test(l) && l.split(/\s+/).length <= 4) return true;
+    if (/@\s*$/.test(l)) return true;
+    return false;
+  };
+
+  // 3. Identify noise, symbols, timestamps, engagement counters, and audio markers
+  const isJunkOrDivider = (l) => {
+    if (l.length <= 2 && !/^(ai|to|in|on|at|by|no)$/i.test(l)) return true;
+    if (/^[0-9:\s=D+&©@#_.\-—¢|¥«»§\\\/‘'"`^~*]+$/.test(l)) return true;
+    if (/^(am|pm|\d{1,2}:\d{2})$/i.test(l)) return true;
+    if (/^(credit|source|via|edit|by)[\s:]/i.test(l)) return true;
+    if (/^(follow|following|subscribe|repost|retweet|share|comment|save)$/i.test(l)) return true;
+    if (/^\.[\s\-_—]+$/.test(l)) return true;
+    if (/^[a-z]\.\s+[a-z]+$/i.test(l)) return true; // e.g. "k. Red"
+    if (/^(audio|original sound|song|track)\b/i.test(l)) return true;
+    if (/^(all\s+)?\d+\s+comments?$/i.test(l)) return true;
+    return false;
+  };
+
+  // 4. Drop account header blocks
+  const dropIndices = new Set();
+  for (let i = 0; i < rawLines.length; i++) {
+    if (isHandle(rawLines[i])) {
+      dropIndices.add(i);
+      if (i > 0) {
+        const prev = rawLines[i - 1];
+        if (prev.split(/\s+/).length <= 4 || isAccountDisplayName(prev)) {
+          dropIndices.add(i - 1);
+        }
+      }
+      if (i > 1 && rawLines[i - 2].length <= 8) {
+        dropIndices.add(i - 2); // avatar icon debris like 'nen)'
+      }
+    } else if (isAccountDisplayName(rawLines[i]) && (i < 3 || isHandle(rawLines[i + 1] || ''))) {
+      dropIndices.add(i);
+    }
+  }
+
+  // 5. Clean remaining lines and remove border debris
+  const cleanCandidates = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    if (dropIndices.has(i)) continue;
+    if (isJunkOrDivider(rawLines[i])) continue;
+
+    let text = rawLines[i]
+      .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]‘«»]/g, ' ')
+      .replace(/^.*?@\w+[\s:]*/i, '')
+      .replace(/^["'“”\s]+|["'“”\s]+$/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Fix common OCR errors
+    text = text
+      .replace(/\bAl\b/g, 'AI')
+      .replace(/\bAl's\b/g, "AI's")
+      .replace(/\bRohotic\b/gi, 'Robotic')
+      .replace(/\bpowered\s+hy\b/gi, 'powered by')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .trim();
+
+    if (text.length >= 4 && !isJunkOrDivider(text)) {
+      cleanCandidates.push({ lineIndex: i, text });
+    }
+  }
+
+  // 6. Group contiguous candidate lines into headline blocks
+  const blocks = [];
+  let currBlock = [];
+  for (let i = 0; i < cleanCandidates.length; i++) {
+    if (currBlock.length === 0) {
+      currBlock.push(cleanCandidates[i]);
+    } else {
+      const prev = currBlock[currBlock.length - 1];
+      if (cleanCandidates[i].lineIndex === prev.lineIndex + 1) {
+        currBlock.push(cleanCandidates[i]);
+      } else {
+        blocks.push(currBlock.map(c => c.text).join(' '));
+        currBlock = [cleanCandidates[i]];
+      }
+    }
+  }
+  if (currBlock.length > 0) {
+    blocks.push(currBlock.map(c => c.text).join(' '));
+  }
+
+  return blocks;
+}
+
+/**
  * Local offline OCR fallback using Tesseract.js & canvas cropping
  * Requires zero API keys and runs 100% locally.
  */
@@ -230,145 +345,86 @@ async function localOcrHeadlineDetection(framePath, options = {}) {
     const img = await loadImage(resolved);
     // If the input is already an isolated headline ROI (from OpenCV or options), do not crop
     const isAlreadyRoi = Boolean(options.isRoi) || (img.height <= 800 && img.width >= img.height);
-    const cropH = isAlreadyRoi ? img.height : Math.floor(img.height * 0.70);
+    const cropH = isAlreadyRoi ? img.height : Math.floor(img.height * 0.85);
     const canvas = createCanvas(img.width, cropH);
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0, img.width, cropH, 0, 0, img.width, cropH);
 
-    // Preprocessing: High-contrast binarization to make text pop against video background
-    try {
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const d = imgData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-        const v = lum > 135 ? 255 : (lum < 75 ? 0 : lum);
-        d[i] = v;
-        d[i + 1] = v;
-        d[i + 2] = v;
-      }
-      ctx.putImageData(imgData, 0, 0);
-    } catch (_) {}
-
     const res = await Tesseract.recognize(canvas.toBuffer('image/png'), 'eng');
-    const rawLines = (res.data?.text || '').split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length >= 2)
-      .filter(l => !/cult|information|reels|share|comment|nobody can fly|every great thing|instagram|audio/i.test(l))
-      .filter(l => !/^[0-9:\s=D+&©@#_.\-]+$/.test(l))
-      .filter(l => !/^(am|pm|\d{1,2}:\d{2})$/i.test(l));
+    const rawOcrText = res.data?.text || '';
 
-    if (rawLines.length === 0) return null;
+    // Extract genuine editorial headline blocks while stripping logos, competitor handles, and account headers
+    const blocks = extractHeadlineBlocksFromOcr(rawOcrText);
+    if (!blocks || blocks.length === 0) return null;
 
-    const validLines = [];
-    for (const raw of rawLines) {
-      // If credit, source, or edit attribution line reached, stop extraction immediately
-      if (/^(credit|source|via|edit|by)[\s:]/i.test(raw) || /credit:\s*/i.test(raw)) break;
-      // Skip creator handles
-      if (/@\w+/.test(raw)) continue;
-
-      // Check alphanumeric character ratio to drop pure video background noise
-      const alphaChars = (raw.match(/[a-zA-Z0-9]/g) || []).length;
-      if (raw.length === 0 || (alphaChars / raw.length) < 0.40) {
-        if (validLines.length >= 1) break;
-        continue;
+    // Evaluate headline blocks: choose top hook or first valid editorial sentence
+    let chosenTitle = null;
+    for (const b of blocks) {
+      if (isTabularOrSpecDebris(b)) continue;
+      const wc = b.split(/\s+/).length;
+      const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(b) || /^(?:all\s+)?\d+\s+comments?$/i.test(b);
+      if (wc >= 2 && wc <= 32 && !isPureDigitsOrJunk && b.length >= 8) {
+        chosenTitle = b;
+        break;
       }
-
-      let l = raw
-        .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]]/g, ' ')
-        .replace(/^.*?@\w+[\s:]*/i, '')
-        .replace(/^["'“”\s]+|["'“”\s]+$/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      // Strip trailing single noise characters or short artifacts (e.g. " Hs", " |", " .", " 8")
-      l = l.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-zA-Z0-9]{1,2}\s*$/g, '').trim();
-
-      // Keep all valid headline text lines (including short/single-word headline lines like "WHY", "HOW", "AI", "INSIDE")
-      if (l.length >= 2) {
-        validLines.push(l);
-      }
-
-      // Allow complete viral headlines up to 28 words without premature truncation
-      const currentWordCount = validLines.join(' ').split(/\s+/).length;
-      if (currentWordCount >= 28) break;
     }
 
-    let title = validLines.join(' ');
-    // Fix OCR misreads of common vocabulary
-    title = title
-      .replace(/\bAl\b/g, 'AI')
-      .replace(/\bAl's\b/g, "AI's")
-      .replace(/\bRohotic\b/gi, 'Robotic')
-      .replace(/\bpowered\s+hy\b/gi, 'powered by')
-      .replace(/\s+([.,;:!?])/g, '$1')
-      .trim();
+    if (!chosenTitle) return null;
 
-    // Strip trailing single noise tokens and punctuation artifacts
-    title = title.replace(/\s+[^a-zA-Z0-9\s]\s*$/g, '').replace(/\s+[a-z0-9]\s*$/i, '').trim();
-    title = title.replace(/[\s.,;:!\-—|§°_~>#+=&\\\/]+$/, '').trim();
-
-    // Reject tabular data, benchmark spec sheets, and price lists
-    if (isTabularOrSpecDebris(title)) {
-      console.log(`[Video Vision] ⚠️ Discarded OCR title as tabular/benchmark spec data ("${title}"). Falling back to editorial hook synthesis.`);
-      return null;
-    }
-
+    let title = chosenTitle;
     const wordCount = title.split(/\s+/).length;
-    const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(title) || /^(?:all\s+)?\d+\s+comments?$/i.test(title);
-    if (wordCount >= 2 && wordCount <= 32 && !isPureDigitsOrJunk && title.length >= 10) {
-      // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
-      const targetHighlights = Math.max(2, Math.min(6, Math.round(wordCount * 0.38)));
-      let highlightedTitle = title;
-      // Word-boundary safe number/unit highlighting: prevents matching inside glued alphanumeric tokens
-      highlightedTitle = highlightedTitle.replace(/(?<=\s|^)(\$?\d[\d,\.]*(?:[%xXkKmMbBtT]|th|rd|st|nd)?|\b(?:billion|million|trillion|hundred)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
 
-      const viralPattern = /\b(Robotic Arms|Table Tennis|Human Pro|World's First|Living Thing|Deep Knowledge|Robotic|Robot|Robots|Algae|Neural|AI|Beat|Players|Human|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Underground|Ocean|Antarctic|Discovery|Discovered|Intelligence)\b/gi;
+    // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
+    const targetHighlights = Math.max(2, Math.min(6, Math.round(wordCount * 0.38)));
+    let highlightedTitle = title;
+    // Word-boundary safe number/unit highlighting: prevents matching inside glued alphanumeric tokens
+    highlightedTitle = highlightedTitle.replace(/(?<=\s|^)(\$?\d[\d,\.]*(?:[%xXkKmMbBtT]|th|rd|st|nd)?|\b(?:billion|million|trillion|hundred)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
 
-      const hlMatches = [...title.matchAll(viralPattern)];
-      let appliedCount = (highlightedTitle.match(/\*\*[^*]+\*\*/g) || []).length;
-      for (const m of hlMatches) {
+    const viralPattern = /\b(Robotic Arms|Table Tennis|Human Pro|World's First|Living Thing|Deep Knowledge|Robotic|Robot|Robots|Algae|Neural|AI|Beat|Players|Human|Secret|Secrets|Exposed|Revealed|Shocking|Truth|Mystery|Impossible|Breakthrough|Classified|Banned|Billionaires|Overnight|Warning|Overheating|Supercluster|Underground|Ocean|Antarctic|Discovery|Discovered|Intelligence)\b/gi;
+
+    const hlMatches = [...title.matchAll(viralPattern)];
+    let appliedCount = (highlightedTitle.match(/\*\*[^*]+\*\*/g) || []).length;
+    for (const m of hlMatches) {
+      if (appliedCount >= targetHighlights) break;
+      const term = m[0];
+      if (!highlightedTitle.includes(`**${term}**`)) {
+        highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${term}\\b`, 'g'), `**${term}**`);
+        appliedCount++;
+      }
+    }
+
+    // If still fewer than targetHighlights, highlight top content words (>= 4 chars, non-stopwords)
+    if (appliedCount < targetHighlights) {
+      const words = title.split(/\s+/);
+      const candidates = words.filter(w => {
+        const cleanW = w.replace(/[^a-zA-Z0-9]/g, '');
+        return cleanW.length >= 4 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would|these|those|there|their|watch|with|from|have|been|that|this)$/i.test(cleanW);
+      });
+      candidates.sort((a, b) => b.length - a.length);
+      for (const cand of candidates) {
         if (appliedCount >= targetHighlights) break;
-        const term = m[0];
-        if (!highlightedTitle.includes(`**${term}**`)) {
-          highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${term}\\b`, 'g'), `**${term}**`);
+        const cleanCand = cand.replace(/[^a-zA-Z0-9]/g, '');
+        if (cleanCand && !highlightedTitle.includes(`**${cleanCand}**`)) {
+          highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${cleanCand}\\b`, 'g'), `**${cleanCand}**`);
           appliedCount++;
         }
       }
-
-      // If still fewer than targetHighlights, highlight top content words (>= 4 chars, non-stopwords)
-      if (appliedCount < targetHighlights) {
-        const words = title.split(/\s+/);
-        const candidates = words.filter(w => {
-          const cleanW = w.replace(/[^a-zA-Z0-9]/g, '');
-          return cleanW.length >= 4 && !/^(about|after|again|before|during|through|under|where|which|while|could|should|would|these|those|there|their|watch|with|from|have|been|that|this)$/i.test(cleanW);
-        });
-        candidates.sort((a, b) => b.length - a.length);
-        for (const cand of candidates) {
-          if (appliedCount >= targetHighlights) break;
-          const cleanCand = cand.replace(/[^a-zA-Z0-9]/g, '');
-          if (cleanCand && !highlightedTitle.includes(`**${cleanCand}**`)) {
-            highlightedTitle = highlightedTitle.replace(new RegExp(`\\b${cleanCand}\\b`, 'g'), `**${cleanCand}**`);
-            appliedCount++;
-          }
-        }
-      }
-
-      // Clean touching markdown boundaries
-      highlightedTitle = highlightedTitle
-        .replace(/\*{4,}/g, '** **')
-        .replace(/\*{3}/g, '**')
-        .replace(/([a-zA-Z0-9$%])\*\*([^\s*]+)/g, '$1 **$2')
-        .replace(/([^\s*]+)\*\*([a-zA-Z0-9$%])/g, '$1** $2')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      return {
-        hasTitle: true,
-        headline: highlightedTitle,
-        rawTitle: title.replace(/[\*<>]+/g, '').trim()
-      };
     }
-    return null;
+
+    // Clean touching markdown boundaries
+    highlightedTitle = highlightedTitle
+      .replace(/\*{4,}/g, '** **')
+      .replace(/\*{3}/g, '**')
+      .replace(/([a-zA-Z0-9$%])\*\*([^\s*]+)/g, '$1 **$2')
+      .replace(/([^\s*]+)\*\*([a-zA-Z0-9$%])/g, '$1** $2')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      hasTitle: true,
+      headline: highlightedTitle,
+      rawTitle: title.replace(/[\*<>]+/g, '').trim()
+    };
   } catch (err) {
     console.warn(`[Video Vision] Local OCR notice: ${err.message}`);
     return null;

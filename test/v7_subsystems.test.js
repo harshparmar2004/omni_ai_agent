@@ -533,6 +533,21 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       'prepareVideoForStory must use force_original_aspect_ratio=increase,crop to prevent video stretching'
     );
   });
+
+  await t.test('19. Social Media Header & Logo Purging for Clean On-Screen Headline Detection', async () => {
+    const { detectOnScreenHeadline } = require('../src/core/videoVisionService');
+    const videoPath = 'public/generated/downloads/reel_DgFnrysA-Uk.mp4';
+    if (fs.existsSync(videoPath)) {
+      const result = await detectOnScreenHeadline(videoPath, { forceFresh: true });
+      assert.ok(result.found, 'Headline hook must be detected');
+      assert.ok(!/evolving/i.test(result.headline), 'Competitor logo/account name must NOT appear in headline');
+      assert.ok(!/@/.test(result.headline), 'Competitor handles must NOT appear in headline');
+      assert.ok(!/k\.\s*red/i.test(result.headline), 'Random UI debris must NOT appear in headline');
+      assert.ok(result.rawTitle.includes('Jensen Huang'), 'rawTitle must contain Jensen Huang');
+      assert.ok(result.rawTitle.includes('returns into office'), 'rawTitle must contain returns into office');
+      assert.ok(result.headline.includes('**'), 'headline must contain brand highlights');
+    }
+  });
 });
 
 

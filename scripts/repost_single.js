@@ -187,30 +187,48 @@ async function main() {
     });
   });
 
-  // 3. Launch Cloudflare Edge Tunnel & Ingest Link in Parallel
+  // 3. Launch Cloudflare Edge Tunnel & Ingest Link in Parallel with Edge Route Warmup
   const { startTunnel, closeTunnel } = require('../src/core/mediaHost');
   const { submitLink } = require('../src/agents/reposter/reposterAgent');
+  const axios = require('axios');
   let tunnelUrl = null;
 
-  console.log(`\n[Reposter Runner] 📥 Submitting link & initializing edge tunnel in parallel: ${targetUrl}... (Force: ${isForce})`);
+  console.log(`\n[Reposter Runner] 📥 Initializing edge tunnel & submitting link: ${targetUrl}... (Force: ${isForce})`);
   const [tunnelResult, enqueueResult] = await Promise.all([
-    !isDryRun ? startTunnel(PORT).catch(e => {
+    !isDryRun ? (async () => {
+      const u = await startTunnel(PORT);
+      if (u) {
+        console.log(`🚀 Edge Tunnel established: ${u}. Verifying edge route...`);
+        for (let i = 0; i < 8; i++) {
+          try {
+            const res = await axios.get(`${u}/health`, { timeout: 3000 });
+            if (res.status === 200) {
+              console.log(`✅ Cloudflare edge tunnel verified online & reachable from public web.`);
+              break;
+            }
+          } catch (_) {
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
+      }
+      return u;
+    })().catch(e => {
       console.warn(`[Tunnel Warning] ${e.message}`);
       return null;
     }) : Promise.resolve(null),
-    submitLink({
-      url: targetUrl,
-      pageId: pageId,
-      chatId: chatId,
-      messageId: messageId,
-      origin: 'telegram_cloud',
-      force: isForce
-    })
+    (async () => {
+      if (!isDryRun) await new Promise(r => setTimeout(r, 3500));
+      return submitLink({
+        url: targetUrl,
+        pageId: pageId,
+        chatId: chatId,
+        messageId: messageId,
+        origin: 'telegram_cloud',
+        force: isForce
+      });
+    })()
   ]);
   tunnelUrl = tunnelResult;
-  if (tunnelUrl) {
-    console.log(`🚀 Edge Tunnel established: ${tunnelUrl}`);
-  }
 
   const selectedPage = pages.find(p => p.id === pageId) || pages[0];
   const targetHandle = selectedPage?.handle || `@page_${pageId}`;
