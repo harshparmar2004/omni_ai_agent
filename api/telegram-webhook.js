@@ -4,6 +4,13 @@ const ACTIVE_FALLBACK_TOKEN = '8887232624:AAGI8q912YhGLF10wfPc1EtOTR1DFzkVEkI';
 const GITHUB_REPO = process.env.GITHUB_REPOSITORY || 'harshparmar2004/omni_ai_agent';
 const ALLOWED_CHATS = (process.env.ALLOWED_CHAT_IDS || '5443723531').split(',').map(s => s.trim());
 
+function getGitHubDispatchTokens() {
+  const env1 = (process.env.GH_DISPATCH_TOKEN || '').trim();
+  const env2 = (process.env.GITHUB_TOKEN || '').trim();
+  const list = [env1, env2].filter(t => Boolean(t && t.length > 20));
+  return Array.from(new Set(list));
+}
+
 function getTelegramToken() {
   const envToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
   if (!envToken || envToken.includes('AAEiRpeqL8bGayHVREpp57eaFc_liOfyNUE') || envToken.includes('AAEnLK8S434FRjtg70XMZRBZVWrg6PFgHpk') || envToken.length < 20) {
@@ -223,10 +230,7 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
     }
   }
 
-  const tokenCandidates = [
-    process.env.GH_DISPATCH_TOKEN,
-    process.env.GITHUB_TOKEN
-  ].filter(t => Boolean(t && t.length > 20));
+  const tokenCandidates = getGitHubDispatchTokens();
 
   if (tokenCandidates.length === 0) {
     if (activeMessageId) {
@@ -313,9 +317,14 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
 }
 
 async function handler(req, res) {
-  const GITHUB_TOKEN = process.env.GH_DISPATCH_TOKEN || process.env.GITHUB_TOKEN || '';
   if (req.method === 'GET') {
-    return res.status(200).json({ status: 'active', service: 'OmniStudio Telegram Webhook Bridge v7' });
+    const tokens = getGitHubDispatchTokens();
+    return res.status(200).json({
+      status: 'active',
+      service: 'OmniStudio Telegram Webhook Bridge v7',
+      tokens_configured: tokens.length,
+      allowed_chats: ALLOWED_CHATS
+    });
   }
 
   if (req.method !== 'POST') {
@@ -327,13 +336,21 @@ async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  const msg = update.message || update.callback_query?.message;
+  const msg = update.message || update.callback_query?.message || update.channel_post || update.edited_message;
   if (!msg) {
     return res.status(200).json({ ok: true });
   }
 
   const chatId = msg.chat?.id;
-  const text = (update.message?.text || '').trim();
+  const text = (
+    update.message?.text ||
+    update.message?.caption ||
+    update.channel_post?.text ||
+    update.channel_post?.caption ||
+    update.edited_message?.text ||
+    update.edited_message?.caption ||
+    ''
+  ).trim();
 
   if (!chatId) return res.status(200).json({ ok: true });
 
@@ -506,12 +523,13 @@ async function handler(req, res) {
   }
 
   if (text.startsWith('/post') || text.startsWith('/scan') || text.startsWith('/watchtower')) {
-    if (!GITHUB_TOKEN) {
+    const tokens = getGitHubDispatchTokens();
+    if (tokens.length === 0) {
       await sendTelegram(
         chatId,
         `⚠️ <b>GitHub Token Required</b>\n` +
         `<code>GH_DISPATCH_TOKEN</code> is not set in your Vercel project environment variables.\n` +
-        `Please add it with 'repo' scope at https://vercel.com.`
+        `Please add it at https://vercel.com.`
       );
       return res.status(200).json({ ok: true });
     }
@@ -521,6 +539,7 @@ async function handler(req, res) {
     if (text.includes('movie') || text.includes('2')) targetPageName = '@movie_series_365';
     else if (text.includes('clubbing') || text.includes('3')) targetPageName = '@clubbingcult';
     else if (text.includes('cult') || text.includes('4')) targetPageName = '@cult_information';
+    else if (text.includes('cherry') || text.includes('5')) targetPageName = '@cherry_official';
     else if (text.includes('gta') || text.includes('1')) targetPageName = '@gta6_updates_007';
 
     await sendTelegram(
@@ -532,36 +551,39 @@ async function handler(req, res) {
       `<i>Cloud runner dispatched. As soon as the winning reel is transcoded & published, you will receive the live Instagram link here!</i>`
     );
 
-    const wtCandidates = ['393660179', 'watchtower-cron.yml', '.github/workflows/watchtower-cron.yml'];
+    const wtCandidates = ['.github/workflows/watchtower-cron.yml', 'watchtower-cron.yml', '393660179'];
     let wtSuccess = false;
     let wtErrDetail = '';
 
-    for (const wf of wtCandidates) {
-      try {
-        const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
-        const dispatchPayload = { ref: 'main' };
-        if (isForce) {
-          dispatchPayload.inputs = { force: 'true' };
-        }
-        await axios.post(
-          dispatchUrl,
-          dispatchPayload,
-          {
-            headers: {
-              Authorization: `Bearer ${GITHUB_TOKEN}`,
-              Accept: 'application/vnd.github.v3+json',
-              'User-Agent': 'OmniStudio-Telegram-Bridge'
-            },
-            timeout: 15000
+    for (const token of tokens) {
+      for (const wf of wtCandidates) {
+        try {
+          const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+          const dispatchPayload = { ref: 'main' };
+          if (isForce) {
+            dispatchPayload.inputs = { force: 'true' };
           }
-        );
-        console.log(`[Telegram Webhook] ✓ Watchtower workflow dispatched via '${wf}' (Force: ${isForce})`);
-        wtSuccess = true;
-        break;
-      } catch (err) {
-        wtErrDetail = err.response?.data?.message || err.message;
-        console.warn(`[Watchtower Telegram Dispatch Attempt Failed for '${wf}']: ${wtErrDetail}`);
+          await axios.post(
+            dispatchUrl,
+            dispatchPayload,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: 'application/vnd.github.v3+json',
+                'User-Agent': 'OmniStudio-Telegram-Bridge'
+              },
+              timeout: 15000
+            }
+          );
+          console.log(`[Telegram Webhook] ✓ Watchtower workflow dispatched via '${wf}' (Force: ${isForce})`);
+          wtSuccess = true;
+          break;
+        } catch (err) {
+          wtErrDetail = err.response?.data?.message || err.message;
+          console.warn(`[Watchtower Telegram Dispatch Attempt Failed for '${wf}']: ${wtErrDetail}`);
+        }
       }
+      if (wtSuccess) break;
     }
 
     if (!wtSuccess) {
@@ -573,13 +595,20 @@ async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
-  // Check Instagram Link
-  const match = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+  // Check Instagram Link (matches reel, reels, p, tv, and share URLs across instagram.com and instagr.am)
+  const match = text.match(/https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.-]+\/)?(?:p|reel|reels|tv|share\/reel)\/([A-Za-z0-9_-]+)/i);
 
   if (!match) {
-    if (text.startsWith('/')) {
-      await sendTelegram(chatId, `ℹ️ Unknown command. Send <code>/post</code> to scan competitors, <code>/pages</code> to view accounts, or paste an Instagram link.`);
-    }
+    await sendTelegram(
+      chatId,
+      `👋 <b>OmniStudio Cloud Assistant</b>\n\n` +
+      `To process and publish a video, please paste or share any Instagram Reel or Post link here!\n\n` +
+      `💡 <i>Example:</i> <code>https://www.instagram.com/reel/DgCQ8Mwkgl8/</code>\n\n` +
+      `<b>Available Commands:</b>\n` +
+      `• <code>/pages</code> — View your connected channels (Cult Info, Cherry, GTA6, etc.)\n` +
+      `• <code>/status</code> — Check 24/7 cloud health & schedule\n` +
+      `• <code>/post</code> — Trigger an instant surveillance scan`
+    );
     return res.status(200).json({ ok: true });
   }
 
