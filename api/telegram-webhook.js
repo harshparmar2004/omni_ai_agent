@@ -223,15 +223,19 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
     }
   }
 
-  // 2. Trigger Turbocharged GitHub Actions Workflow
-  if (!GITHUB_TOKEN) {
+  const tokenCandidates = [
+    process.env.GH_DISPATCH_TOKEN,
+    process.env.GITHUB_TOKEN
+  ].filter(t => Boolean(t && t.length > 20));
+
+  if (tokenCandidates.length === 0) {
     if (activeMessageId) {
       await editTelegram(
         chatId,
         activeMessageId,
         `⚠️ <b>GitHub Token Required</b>\n` +
         `To allow Vercel to trigger GitHub Actions, please add <code>GH_DISPATCH_TOKEN</code> in your Vercel project environment variables.\n` +
-        `Generate a free token at https://github.com/settings/tokens with 'repo' scope.`
+        `Generate a token at https://github.com/settings/tokens with 'workflow' scope.`
       );
     }
     return { success: false, error: 'no_github_token' };
@@ -241,53 +245,65 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
   let dispatchSuccess = false;
   let lastErrDetail = '';
 
-  for (const wf of workflowCandidates) {
-    try {
-      const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
-      await axios.post(
-        dispatchUrl,
-        {
-          ref: 'main',
-          inputs: {
-            url: url || `https://www.instagram.com/reel/${shortcode}/`,
-            chat_id: String(chatId),
-            page_id: String(pageId),
-            message_id: String(activeMessageId || ''),
-            force: isForce ? 'true' : 'false'
-          }
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: 'application/vnd.github.v3+json',
-            'User-Agent': 'OmniStudio-Vercel-Bridge'
+  for (const token of tokenCandidates) {
+    for (const wf of workflowCandidates) {
+      try {
+        const dispatchUrl = `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${wf}/dispatches`;
+        await axios.post(
+          dispatchUrl,
+          {
+            ref: 'main',
+            inputs: {
+              url: url || `https://www.instagram.com/reel/${shortcode}/`,
+              chat_id: String(chatId),
+              page_id: String(pageId),
+              message_id: String(activeMessageId || ''),
+              force: isForce ? 'true' : 'false'
+            }
           },
-          timeout: 15000
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: 'application/vnd.github.v3+json',
+              'User-Agent': 'OmniStudio-Vercel-Bridge'
+            },
+            timeout: 15000
+          }
+        );
 
-      console.log(`[Webhook] ✓ GitHub Actions Dispatched via '${wf}' for #${shortcode} on Page #${pageId} (Force: ${isForce})`);
-      dispatchSuccess = true;
-      break;
-    } catch (err) {
-      lastErrDetail = err.response?.data?.message || err.message;
-      console.warn(`[Webhook Dispatch Attempt Failed for '${wf}']: ${lastErrDetail}`);
+        console.log(`[Webhook] ✓ GitHub Actions Dispatched via '${wf}' for #${shortcode} on Page #${pageId} (Force: ${isForce})`);
+        dispatchSuccess = true;
+        break;
+      } catch (err) {
+        lastErrDetail = err.response?.data?.message || err.message;
+        console.warn(`[Webhook Dispatch Attempt Failed for '${wf}']: ${lastErrDetail}`);
+      }
     }
+    if (dispatchSuccess) break;
   }
 
   if (!dispatchSuccess && activeMessageId) {
     let helpMsg = `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\n\n`;
-    if (String(lastErrDetail).toLowerCase().includes('not found')) {
+    const errLower = String(lastErrDetail).toLowerCase();
+
+    if (errLower.includes('resource not accessible') || errLower.includes('403')) {
       helpMsg +=
-        `🔍 <b>Why this happened:</b> GitHub returned HTTP 404. This means the <code>GH_DISPATCH_TOKEN</code> in your Vercel project has expired or lacks <code>workflow</code> / <code>repo</code> write permissions on <code>${GITHUB_REPO}</code>.\n\n` +
-        `🛠️ <b>Solution 1 (Fix Cloud 24/7):</b>\n` +
-        `1. Go to <a href="https://github.com/settings/tokens">GitHub &gt; Personal access tokens (classic)</a>\n` +
-        `2. Generate a token with <b>repo</b> and <b>workflow</b> scopes checked\n` +
-        `3. In Vercel Project Settings &gt; Environment Variables, set <code>GH_DISPATCH_TOKEN</code>\n\n` +
-        `💻 <b>Solution 2 (Run Locally Right Now):</b>\n` +
-        `Run <code>npm run bot:local</code> on your computer to process reels directly with local FFmpeg, Wan 3.0 & zero GitHub tokens!`;
+        `🔍 <b>Permission Missing on GitHub Token:</b>\n` +
+        `Your fine-grained GitHub token lacks <b>Actions: Read and write</b> permission.\n\n` +
+        `🛠️ <b>Quick 15-Second Fix:</b>\n` +
+        `1. Go to <a href="https://github.com/settings/tokens?type=beta">GitHub Fine-grained Tokens</a>\n` +
+        `2. Click on your token\n` +
+        `3. Under <b>Repository permissions</b>, find <b>Actions</b> and set it to <b>Read and write</b>\n` +
+        `4. Click <b>Save changes</b> at the bottom!\n\n` +
+        `<i>Alternatively, generate a classic token with 'repo' and 'workflow' scopes checked.</i>`;
+    } else if (errLower.includes('not found') || errLower.includes('404')) {
+      helpMsg +=
+        `🔍 <b>Why this happened:</b> GitHub returned 404 (Not Found). The token lacks access to <code>${GITHUB_REPO}</code> or lacks the <b>workflow</b> scope.\n\n` +
+        `🛠️ <b>How to fix:</b>\n` +
+        `1. Go to <a href="https://github.com/settings/tokens">GitHub Tokens</a> and ensure <b>workflow</b> scope is enabled\n` +
+        `2. In Vercel Project Settings &gt; Environment Variables, update <code>GH_DISPATCH_TOKEN</code>.`;
     } else {
-      helpMsg += `Please verify your <code>GH_DISPATCH_TOKEN</code> permissions on Vercel or run <code>npm run bot:local</code> on your PC.`;
+      helpMsg += `Please verify that your GitHub token has <b>Actions: Read and write</b> permissions for <code>${GITHUB_REPO}</code>.`;
     }
     await editTelegram(chatId, activeMessageId, helpMsg);
     return { success: false, error: lastErrDetail };
