@@ -6,7 +6,11 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test test/v7_subsystems.test.js"
+    "test": "node --test test/v7_subsystems.test.js",
+    "bot:local": "node -e \"require('./src/agents/reposter/telegramBot').startTelegramBot({ forcePolling: true })\"",
+    "bot:status": "node scripts/telegram_switch.js status",
+    "bot:switch:local": "node scripts/telegram_switch.js local",
+    "bot:switch:cloud": "node scripts/telegram_switch.js cloud"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.9",

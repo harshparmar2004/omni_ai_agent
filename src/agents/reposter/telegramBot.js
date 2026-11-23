@@ -76,7 +76,7 @@ function getTelegramToken() {
   return t;
 }
 
-async function startTelegramBot() {
+async function startTelegramBot(options = {}) {
   const token = getTelegramToken();
   if (!token) {
     console.log('[Telegram Bot] ⚠️ No telegram_bot_token found in settings. Telegram bot disabled.');
@@ -87,14 +87,28 @@ async function startTelegramBot() {
   isPolling = true;
   stopRequested = false;
 
+  const forcePolling = options.forcePolling ||
+                        process.env.TELEGRAM_MODE === 'local' ||
+                        process.env.TELEGRAM_MODE === 'polling' ||
+                        process.argv.includes('--polling') ||
+                        process.argv.includes('--local') ||
+                        getSetting('telegram_mode') === 'local';
+
   // Check if a cloud webhook is already active
   try {
     const hookInfo = await axios.get(`https://api.telegram.org/bot${token}/getWebhookInfo`, { timeout: 8000 });
     if (hookInfo.data?.result?.url) {
-      console.log(`[Telegram Bot] 🌐 Cloud Webhook is active: ${hookInfo.data.result.url}`);
-      console.log(`[Telegram Bot] ℹ️ Local polling skipped to allow 24/7 cloud serverless operation without conflict.`);
-      isPolling = false;
-      return;
+      if (forcePolling) {
+        console.log(`[Telegram Bot] 🔄 Releasing cloud webhook (${hookInfo.data.result.url}) for local execution...`);
+        await axios.post(`https://api.telegram.org/bot${token}/deleteWebhook`, { drop_pending_updates: false }, { timeout: 8000 });
+        console.log(`[Telegram Bot] ✅ Webhook released. Local long-polling enabled.`);
+      } else {
+        console.log(`[Telegram Bot] 🌐 Cloud Webhook is active: ${hookInfo.data.result.url}`);
+        console.log(`[Telegram Bot] ℹ️ Local polling skipped to allow 24/7 cloud serverless operation without conflict.`);
+        console.log(`[Telegram Bot] 💡 To run locally with zero GitHub token dependencies, run: npm run bot:local`);
+        isPolling = false;
+        return;
+      }
     }
   } catch (e) {
     console.warn('[Telegram Bot] Webhook check notice:', e.message);

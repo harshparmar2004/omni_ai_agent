@@ -185,6 +185,12 @@ function initV7Schema(db) {
     db.prepare('UPDATE pages SET daily_quota = 5, min_spacing_minutes = 120 WHERE min_spacing_minutes < 120').run();
   } catch (e) {}
 
+  // Auto-pause watchtower and stop auto-posting from pipeline (operator safety gate)
+  try {
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('watchtower_paused', '1')").run();
+    db.prepare("UPDATE pages SET post_mode = 'review' WHERE post_mode = 'auto'").run();
+  } catch (e) {}
+
   // Story publishing migrations
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_ig_media_id TEXT DEFAULT ""'); } catch (e) {}
   try { db.exec('ALTER TABLE publish_jobs ADD COLUMN story_published_at TEXT'); } catch (e) {}
@@ -221,7 +227,7 @@ function initV7Schema(db) {
         '#cultinformation #information #culture #knowledge #curation #mustknow #explore',
         0,
         0,
-        'auto',
+        'review',
         1,
         5,
         120,
@@ -408,7 +414,7 @@ function initV7Schema(db) {
         '#cherry #aiinfluencer #outfitinspo #viralreels #explorepage',
         0,
         0,
-        'auto',
+        'review',
         1,
         10,
         60,

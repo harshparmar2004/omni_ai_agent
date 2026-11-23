@@ -237,7 +237,7 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
     return { success: false, error: 'no_github_token' };
   }
 
-  const workflowCandidates = ['393722735', 'repost-job.yml', '.github/workflows/repost-job.yml'];
+  const workflowCandidates = ['.github/workflows/repost-job.yml', 'repost-job.yml', '393722735'];
   let dispatchSuccess = false;
   let lastErrDetail = '';
 
@@ -276,11 +276,20 @@ async function dispatchJobToRunner({ url, shortcode, pageId, chatId, messageId =
   }
 
   if (!dispatchSuccess && activeMessageId) {
-    await editTelegram(
-      chatId,
-      activeMessageId,
-      `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\nPlease check your GitHub token permissions (requires 'repo' or 'workflow' scope) or try again.`
-    );
+    let helpMsg = `❌ <b>Cloud Dispatch Failed:</b> ${lastErrDetail}\n\n`;
+    if (String(lastErrDetail).toLowerCase().includes('not found')) {
+      helpMsg +=
+        `🔍 <b>Why this happened:</b> GitHub returned HTTP 404. This means the <code>GH_DISPATCH_TOKEN</code> in your Vercel project has expired or lacks <code>workflow</code> / <code>repo</code> write permissions on <code>${GITHUB_REPO}</code>.\n\n` +
+        `🛠️ <b>Solution 1 (Fix Cloud 24/7):</b>\n` +
+        `1. Go to <a href="https://github.com/settings/tokens">GitHub &gt; Personal access tokens (classic)</a>\n` +
+        `2. Generate a token with <b>repo</b> and <b>workflow</b> scopes checked\n` +
+        `3. In Vercel Project Settings &gt; Environment Variables, set <code>GH_DISPATCH_TOKEN</code>\n\n` +
+        `💻 <b>Solution 2 (Run Locally Right Now):</b>\n` +
+        `Run <code>npm run bot:local</code> on your computer to process reels directly with local FFmpeg, Wan 3.0 & zero GitHub tokens!`;
+    } else {
+      helpMsg += `Please verify your <code>GH_DISPATCH_TOKEN</code> permissions on Vercel or run <code>npm run bot:local</code> on your PC.`;
+    }
+    await editTelegram(chatId, activeMessageId, helpMsg);
     return { success: false, error: lastErrDetail };
   }
 

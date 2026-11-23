@@ -83,7 +83,7 @@ async function main() {
     for (const p of defaultPages) {
       createPage({
         ...p,
-        post_mode: 'auto',
+        post_mode: 'review',
         daily_quota: 7,
         min_spacing_minutes: 90,
         attribution_enabled: 0,
@@ -228,8 +228,10 @@ async function main() {
   }
 
   // 6. Process Queued Jobs (Feed Publish + Story Reel Card)
-  // Night Blackout Protection: Zero publishing during Indian night hours (20:30 - 08:30 IST)
-  if (windowStatus.isNightBlackout && !isForce) {
+  const isWatchtowerPaused = getSetting('watchtower_paused', '1') === '1';
+  if (isWatchtowerPaused && !isForce) {
+    console.log(`\n[Cron Runner] ⏸️ Watchtower Auto-Posting is PAUSED (watchtower_paused = 1). Skipping automated Instagram publishing.`);
+  } else if (windowStatus.isNightBlackout && !isForce) {
     console.log(`\n[Cron Runner] 🌙 Indian Night Blackout Active (${windowStatus.currentTime}). Zero posting overnight to prevent Instagram bot flags. Jobs remain safely staged for morning peak.`);
   } else {
     const jobWorkerPool = require('../src/core/jobWorker');
@@ -244,6 +246,10 @@ async function main() {
 
     for (const job of queuedJobs) {
       const page = pages.find(p => p.id === job.page_id) || getPageById(job.page_id);
+      if (page && page.post_mode !== 'auto' && !isForce) {
+        console.log(`[Cron Runner] ⏸️ Page ${page.handle} is in 'review' mode. Skipping auto-publish.`);
+        continue;
+      }
       const targetPerCycle = page?.posts_per_cycle || 1;
       const currentCount = publishedByPage[job.page_id] || 0;
 
