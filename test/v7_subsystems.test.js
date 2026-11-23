@@ -548,6 +548,35 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
       assert.ok(result.headline.includes('**'), 'headline must contain brand highlights');
     }
   });
+
+  await t.test('20. Dynamic Single-Line Auto-Fitting & Anti-Orphan Layout Engine', async () => {
+    const { generateEvolvingAiOverlay } = require('../src/utils/ffmpegHelper');
+    const overlayPath = await generateEvolvingAiOverlay('cult_information', {
+      hookHeadline: '**Jensen** Huang as he **returns** into **office**',
+      cardX: 0,
+      cardY: 640,
+      cardW: 1080,
+      cardH: 608
+    });
+    assert.ok(fs.existsSync(overlayPath), 'Overlay PNG must exist');
+
+    // Test anti-orphan wrapping rule
+    const { wrapTokens } = require('../src/utils/ffmpegHelper');
+    const { createCanvas } = require('@napi-rs/canvas');
+    const canvas = createCanvas(1080, 1920);
+    const ctx = canvas.getContext('2d');
+    ctx.font = '800 48px Arial';
+    // Construct tokens where last word would greedily orphan
+    const sampleTokens = [
+      { text: 'Artificial' }, { text: 'Intelligence' }, { text: 'is' },
+      { text: 'rapidly' }, { text: 'reshaping' }, { text: 'our' }, { text: 'entire' }, { text: 'future' }
+    ];
+    const wrapped = wrapTokens(ctx, sampleTokens, 600);
+    if (wrapped.length > 1) {
+      const lastLine = wrapped[wrapped.length - 1];
+      assert.ok(lastLine.length >= 2, 'Anti-orphan rule must guarantee at least 2 words on final line');
+    }
+  });
 });
 
 

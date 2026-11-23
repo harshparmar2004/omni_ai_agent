@@ -2070,6 +2070,7 @@ function parseHeadlineTokens(rawHeadline) {
 }
 
 function wrapTokens(ctx, tokens, maxWidth) {
+  if (!tokens || tokens.length === 0) return [];
   const lines = [];
   let currentLine = [];
   let currentWidth = 0;
@@ -2090,6 +2091,18 @@ function wrapTokens(ctx, tokens, maxWidth) {
   }
 
   if (currentLine.length > 0) lines.push(currentLine);
+
+  // Anti-orphan rule: If the last line has only 1 word and previous line has > 2 words,
+  // pull the last word from the previous line to form a balanced couplet!
+  if (lines.length > 1) {
+    const lastLine = lines[lines.length - 1];
+    const prevLine = lines[lines.length - 2];
+    if (lastLine.length === 1 && prevLine.length > 2) {
+      const moved = prevLine.pop();
+      lastLine.unshift(moved);
+    }
+  }
+
   return lines;
 }
 
@@ -2305,7 +2318,7 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
 
   // 3. Ergonomic & Responsive Layout
   const marginX = 64;
-  const maxTextWidth = 900; // Wide, screen-filling hook without touching side edges
+  const maxTextWidth = 950; // Optimized wide, screen-filling hook without touching side edges (65px margins)
   const spaceAboveVideo = 26; // Snug, ergonomic breathing room right above video card
   const spaceBetweenHeaderAndHeadline = 24;
 
@@ -2321,20 +2334,43 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
     .replace(/["'“”\s]+$/, '')
     .trim();
 
-  // Responsive headline font: 54px default for bold, screen-filling hooks
-  const wordsCount = cleanHeadline.split(/\s+/).length;
-  let fontSize = 54;
-  if (cleanHeadline.length > 85 || wordsCount > 17) {
-    fontSize = 42;
-  } else if (cleanHeadline.length > 70 || wordsCount > 14) {
-    fontSize = 48;
-  }
-  const lineHeight = Math.round(fontSize * 1.25); // ~68px clean vertical rhythm
-
-  ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
-
   const tokens = parseHeadlineTokens(cleanHeadline);
-  const lines = wrapTokens(ctx, tokens, maxTextWidth);
+
+  // Dynamic Single-Line Priority Scaling & Balanced Anti-Orphan Layout
+  // Check if headline can fit on ONE single line by smoothly scaling font size [54px down to 40px]
+  let fontSize = 54;
+  let lines = null;
+
+  for (let candidateFs = 54; candidateFs >= 40; candidateFs -= 2) {
+    ctx.font = `800 ${candidateFs}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+    const spaceWidth = ctx.measureText(' ').width;
+    let singleLineWidth = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      singleLineWidth += ctx.measureText(tokens[i].text).width + (i > 0 ? spaceWidth : 0);
+    }
+    if (singleLineWidth <= maxTextWidth) {
+      fontSize = candidateFs;
+      lines = [tokens]; // Perfectly fits on ONE single enhanced line!
+      break;
+    }
+  }
+
+  // If text is genuinely long (> 50 chars or > 10 words) and cannot fit on 1 line even at 40px,
+  // use balanced multi-line wrapping with strict anti-orphan protection
+  if (!lines) {
+    const wordsCount = tokens.length;
+    if (cleanHeadline.length > 85 || wordsCount > 17) {
+      fontSize = 42;
+    } else if (cleanHeadline.length > 70 || wordsCount > 14) {
+      fontSize = 46;
+    } else {
+      fontSize = 48;
+    }
+    ctx.font = `800 ${fontSize}px "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+    lines = wrapTokens(ctx, tokens, maxTextWidth);
+  }
+
+  const lineHeight = Math.round(fontSize * 1.22); // Clean optical vertical rhythm
   const totalTextHeight = lines.length * lineHeight;
   const totalBrandingHeight = avatarSize + spaceBetweenHeaderAndHeadline + totalTextHeight;
 
@@ -3838,6 +3874,7 @@ module.exports = {
   isLetterboxedReel,
   detectActiveVideoBounds,
   parseHeadlineTokens,
+  wrapTokens,
   prepareVideoForFeedCard,
   extractVideoCover,
   resolvePageTheme
