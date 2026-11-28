@@ -97,7 +97,13 @@ async function callGeminiVision(imagePath, apiKey) {
   const base64Data = imageBuffer.toString('base64');
 
   const prompt = `Analyze this video frame from a social media reel (1080x1920 layout).
-1. "headline": Check if there is an on-screen title, headline, or hook text displayed on the screen (such as at the top, center, or above the video content). If yes, transcribe 100% of that EXACT title or hook text VERBATIM. Do NOT omit any starting words (e.g. "Why", "How", "The", "Inside", "AI"), do NOT shorten, and do NOT truncate. Transcribe the COMPLETE headline from the first word to the very last word. If there is NO on-screen text, write an ultra-catchy 8-16 word viral hook based on what is happening in the video.
+1. "headline": Check if there is an on-screen title, headline, or hook text displayed on the screen (such as at the top, center, or above the video content).
+CRITICAL RULES FOR HEADLINE:
+- Transcribe 100% of that EXACT editorial title or hook text VERBATIM (e.g. "AI Just Designed A Real Rocket Engine From Scratch With Zero Human Engineers").
+- Do NOT omit any starting words (e.g. "Why", "How", "The", "Inside", "AI"), do NOT shorten, and do NOT truncate.
+- STRICTLY EXCLUDE social media account names, profile handles (e.g. "@theaifocus", "@evolving.ai"), creator usernames, verification badges, or channel logos.
+- If you see a channel name/logo at the top (such as "Theaifocus" or "@theaifocus") and an editorial headline below it, COMPLETELY IGNORE the channel name/logo, and transcribe ONLY the editorial headline below it!
+- If there is NO on-screen text, write an ultra-catchy 8-16 word viral hook based on what is happening in the video.
 2. "rawTitle": The complete unformatted verbatim headline with zero asterisks.
 3. Identify 2 to 6 of the most impactful keywords, numbers, or amounts in the headline (~35-40% of words). Wrap those impactful words in double asterisks **like this** for brand color highlighting (e.g. "These **Robotic Arms** Are Powered By **Algae**. Watch How They **Move**").
 4. "topicBreakdown": Write a concise, 2-sentence high-energy explanation of this topic for an Instagram caption post body.
@@ -145,10 +151,14 @@ async function callOpenAiVision(imagePath, apiKey) {
 
   const prompt = `Analyze this video frame from a social media reel.
 1. Check if there is an on-screen hook title or headline text displayed on the screen.
-2. If yes, transcribe 100% of the COMPLETE on-screen headline VERBATIM. Do NOT omit any starting words (e.g. "Why", "How", "The", "AI"), do NOT shorten, and do NOT truncate. Transcribe the COMPLETE headline from first word to last word.
-3. Identify 2 to 5 impactful keywords, numbers, or amounts in the headline and wrap them in double asterisks **like this** for brand color highlighting.
-4. "rawTitle": The complete unformatted verbatim headline without asterisks.
-5. If no title is visible, set hasTitle to false.
+CRITICAL RULES FOR HEADLINE:
+- Transcribe 100% of the COMPLETE on-screen headline VERBATIM (e.g. "AI Just Designed A Real Rocket Engine From Scratch With Zero Human Engineers").
+- Do NOT omit any starting words (e.g. "Why", "How", "The", "AI"), do NOT shorten, and do NOT truncate.
+- STRICTLY EXCLUDE social media account names, profile handles (e.g. "@theaifocus", "@evolving.ai"), creator usernames, verification badges, or channel logos.
+- If you see a channel name/logo at the top and an editorial headline below it, COMPLETELY IGNORE the channel name/logo, and transcribe ONLY the editorial headline below it!
+2. Identify 2 to 5 impactful keywords, numbers, or amounts in the headline and wrap them in double asterisks **like this** for brand color highlighting.
+3. "rawTitle": The complete unformatted verbatim headline without asterisks.
+4. If no title is visible, set hasTitle to false.
 
 Respond ONLY with valid JSON:
 {"hasTitle": true, "headline": "...", "rawTitle": "..."}`;
@@ -218,6 +228,24 @@ function isTabularOrSpecDebris(text) {
 }
 
 /**
+ * Checks whether an extracted token or line matches a known competitor account,
+ * social media handle, channel username, or profile header branding.
+ */
+function isCompetitorAccountName(text) {
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.replace(/[@#]/g, '').trim().toLowerCase();
+  const noSpaces = clean.replace(/[\s_.-]+/g, '');
+  if (/^(theaifocus|aifocus|evolvingai|evolving|cultinformation|gta6updates|movieseries365|clubbingcult|nvidianewsroom)$/i.test(noSpaces)) return true;
+  if (/^[a-z0-9_.-]{3,24}$/i.test(clean) && !/\s/.test(clean)) {
+    // Single-word handle-like tokens (e.g. "theaifocus", "newsroom")
+    if (/\b(focus|news|media|daily|updates?|tech|ai|studios?|hub|insider|channel|tv|official|tube|page|pulse|feed|bytes|wire)\b/i.test(clean)) return true;
+  }
+  if (/\b(the\s*ai\s*focus|theaifocus|evolving\s*ai|evolving\s+evolving|nvidianewsroom)\b/i.test(clean)) return true;
+  if (clean.split(/\s+/).length <= 3 && /\b(newsroom|official\s+page|media\s+house|daily\s+updates?)\b/i.test(clean)) return true;
+  return false;
+}
+
+/**
  * Intelligent social media card / reel headline parser.
  * Discards avatar logos, competitor display names, handle lines (@...),
  * verification badges, engagement counts, and random visual debris.
@@ -230,7 +258,7 @@ function extractHeadlineBlocksFromOcr(rawText) {
     .map(l => l.trim())
     .filter(Boolean);
 
-  // 1. Identify handle lines (e.g. @evolving.ai, @nvidianewsroom, (@ e ilale Nel)
+  // 1. Identify handle lines (e.g. @evolving.ai, @theaifocus, @nvidianewsroom, (@ e ilale Nel)
   const isHandle = (l) => {
     return /^[@#][a-zA-Z0-9_.-]{2,}/i.test(l) ||
            /\b@[a-zA-Z0-9_.-]{2,}/i.test(l) ||
@@ -242,9 +270,10 @@ function extractHeadlineBlocksFromOcr(rawText) {
 
   // 2. Identify account display names or channel branding
   const isAccountDisplayName = (l) => {
-    if (/\b(newsroom|official|media|daily|updates?|technologies|studios?)\b/i.test(l)) return true;
-    if (/\b(evolving\s+ai|evolving\s+evolving|evolution)\b/i.test(l)) return true;
-    if (/^[<x«»\s]*[a-zA-Z\s]+(?:\s+\d{1,3})?$/i.test(l) && l.split(/\s+/).length <= 4) return true;
+    const cleanL = l.replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]‘«»()]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (isCompetitorAccountName(cleanL)) return true;
+    if (/\b(newsroom|official|media|daily|updates?|technologies|studios?|insider|channel|focus|digest|hub|tv|network|press)\b/i.test(cleanL) && cleanL.split(/\s+/).length <= 3) return true;
+    if (/\b(theaifocus|aifocus|evolving\s+ai|evolving\s+evolving|evolution)\b/i.test(cleanL)) return true;
     if (/@\s*$/.test(l)) return true;
     return false;
   };
@@ -252,7 +281,7 @@ function extractHeadlineBlocksFromOcr(rawText) {
   // 3. Identify noise, symbols, timestamps, engagement counters, and audio markers
   const isJunkOrDivider = (l) => {
     if (l.length <= 2 && !/^(ai|to|in|on|at|by|no)$/i.test(l)) return true;
-    if (/^[0-9:\s=D+&©@#_.\-—¢|¥«»§\\\/‘'"`^~*]+$/.test(l)) return true;
+    if (/^[0-9:\s=D+&©@#_.\-—¢|¥«»§\\\/‘'"`^~*()]+$/.test(l)) return true;
     if (/^(am|pm|\d{1,2}:\d{2})$/i.test(l)) return true;
     if (/^(credit|source|via|edit|by)[\s:]/i.test(l)) return true;
     if (/^(follow|following|subscribe|repost|retweet|share|comment|save)$/i.test(l)) return true;
@@ -263,10 +292,11 @@ function extractHeadlineBlocksFromOcr(rawText) {
     return false;
   };
 
-  // 4. Drop account header blocks
+  // 4. Drop account header blocks and avatar debris
   const dropIndices = new Set();
   for (let i = 0; i < rawLines.length; i++) {
-    if (isHandle(rawLines[i])) {
+    const line = rawLines[i];
+    if (isHandle(line) || isCompetitorAccountName(line)) {
       dropIndices.add(i);
       if (i > 0) {
         const prev = rawLines[i - 1];
@@ -275,9 +305,9 @@ function extractHeadlineBlocksFromOcr(rawText) {
         }
       }
       if (i > 1 && rawLines[i - 2].length <= 8) {
-        dropIndices.add(i - 2); // avatar icon debris like 'nen)'
+        dropIndices.add(i - 2); // avatar icon debris like '(CO) rain' or 'nen)'
       }
-    } else if (isAccountDisplayName(rawLines[i]) && (i < 3 || isHandle(rawLines[i + 1] || ''))) {
+    } else if (isAccountDisplayName(line) && (i < 3 || isHandle(rawLines[i + 1] || ''))) {
       dropIndices.add(i);
     }
   }
@@ -289,7 +319,7 @@ function extractHeadlineBlocksFromOcr(rawText) {
     if (isJunkOrDivider(rawLines[i])) continue;
 
     let text = rawLines[i]
-      .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]‘«»]/g, ' ')
+      .replace(/[©®™§|°~_—\-+=:;`^•*\\\/<{}>[\]‘«»()]/g, ' ')
       .replace(/^.*?@\w+[\s:]*/i, '')
       .replace(/^["'“”\s]+|["'“”\s]+$/g, '')
       .replace(/\s+/g, ' ')
@@ -357,21 +387,42 @@ async function localOcrHeadlineDetection(framePath, options = {}) {
     const blocks = extractHeadlineBlocksFromOcr(rawOcrText);
     if (!blocks || blocks.length === 0) return null;
 
-    // Evaluate headline blocks: choose top hook or first valid editorial sentence
-    let chosenTitle = null;
-    for (const b of blocks) {
-      if (isTabularOrSpecDebris(b)) continue;
-      const wc = b.split(/\s+/).length;
-      const isPureDigitsOrJunk = /^[\d\s.,\-+]+$/.test(b) || /^(?:all\s+)?\d+\s+comments?$/i.test(b);
-      if (wc >= 2 && wc <= 32 && !isPureDigitsOrJunk && b.length >= 8) {
-        chosenTitle = b;
-        break;
+    // Score all candidate blocks to prioritize genuine editorial headlines over short brand names
+    const scoredBlocks = blocks.map(b => {
+      const cleanB = b.replace(/[\*<>]+/g, '').trim();
+      const wc = cleanB.split(/\s+/).length;
+      if (isTabularOrSpecDebris(cleanB)) return { text: cleanB, score: -100 };
+      if (/^[\d\s.,\-+]+$/.test(cleanB) || /^(?:all\s+)?\d+\s+comments?$/i.test(cleanB)) return { text: cleanB, score: -100 };
+      if (isCompetitorAccountName(cleanB)) return { text: cleanB, score: -100 };
+      if (wc < 3 && cleanB.length < 15) return { text: cleanB, score: -50 };
+
+      let score = 0;
+      // Substantial headline length sweet-spot: 6 to 24 words
+      if (wc >= 6 && wc <= 24) score += 50;
+      else if (wc >= 4 && wc <= 30) score += 25;
+
+      // Verb presence strongly indicates an informative headline sentence
+      if (/\b(designed|built|created|returns|returned|discovered|unveils|unveiled|reveals|revealed|exposed|shows|warning|is|are|was|were|has|have|can|could|will|would|breaks|leaves|fired|tested|powered|explains|facing|secret|classified|truth|anomaly|engineered)\b/i.test(cleanB)) {
+        score += 35;
       }
-    }
 
-    if (!chosenTitle) return null;
+      // Numbers or metrics (common in viral hooks)
+      if (/\b(?:\$?\d[\d,\.]*|zero|first|billion|million|hundred)\b/i.test(cleanB)) {
+        score += 15;
+      }
 
-    let title = chosenTitle;
+      // Penalize isolated single words or words looking like channel names
+      if (/^[a-zA-Z0-9]+$/i.test(cleanB) || /\b(focus|newsroom|media|daily|updates|studios|channel|hub|insider|tv)\b/i.test(cleanB)) {
+        score -= 40;
+      }
+
+      return { text: cleanB, score };
+    });
+
+    scoredBlocks.sort((a, b) => b.score - a.score);
+    const bestCandidate = scoredBlocks.find(s => s.score > 0);
+    if (!bestCandidate) return null;
+    let title = bestCandidate.text;
     const wordCount = title.split(/\s+/).length;
 
     // Dynamic brand highlighting: proportion ~35-40% of words in Cult Electric Lime (#CCFF00)
@@ -626,5 +677,8 @@ async function detectOnScreenHeadline(videoOrImagePath, options = {}) {
 
 module.exports = {
   extractSnapshotFrame,
-  detectOnScreenHeadline
+  detectOnScreenHeadline,
+  extractHeadlineBlocksFromOcr,
+  localOcrHeadlineDetection,
+  isCompetitorAccountName
 };

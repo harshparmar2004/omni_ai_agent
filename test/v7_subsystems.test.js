@@ -568,7 +568,37 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
   });
 
   await t.test('19. Social Media Header & Logo Purging for Clean On-Screen Headline Detection', async () => {
-    const { detectOnScreenHeadline } = require('../src/core/videoVisionService');
+    const { detectOnScreenHeadline, extractHeadlineBlocksFromOcr, isCompetitorAccountName } = require('../src/core/videoVisionService');
+
+    // 1. Rigorous competitor account name purging validation
+    assert.ok(isCompetitorAccountName('theaifocus'), 'theaifocus must be detected as competitor account');
+    assert.ok(isCompetitorAccountName('@theaifocus'), '@theaifocus must be detected as competitor account');
+    assert.ok(isCompetitorAccountName('The AI Focus'), 'The AI Focus must be detected as competitor account');
+    assert.ok(isCompetitorAccountName('evolving.ai'), 'evolving.ai must be detected as competitor account');
+    assert.ok(!isCompetitorAccountName('AI Just Designed A Real Rocket Engine'), 'Editorial headline must NOT be flagged as competitor account');
+    assert.ok(!isCompetitorAccountName('Jensen Huang returns into office'), 'Editorial headline must NOT be flagged as competitor account');
+
+    // 2. OCR text block purging with competitor logo, handle, and headline
+    const sampleOcr = "(CO) rain\n\n@theaifocus\nAl Just Designed A Real Rocket Engine\nFrom Scratch With Zero Human Engineers";
+    const blocks = extractHeadlineBlocksFromOcr(sampleOcr);
+    assert.equal(blocks.length, 1, 'Only genuine headline block must be extracted');
+    assert.ok(blocks[0].includes('AI Just Designed A Real Rocket Engine'), 'Headline must be isolated');
+    assert.ok(blocks[0].includes('Zero Human Engineers'), 'Headline must be complete');
+    assert.ok(!/theaifocus/i.test(blocks[0]), 'Competitor name must be completely purged');
+    assert.ok(!/@/.test(blocks[0]), 'Competitor handle must be purged');
+
+    // 3. Live image inspection on uploaded reel frame
+    const userUploadedImg = 'C:/Users/harsh parmar/.gemini/antigravity/brain/b0ce8539-8cbf-49fc-a919-749c1c07e5af/.user_uploaded/media_1795848025362_3ebe3f12.jpg';
+    if (fs.existsSync(userUploadedImg)) {
+      const imgRes = await detectOnScreenHeadline(userUploadedImg, { forceFresh: true });
+      assert.ok(imgRes.found, 'Must find headline in uploaded frame');
+      assert.ok(imgRes.rawTitle.includes('AI Just Designed A Real Rocket Engine'), 'Must extract Rocket Engine headline');
+      assert.ok(imgRes.rawTitle.includes('Zero Human Engineers'), 'Must preserve full headline');
+      assert.ok(!/theaifocus/i.test(imgRes.headline), 'Must NOT contain theaifocus');
+      assert.ok(!/@/.test(imgRes.headline), 'Must NOT contain @handle');
+      assert.ok(imgRes.headline.includes('**'), 'Must contain Cult brand highlights');
+    }
+
     const videoPath = 'public/generated/downloads/reel_DgFnrysA-Uk.mp4';
     if (fs.existsSync(videoPath)) {
       const result = await detectOnScreenHeadline(videoPath, { forceFresh: true });

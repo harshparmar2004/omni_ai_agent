@@ -2295,7 +2295,19 @@ async function generateEvolvingAiOverlay(handle, options = {}) {
   const cleanHandle = (handle || options.page?.handle || 'cult_information').replace(/^@+/, '');
   const rawPageName = (options.pageName || options.page?.name || cleanHandle.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).trim();
   const pageName = rawPageName.replace(/^@+/, '');
-  const hookHeadline = options.hookHeadline || options.headline || 'The next generation of AI is evolving faster than anyone expected';
+
+  let rawHookCandidate = (options.hookHeadline || options.headline || '').trim();
+  try {
+    const { isCompetitorAccountName } = require('../core/videoVisionService');
+    if (!rawHookCandidate || isCompetitorAccountName(rawHookCandidate.replace(/\*\*/g, '')) || rawHookCandidate.split(/\s+/).length < 3) {
+      rawHookCandidate = 'Breakthrough technology is evolving faster than anyone expected';
+    }
+  } catch (_) {
+    if (!rawHookCandidate || rawHookCandidate.split(/\s+/).length < 3) {
+      rawHookCandidate = 'Breakthrough technology is evolving faster than anyone expected';
+    }
+  }
+  const hookHeadline = rawHookCandidate;
   const {
     cardX = 0,
     cardY = 640,
@@ -3506,11 +3518,19 @@ async function prepareVideoForFeedCard(inputVideoPath, options = {}) {
   }
 
   // For Video-Essay (Cult Information), guarantee on-screen headline OCR from reel if not already provided
-  if (isVideoEssay && (!options.hookHeadline || options.hookHeadline.includes('The next generation of AI is evolving') || options.hookHeadline.includes('The shocking untold truth'))) {
+  let isInvalidHook = !options.hookHeadline || options.hookHeadline.includes('The next generation of AI is evolving') || options.hookHeadline.includes('The shocking untold truth');
+  try {
+    const { isCompetitorAccountName } = require('../core/videoVisionService');
+    if (options.hookHeadline && isCompetitorAccountName(options.hookHeadline.replace(/\*\*/g, ''))) {
+      isInvalidHook = true;
+    }
+  } catch (_) {}
+
+  if (isVideoEssay && isInvalidHook) {
     try {
-      const { detectOnScreenHeadline } = require('../core/videoVisionService');
+      const { detectOnScreenHeadline, isCompetitorAccountName } = require('../core/videoVisionService');
       const visionRes = await detectOnScreenHeadline(absPath);
-      if (visionRes && visionRes.found && visionRes.headline) {
+      if (visionRes && visionRes.found && visionRes.headline && !isCompetitorAccountName(visionRes.headline.replace(/\*\*/g, ''))) {
         options.hookHeadline = visionRes.headline;
         console.log(`[FFmpeg Helper] 👁️ Auto-detected on-screen hook headline from reel: "${options.hookHeadline}"`);
       }

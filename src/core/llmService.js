@@ -437,13 +437,27 @@ async function generateAiCaption({ rawCaption = '', sourceUsername = '', page = 
       ? 'an elite curation platform uncovering shocking untold history, cultural secrets, scientific anomalies, and mind-bending phenomena'
       : 'an elite Instagram channel producing viral high-retention video-essays on breakthrough technology and intelligence';
 
-    const cleanHookNoStars = headline.replace(/\*\*/g, '');
+    const cleanHookNoStars = headline.replace(/\*\*/g, '').trim();
     const aiPrompt = hasDetectedOnScreenHook
       ? `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
-The video reel has this EXACT on-screen headline displayed on the video: "${cleanHookNoStars}".
-Generate a high-energy 2 to 3 sentence post body ("breakdown") for this video explaining the reality, significance, and intrigue of this story.
+A video reel was scraped. From the on-screen video frame, we extracted this candidate headline: "${cleanHookNoStars}".
+Original source post caption / context:
+"""
+${cleanedSource || ''}
+"""
+
+YOUR MANDATORY TASKS:
+1. RECHECK & SANITIZE HEADLINE:
+   - Check if "${cleanHookNoStars}" is a creator username, social profile handle, brand logo, or page watermark (e.g., "Theaifocus", "@theaifocus", "Evolving AI", "Daily Tech", etc.).
+   - If it is a competitor name or logo, REJECT IT! Instead, synthesize the genuine, accurate 8-14 word editorial news headline based on what is happening in the video/context (e.g., "AI Just Designed A Real Rocket Engine From Scratch With Zero Human Engineers").
+   - If "${cleanHookNoStars}" is the genuine headline, verify it is complete and verbatim. If it has a competitor handle or prefix attached (e.g., "Theaifocus: AI Just Designed..."), STRIP the competitor handle!
+   - Correct any obvious OCR typos (e.g., "Al" -> "AI", "Rohotic" -> "Robotic").
+   - Wrap 2 to 4 of the most impactful keywords, numbers, or amounts in double asterisks **like this** for brand color highlighting.
+2. POST BREAKDOWN:
+   - Write a high-energy 2 to 3 sentence post body ("breakdown") for this video explaining the reality, significance, and intrigue of this story.
+
 Respond ONLY with valid JSON in this exact structure:
-{"headline": "${cleanHookNoStars}", "breakdown": "..."}`
+{"headline": "...", "rawTitle": "...", "breakdown": "..."}`
       : `You are the lead editor and viral copywriter for "${pageName}" (${handle}), ${channelNiche}.
 CRITICAL INSTRUCTION: Do NOT summarize the creator's social bio, do NOT copy follower pleas, credits, or promo links.
 Read the source content below to understand the CENTRAL REVELATION, SURPRISING METRIC, OR SHOCKING FACT of the video.
@@ -494,14 +508,20 @@ Respond ONLY with valid JSON in this exact structure:
             const jsonMatch = rawOutput.match(/\{[\s\S]*\}/);
             const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
             if (parsed) {
-              if (!hasDetectedOnScreenHook && parsed.headline) {
+              if (parsed.headline) {
                 let candidateHeadline = parsed.headline.trim();
-                const isCandValid = candidateHeadline.length >= 20 && candidateHeadline.split(/\s+/).length >= 4 && !/^[\d\s.,\-+]+$/.test(candidateHeadline) && !/^(?:all\s+)?\d+\s+comments?$/i.test(candidateHeadline);
+                // Strip competitor handles or prefixes if any survived
+                candidateHeadline = candidateHeadline.replace(/^[@#]?[a-zA-Z0-9_.-]+:\s*/, '').trim();
+                const isCandValid = candidateHeadline.length >= 15 && candidateHeadline.split(/\s+/).length >= 3 && !/^[\d\s.,\-+]+$/.test(candidateHeadline) && !/^(?:all\s+)?\d+\s+comments?$/i.test(candidateHeadline);
                 if (isCandValid) {
-                  if (!candidateHeadline.includes('**')) {
-                    candidateHeadline = candidateHeadline.replace(/(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion)\b)/gi, '**$1**');
+                  const { isCompetitorAccountName } = require('./videoVisionService');
+                  if (!isCompetitorAccountName(candidateHeadline.replace(/\*\*/g, ''))) {
+                    if (!candidateHeadline.includes('**')) {
+                      candidateHeadline = candidateHeadline.replace(/(?<=\s|^)(\$?\d[\d,\.]*[%xXkKmMbBtT]?|\b(?:billion|million|trillion|hundred)\b)(?=\s|[.,;:!?]|$)/gi, '**$1**');
+                    }
+                    headline = candidateHeadline;
+                    console.log(`[LLM Service] ✨ AI rechecked & polished headline: "${headline}"`);
                   }
-                  headline = candidateHeadline;
                 }
               }
               if (parsed.breakdown) aiBreakdown = parsed.breakdown.trim();

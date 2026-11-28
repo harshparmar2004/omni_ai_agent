@@ -43,7 +43,7 @@ function cleanRawCaption(rawCaption, competitorHandles = []) {
   // 2. Remove competitor @handles mentioned in competitorHandles list & any external @mentions
   text = text.replace(/@[a-zA-Z0-9_.-]+/g, (match) => {
     const lower = match.toLowerCase();
-    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult' || lower === '@cult_information' || lower === '@evolving.ai') return match;
+    if (lower === '@gta6_updates_007' || lower === '@movie_series_365' || lower === '@clubbingcult' || lower === '@cult_information' || lower === '@cherry_official') return match;
     return '';
   });
 
