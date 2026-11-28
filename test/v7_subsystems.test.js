@@ -391,7 +391,8 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
   });
 
   await t.test('14. Interactive Destination Page Selection Keyboard & Callback Routing', async () => {
-    const { buildPageSelectionKeyboard, getPagesList } = require('../api/telegram-webhook');
+    const handler = require('../api/telegram-webhook');
+    const { buildPageSelectionKeyboard, getPagesList } = handler;
 
     const pages = await getPagesList();
     const shortcode = 'TEST_SHORTCODE_123';
@@ -408,6 +409,38 @@ test('OmniStudio v7 Subsystems Test Suite', async (t) => {
     assert.ok(allButtons.some(b => b.text.includes('GTA 6') && b.callback_data === `post:1:${shortcode}`), 'GTA 6 button must exist');
     assert.ok(allButtons.some(b => b.text.includes('Clubbing Cult') && b.callback_data === `post:3:${shortcode}`), 'Clubbing Cult button must exist');
     assert.ok(allButtons.some(b => b.text.includes('Cancel') && b.callback_data === `cancel:${shortcode}`), 'Cancel button must exist');
+
+    // 2. Inbound reel link without explicit page MUST prompt for page selection, not auto-dispatch to page 4
+    let jsonResult = null;
+    let statusCode = null;
+    const mockRes = {
+      status(code) {
+        statusCode = code;
+        return {
+          json(payload) {
+            jsonResult = payload;
+            return payload;
+          }
+        };
+      }
+    };
+    const mockReq = {
+      method: 'POST',
+      body: {
+        update_id: 99999,
+        message: {
+          message_id: 1234,
+          chat: { id: 5443723531 },
+          from: { id: 5443723531, username: 'testuser' },
+          text: 'https://www.instagram.com/reel/DgFnrysA-Uk/'
+        }
+      }
+    };
+    await handler(mockReq, mockRes);
+    assert.strictEqual(statusCode, 200);
+    assert.strictEqual(jsonResult?.ok, true);
+    assert.strictEqual(jsonResult?.prompt_page_selection, true, 'Must prompt for page selection when reel link is sent');
+    assert.strictEqual(jsonResult?.shortcode, 'DgFnrysA-Uk');
   });
 
   await t.test('15. Extended Meta Container Polling & Audible Lock-Screen Notifications', () => {

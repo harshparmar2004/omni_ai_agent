@@ -720,24 +720,41 @@ async function handler(req, res) {
 
   console.log(`[Webhook] Inbound Instagram URL: ${rawUrl} (Shortcode: ${shortcode})`);
 
-  // Auto-resolve target page (e.g. cherry, cult, movie, clubbing, gta)
-  const targetPageId = resolveAutoTargetPage(text);
+  // Check for explicit page override in user message (e.g. 'page:2' or 'p:1')
+  const explicitPageMatch = text.match(/(?:page|p):([1-5])/i);
+  if (explicitPageMatch) {
+    const targetPageId = String(explicitPageMatch[1]);
+    console.log(`[Webhook] Explicit Page Directive in text: #${shortcode} -> Page #${targetPageId}`);
+    const dispatchResult = await dispatchJobToRunner({
+      url: reelUrl,
+      shortcode,
+      pageId: targetPageId,
+      chatId,
+      messageId: null,
+      isForce: false
+    });
+    recordEvent('dispatched_reel', { shortcode, pageId: targetPageId, success: dispatchResult?.success });
+    return res.status(200).json({ ok: true, auto_dispatched: true, pageId: targetPageId, shortcode, dispatch: dispatchResult });
+  }
 
-  console.log(`[Webhook] Autonomous Instant Trigger: #${shortcode} -> Page #${targetPageId}`);
+  // Interactive Destination Page Selection: Ask user which page to upload to first
+  const pages = await getPagesList();
+  const keyboard = buildPageSelectionKeyboard(shortcode, pages);
 
-  // Dispatches to GitHub Actions immediately, sends stepper status message with switch buttons to Telegram
-  const dispatchResult = await dispatchJobToRunner({
-    url: reelUrl,
-    shortcode,
-    pageId: targetPageId,
+  await sendTelegram(
     chatId,
-    messageId: null,
-    isForce: false
-  });
+    `📥 <b>Instagram Reel Received!</b>\n\n` +
+    `🔗 <b>Shortcode:</b> <code>#${shortcode}</code>\n\n` +
+    `👉 <b>Which page do you want to upload this reel to?</b>`,
+    {
+      reply_markup: {
+        inline_keyboard: keyboard
+      }
+    }
+  );
 
-  recordEvent('dispatched_reel', { shortcode, pageId: targetPageId, success: dispatchResult?.success });
-
-  return res.status(200).json({ ok: true, auto_dispatched: true, pageId: targetPageId, shortcode, dispatch: dispatchResult });
+  recordEvent('prompt_page_selection', { shortcode, chatId });
+  return res.status(200).json({ ok: true, prompt_page_selection: true, shortcode });
 }
 
 module.exports = handler;
